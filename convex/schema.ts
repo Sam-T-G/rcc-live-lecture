@@ -153,10 +153,14 @@ export default defineSchema({
     .index("by_channel", ["channel"])
     .index("by_channel_and_user", ["channel", "user"]),
 
-  // team: live. How many students per team the professor chose: 3 or 4. No row means 4.
+  // team: live. How many students per team the professor chose: 3 or 4 (no row means 4), and when
+  // the teams were locked. Teams lock 5 minutes after class starts (or after the first check-in when
+  // no start time is set); `scheduled` means that lock is already queued.
   groupSettings: defineTable({
     channel: v.string(),
     size: v.number(),
+    lockedAt: v.optional(v.number()),
+    scheduled: v.optional(v.boolean()),
   }).index("by_channel", ["channel"]),
 
   // team: host. A question the professor asked the room on one slide. `correct` never goes to

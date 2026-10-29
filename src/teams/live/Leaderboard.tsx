@@ -24,13 +24,13 @@ export function GroupBadge() {
 function TeamSize() {
   const key = useProfKey();
   const host = useQuery(api.checkin.pass.amHost, { key });
-  const size = useQuery(api.live.groups.size, { channel: CHANNEL });
+  const status = useQuery(api.live.groups.status, { channel: CHANNEL });
   const set = useMutation(api.live.groups.setSize);
-  if (!host || size === undefined) return null;
+  if (!host || status === undefined) return null;
   return (
     <div className="qa__tabs" role="group" aria-label="Students per team">
       {[3, 4].map((n) => (
-        <button key={n} type="button" aria-pressed={size === n} onClick={() => void set({ key, channel: CHANNEL, size: n })}>
+        <button key={n} type="button" aria-pressed={status.size === n} onClick={() => void set({ key, channel: CHANNEL, size: n })}>
           Teams of {n}
         </button>
       ))}
@@ -52,6 +52,16 @@ function TeamRow({ g, mine }: { g: Row; mine: boolean }) {
   );
 }
 
+// "Teams are final." or when they will be.
+function LockNote() {
+  const status = useQuery(api.live.groups.status, { channel: CHANNEL });
+  if (!status) return null;
+  if (status.locked) return <p className="muted">Teams are final.</p>;
+  if (status.locksAt === null) return <p className="muted">Teams lock 5 minutes after class starts.</p>;
+  const t = new Date(status.locksAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return <p className="muted">Teams are still forming. They lock at {t}.</p>;
+}
+
 export function Leaderboard({ big }: { big?: boolean }) {
   const board = useQuery(api.live.groups.leaderboard, { channel: CHANNEL });
   const me = useQuery(api.live.groups.mine, { channel: CHANNEL });
@@ -62,6 +72,7 @@ export function Leaderboard({ big }: { big?: boolean }) {
   return (
     <Card title="Team leaderboard">
       <TeamSize />
+      <LockNote />
       {board === undefined ? (
         <Status kind="loading">Loading the scores…</Status>
       ) : (
