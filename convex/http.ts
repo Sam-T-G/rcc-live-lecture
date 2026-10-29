@@ -23,14 +23,14 @@ http.route({
   path: "/deck",
   method: "POST",
   handler: httpAction(async (ctx, req) => {
-    let body: any;
+    let body: Record<string, unknown>;
     try {
-      body = JSON.parse(await req.text());
+      body = JSON.parse(await req.text()) ?? {};
     } catch {
       return new Response("bad json", { status: 400, headers: cors });
     }
     const key = process.env.DECK_BRIDGE_KEY;
-    if (!key || body?.key !== key) return new Response("wrong key", { status: 403, headers: cors });
+    if (!key || body.key !== key) return new Response("wrong key", { status: 403, headers: cors });
     const str = (x: unknown) => (typeof x === "string" ? x : "");
     const num = (x: unknown) => (typeof x === "number" && isFinite(x) ? x : 0);
     const channel = str(body.channel).slice(0, 64);

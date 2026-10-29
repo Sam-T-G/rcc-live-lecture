@@ -15,9 +15,10 @@ export async function geminiText(prompt: string): Promise<string> {
     },
   );
   if (!res.ok) throw new ConvexError(`The AI call failed (${res.status}).`);
-  const data: any = await res.json();
+  type Reply = { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  const data = (await res.json()) as Reply;
   const text: string = (data?.candidates?.[0]?.content?.parts ?? [])
-    .map((p: any) => p?.text ?? "")
+    .map((p) => p?.text ?? "")
     .join("")
     .trim();
   if (!text) throw new ConvexError("The AI sent back nothing.");

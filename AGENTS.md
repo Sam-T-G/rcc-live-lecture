@@ -2,7 +2,9 @@
 
 A platform where students check in to a lecture and follow and interact with the professor's slides from their phones, live. Built by GDG on Campus RCC in timed team sprints, with one Claude Code agent per team lead. This file is the only rule file; `CLAUDE.md` imports it.
 
-Read before any change: this file, [BLOCKS.md](BLOCKS.md) (the building blocks and how to call them), and your team's `TEAM.md` if the lead named one. During a meeting, `TEAM.md` beats your own ideas about what to build.
+Read before any change: this file, [BLOCKS.md](BLOCKS.md) (the building blocks and how to call them), [docs/contracts.md](docs/contracts.md) (what each team reads from the others), and your team's `src/teams/<team>/TEAM.md`. During a meeting, `TEAM.md` beats your own ideas about what to build.
+
+**The teams:** `checkin` (#/checkin/kiosk and #/checkin/join), `live` (#/live), `host` (#/host, hosts only). Their pages, tables, and read functions already exist; each team fills in its own. Asks arrive through `/next` (`.claude/commands/next.md`) and the team ships with `/freeze`. The run of the meeting is [docs/meeting-1029.md](docs/meeting-1029.md).
 
 ## The stack
 
@@ -19,20 +21,22 @@ No other frameworks, UI kits, routers, or state libraries. Ask the lead before a
 
 ## How to work during a sprint
 
-1. **Read `TEAM.md`.** Build only what serves its "For" and "Must do" lines. If the ask doesn't fit them, say so before writing code.
+1. **Read `TEAM.md`.** Build only what serves its "For" and "Must do" lines. If the ask doesn't fit them, say so before writing code. When the lead pastes the team sheet from the Google Doc, update `TEAM.md` with it (it already exists).
 2. **Small steps that run.** After every change the app still builds and the page still loads. Run `npm run build` (typechecks too) before saying a step is done.
 3. **Stay in your lane.** Each team owns its folders (below). Touch shared files only where marked, and say when you do.
 4. **Reuse a block before writing new plumbing.** Sign-in, QR codes, location, the slide feed, and AI calls already exist. Never write a second version.
 5. **Report in plain words.** After each step, tell the lead in two or three sentences what changed and what to try in the browser. The room hears it read aloud.
+6. **Your backend is yours alone.** Every lead's dev deployment has its own data, so another team's tables look empty until the merge at freeze. Build against the read functions in docs/contracts.md and fill them with `npx convex run dev/seed:fill '{"channel":"gdg"}'`.
+7. **Never touch prod.** No `npx convex deploy`, no `scripts/deploy.sh`, no env changes; `.claude/settings.json` blocks them. Sam deploys `main` at the review break and at freeze.
 
 ## Who owns what
 
 | Path | Owner |
 |---|---|
 | `src/teams/<team>/`, `convex/<team>/` | That team only |
-| `src/pages/index.ts` | Shared: add one line per page |
-| `convex/schema.ts` | Shared: add your tables in one block headed `// team: <name>` at the bottom |
-| `src/blocks/`, `convex/lib.ts`, `convex/ai.ts`, `convex/deck.ts`, `convex/http.ts`, `public/deck-bridge.js`, `src/index.css` | Leads only. Ask before changing |
+| `src/pages/index.ts` | Done: the three team pages are registered. Add a route inside your own `Page.tsx` with `useRoute()` instead |
+| `convex/schema.ts` | Shared: each team's tables are in its own `// team: <name>` block. Add fields or tables only inside yours |
+| `src/blocks/`, `convex/dev/`, `convex/lib.ts`, `convex/ai.ts`, `convex/deck.ts`, `convex/http.ts`, `public/deck-bridge.js`, `src/index.css` | Leads only. Ask before changing |
 | `convex/auth.config.ts`, `scripts/`, `AGENTS.md`, `BLOCKS.md` | Sam only |
 
 A team's Convex functions live in `convex/<team>/<file>.ts` and are called as `api.<team>.<file>.<function>`.

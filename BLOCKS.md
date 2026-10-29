@@ -118,17 +118,36 @@ Needs `GEMINI_API_KEY` in Convex env (`GEMINI_MODEL` optional). A room of studen
 
 Hash URLs, so one GitHub Pages file serves every page.
 
-```tsx
-// src/teams/checkin/Kiosk.tsx
-import { useRoute, go, pageUrl } from "../../blocks/router";
-export default function Kiosk() {
-  const [, code] = useRoute(); // #/kiosk/ABC123 → ["kiosk", "ABC123"]
-  ...
-}
-```
+The team pages are registered already (`src/pages/index.ts`): `#/checkin/...` → `src/teams/checkin/Page.tsx`, `#/live` → `src/teams/live/Page.tsx`, `#/host` → `src/teams/host/Page.tsx`. A team adds its own sub-pages by reading the rest of the URL:
 
-Register it with one line in `src/pages/index.ts`: `kiosk: Kiosk,`.
+```tsx
+// src/teams/checkin/Page.tsx
+import { useRoute, go, pageUrl } from "../../blocks/router";
+export default function CheckinPage() {
+  const [, part, code] = useRoute(); // #/checkin/join/ABC123 → ["checkin", "join", "ABC123"]
+  if (part === "kiosk") return <Kiosk />;
+  return <Join code={code} />;
+}
+// pageUrl("checkin/join/" + code) is the full URL to put in the kiosk's QR.
+```
 
 ## Look
 
 `src/index.css` has the tokens (`--accent`, `--surface`, `--muted`, ...) and base styles for `.page`, `.panel`, `button`, `input`, light and dark. Use the classes and tokens; put team-only styles in your team folder.
+
+Screen parts in `src/blocks/ui.tsx`, so every team's pages look like one app:
+
+```tsx
+import { Screen, Big, Status, Card, Todo } from "../../blocks/ui";
+<Screen title="Professor view" wide>          {/* wide for a kiosk or projector, narrow for phones */}
+  <Big value={count} label="checked in" />    {/* one number, readable across a room */}
+  <Status kind="loading">Waiting for the slide…</Status>   {/* or "empty", "error": the designer's words */}
+  <Card title="Who's lost">…</Card>
+</Screen>
+```
+
+`Todo` is the placeholder each team page starts with; delete it when the page is real.
+
+## Shared data between teams
+
+Tables and read functions the teams agreed on before the meeting: [docs/contracts.md](docs/contracts.md). Sample data for your own backend: `npx convex run dev/seed:fill '{"channel":"gdg"}'` (and `dev/seed:clear`). The lecture's channel is `CHANNEL` from `src/blocks/deck.ts`.

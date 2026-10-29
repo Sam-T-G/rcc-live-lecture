@@ -42,3 +42,13 @@ a { color: var(--accent); }
 .qr svg { width: 100%; height: auto; display: block; border-radius: 8px; }
 .qr figcaption { color: var(--muted); margin-top: 6px; text-align: center; }
 .slide h3 { margin: 4px 0 8px; }
+
+/* Shared screen parts (src/blocks/ui.tsx) */
+.page--wide { max-width: 1280px; }
+.todo { border-style: dashed; }
+.todo__team { margin: 0 0 4px; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.big { display: flex; flex-direction: column; align-items: flex-start; }
+.big__value { font-size: clamp(4rem, 14vw, 10rem); line-height: 1; font-weight: 600; letter-spacing: -0.03em; color: var(--accent); font-variant-numeric: tabular-nums; }
+.big__label { color: var(--muted); font-size: 1.1rem; }
+.status { padding: 12px 0; color: var(--muted); }
+.status--error { color: var(--error); }

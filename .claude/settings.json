@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "Bash(npm run lint)",
+      "Bash(npm run dev)",
+      "Bash(npx convex dev:*)",
+      "Bash(npx convex run:*)",
+      "Bash(npx convex logs:*)",
+      "Bash(npx convex env list)",
+      "Bash(scripts/doctor.sh)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add src/teams/:*)",
+      "Bash(git add convex/checkin/:*)",
+      "Bash(git add convex/live/:*)",
+      "Bash(git add convex/host/:*)",
+      "Bash(git pull --rebase:*)"
+    ],
+    "deny": [
+      "Bash(npx convex deploy:*)",
+      "Bash(scripts/deploy.sh:*)",
+      "Bash(npx convex env set:*)",
+      "Bash(npx convex env remove:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)"
+    ]
+  }
+}

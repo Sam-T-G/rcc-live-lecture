@@ -8,6 +8,7 @@ export const GOOGLE_CLIENT_ID = "954308885597-kmeh8q5gajj5mh2vhnkgtgfd89e8son4.a
 const KEY = "rcc-live:google-id-token";
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Google's script has no types package here
   interface Window { google?: any }
 }
 

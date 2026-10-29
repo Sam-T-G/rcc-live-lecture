@@ -20,4 +20,42 @@ export default defineSchema({
     user: v.string(),
     at: v.number(),
   }),
+
+  // Team tables. Agreed before the meeting so the teams never wait on each other: every
+  // lecture is one deck channel ("gdg" on 10-29), and docs/contracts.md says who writes
+  // each table and who reads it. A team may add fields; tell the team that reads the table
+  // before renaming or removing one.
+
+  // team: checkin. One kiosk per channel: the code its QR shows now and the one before it
+  // (a phone that scanned a second before it changed still gets in), and where the room is.
+  kiosks: defineTable({
+    channel: v.string(),
+    code: v.string(),
+    prevCode: v.string(),
+    at: v.number(), // when `code` was made
+    lat: v.optional(v.number()),
+    lng: v.optional(v.number()),
+    radius: v.optional(v.number()), // meters
+  }).index("by_channel", ["channel"]),
+
+  // team: checkin. One row per student per channel.
+  checkins: defineTable({
+    channel: v.string(),
+    user: v.string(), // identity.tokenIdentifier
+    name: v.string(),
+    at: v.number(),
+    meters: v.optional(v.number()), // distance from the room when they checked in; never their coordinates
+  })
+    .index("by_channel", ["channel"])
+    .index("by_channel_and_user", ["channel", "user"]),
+
+  // team: live. One row per student per slide they said they're lost on.
+  lost: defineTable({
+    channel: v.string(),
+    index: v.number(), // the slide, 0-based, as in deckChannels
+    user: v.string(), // identity.tokenIdentifier
+    at: v.number(),
+  })
+    .index("by_channel_and_index", ["channel", "index"])
+    .index("by_channel_and_index_and_user", ["channel", "index", "user"]),
 });
