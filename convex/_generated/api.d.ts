@@ -11,6 +11,7 @@
 import type * as ai from "../ai.js";
 import type * as checkin_attendance from "../checkin/attendance.js";
 import type * as checkin_pass from "../checkin/pass.js";
+import type * as checkin_prof from "../checkin/prof.js";
 import type * as checkin_quiz from "../checkin/quiz.js";
 import type * as checkin_read from "../checkin/read.js";
 import type * as deck from "../deck.js";
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   ai: typeof ai;
   "checkin/attendance": typeof checkin_attendance;
   "checkin/pass": typeof checkin_pass;
+  "checkin/prof": typeof checkin_prof;
   "checkin/quiz": typeof checkin_quiz;
   "checkin/read": typeof checkin_read;
   deck: typeof deck;
