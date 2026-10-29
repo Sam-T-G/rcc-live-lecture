@@ -9,12 +9,15 @@
  */
 
 import type * as ai from "../ai.js";
+import type * as checkin_kiosk from "../checkin/kiosk.js";
 import type * as checkin_read from "../checkin/read.js";
 import type * as deck from "../deck.js";
 import type * as dev_seed from "../dev/seed.js";
+import type * as host_me from "../host/me.js";
 import type * as http from "../http.js";
 import type * as lab from "../lab.js";
 import type * as lib from "../lib.js";
+import type * as live_lost from "../live/lost.js";
 import type * as live_read from "../live/read.js";
 
 import type {
@@ -25,12 +28,15 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
+  "checkin/kiosk": typeof checkin_kiosk;
   "checkin/read": typeof checkin_read;
   deck: typeof deck;
   "dev/seed": typeof dev_seed;
+  "host/me": typeof host_me;
   http: typeof http;
   lab: typeof lab;
   lib: typeof lib;
+  "live/lost": typeof live_lost;
   "live/read": typeof live_read;
 }>;
 
