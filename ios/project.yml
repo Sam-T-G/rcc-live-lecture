@@ -1,0 +1,52 @@
+name: RCCLivePortal
+options:
+  bundleIdPrefix: com.samtg
+  deploymentTarget:
+    iOS: "18.0"
+packages:
+  ConvexMobile:
+    url: https://github.com/get-convex/convex-swift
+    exactVersion: 0.8.2
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+targets:
+  RCCLivePortal:
+    type: application
+    platform: iOS
+    sources:
+      - path: RCCLivePortal
+        excludes:
+          - ATS-Debug.plist
+    dependencies:
+      - package: ConvexMobile
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.samtg.rccliveportal
+        PRODUCT_NAME: RCCLivePortal
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: RCC Live
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+      configs:
+        # Debug builds may reach a backend on this Mac (http://127.0.0.1:3210).
+        # Release builds get no ATS exception at all.
+        Debug:
+          INFOPLIST_FILE: RCCLivePortal/ATS-Debug.plist
+schemes:
+  RCCLivePortal:
+    build:
+      targets:
+        RCCLivePortal: all
+    run:
+      config: Debug
+      # Tick these in Edit Scheme > Run > Arguments to use the local test backend.
+      commandLineArguments:
+        "-convexURL http://127.0.0.1:3210": false
+        "-channel portal-ios-test": false
+        "-startOnSlide 2": false
