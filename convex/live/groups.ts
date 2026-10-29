@@ -6,7 +6,8 @@
 // answer). Every team is ranked; extra credit: 1st place 5, 2nd 3, 3rd 1, the rest 0.
 import { mutation, query, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
-import { requireHost, requireUser } from "../lib";
+import { requireUser } from "../lib";
+import { requireProf } from "../checkin/prof";
 
 const COLORS = ["red", "blue", "yellow"] as const;
 const EC = [5, 3, 1];
@@ -52,12 +53,12 @@ export const size = query({
   handler: async (ctx, { channel }) => await teamSize(ctx, channel),
 });
 
-// A host picks 3 or 4 students per team. Students already on a team keep it, so set it before class.
+// A host (or the professor key) picks 3 or 4 students per team. Students already on a team keep it, so set it before class.
 export const setSize = mutation({
-  args: { channel: v.string(), size: v.number() },
+  args: { key: v.optional(v.string()), channel: v.string(), size: v.number() },
   returns: v.null(),
-  handler: async (ctx, { channel, size }) => {
-    await requireHost(ctx);
+  handler: async (ctx, { key, channel, size }) => {
+    await requireProf(ctx, key); // a Google host, or the professor key
     if (size !== 3 && size !== 4) throw new ConvexError("Pick teams of 3 or 4.");
     const row = await ctx.db.query("groupSettings").withIndex("by_channel", (q) => q.eq("channel", channel)).unique();
     if (row) await ctx.db.patch(row._id, { size });
