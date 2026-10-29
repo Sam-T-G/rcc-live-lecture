@@ -22,9 +22,13 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l);
 }
 
-// The saved key, or undefined. Pass it as `key` to every host-only function.
+// Demo only: the same key as DEMO_KEY in convex/checkin/prof.ts, used when none is saved, so
+// the professor pages open with nothing to type. Delete both after the 10-29 demos.
+const DEMO_KEY = "gdg-demo-1029";
+
+// The saved key, else the demo key. Pass it as `key` to every host-only function.
 export function useProfKey() {
-  return useSyncExternalStore(subscribe, read);
+  return useSyncExternalStore(subscribe, read) ?? DEMO_KEY;
 }
 
 export function ProfGate({ title, children }: { title: string; children: ReactNode }) {

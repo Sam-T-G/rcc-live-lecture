@@ -5,9 +5,14 @@ import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { isHostEmail, requireHost } from "../lib";
 
+// Demo only: a key anyone can read in this public repo, so the professor pages open with
+// no sign-in during the 10-29 demos. Delete it (and the client's copy in prof.tsx) after.
+export const DEMO_KEY = "gdg-demo-1029";
+
 export function keyOk(key: string | undefined) {
+  if (!key) return false;
   const k = process.env.PROFESSOR_KEY;
-  return !!k && !!key && key.trim() === k;
+  return key.trim() === DEMO_KEY || (!!k && key.trim() === k);
 }
 
 // A host signed in with Google, or anyone with the professor key.
