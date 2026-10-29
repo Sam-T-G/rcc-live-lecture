@@ -158,4 +158,65 @@ export default defineSchema({
     channel: v.string(),
     size: v.number(),
   }).index("by_channel", ["channel"]),
+
+  // team: host. A question the professor asked the room on one slide. `correct` never goes to
+  // students (questions.current leaves it out).
+  quizQuestions: defineTable({
+    channel: v.string(),
+    index: v.number(), // the slide, 0-based, as in deckChannels
+    text: v.string(),
+    choices: v.array(v.string()),
+    correct: v.number(), // index into choices
+    status: v.union(v.literal("open"), v.literal("closed")),
+    points: v.number(), // base points for a right answer
+    openedAt: v.number(),
+  }).index("by_channel", ["channel"]),
+
+  // team: host. One row per student per question. The team (red, yellow, blue) is worked out
+  // when read, from the user and the room's salt, so a reshuffle regroups everyone.
+  answers: defineTable({
+    questionId: v.id("quizQuestions"),
+    user: v.string(), // identity.tokenIdentifier
+    name: v.string(),
+    choice: v.number(),
+    correct: v.boolean(),
+    points: v.number(),
+    at: v.number(),
+  })
+    .index("by_question", ["questionId"])
+    .index("by_question_and_user", ["questionId", "user"]),
+
+  // team: host. Per-lecture settings. `salt` decides the random red/yellow/blue split.
+  hostRooms: defineTable({
+    channel: v.string(),
+    salt: v.string(),
+    dayStart: v.optional(v.number()), // when today's points started counting (End day moves it)
+  }).index("by_channel", ["channel"]),
+  // team: host. Manual changes to points: a deduction, or the extra credit a winning team gets
+  // when the day ends. Totals are answers plus these, so every change can be seen and undone.
+  pointEvents: defineTable({
+    channel: v.string(),
+    user: v.string(), // identity.tokenIdentifier
+    name: v.string(),
+    delta: v.number(),
+    reason: v.string(),
+    at: v.number(),
+  }).index("by_channel", ["channel"]),
+
+  // team: host. A question a student asks the professor. "private" is for the professor only.
+  // The professor decides what is kept, answered, and shared with the room.
+  studentQuestions: defineTable({
+    channel: v.string(),
+    index: v.number(), // the slide it was asked on
+    user: v.string(),
+    name: v.string(),
+    text: v.string(),
+    visibility: v.union(v.literal("public"), v.literal("private")),
+    topic: v.optional(v.string()), // set by the AI grouping
+    cluster: v.optional(v.string()), // the AI's label for questions that ask the same thing
+    status: v.union(v.literal("new"), v.literal("keep"), v.literal("dismissed")),
+    answer: v.optional(v.string()), // typed by the professor
+    shared: v.boolean(), // the professor approved showing this (and its answer) to students
+    at: v.number(),
+  }).index("by_channel", ["channel"]),
 });
