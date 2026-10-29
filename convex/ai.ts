@@ -73,3 +73,23 @@ export const models = internalAction({
     return out;
   },
 });
+
+// Try a model from the CLI before building on it, optionally with an image from a URL:
+//   npx convex run ai:tryIt '{"model":"smart","prompt":"Say hi in five words."}'
+//   npx convex run ai:tryIt '{"prompt":"What is in this picture?","imageUrl":"https://...","json":true}'
+export const tryIt = internalAction({
+  args: { prompt: v.string(), model: v.optional(v.string()), imageUrl: v.optional(v.string()), json: v.optional(v.boolean()) },
+  returns: v.object({ model: v.string(), text: v.string() }),
+  handler: async (_ctx, { prompt, model, imageUrl, json }) => {
+    const parts: Part[] = [{ text: prompt }];
+    if (imageUrl) {
+      const img = await fetch(imageUrl);
+      if (!img.ok) throw new ConvexError(`Couldn't fetch the image (${img.status}).`);
+      const bytes = new Uint8Array(await img.arrayBuffer());
+      let bin = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      parts.push({ inlineData: { mimeType: img.headers.get("content-type") ?? "image/png", data: btoa(bin) } });
+    }
+    return { model: pickModel(model), text: await gemini({ parts, model, json }) };
+  },
+});

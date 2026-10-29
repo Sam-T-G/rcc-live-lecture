@@ -126,7 +126,7 @@ const reply = await gemini({
 const { summary, terms } = JSON.parse(reply);
 ```
 
-Setup, Sam once per backend: `npx convex env set GEMINI_API_KEY <key from aistudio.google.com>`, then `npx convex run ai:models` to see the model IDs this key can use, then `npx convex env set GEMINI_MODEL_FAST <a Flash ID>` and `GEMINI_MODEL_SMART <a Pro ID>` (add `--prod` for prod). A room of students asking the same thing should share one answer: save the result in a table keyed by slide and check it first.
+Set up on Sam's dev and on prod (2026-10-29): fast is `gemini-3.8-flash`, smart is `gemini-pro-latest`. Another lead's own dev backend needs `GEMINI_API_KEY`, `GEMINI_MODEL_FAST`, and `GEMINI_MODEL_SMART` set the same way (Sam sends the key privately). `npx convex run ai:models` lists every model the key can call (Flash, Pro, image generation, speech, transcription); `npx convex run ai:tryIt '{"model":"smart","prompt":"...","imageUrl":"https://...","json":true}'` tries one before you build on it. A room of students asking the same thing should share one answer: save the result in a table keyed by slide and check it first.
 
 ## Pages and routes
 
