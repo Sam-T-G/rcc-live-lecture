@@ -112,7 +112,21 @@ export const explain = action({
 });
 ```
 
-Needs `GEMINI_API_KEY` in Convex env (`GEMINI_MODEL` optional). A room of students asking the same thing should share one answer: save the result in a table keyed by slide and check it first.
+Pick a model by tier or by exact ID: `geminiText(prompt)` uses the fast tier, `geminiText(prompt, "smart")` the strong one. For images, audio, or PDFs, and for JSON back:
+
+```ts
+import { gemini } from "../ai";
+// photo: base64 from the browser (FileReader, or a canvas from the camera), a few MB at most
+const reply = await gemini({
+  model: "fast",
+  system: "You read lecture slides for students. Plain words, no jargon.",
+  parts: [{ text: "What is on this slide? Return {\"summary\": string, \"terms\": string[]}" }, { inlineData: { mimeType: "image/jpeg", data: photo } }],
+  json: true,
+});
+const { summary, terms } = JSON.parse(reply);
+```
+
+Setup, Sam once per backend: `npx convex env set GEMINI_API_KEY <key from aistudio.google.com>`, then `npx convex run ai:models` to see the model IDs this key can use, then `npx convex env set GEMINI_MODEL_FAST <a Flash ID>` and `GEMINI_MODEL_SMART <a Pro ID>` (add `--prod` for prod). A room of students asking the same thing should share one answer: save the result in a table keyed by slide and check it first.
 
 ## Pages and routes
 
