@@ -1,7 +1,7 @@
 // Block: Google sign-in. Google Identity Services gives the browser an ID token; Convex
 // checks it (convex/auth.config.ts). Wrap the app in <AuthProvider>, put <SignInButton/>
 // where people sign in, and read the user server-side with ctx.auth.getUserIdentity().
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 
 export const GOOGLE_CLIENT_ID = "954308885597-kmeh8q5gajj5mh2vhnkgtgfd89e8son4.apps.googleusercontent.com";
@@ -46,7 +46,7 @@ function loadGsi() {
   return gsiPromise;
 }
 
-type AuthState = { user: Stored | null; ready: boolean; signOut: () => void; renderButton: (el: HTMLElement) => void };
+type AuthState = { user: Stored | null; ready: boolean; signOut: () => void; renderButton: (el: HTMLElement) => void; signInWithToken: (token: string) => void };
 const AuthContext = createContext<AuthState | null>(null);
 
 export function useGoogleUser() {
@@ -101,7 +101,15 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
     [ready],
   );
 
-  const value = useMemo(() => ({ user, ready, signOut, renderButton }), [user, ready, signOut, renderButton]);
+  // Signs in with a token made somewhere other than Google (the dev test sign-in).
+  const signInWithToken = useCallback((token: string) => {
+    const s = decode(token);
+    if (!s) return;
+    localStorage.setItem(KEY, JSON.stringify(s));
+    setUser(s);
+  }, []);
+
+  const value = useMemo(() => ({ user, ready, signOut, renderButton, signInWithToken }), [user, ready, signOut, renderButton, signInWithToken]);
 
   return (
     <AuthContext.Provider value={value}>
@@ -123,5 +131,37 @@ export function SignInButton() {
   const { renderButton, ready } = useGoogleUser();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { if (ref.current) renderButton(ref.current); }, [renderButton]);
-  return <div ref={ref} aria-busy={!ready} style={{ minHeight: 44 }} />;
+  return (
+    <>
+      <div ref={ref} aria-busy={!ready} style={{ minHeight: 44 }} />
+      {import.meta.env.DEV && <TestSignIn />}
+    </>
+  );
+}
+
+// `npm run dev` only: sign in as anyone without Google. Works only against a dev backend
+// (convex/auth.config.ts). Use a host's email to test the teacher pages.
+function TestSignIn() {
+  const { signInWithToken } = useGoogleUser();
+  const [name, setName] = useState("Test Student");
+  const [email, setEmail] = useState("student1@test.local");
+  const [err, setErr] = useState("");
+  async function go(e: FormEvent) {
+    e.preventDefault();
+    try {
+      const { mintTestToken } = await import("./devLogin");
+      signInWithToken(await mintTestToken(name.trim() || "Test Student", email.trim()));
+    } catch {
+      setErr("Test sign-in failed.");
+    }
+  }
+  return (
+    <form onSubmit={go} style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16, alignItems: "center" }}>
+      <strong style={{ width: "100%" }}>Test sign-in (dev only)</strong>
+      <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Name" placeholder="Name" />
+      <input value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Email" placeholder="Email" type="email" required />
+      <button type="submit">Sign in</button>
+      {err && <span role="alert">{err}</span>}
+    </form>
+  );
 }
