@@ -5,7 +5,6 @@ import { useState, useSyncExternalStore, type FormEvent, type ReactNode } from "
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Card, Screen, Status } from "../../blocks/ui";
-import { SignInButton, useGoogleUser } from "../../blocks/auth";
 
 const STORE = "rcc-live:prof-key";
 const listeners = new Set<() => void>();
@@ -33,7 +32,6 @@ export function useProfKey() {
 
 export function ProfGate({ title, children }: { title: string; children: ReactNode }) {
   const key = useProfKey();
-  const { user } = useGoogleUser();
   const host = useQuery(api.checkin.pass.amHost, { key });
   const [typed, setTyped] = useState("");
 
@@ -54,12 +52,6 @@ export function ProfGate({ title, children }: { title: string; children: ReactNo
         </form>
         {key && <Status kind="error">That key didn’t work.</Status>}
       </Card>
-      {!user && (
-        <Card title="Or sign in with Google">
-          <SignInButton />
-        </Card>
-      )}
-      {user && <Status kind="error">{user.email} isn’t a teacher account. Use the professor key.</Status>}
     </Screen>
   );
 }

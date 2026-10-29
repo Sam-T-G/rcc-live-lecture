@@ -20,7 +20,7 @@ export async function mintTestToken(name: string, email: string) {
     email,
     email_verified: true,
     iat: now,
-    exp: now + 3600,
+    exp: now + 12 * 3600, // a whole day of class
   });
   const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(head + "." + body));
   return head + "." + body + "." + b64url(sig);

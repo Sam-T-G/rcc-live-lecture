@@ -3,7 +3,7 @@
 // only works for about 40 seconds. Writes `passes` and `checkins`.
 import { mutation, query } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
-import { isHostEmail, randomCode, requireUser } from "../lib";
+import { isHostIdentity, randomCode, requireUser } from "../lib";
 import { keyOk, requireProf } from "./prof";
 import { ensureGroup } from "../live/groups";
 
@@ -17,7 +17,7 @@ export const amHost = query({
   handler: async (ctx, { key }) => {
     if (keyOk(key)) return true;
     const me = await ctx.auth.getUserIdentity();
-    return !!me && me.emailVerified !== false && isHostEmail(me.email);
+    return isHostIdentity(me);
   },
 });
 

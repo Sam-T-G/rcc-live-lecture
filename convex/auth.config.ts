@@ -5,12 +5,10 @@ import { AuthConfig } from "convex/server";
 // The client is the GDG/ACM deck relay's; its Authorized JavaScript origins must list
 // every address this app is served from (README, "Google sign-in").
 //
-// Test sign-in (src/blocks/devLogin.ts): type any name and email on `npm run dev`. Its
-// signing key is public in this repo, so Convex accepts it only on dev backends. Prod
-// (utmost-ibis-818) never lists it, and neither does a deployment whose URL it can't read.
-const url = process.env.CONVEX_CLOUD_URL ?? "";
-const devBackend = url !== "" && !url.includes("utmost-ibis-818");
-
+// Typed sign-in (src/blocks/devLogin.ts): students type a name and email, no Google. Its
+// signing key is public in this repo, so anyone can sign in as any email; that's why
+// convex/lib.ts never treats it as a host. Accepted on every backend, prod included (Sam,
+// 2026-10-29, for the demos).
 const testLogin = {
   type: "customJwt",
   applicationID: "rcc-live-lecture-test",
@@ -26,6 +24,6 @@ export default {
       applicationID:
         "954308885597-kmeh8q5gajj5mh2vhnkgtgfd89e8son4.apps.googleusercontent.com",
     },
-    ...(devBackend ? [testLogin] : []),
+    testLogin,
   ],
 } satisfies AuthConfig;

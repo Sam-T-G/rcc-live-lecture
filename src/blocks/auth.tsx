@@ -1,7 +1,7 @@
 // Block: Google sign-in. Google Identity Services gives the browser an ID token; Convex
 // checks it (convex/auth.config.ts). Wrap the app in <AuthProvider>, put <SignInButton/>
 // where people sign in, and read the user server-side with ctx.auth.getUserIdentity().
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 
 export const GOOGLE_CLIENT_ID = "954308885597-kmeh8q5gajj5mh2vhnkgtgfd89e8son4.apps.googleusercontent.com";
@@ -127,39 +127,32 @@ function useConvexAuth() {
   return { isLoading: false, isAuthenticated: !!u, fetchAccessToken };
 }
 
+// Students type a name and email; no Google. (Google sign-in is still wired in
+// AuthProvider for anyone already signed in, but no button shows it.)
 export function SignInButton() {
-  const { renderButton, ready } = useGoogleUser();
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) renderButton(ref.current); }, [renderButton]);
-  return (
-    <>
-      <div ref={ref} aria-busy={!ready} style={{ minHeight: 44 }} />
-      {import.meta.env.DEV && <TestSignIn />}
-    </>
-  );
+  return <TestSignIn />;
 }
 
-// `npm run dev` only: sign in as anyone without Google. Works only against a dev backend
-// (convex/auth.config.ts). Use a host's email to test the teacher pages.
+// Typed sign-in: any name and email (convex/auth.config.ts). Never a host (convex/lib.ts).
 function TestSignIn() {
   const { signInWithToken } = useGoogleUser();
-  const [name, setName] = useState("Test Student");
-  const [email, setEmail] = useState("student1@test.local");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [err, setErr] = useState("");
   async function go(e: FormEvent) {
     e.preventDefault();
     try {
       const { mintTestToken } = await import("./devLogin");
-      signInWithToken(await mintTestToken(name.trim() || "Test Student", email.trim()));
+      signInWithToken(await mintTestToken(name.trim() || email.trim(), email.trim()));
     } catch {
-      setErr("Test sign-in failed.");
+      setErr("Sign-in failed. Try again.");
     }
   }
   return (
     <form onSubmit={go} style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16, alignItems: "center" }}>
-      <strong style={{ width: "100%" }}>Test sign-in (dev only)</strong>
-      <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Name" placeholder="Name" />
-      <input value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Email" placeholder="Email" type="email" required />
+      <strong style={{ width: "100%" }}>Sign in</strong>
+      <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Your name" placeholder="Your name" required autoComplete="name" />
+      <input value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Your email" placeholder="Your email" type="email" required autoComplete="email" />
       <button type="submit">Sign in</button>
       {err && <span role="alert">{err}</span>}
     </form>

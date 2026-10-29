@@ -7,7 +7,7 @@ type Ctx = QueryCtx | MutationCtx;
 // The signed-in Google account, or an error. Use identity.tokenIdentifier as the user key.
 export async function requireUser(ctx: Ctx) {
   const me = await ctx.auth.getUserIdentity();
-  if (!me) throw new ConvexError("Sign in with Google first.");
+  if (!me) throw new ConvexError("Sign in first.");
   return me;
 }
 
@@ -22,9 +22,16 @@ export function isHostEmail(email: string | undefined) {
   return list.includes(email.toLowerCase());
 }
 
+// A host is a Google account on HOST_EMAILS. Typed sign-in (src/blocks/devLogin.ts) lets
+// anyone claim any email, so it never counts as a host; hosts without Google use the
+// professor key (convex/checkin/prof.ts).
+export function isHostIdentity(me: { issuer: string; email?: string; emailVerified?: boolean } | null) {
+  return !!me && me.issuer === "https://accounts.google.com" && me.emailVerified !== false && isHostEmail(me.email);
+}
+
 export async function requireHost(ctx: Ctx) {
   const me = await requireUser(ctx);
-  if (!isHostEmail(me.email) || me.emailVerified === false)
+  if (!isHostIdentity(me))
     throw new ConvexError("Only hosts can do that.");
   return me;
 }

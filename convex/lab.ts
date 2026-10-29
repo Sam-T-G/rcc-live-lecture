@@ -2,7 +2,7 @@
 // Safe to leave in; nothing product-facing depends on them.
 import { v } from "convex/values";
 import { query, mutation, action } from "./_generated/server";
-import { requireUser, isHostEmail } from "./lib";
+import { requireUser, isHostIdentity } from "./lib";
 import { geminiText } from "./ai";
 
 export const whoami = query({
@@ -11,7 +11,7 @@ export const whoami = query({
   handler: async (ctx) => {
     const me = await ctx.auth.getUserIdentity();
     if (!me) return null;
-    return { name: me.name ?? "", email: me.email ?? "", isHost: isHostEmail(me.email) };
+    return { name: me.name ?? "", email: me.email ?? "", isHost: isHostIdentity(me) };
   },
 });
 

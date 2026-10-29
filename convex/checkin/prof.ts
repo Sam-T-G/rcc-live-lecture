@@ -3,7 +3,7 @@
 // never in the repo. Host-only functions take an optional `key` and call requireProf.
 import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { isHostEmail, requireHost } from "../lib";
+import { isHostIdentity, requireHost } from "../lib";
 
 // Demo only: a key anyone can read in this public repo, so the professor pages open with
 // no sign-in during the 10-29 demos. Delete it (and the client's copy in prof.tsx) after.
@@ -20,7 +20,7 @@ export async function requireProf(ctx: QueryCtx | MutationCtx, key: string | und
   if (keyOk(key)) return;
   if (key) {
     const me = await ctx.auth.getUserIdentity();
-    if (!me || !isHostEmail(me.email)) throw new ConvexError("That professor key is wrong.");
+    if (!isHostIdentity(me)) throw new ConvexError("That professor key is wrong.");
   }
   await requireHost(ctx);
 }

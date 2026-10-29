@@ -40,7 +40,7 @@ function Student() {
   if (!user)
     return (
       <Screen title="Your check-in pass">
-        <p>Sign in with Google to get your pass.</p>
+        <p>Type your name and email to get your pass.</p>
         <SignInButton />
       </Screen>
     );
