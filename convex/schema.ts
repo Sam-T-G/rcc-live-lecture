@@ -74,6 +74,29 @@ export default defineSchema({
     graceMin: v.number(),
   }).index("by_channel", ["channel"]),
 
+  // team: checkin. Live quiz or vote: a host asks one question at a time on a channel;
+  // checked-in students pick one choice. A quiz may have a right answer; a vote never does.
+  polls: defineTable({
+    channel: v.string(),
+    question: v.string(),
+    choices: v.array(v.string()),
+    correct: v.optional(v.number()), // index into choices; never set on a vote
+    kind: v.optional(v.union(v.literal("quiz"), v.literal("vote"))), // missing = quiz
+    open: v.boolean(),
+    at: v.number(),
+    closedAt: v.optional(v.number()),
+  }).index("by_channel", ["channel"]),
+
+  // team: checkin. One answer per student per poll: locked on a quiz, changeable on an open vote.
+  pollAnswers: defineTable({
+    poll: v.id("polls"),
+    user: v.string(), // identity.tokenIdentifier
+    choice: v.number(),
+    at: v.number(),
+  })
+    .index("by_poll", ["poll"])
+    .index("by_poll_and_user", ["poll", "user"]),
+
   // team: live. One row per student per slide they said they're lost on.
   lost: defineTable({
     channel: v.string(),

@@ -2,6 +2,7 @@
 //   #/checkin/student (also #/checkin/join): sign in, and the phone shows your QR pass.
 //   #/checkin/teacher (also #/checkin/kiosk): hosts only. The laptop camera reads passes
 //   and the list of who's here fills in live.
+//   #/checkin/quiz: hosts only. Ask the room a quiz question or a vote (Quiz.tsx).
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import "./checkin.css";
 import { useMutation, useQuery } from "convex/react";
@@ -14,6 +15,7 @@ import { SignInButton, useGoogleUser } from "../../blocks/auth";
 import { useCamera } from "../../blocks/vision";
 import LateBanner from "./LateBanner";
 import Kiosk from "./Kiosk";
+import { Professor, QuizCard } from "./Quiz";
 
 // The words a ConvexError carries, or a plain fallback.
 function why(e: unknown) {
@@ -24,6 +26,7 @@ function why(e: unknown) {
 export default function CheckinPage() {
   const [, part = "student"] = useRoute();
   if (part === "kiosk") return <Kiosk />;
+  if (part === "quiz") return <Professor />;
   return part === "teacher" ? <Teacher /> : <Student />;
 }
 
@@ -59,8 +62,10 @@ function StudentPass() {
   if (here)
     return (
       <Screen title="You’re checked in.">
+        <QuizCard />
         <p><Link to="live">Follow the slides</Link></p>
         <HideLate />
+        <LateBanner />
       </Screen>
     );
   if (err) return <Screen title="Your check-in pass"><Status kind="error">{err}</Status></Screen>;
@@ -240,6 +245,7 @@ function Scanner() {
         </div>
         <div>
           <ClassStart />
+          <p className="row"><Link to="checkin/quiz">Ask a question or start a vote</Link></p>
           <Big value={count ?? "…"} label="checked in" />
           <Download />
           {names && names.length === 0 && <Status kind="empty">No one yet.</Status>}
