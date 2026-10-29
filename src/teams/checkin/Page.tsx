@@ -15,6 +15,7 @@ import { SignInButton, useGoogleUser } from "../../blocks/auth";
 import { useCamera } from "../../blocks/vision";
 import LateBanner from "./LateBanner";
 import Kiosk from "./Kiosk";
+import Stage from "./Stage";
 import { ProfGate, useProfKey } from "./prof";
 import { Professor, QuizCard } from "./Quiz";
 
@@ -27,6 +28,7 @@ function why(e: unknown) {
 export default function CheckinPage() {
   const [, part = "student"] = useRoute();
   if (part === "kiosk") return <Kiosk />;
+  if (part === "stage") return <Stage />;
   if (part === "quiz") return <Professor />;
   return part === "teacher" ? <Teacher /> : <Student />;
 }
