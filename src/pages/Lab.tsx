@@ -1,5 +1,5 @@
 // /#/lab: one panel per building block, so anyone can see each one work before building on it.
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { SignInButton, useGoogleUser } from "../blocks/auth";
@@ -7,6 +7,8 @@ import { QR } from "../blocks/qr";
 import { useLocation } from "../blocks/location";
 import { useDeckSlide } from "../blocks/deck";
 import { pageUrl } from "../blocks/router";
+// Loaded only when the lab opens, so phones on other pages never download the vision library.
+const Vision = lazy(() => import("./LabVision"));
 
 export default function Lab() {
   return (
@@ -19,6 +21,7 @@ export default function Lab() {
       <Location />
       <Deck />
       <Ai />
+      <Suspense fallback={<p className="muted">Loading vision…</p>}><Vision /></Suspense>
     </main>
   );
 }

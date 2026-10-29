@@ -15,6 +15,7 @@ Read before any change: this file, [BLOCKS.md](BLOCKS.md) (the building blocks a
 | Sign-in | Google Identity Services, ID token checked by Convex | `src/blocks/auth.tsx`, `convex/auth.config.ts` |
 | AI | Gemini through a Convex action; the key never reaches the browser | `convex/ai.ts` |
 | Slides | deck-kit decks send their current slide through `public/deck-bridge.js` | `convex/http.ts`, `convex/deck.ts` |
+| Vision | MediaPipe Tasks in the browser (gestures, hands, pose, faces, face mesh, objects, classify), on the device | `src/blocks/vision.ts` |
 | Hosting | GitHub Pages (`gh-pages` branch) + Convex prod | `scripts/deploy.sh` |
 
 No other frameworks, UI kits, routers, or state libraries. Ask the lead before adding any npm package; if they say yes, pin the exact version.
@@ -55,7 +56,7 @@ A team's Convex functions live in `convex/<team>/<file>.ts` and are called as `a
 
 - Never commit student names, emails, locations, or attendance. They live only in Convex.
 - Location: ask only from a button press, send it to a mutation, check distance there with `metersBetween`, and store only what the feature needs (the distance, not the coordinates, unless a team decides otherwise and says why).
-- Camera and microphone: none of the blocks use them. A team that adds one says so in `TEAM.md` under "What it sees".
+- Camera: only through `src/blocks/vision.ts`, started from a button press, frames stay on the device; send counts or labels, never images or face data. Microphone: no block uses it. A team that uses either says so in `TEAM.md` under "What it sees".
 
 ## Commands
 

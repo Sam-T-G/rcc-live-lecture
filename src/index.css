@@ -52,3 +52,10 @@ a { color: var(--accent); }
 .big__label { color: var(--muted); font-size: 1.1rem; }
 .status { padding: 12px 0; color: var(--muted); }
 .status--error { color: var(--error); }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; max-width: 100%; }
+label select { display: block; width: 100%; margin-top: 4px; }
+.vision { position: relative; }
+.vision video, .vision img { display: block; width: 100%; height: auto; border-radius: 10px; }
+.vision canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.vision [hidden] { display: none; }

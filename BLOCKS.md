@@ -128,6 +128,39 @@ const { summary, terms } = JSON.parse(reply);
 
 Set up on Sam's dev and on prod (2026-10-29): fast is `gemini-3.8-flash`, smart is `gemini-pro-latest`. Another lead's own dev backend needs `GEMINI_API_KEY`, `GEMINI_MODEL_FAST`, and `GEMINI_MODEL_SMART` set the same way (Sam sends the key privately). `npx convex run ai:models` lists every model the key can call (Flash, Pro, image generation, speech, transcription); `npx convex run ai:tryIt '{"model":"smart","prompt":"...","imageUrl":"https://...","json":true}'` tries one before you build on it. A room of students asking the same thing should share one answer: save the result in a table keyed by slide and check it first.
 
+## Vision (camera, on the device)
+
+MediaPipe models that run in the browser: no key, nothing leaves the device, offline once loaded. Seven are ready, each tested on the lab page (`#/lab`, "Vision"):
+
+| Kind | Finds | Good for |
+|---|---|---|
+| `gestures` | Thumb_Up, Thumb_Down, Open_Palm, Closed_Fist, Pointing_Up, Victory, ILoveYou | A thumbs poll: "got it?" counted by the professor's laptop camera |
+| `hands` | 21 points per hand, left or right | Counting hands in the air, pointing at something |
+| `pose` | 33 body points per person; `labels` says "hand up" | Counting raised hands across a row |
+| `faces` | faces and boxes | How many people are facing the screen |
+| `faceMesh` | 478 points per face and expressions (smile, blink) | Reactions, attention |
+| `objects` | everyday objects with boxes | Phones out, laptops open, a book on the desk |
+| `classify` | what the whole picture is | "What is this?" from a photo |
+
+```tsx
+import { loadVision, useCamera, useVisionLoop, drawSeen, type Runner } from "../../blocks/vision";
+
+const cam = useCamera();                       // cam.video is the <video ref>; start from a button
+const [runner, setRunner] = useState<Runner | null>(null);
+async function go() { setRunner(await loadVision("gestures")); await cam.start(); }
+useVisionLoop(cam.video, runner, cam.on, (seen) => {
+  const ups = seen.labels.filter((l) => l === "Thumb_Up").length;   // { count, labels, raw }
+  // drawSeen(canvas, "gestures", seen, cam.video.current!.videoWidth, cam.video.current!.videoHeight);
+});
+// <video ref={cam.video} playsInline muted /> and a <canvas> on top of it for drawSeen
+```
+
+- **Load it lazily.** The library is about 160 KB; import the page or component that uses it with `React.lazy` (as `src/pages/Lab.tsx` does), so phones on other pages never download it. Each model is a few MB the first time, then cached.
+- **The camera** starts only from a button press. On a Mac, `useCamera` skips an iPhone (Continuity Camera) and uses the built-in one.
+- **Privacy:** send counts or labels to Convex, never frames or face data. Say what the camera sees in TEAM.md.
+- **A still picture:** `loadVision(kind, "IMAGE")`, then `run(img)` on a loaded `<img>`.
+- **Gemini** reads pictures too (`gemini()` with an image part, above). Use it when you need words about a picture; use MediaPipe when you need it live, many times a second.
+
 ## Pages and routes
 
 Hash URLs, so one GitHub Pages file serves every page.
