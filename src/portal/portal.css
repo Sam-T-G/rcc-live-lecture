@@ -1,0 +1,63 @@
+/* #/portal. Colors come from the tokens in src/index.css. */
+.portal {
+  max-width: 720px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  touch-action: pan-y;
+}
+.portal__bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.portal__count { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.portal__tag { font-size: 0.85rem; font-weight: 600; padding: 4px 12px; border-radius: 999px; }
+.portal__tag--live { background: var(--accent); color: var(--accent-text); }
+.portal__tag--live::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 1px;
+}
+.portal__tolive { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 8px 14px; }
+
+.portal__notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 12px 10px 16px;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  animation: portal-in 200ms ease-out;
+}
+
+.portal__slide {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  overflow-wrap: anywhere;
+  animation: portal-in 180ms ease-out;
+}
+.portal__slide h1 { font-size: 1.6rem; line-height: 1.2; margin: 0 0 16px; }
+.portal__slide ul { margin: 0; padding-left: 1.2em; font-size: 1.1rem; }
+.portal__slide li + li { margin-top: 10px; }
+
+.portal__nav { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.portal__nav button { min-height: 52px; }
+
+@keyframes portal-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .portal__slide, .portal__notice { animation: none; }
+}

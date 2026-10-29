@@ -7,6 +7,7 @@ import Lab from "./Lab";
 import CheckinPage from "../teams/checkin/Page";
 import LivePage from "../teams/live/Page";
 import HostPage from "../teams/host/Page";
+import PortalPage from "../portal/Page";
 
 export const pages: Record<string, ComponentType> = {
   "": Home,
@@ -14,4 +15,5 @@ export const pages: Record<string, ComponentType> = {
   checkin: CheckinPage, // #/checkin/kiosk, #/checkin/join
   live: LivePage, // #/live
   host: HostPage, // #/host
+  portal: PortalPage, // #/portal, #/portal?channel=<name>
 };
