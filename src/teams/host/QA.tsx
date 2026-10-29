@@ -37,23 +37,23 @@ function Question({ q }: { q: Item }) {
         <div>
           <textarea className="host-answer" rows={3} value={text} onChange={(e) => setText(e.target.value)} aria-label="Your answer" />
           <div className="row">
-            <button className="host-small" onClick={() => void run(answer({ key, id, text }).then(() => setTyping(false)))}>Save answer</button>
-            <button className="host-small host-ghost" onClick={() => setTyping(false)}>Cancel</button>
+            <button className="host-small host-main" onClick={() => void run(answer({ key, id, text }).then(() => setTyping(false)))}>Save answer</button>
+            <button className="host-small host-quiet" onClick={() => setTyping(false)}>Cancel</button>
           </div>
         </div>
       )}
-      <div className="row" style={{ marginTop: 8 }}>
+      <div className="host-q__actions">
         {q.status === "dismissed" ? (
-          <button className="host-small host-ghost" onClick={() => void run(setStatus({ key, id, status: "new" }))}>Bring back</button>
+          <button className="host-small host-quiet" onClick={() => void run(setStatus({ key, id, status: "new" }))}>Bring back</button>
         ) : (
           <>
-            {q.status !== "keep" && <button className="host-small host-ghost" onClick={() => void run(setStatus({ key, id, status: "keep" }))}>Keep</button>}
-            <button className="host-small host-ghost" onClick={() => setTyping(true)}>{q.answer ? "Edit answer" : "Type answer"}</button>
-            <button className="host-small host-ghost" disabled title="Voice answers are coming" onClick={() => undefined}>Record answer</button>
+            {q.status !== "keep" && <button className="host-small host-quiet" onClick={() => void run(setStatus({ key, id, status: "keep" }))}>Keep</button>}
+            <button className="host-small host-quiet" onClick={() => setTyping(true)}>{q.answer ? "Edit answer" : "Type answer"}</button>
+            <button className="host-small host-quiet" disabled title="Voice answers are coming" onClick={() => undefined}>Record answer</button>
             {q.visibility === "public" && (
-              <button className="host-small host-ghost" onClick={() => void run(share({ key, id, shared: !q.shared }))}>{q.shared ? "Stop sharing" : "Share with students"}</button>
+              <button className="host-small host-quiet" onClick={() => void run(share({ key, id, shared: !q.shared }))}>{q.shared ? "Stop sharing" : "Share with students"}</button>
             )}
-            <button className="host-small host-ghost" onClick={() => void run(setStatus({ key, id, status: "dismissed" }))}>Dismiss</button>
+            <button className="host-small host-quiet" onClick={() => void run(setStatus({ key, id, status: "dismissed" }))}>Dismiss</button>
           </>
         )}
       </div>
@@ -107,6 +107,7 @@ export default function QA() {
         <div className="row">
           <label className="host-switch">
             <input type="checkbox" checked={sorted} disabled={busy} onChange={(e) => void toggle(e.target.checked)} />
+            <span className="host-switch__track" />
             Group by topic with AI
           </label>
           {busy && <span className="muted">Sorting...</span>}

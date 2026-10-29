@@ -57,13 +57,13 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
           ))}
           <p className="muted">The dot marks the right answer.</p>
           <div className="row">
-            <button onClick={openIt} disabled={busy || slideIndex === null}>Open question</button>
-            <button onClick={() => setDraft(null)} disabled={busy}>Cancel</button>
+            <button className="host-main" onClick={openIt} disabled={busy || slideIndex === null}>Open question</button>
+            <button className="host-quiet" onClick={() => setDraft(null)} disabled={busy}>Cancel</button>
           </div>
         </div>
       ) : (
         <div className="row">
-          <button onClick={makeDraft} disabled={busy || slideIndex === null}>{busy ? "Writing..." : "Draft with AI"}</button>
+          <button className="host-main" onClick={makeDraft} disabled={busy || slideIndex === null}>{busy ? "Writing..." : "Draft with AI"}</button>
           <button onClick={blank} disabled={busy}>Write my own</button>
         </div>
       )}
@@ -85,8 +85,8 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
               <span className="host-bar__n">{question.picks[i]}</span>
             </div>
           ))}
-          <ol type="A" className="muted">{question.choices.map((c, i) => <li key={i}>{c}{i === question.correct ? " (right)" : ""}</li>)}</ol>
-          {question.status === "open" && <button onClick={() => run(() => close({ key, questionId: question._id }).then(() => undefined))} disabled={busy}>Close question</button>}
+          <ol type="A" className="host-choices">{question.choices.map((c, i) => <li key={i}>{c}{i === question.correct ? " (right)" : ""}</li>)}</ol>
+          {question.status === "open" && <button className="host-small" onClick={() => run(() => close({ key, questionId: question._id }).then(() => undefined))} disabled={busy}>Close question</button>}
         </>
       )}
       {question === null && !draft && <Status kind="empty">No question yet.</Status>}

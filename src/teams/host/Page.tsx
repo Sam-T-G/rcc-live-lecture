@@ -8,6 +8,7 @@ import { Big, Card, Screen, Status } from "../../blocks/ui";
 import { ProfGate } from "../checkin/prof";
 import AskRoom from "./AskRoom";
 import { Missing, Roster, TeamBoard } from "./Boards";
+import type { TeamName } from "./Team";
 import QA from "./QA";
 import "./host.css";
 
@@ -24,12 +25,14 @@ export default function HostPage() {
 
 function Dashboard() {
   const [tab, setTab] = useState<Tab>("Now");
+  const [team, setTeam] = useState<TeamName | "all">("all");
   const slide = useDeckSlide(CHANNEL);
   const checkedIn = useQuery(api.checkin.read.count, { channel: CHANNEL });
   const lost = useQuery(api.live.read.lostCount, slide ? { channel: CHANNEL, index: slide.index } : "skip");
 
   return (
-    <Screen title="Professor view" wide>
+    <Screen wide>
+      <div className="host-root">
       <Card>
         <div className="host-head">
           <div>
@@ -56,18 +59,19 @@ function Dashboard() {
       </div>
 
       {tab === "Now" && (
-        <div className="host-grid">
+        <div className="host-grid host-fade" key="now">
           <AskRoom slideIndex={slide ? slide.index : null} />
           <Missing />
         </div>
       )}
       {tab === "Points" && (
-        <div className="host-grid">
-          <TeamBoard />
-          <Roster />
+        <div className="host-grid host-fade" key="points">
+          <TeamBoard team={team} onTeam={setTeam} />
+          <Roster team={team} onTeam={setTeam} />
         </div>
       )}
-      {tab === "Questions" && <QA />}
+      {tab === "Questions" && <div className="host-fade" key="q"><QA /></div>}
+      </div>
     </Screen>
   );
 }

@@ -8,7 +8,10 @@ import { useProfKey } from "../checkin/prof";
 import { TEAMS, Team, errorText } from "./Team";
 import type { TeamName } from "./Team";
 
-export function TeamBoard() {
+type Pick = TeamName | "all";
+
+// Tap a team to show only its students. Tap it again to show everyone.
+export function TeamBoard({ team, onTeam }: { team: Pick; onTeam: (t: Pick) => void }) {
   const key = useProfKey();
   const teams = useQuery(api.host.board.teams, { key, channel: CHANNEL });
   const reshuffle = useMutation(api.host.teams.reshuffle);
@@ -24,42 +27,44 @@ export function TeamBoard() {
     }
   }
 
+  const most = Math.max(1, ...(teams ?? []).map((t) => t.today));
   return (
-    <Card title="Teams">
+    <Card title="Teams today">
       {teams === undefined ? (
         <Status kind="loading">Loading...</Status>
       ) : (
-        <table className="host-table">
-          <thead><tr><th>Team</th><th>Students</th><th>Today</th><th>Total</th></tr></thead>
-          <tbody>
-            {teams.map((t, i) => (
-              <tr key={t.team}><td><Team name={t.team} />{i === 0 && t.today > 0 ? " leading" : ""}</td><td>{t.students}</td><td>{t.today}</td><td>{t.total}</td></tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="host-teams">
+          {teams.map((t, i) => (
+            <button key={t.team} className="host-teamrow" aria-pressed={team === t.team} onClick={() => onTeam(team === t.team ? "all" : t.team)}>
+              <span><Team name={t.team} /><small>{t.students} students{i === 0 && t.today > 0 ? " · leading" : ""}</small></span>
+              <span className="host-teamrow__bar"><span className={"host-teamrow__fill host-teamrow__fill--" + t.team} style={{ width: `${Math.max(0, (t.today / most) * 100)}%` }} /></span>
+              <span className="host-teamrow__n">{t.today}</span>
+            </button>
+          ))}
+        </div>
       )}
       <div className="row">
-        <button onClick={end}>End day</button>
-        <button className="host-ghost" onClick={() => { if (window.confirm("Mix everyone into new teams?")) void reshuffle({ key, channel: CHANNEL }); }}>Mix the teams</button>
+        <button className="host-main" onClick={end}>End day</button>
+        <button className="host-quiet" onClick={() => { if (window.confirm("Mix everyone into new teams?")) void reshuffle({ key, channel: CHANNEL }); }}>Mix the teams</button>
       </div>
       {message && <Status kind="empty">{message}</Status>}
     </Card>
   );
 }
 
-// Every student with their points. Deduct buttons take 1 or 5 off; each one is kept as an event.
-export function Roster() {
+// Every student with their points. Tap -1 or -5 to take points off; each one is kept as an event.
+export function Roster({ team, onTeam }: { team: Pick; onTeam: (t: Pick) => void }) {
   const key = useProfKey();
   const rows = useQuery(api.host.board.students, { key, channel: CHANNEL });
   const adjust = useMutation(api.host.points.adjust);
-  const [filter, setFilter] = useState<TeamName | "all">("all");
-  const shown = rows?.filter((r) => filter === "all" || r.team === filter);
+  const ranked = rows?.map((r, i) => ({ ...r, rank: i + 1 }));
+  const shown = ranked?.filter((r) => team === "all" || r.team === team);
 
   return (
     <Card title="Students">
-      <div className="row" style={{ marginBottom: 8 }}>
+      <div className="host-filter">
         {(["all", ...TEAMS] as const).map((t) => (
-          <button key={t} className={filter === t ? "host-small" : "host-small host-ghost"} onClick={() => setFilter(t)}>{t === "all" ? "Everyone" : t}</button>
+          <button key={t} className="host-small" aria-pressed={team === t} onClick={() => onTeam(t)}>{t === "all" ? "Everyone" : t}</button>
         ))}
       </div>
       {shown === undefined && <Status kind="loading">Loading...</Status>}
@@ -68,12 +73,12 @@ export function Roster() {
         <table className="host-table">
           <thead><tr><th>#</th><th>Name</th><th>Team</th><th>Today</th><th>Total</th><th /></tr></thead>
           <tbody>
-            {shown.map((r, i) => (
+            {shown.map((r) => (
               <tr key={r.user}>
-                <td>{i + 1}</td><td>{r.name}</td><td><Team name={r.team} /></td><td>{r.today}</td><td>{r.total}</td>
-                <td>
+                <td className="host-rank">{r.rank}</td><td>{r.name}</td><td><Team name={r.team} /></td><td>{r.today}</td><td>{r.total}</td>
+                <td className="host-act">
                   {[1, 5].map((n) => (
-                    <button key={n} className="host-ghost host-small" aria-label={`Take ${n} off ${r.name}`} onClick={() => void adjust({ key, channel: CHANNEL, user: r.user, name: r.name, delta: -n })}>-{n}</button>
+                    <button key={n} className="host-small host-quiet" aria-label={`Take ${n} off ${r.name}`} onClick={() => void adjust({ key, channel: CHANNEL, user: r.user, name: r.name, delta: -n })}>-{n}</button>
                   ))}
                 </td>
               </tr>
@@ -107,7 +112,7 @@ export function Missing() {
 
   return (
     <Card title="Who is missing it">
-      <button onClick={ask} disabled={busy}>{busy ? "Reading..." : "Ask the AI"}</button>
+      <button className="host-main" onClick={ask} disabled={busy}>{busy ? "Reading..." : "Ask the AI"}</button>
       {error && <Status kind="error">{error}</Status>}
       {note && <p className="host-note">{note}</p>}
       {rows === undefined && <Status kind="loading">Loading...</Status>}
