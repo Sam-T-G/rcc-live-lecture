@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Card, Screen, Status } from "../../blocks/ui";
+import { Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
-import { SignInButton, useGoogleUser } from "../../blocks/auth";
 import { useCamera } from "../../blocks/vision";
 import { makeQrReader } from "./qrRead";
+import { ProfGate, useProfKey } from "./prof";
 
 function why(e: unknown) {
   const x = e as { data?: unknown };
@@ -15,20 +15,7 @@ function why(e: unknown) {
 }
 
 export default function Kiosk() {
-  const { user } = useGoogleUser();
-  const host = useQuery(api.checkin.pass.amHost);
-  if (!user)
-    return (
-      <Screen title="Check-in kiosk" wide>
-        <Card title="Sign in">
-          <p>Sign in with a teacher account.</p>
-          <SignInButton />
-        </Card>
-      </Screen>
-    );
-  if (host === undefined) return <Screen title="Check-in kiosk" wide><Status kind="loading">Checking your account…</Status></Screen>;
-  if (!host) return <Screen title="Check-in kiosk" wide><Status kind="error">Only teachers can open this page.</Status></Screen>;
-  return <KioskScanner />;
+  return <ProfGate title="Check-in kiosk"><KioskScanner /></ProfGate>;
 }
 
 type Result = { kind: "ok" | "again" | "error"; text: string };
@@ -44,7 +31,8 @@ async function frontCamera() {
 
 function KioskScanner() {
   const count = useQuery(api.checkin.read.count, { channel: CHANNEL });
-  const names = useQuery(api.checkin.read.names, { channel: CHANNEL });
+  const key = useProfKey();
+  const names = useQuery(api.checkin.read.names, { channel: CHANNEL, key });
   const scan = useMutation(api.checkin.pass.scan);
   const cam = useCamera();
   const [read] = useState(makeQrReader);
@@ -57,7 +45,7 @@ function KioskScanner() {
     if (code === last.current.code && now - last.current.at < 4000) return;
     last.current = { code, at: now };
     try {
-      const r = await scan({ channel: CHANNEL, code });
+      const r = await scan({ channel: CHANNEL, code, key });
       setResult(r.already ? { kind: "again", text: r.name } : { kind: "ok", text: r.name });
     } catch (e) {
       setResult({ kind: "error", text: why(e) });

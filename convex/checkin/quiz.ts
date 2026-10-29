@@ -3,7 +3,8 @@
 import { mutation, query, type QueryCtx } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { requireHost, requireUser } from "../lib";
+import { requireUser } from "../lib";
+import { requireProf } from "./prof";
 
 async function latest(ctx: QueryCtx, channel: string) {
   return await ctx.db.query("polls").withIndex("by_channel", (q) => q.eq("channel", channel)).order("desc").first();
@@ -57,10 +58,10 @@ export const mine = query({
 
 // A host asks a new question (a quiz, or a vote with no right answer). Any question still open on the channel closes first.
 export const ask = mutation({
-  args: { channel: v.string(), kind, question: v.string(), choices: v.array(v.string()), correct: v.optional(v.number()) },
+  args: { key: v.optional(v.string()), channel: v.string(), kind, question: v.string(), choices: v.array(v.string()), correct: v.optional(v.number()) },
   returns: v.id("polls"),
-  handler: async (ctx, { channel, kind, question, choices, correct }) => {
-    await requireHost(ctx);
+  handler: async (ctx, { key, channel, kind, question, choices, correct }) => {
+    await requireProf(ctx, key);
     const q = question.trim();
     const cs = choices.map((c) => c.trim()).filter(Boolean);
     if (!q) throw new ConvexError("Type a question.");
@@ -76,10 +77,10 @@ export const ask = mutation({
 
 // A host ends the question. Answers stop and results show on every phone.
 export const end = mutation({
-  args: { poll: v.id("polls") },
+  args: { key: v.optional(v.string()), poll: v.id("polls") },
   returns: v.null(),
-  handler: async (ctx, { poll }) => {
-    await requireHost(ctx);
+  handler: async (ctx, { key, poll }) => {
+    await requireProf(ctx, key);
     const p = await ctx.db.get(poll);
     if (p?.open) await ctx.db.patch(poll, { open: false, closedAt: Date.now() });
     return null;
@@ -112,7 +113,7 @@ export const answer = mutation({
 
 // The professor's numbers for one poll, live while it's open. Hosts only.
 export const stats = query({
-  args: { poll: v.id("polls") },
+  args: { key: v.optional(v.string()), poll: v.id("polls") },
   returns: v.union(
     v.null(),
     v.object({
@@ -124,8 +125,8 @@ export const stats = query({
       medianSec: v.union(v.null(), v.number()),
     }),
   ),
-  handler: async (ctx, { poll }) => {
-    await requireHost(ctx);
+  handler: async (ctx, { key, poll }) => {
+    await requireProf(ctx, key);
     const p = await ctx.db.get(poll);
     if (!p) return null;
     const { rows, counts } = await tally(ctx, poll, p.choices.length);
@@ -145,10 +146,10 @@ export const stats = query({
 
 // Every question asked on the channel, newest first, with how many got it right. Hosts only.
 export const history = query({
-  args: { channel: v.string() },
+  args: { key: v.optional(v.string()), channel: v.string() },
   returns: v.array(v.object({ id: v.id("polls"), kind, question: v.string(), answered: v.number(), rightPct: v.union(v.null(), v.number()) })),
-  handler: async (ctx, { channel }) => {
-    await requireHost(ctx);
+  handler: async (ctx, { key, channel }) => {
+    await requireProf(ctx, key);
     const polls = await ctx.db.query("polls").withIndex("by_channel", (q) => q.eq("channel", channel)).order("desc").take(50);
     const out = [];
     for (const p of polls) {

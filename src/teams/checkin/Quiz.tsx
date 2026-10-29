@@ -10,7 +10,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Big, Card, Screen, Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
-import { SignInButton, useGoogleUser } from "../../blocks/auth";
+import { ProfGate, useProfKey } from "./prof";
 
 const LETTERS = ["A", "B", "C", "D"];
 
@@ -48,17 +48,7 @@ function Bars({ choices, counts, correct, mine }: { choices: string[]; counts: n
 // ---------- Professor ----------
 
 export function Professor() {
-  const { user } = useGoogleUser();
-  const host = useQuery(api.checkin.pass.amHost);
-  if (!user)
-    return (
-      <Screen title="Live quiz" wide>
-        <Card title="Sign in"><p>Sign in with a teacher account.</p><SignInButton /></Card>
-      </Screen>
-    );
-  if (host === undefined) return <Screen title="Live quiz" wide><Status kind="loading">Checking your account…</Status></Screen>;
-  if (!host) return <Screen title="Live quiz" wide><Status kind="error">Only teachers can open this page.</Status></Screen>;
-  return <ProfessorBoard />;
+  return <ProfGate title="Live quiz"><ProfessorBoard /></ProfGate>;
 }
 
 function ProfessorBoard() {
@@ -81,6 +71,7 @@ function ProfessorBoard() {
 }
 
 function AskForm({ onDone }: { onDone: () => void }) {
+  const key = useProfKey();
   const ask = useMutation(api.checkin.quiz.ask);
   const [kind, setKind] = useState<"quiz" | "vote">("quiz");
   const [question, setQuestion] = useState("");
@@ -93,7 +84,7 @@ function AskForm({ onDone }: { onDone: () => void }) {
     // Blank choices drop out, so the right answer's index has to follow its choice.
     const kept = choices.map((c, i) => ({ c: c.trim(), i })).filter((x) => x.c);
     const at = kind === "quiz" && correct !== null ? kept.findIndex((x) => x.i === correct) : -1;
-    ask({ channel: CHANNEL, kind, question, choices: kept.map((x) => x.c), correct: at >= 0 ? at : undefined })
+    ask({ channel: CHANNEL, key, kind, question, choices: kept.map((x) => x.c), correct: at >= 0 ? at : undefined })
       .then(() => { setErr(""); onDone(); })
       .catch((x) => setErr(why(x)));
   }
@@ -137,7 +128,8 @@ type Poll = NonNullable<ReturnType<typeof useCurrent>>;
 function useCurrent() { return useQuery(api.checkin.quiz.current, { channel: CHANNEL }); }
 
 function Running({ poll, onNew }: { poll: Poll; onNew: () => void }) {
-  const stats = useQuery(api.checkin.quiz.stats, { poll: poll.id });
+  const key = useProfKey();
+  const stats = useQuery(api.checkin.quiz.stats, { poll: poll.id, key });
   const end = useMutation(api.checkin.quiz.end);
   const vote = poll.kind === "vote";
   return (
@@ -148,7 +140,7 @@ function Running({ poll, onNew }: { poll: Poll; onNew: () => void }) {
         <>
           <Big value={stats ? `${stats.answered} / ${stats.checkedIn}` : "…"} label="checked-in students answered" />
           <ul className="quiz__list">{poll.choices.map((c, i) => <li key={i}><b>{LETTERS[i]}</b> {c}</li>)}</ul>
-          <p className="row"><button onClick={() => end({ poll: poll.id })}>{vote ? "End the vote" : "End the question"}</button></p>
+          <p className="row"><button onClick={() => end({ poll: poll.id, key })}>{vote ? "End the vote" : "End the question"}</button></p>
         </>
       ) : stats ? (
         <>
@@ -166,7 +158,8 @@ function Running({ poll, onNew }: { poll: Poll; onNew: () => void }) {
 }
 
 function History() {
-  const past = useQuery(api.checkin.quiz.history, { channel: CHANNEL });
+  const key = useProfKey();
+  const past = useQuery(api.checkin.quiz.history, { channel: CHANNEL, key });
   if (!past || past.length === 0) return <div><h2>This class</h2><Status kind="empty">No questions yet.</Status></div>;
   return (
     <div>

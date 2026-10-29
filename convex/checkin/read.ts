@@ -3,7 +3,7 @@
 // Check-in team owns this file and the tables; keep these three working if you change them.
 import { query } from "../_generated/server";
 import { v } from "convex/values";
-import { requireHost } from "../lib";
+import { requireProf } from "./prof";
 
 // How many people checked in on this channel. Anyone can read the number.
 export const count = query({
@@ -32,10 +32,10 @@ export const me = query({
 
 // Who checked in, newest first. Names are private, so hosts only.
 export const names = query({
-  args: { channel: v.string() },
+  args: { key: v.optional(v.string()), channel: v.string() },
   returns: v.array(v.object({ name: v.string(), at: v.number() })),
-  handler: async (ctx, { channel }) => {
-    await requireHost(ctx);
+  handler: async (ctx, { key, channel }) => {
+    await requireProf(ctx, key);
     const rows = await ctx.db.query("checkins").withIndex("by_channel", (q) => q.eq("channel", channel)).order("desc").collect();
     return rows.map((r) => ({ name: r.name, at: r.at }));
   },

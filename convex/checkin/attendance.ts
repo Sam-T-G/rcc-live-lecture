@@ -2,7 +2,8 @@
 // student's `hideLate`; reads `checkins`. The late banner shows first names only.
 import { mutation, query } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
-import { requireHost, requireUser } from "../lib";
+import { requireUser } from "../lib";
+import { requireProf } from "./prof";
 
 const start = v.object({ startsAt: v.number(), graceMin: v.number() });
 
@@ -18,10 +19,10 @@ export const classStart = query({
 
 // A host sets the start time (ms) and how many minutes of grace before "late".
 export const setClassStart = mutation({
-  args: { channel: v.string(), startsAt: v.number(), graceMin: v.number() },
+  args: { key: v.optional(v.string()), channel: v.string(), startsAt: v.number(), graceMin: v.number() },
   returns: v.null(),
-  handler: async (ctx, { channel, startsAt, graceMin }) => {
-    await requireHost(ctx);
+  handler: async (ctx, { key, channel, startsAt, graceMin }) => {
+    await requireProf(ctx, key);
     if (graceMin < 0 || graceMin > 60) throw new ConvexError("Grace has to be 0 to 60 minutes.");
     const row = await ctx.db.query("classStarts").withIndex("by_channel", (q) => q.eq("channel", channel)).unique();
     if (row) await ctx.db.patch(row._id, { startsAt, graceMin });
@@ -32,10 +33,10 @@ export const setClassStart = mutation({
 
 // Every check-in on this channel, first in first, with email and minutes late. Hosts only.
 export const sheet = query({
-  args: { channel: v.string() },
+  args: { key: v.optional(v.string()), channel: v.string() },
   returns: v.array(v.object({ name: v.string(), email: v.string(), at: v.number(), lateMin: v.union(v.null(), v.number()) })),
-  handler: async (ctx, { channel }) => {
-    await requireHost(ctx);
+  handler: async (ctx, { key, channel }) => {
+    await requireProf(ctx, key);
     const rows = await ctx.db.query("checkins").withIndex("by_channel", (q) => q.eq("channel", channel)).collect();
     return rows.map((r) => ({ name: r.name, email: r.email ?? "", at: r.at, lateMin: r.lateMin ?? null }));
   },

@@ -3,16 +3,18 @@
 // only works for about 40 seconds. Writes `passes` and `checkins`.
 import { mutation, query } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
-import { isHostEmail, randomCode, requireHost, requireUser } from "../lib";
+import { isHostEmail, randomCode, requireUser } from "../lib";
+import { keyOk, requireProf } from "./prof";
 
 const EVERY = 20_000; // ms between codes
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no look-alikes, so a teacher can type one
 
 // Whether the signed-in person can open the teacher page.
 export const amHost = query({
-  args: {},
+  args: { key: v.optional(v.string()) },
   returns: v.boolean(),
-  handler: async (ctx) => {
+  handler: async (ctx, { key }) => {
+    if (keyOk(key)) return true;
     const me = await ctx.auth.getUserIdentity();
     return !!me && me.emailVerified !== false && isHostEmail(me.email);
   },
@@ -51,10 +53,10 @@ export const refresh = mutation({
 
 // The teacher scans (or types) a pass code. Checks the student in on this channel once.
 export const scan = mutation({
-  args: { channel: v.string(), code: v.string() },
+  args: { key: v.optional(v.string()), channel: v.string(), code: v.string() },
   returns: v.object({ name: v.string(), email: v.string(), already: v.boolean() }),
-  handler: async (ctx, { channel, code }) => {
-    await requireHost(ctx);
+  handler: async (ctx, { key, channel, code }) => {
+    await requireProf(ctx, key);
     const c = code.trim().toUpperCase().replace(/^RCC-/, "");
     if (!c) throw new ConvexError("No code.");
     const now = Date.now();

@@ -15,6 +15,7 @@ import { SignInButton, useGoogleUser } from "../../blocks/auth";
 import { useCamera } from "../../blocks/vision";
 import LateBanner from "./LateBanner";
 import Kiosk from "./Kiosk";
+import { ProfGate, useProfKey } from "./prof";
 import { Professor, QuizCard } from "./Quiz";
 
 // The words a ConvexError carries, or a plain fallback.
@@ -90,6 +91,7 @@ const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numer
 // The host sets when class starts and the grace minutes. Check-ins after that are late.
 function ClassStart() {
   const start = useQuery(api.checkin.attendance.classStart, { channel: CHANNEL });
+  const key = useProfKey();
   const set = useMutation(api.checkin.attendance.setClassStart);
   const [time, setTime] = useState("14:30");
   const [grace, setGrace] = useState("5");
@@ -100,7 +102,7 @@ function ClassStart() {
     const [h, m] = time.split(":").map(Number);
     const d = new Date();
     d.setHours(h, m, 0, 0);
-    set({ channel: CHANNEL, startsAt: d.getTime(), graceMin: Number(grace) || 0 }).then(() => setErr("")).catch((x) => setErr(why(x)));
+    set({ channel: CHANNEL, key, startsAt: d.getTime(), graceMin: Number(grace) || 0 }).then(() => setErr("")).catch((x) => setErr(why(x)));
   }
 
   return (
@@ -118,7 +120,8 @@ function ClassStart() {
 
 // The attendance sheet for the professor: name, email, time in, minutes late.
 function Download() {
-  const sheet = useQuery(api.checkin.attendance.sheet, { channel: CHANNEL });
+  const key = useProfKey();
+  const sheet = useQuery(api.checkin.attendance.sheet, { channel: CHANNEL, key });
   if (!sheet) return null;
   function save() {
     const cell = (x: string) => `"${x.replace(/"/g, '""')}"`;
@@ -155,20 +158,7 @@ function HideLate() {
 // ---------- Teacher portal ----------
 
 function Teacher() {
-  const { user } = useGoogleUser();
-  const host = useQuery(api.checkin.pass.amHost);
-  if (!user)
-    return (
-      <Screen title="Teacher check-in" wide>
-        <Card title="Sign in">
-          <p>Sign in with a teacher account.</p>
-          <SignInButton />
-        </Card>
-      </Screen>
-    );
-  if (host === undefined) return <Screen title="Teacher check-in" wide><Status kind="loading">Checking your account…</Status></Screen>;
-  if (!host) return <Screen title="Teacher check-in" wide><Status kind="error">Only teachers can open this page.</Status></Screen>;
-  return <Scanner />;
+  return <ProfGate title="Teacher check-in"><Scanner /></ProfGate>;
 }
 
 type Result = { ok: true; name: string; email: string; already: boolean } | { ok: false; text: string };
@@ -183,7 +173,8 @@ function makeDetector(): Detector | null {
 
 function Scanner() {
   const count = useQuery(api.checkin.read.count, { channel: CHANNEL });
-  const names = useQuery(api.checkin.read.names, { channel: CHANNEL });
+  const key = useProfKey();
+  const names = useQuery(api.checkin.read.names, { channel: CHANNEL, key });
   const scan = useMutation(api.checkin.pass.scan);
   const cam = useCamera();
   const [detector] = useState(makeDetector);
@@ -197,7 +188,7 @@ function Scanner() {
     if (code === last.current.code && now - last.current.at < 4000) return;
     last.current = { code, at: now };
     try {
-      setResult({ ok: true, ...(await scan({ channel: CHANNEL, code })) });
+      setResult({ ok: true, ...(await scan({ channel: CHANNEL, code, key })) });
     } catch (e) {
       setResult({ ok: false, text: why(e) });
     }
