@@ -51,8 +51,11 @@ git fetch origin
 git checkout origin/insurance -- src/teams/checkin convex/checkin convex/host/me.ts   # Check-in (needs the host check)
 git checkout origin/insurance -- src/teams/live convex/live                          # Live slides
 git checkout origin/insurance -- src/teams/host convex/host                          # Professor view
-git commit -m "Use the backup for <team>" && scripts/deploy.sh
+npx convex codegen && npm run build      # refresh the API types for the new functions, then check
+git add -A src/teams convex && git commit -m "Use the backup for <team>" && scripts/deploy.sh
 ```
+
+Tested on a fresh clone 2026-10-29: Check-in alone and all three together both build after `codegen`.
 
 Each team's styles live in its own folder, so taking one team's backup never touches a shared file.
 
