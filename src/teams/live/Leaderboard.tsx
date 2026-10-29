@@ -8,7 +8,7 @@ import { useGoogleUser } from "../../blocks/auth";
 import { Card, Status } from "../../blocks/ui";
 import { useProfKey } from "../checkin/prof";
 
-// "You're on Red 2." Also puts a student who checked in earlier onto a team.
+// "You're on Green." Also puts a student who checked in earlier onto a team.
 export function GroupBadge() {
   const { user } = useGoogleUser();
   const team = useQuery(api.live.groups.mine, { channel: CHANNEL });
@@ -38,7 +38,7 @@ function TeamSize() {
   );
 }
 
-type Row = { team: number; color: "red" | "blue" | "yellow"; label: string; members: number; correct: number; rank: number; ec: number };
+type Row = { team: number; color: string; label: string; members: number; correct: number; rank: number; ec: number };
 
 function TeamRow({ g, mine }: { g: Row; mine: boolean }) {
   return (

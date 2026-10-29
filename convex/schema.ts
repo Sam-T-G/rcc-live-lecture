@@ -144,7 +144,7 @@ export default defineSchema({
   // team: live. The small team a student plays on. Teams are numbered from 0 and dealt in arrival
   // order, three at a time: the 1st student is team 0 (Red), the 2nd team 1 (Blue), the 3rd team 2
   // (Yellow), then around again until each has the professor's team size; then the next three teams
-  // open (Red 2, Blue 2, Yellow 2). One row per student per channel.
+  // open (Green, Orange, Purple, and on through a longer color list). One row per student per channel.
   groups: defineTable({
     channel: v.string(),
     user: v.string(), // identity.tokenIdentifier

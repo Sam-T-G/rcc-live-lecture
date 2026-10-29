@@ -25,6 +25,15 @@
 /* Team leaderboard. Each color also has its name written out, so it never relies on color alone. */
 .group--red { --group: #c5221f; --group-text: #ffffff; }
 .group--yellow { --group: #f9ab00; --group-text: #1f1500; }
+.group--green { --group: #188038; --group-text: #ffffff; }
+.group--orange { --group: #e8710a; --group-text: #1f0d00; }
+.group--purple { --group: #8430ce; --group-text: #ffffff; }
+.group--pink { --group: #e52592; --group-text: #ffffff; }
+.group--teal { --group: #129eaf; --group-text: #00181c; }
+.group--brown { --group: #8a5a2b; --group-text: #ffffff; }
+.group--gray { --group: #6b7280; --group-text: #ffffff; }
+.group--navy { --group: #1e3a8a; --group-text: #ffffff; }
+.group--lime { --group: #84cc16; --group-text: #142000; }
 .group--blue { --group: #1a73e8; --group-text: #ffffff; }
 .group-badge { display: inline-block; margin: 0 0 12px; padding: 6px 14px; border-radius: 999px; font-weight: 600; background: var(--group); color: var(--group-text); }
 .board { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 10px; }

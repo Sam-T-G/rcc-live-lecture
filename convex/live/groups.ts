@@ -1,7 +1,7 @@
 // Live slides: small teams of 3 or 4 students and their leaderboard. A student joins a team when
-// the teacher scans their pass. Teams open three at a time, named by color: the 1st student is Red,
-// the 2nd Blue, the 3rd Yellow, then around again until each has the professor's team size; then
-// Red 2, Blue 2, Yellow 2 open. A team's score is how many right answers its members gave on
+// the teacher scans their pass. Teams open three at a time, each with its own color: the 1st student
+// is Red, the 2nd Blue, the 3rd Yellow, then around again until each has the professor's team size;
+// then Green, Orange, Purple open, and so on down COLORS (past the last color the list repeats, with a number). A team's score is how many right answers its members gave on
 // quizzes the professor has ended (an open quiz counts for nothing, so the board can't leak the
 // answer). Every team is ranked; extra credit: 1st place 5, 2nd 3, 3rd 1, the rest 0.
 import { mutation, query, type MutationCtx, type QueryCtx } from "../_generated/server";
@@ -9,16 +9,17 @@ import { ConvexError, v } from "convex/values";
 import { requireUser } from "../lib";
 import { requireProf } from "../checkin/prof";
 
-const COLORS = ["red", "blue", "yellow"] as const;
+// Every team gets its own color, in the order teams open. Each needs a `.group--<name>` style in live.css.
+const COLORS = ["red", "blue", "yellow", "green", "orange", "purple", "pink", "teal", "brown", "gray", "navy", "lime"];
 const EC = [5, 3, 1];
 
-const color = v.union(v.literal("red"), v.literal("blue"), v.literal("yellow"));
+const color = v.string();
 const teamInfo = v.object({ team: v.number(), color, label: v.string() });
 
 function describe(team: number) {
-  const batch = Math.floor(team / 3) + 1;
-  const c = COLORS[team % 3];
-  return { team, color: c, label: (c[0].toUpperCase() + c.slice(1)) + (batch > 1 ? " " + batch : "") };
+  const c = COLORS[team % COLORS.length];
+  const round = Math.floor(team / COLORS.length) + 1;
+  return { team, color: c, label: c[0].toUpperCase() + c.slice(1) + (round > 1 ? " " + round : "") };
 }
 
 async function teamSize(ctx: QueryCtx, channel: string) {
