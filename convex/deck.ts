@@ -25,6 +25,28 @@ export const current = query({
   },
 });
 
+const shownShape = v.object({
+  index: v.number(),
+  beat: v.number(),
+  title: v.string(),
+  lines: v.array(v.string()),
+  at: v.number(),
+});
+
+// Every slide the deck has shown on a channel, in slide order. Slides not shown yet are left
+// out, so a phone can page back but never ahead of the professor.
+export const slides = query({
+  args: { channel: v.string() },
+  returns: v.array(shownShape),
+  handler: async (ctx, { channel }) => {
+    const rows = await ctx.db
+      .query("deckSlides")
+      .withIndex("by_channel_and_index", (q) => q.eq("channel", channel))
+      .take(500);
+    return rows.map(({ index, beat, title, lines, at }) => ({ index, beat, title, lines, at }));
+  },
+});
+
 export const set = internalMutation({
   args: {
     channel: v.string(),
@@ -43,6 +65,16 @@ export const set = internalMutation({
     const doc = { ...a, at: Date.now() };
     if (row) await ctx.db.replace(row._id, doc);
     else await ctx.db.insert("deckChannels", doc);
+
+    // Keep the fullest version of this slide: going back to a slide shows it from its first
+    // press, which must not hide lines the room has already seen.
+    const shown = await ctx.db
+      .query("deckSlides")
+      .withIndex("by_channel_and_index", (q) => q.eq("channel", a.channel).eq("index", a.index))
+      .unique();
+    const slide = { channel: a.channel, index: a.index, beat: a.beat, title: a.title, lines: a.lines, at: doc.at };
+    if (!shown) await ctx.db.insert("deckSlides", slide);
+    else if (a.beat >= shown.beat) await ctx.db.replace(shown._id, slide);
     return null;
   },
 });

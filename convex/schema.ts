@@ -15,6 +15,17 @@ export default defineSchema({
     at: v.number(),
   }).index("by_channel", ["channel"]),
 
+  // Block: deck bridge. Every slide a deck has shown, one row per slide, at the most presses
+  // shown so far. Lets a phone page back through earlier slides while the deck moves on.
+  deckSlides: defineTable({
+    channel: v.string(),
+    index: v.number(),
+    beat: v.number(),
+    title: v.string(),
+    lines: v.array(v.string()),
+    at: v.number(),
+  }).index("by_channel_and_index", ["channel", "index"]),
+
   // Block: lab. One row per press of the lab page's "ping" button, to prove live sync.
   pings: defineTable({
     user: v.string(),
