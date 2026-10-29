@@ -60,6 +60,12 @@ The student side is not ours. When it is built, it calls:
 - `api.host.qa.shared({ channel })`
 - `api.host.teams.mine({ channel })`: the signed-in student's team
 
+## Sharing the app with the other teams
+
+- **Sign-in:** the page uses Check-in's `ProfGate` and `useProfKey` (`src/teams/checkin/prof.tsx`). Every host-only function takes an optional `key` and calls `requireProf` (`convex/checkin/prof.ts`), so a Google host or the professor key both work. Pass `key` on every call.
+- **Table names:** Live owns `questions` (student questions with upvotes). Ours is `quizQuestions`, the professor's quiz.
+- **Still overlapping, to settle with the leads:** Live's `groups` (numbered teams of 3 or 4) and our red/yellow/blue teams; Live's `questions` and our `studentQuestions` (public or private, AI grouping, typed answers); Check-in's `polls` quiz and our quiz.
+
 ## Rules that matter
 
 - Every host-only function starts with `requireHost(ctx)`. Hiding it in the page is not enough. Never take a user ID, email, or "isHost" as an argument.
