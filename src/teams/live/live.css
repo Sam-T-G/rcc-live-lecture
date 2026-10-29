@@ -1,0 +1,52 @@
+/* Live slides team styles; only used by pages in this folder. */
+.live { display: grid; gap: 16px; }
+@media (min-width: 900px) { .live { grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr); align-items: start; } }
+.live .panel { margin: 0; }
+.slide__title { margin: 0 0 8px; }
+.slide__lines { margin: 0; padding-left: 1.2em; }
+.slide__count { margin: 12px 0 0; font-size: 0.9rem; }
+.qa__tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.qa__tabs button[aria-pressed="false"] { background: transparent; color: var(--text); border: 1px solid var(--line); }
+.qa__form textarea { display: block; width: 100%; box-sizing: border-box; min-height: 72px; resize: vertical; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.qa__row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }
+.qa__row label { display: flex; align-items: center; gap: 8px; margin: 0; }
+.qa__row input[type="checkbox"] { display: inline-block; width: auto; margin: 0; }
+.qa__row .muted { margin-left: auto; font-size: 0.85rem; }
+.qa__list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
+.q { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.q__vote { display: flex; flex-direction: column; align-items: center; min-width: 48px; padding: 6px 10px; background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 10px; }
+.q__vote[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.q__vote:disabled { opacity: 0.6; cursor: default; }
+.q__text { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.q__meta { margin: 4px 0 0; font-size: 0.85rem; color: var(--muted); }
+.q__meta button { min-height: 0; padding: 0 4px; background: transparent; color: var(--muted); text-decoration: underline; font-weight: 400; }
+
+.board__row--mine { outline: 2px solid var(--accent); }
+/* Team leaderboard. Each color also has its name written out, so it never relies on color alone. */
+.group--red { --group: #c5221f; --group-text: #ffffff; }
+.group--yellow { --group: #f9ab00; --group-text: #1f1500; }
+.group--blue { --group: #1a73e8; --group-text: #ffffff; }
+.group-badge { display: inline-block; margin: 0 0 12px; padding: 6px 14px; border-radius: 999px; font-weight: 600; background: var(--group); color: var(--group-text); }
+.board { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 10px; }
+.board__row { display: grid; grid-template-columns: 2.2em 1fr auto auto; align-items: center; gap: 4px 14px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); border-left: 10px solid var(--group); }
+.board__rank { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.board__name { font-weight: 600; font-size: 1.15rem; }
+.board__score, .board__ec { font-variant-numeric: tabular-nums; font-weight: 600; }
+.board__ec { color: var(--accent); }
+.board small { font-weight: 400; color: var(--muted); }
+.board__members { grid-column: 2 / -1; font-size: 0.85rem; }
+.board--big .board__row { padding: 24px 28px; }
+.board--big .board__rank { font-size: 3.5rem; }
+.board--big .board__name { font-size: 2.2rem; }
+.board--big .board__score, .board--big .board__ec { font-size: 2.2rem; }
+.board--big .board__members { font-size: 1.1rem; }
+
+/* Past questions */
+.past { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.past > li { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.past summary { cursor: pointer; display: grid; gap: 2px; }
+.past__q { font-weight: 600; overflow-wrap: anywhere; }
+.past__verdict { font-size: 0.85rem; }
+.past__choices { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.past__choice { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); overflow-wrap: anywhere; }
+.past__choice--right { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }

@@ -19,6 +19,9 @@ import type * as dev_seed from "../dev/seed.js";
 import type * as http from "../http.js";
 import type * as lab from "../lab.js";
 import type * as lib from "../lib.js";
+import type * as live_groups from "../live/groups.js";
+import type * as live_past from "../live/past.js";
+import type * as live_questions from "../live/questions.js";
 import type * as live_read from "../live/read.js";
 
 import type {
@@ -39,6 +42,9 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   lab: typeof lab;
   lib: typeof lib;
+  "live/groups": typeof live_groups;
+  "live/past": typeof live_past;
+  "live/questions": typeof live_questions;
   "live/read": typeof live_read;
 }>;
 

@@ -5,6 +5,7 @@ import { mutation, query } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import { isHostEmail, randomCode, requireUser } from "../lib";
 import { keyOk, requireProf } from "./prof";
+import { ensureGroup } from "../live/groups";
 
 const EVERY = 20_000; // ms between codes
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no look-alikes, so a teacher can type one
@@ -78,6 +79,7 @@ export const scan = mutation({
       const lateMin = over > 0 ? Math.max(1, Math.round((now - start!.startsAt) / 60_000)) : undefined;
       await ctx.db.insert("checkins", { channel, user: p.user, name: p.name, email: p.email, at: now, lateMin });
     }
+    await ensureGroup(ctx, channel, p.user); // Live slides: deals a team in arrival order (Red, Blue, Yellow, ...)
     return { name: p.name, email: p.email, already: !!row };
   },
 });

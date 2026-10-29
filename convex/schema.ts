@@ -117,4 +117,45 @@ export default defineSchema({
   })
     .index("by_channel_and_index", ["channel", "index"])
     .index("by_channel_and_index_and_user", ["channel", "index", "user"]),
+
+  // team: live. A question or comment a student posts beside a slide. `name` is left out when
+  // they post anonymously, and no query ever returns `user`; it is only for "mine" and delete.
+  questions: defineTable({
+    channel: v.string(),
+    index: v.number(), // the slide it was posted on, 0-based
+    user: v.string(), // identity.tokenIdentifier
+    name: v.optional(v.string()),
+    text: v.string(),
+    votes: v.number(), // upvotes, kept in step with questionVotes
+    at: v.number(),
+  })
+    .index("by_channel_and_index", ["channel", "index"])
+    .index("by_channel_and_user", ["channel", "user"]),
+
+  // team: live. One row per student per question they upvoted.
+  questionVotes: defineTable({
+    channel: v.string(),
+    question: v.id("questions"),
+    user: v.string(),
+  })
+    .index("by_question_and_user", ["question", "user"])
+    .index("by_channel_and_user", ["channel", "user"]),
+
+  // team: live. The small team a student plays on. Teams are numbered from 0 and dealt in arrival
+  // order, three at a time: the 1st student is team 0 (Red), the 2nd team 1 (Blue), the 3rd team 2
+  // (Yellow), then around again until each has the professor's team size; then the next three teams
+  // open (Red 2, Blue 2, Yellow 2). One row per student per channel.
+  groups: defineTable({
+    channel: v.string(),
+    user: v.string(), // identity.tokenIdentifier
+    team: v.number(),
+  })
+    .index("by_channel", ["channel"])
+    .index("by_channel_and_user", ["channel", "user"]),
+
+  // team: live. How many students per team the professor chose: 3 or 4. No row means 4.
+  groupSettings: defineTable({
+    channel: v.string(),
+    size: v.number(),
+  }).index("by_channel", ["channel"]),
 });
