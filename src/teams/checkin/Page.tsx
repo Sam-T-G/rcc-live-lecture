@@ -1,6 +1,7 @@
 // Check-in team: #/checkin/kiosk (a host's laptop or TV at the door) and
 // #/checkin/join/<code> (what a phone opens after scanning).
 import { useEffect, useState } from "react";
+import "./checkin.css";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Link, pageUrl, useRoute } from "../../blocks/router";

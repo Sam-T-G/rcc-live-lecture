@@ -1,0 +1,4 @@
+/* host team styles (insurance build) */
+.host__slide { font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1.1; margin: 0 0 24px; }
+.host__nums { display: flex; flex-wrap: wrap; gap: 64px; margin: 16px 0 24px; }
+.host__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }

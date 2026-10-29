@@ -1,5 +1,6 @@
 // Live slides team: #/live, the slide the professor is on, with "I'm lost".
 import { useState } from "react";
+import "./live.css";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Screen, Status } from "../../blocks/ui";

@@ -1,4 +1,5 @@
 // Professor view team: #/host, hosts only. The slide, who's here, and who's lost where.
+import "./host.css";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Big, Card, Screen, Status } from "../../blocks/ui";

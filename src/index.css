@@ -53,17 +53,3 @@ a { color: var(--accent); }
 .status { padding: 12px 0; color: var(--muted); }
 .status--error { color: var(--error); }
 
-/* Insurance build: kiosk, live, and professor view */
-.row { display: flex; flex-wrap: wrap; gap: 12px; }
-button.quiet { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
-.kiosk { display: grid; grid-template-columns: auto 1fr; gap: 48px; align-items: start; }
-.kiosk__names { list-style: none; padding: 0; margin: 16px 0 0; font-size: 1.3rem; }
-.kiosk__names li { padding: 4px 0; border-bottom: 1px solid var(--line); }
-.live__lines { padding-left: 1.2em; font-size: 1.15rem; }
-.live__lines li { margin: 6px 0; }
-button.lost { width: 100%; min-height: 64px; font-size: 1.25rem; margin-top: 12px; }
-button.lost--on { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 2px var(--accent); }
-.host__slide { font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1.1; margin: 0 0 24px; }
-.host__nums { display: flex; flex-wrap: wrap; gap: 64px; margin: 16px 0 24px; }
-.host__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-@media (max-width: 720px) { .kiosk { grid-template-columns: 1fr; } }
