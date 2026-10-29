@@ -45,9 +45,34 @@ export default defineSchema({
     name: v.string(),
     at: v.number(),
     meters: v.optional(v.number()), // distance from the room when they checked in; never their coordinates
+    email: v.optional(v.string()), // for the professor's attendance sheet; hosts only
+    lateMin: v.optional(v.number()), // minutes after class start plus grace; missing = on time
   })
     .index("by_channel", ["channel"])
     .index("by_channel_and_user", ["channel", "user"]),
+
+  // team: checkin. Each student's own QR pass. The code changes every 20 seconds so a
+  // screenshot sent to a friend stops working; the one before it still scans.
+  passes: defineTable({
+    user: v.string(), // identity.tokenIdentifier
+    name: v.string(),
+    email: v.string(),
+    code: v.string(),
+    prevCode: v.string(),
+    at: v.number(), // when `code` was made
+    hideLate: v.optional(v.boolean()), // the student turned off the late banner for themselves
+  })
+    .index("by_user", ["user"])
+    .index("by_code", ["code"])
+    .index("by_prevCode", ["prevCode"]),
+
+  // team: checkin. When class starts on a channel, set by a host. A check-in after
+  // startsAt + graceMin counts as late.
+  classStarts: defineTable({
+    channel: v.string(),
+    startsAt: v.number(),
+    graceMin: v.number(),
+  }).index("by_channel", ["channel"]),
 
   // team: live. One row per student per slide they said they're lost on.
   lost: defineTable({
