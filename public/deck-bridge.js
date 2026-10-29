@@ -7,13 +7,20 @@
    parameter the script does nothing, so a published deck is safe to carry the line.
    Phones read the channel with useDeckSlide("<channel>") (src/blocks/deck.ts).
 
+   To feed other backends instead (each lead's own dev deployment during a meeting), add
+   &bridge-site=<deployment>,<deployment> with their names (e.g. quaint-swan-637). Every
+   one of them needs the same DECK_BRIDGE_KEY in its Convex env.
+
    It sends: the slide number, presses revealed, slide count, the heading, and the
    slide's visible text in order (never speaker notes, never beats not yet shown). */
 (function () {
   var me = document.currentScript;
-  var site = me && me.getAttribute('data-site');
+  var named = (/[?&]bridge-site=([^&#]+)/.exec(location.search) || [])[1];
+  var sites = named
+    ? decodeURIComponent(named).split(',').filter(function (n) { return /^[a-z]+-[a-z]+-\d+$/.test(n); }).map(function (n) { return 'https://' + n + '.convex.site'; })
+    : [me && me.getAttribute('data-site')].filter(Boolean);
   var param = (/[?&]bridge=([^&#]+)/.exec(location.search) || [])[1];
-  if (!site || !param) return;
+  if (!sites.length || !param) return;
   if (/[?&]view=/.test(location.search)) return; // presenter, mirror, remote: only the main window sends
   var cut = decodeURIComponent(param).lastIndexOf('.');
   if (cut < 1) return;
@@ -54,9 +61,11 @@
     last = sig;
     body.channel = channel;
     body.key = key;
-    fetch(site.replace(/\/$/, '') + '/deck', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) })
-      .then(function (r) { if (!r.ok) console.warn('deck-bridge:', r.status); })
-      .catch(function (e) { last = ''; console.warn('deck-bridge: offline', e); });
+    sites.forEach(function (site) {
+      fetch(site.replace(/\/$/, '') + '/deck', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) })
+        .then(function (r) { if (!r.ok) console.warn('deck-bridge:', site, r.status); })
+        .catch(function (e) { last = ''; console.warn('deck-bridge: offline', site, e); });
+    });
   }
   setInterval(tick, 300);
 })();

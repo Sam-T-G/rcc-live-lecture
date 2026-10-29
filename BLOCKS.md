@@ -81,6 +81,8 @@ Indoors a phone is often 20 to 100 m off. Treat location as a soft check; pair i
 
 Then open the deck with `?bridge=<channel>.<DECK_BRIDGE_KEY>` on its URL (the key is in Convex env: `npx convex env get DECK_BRIDGE_KEY`). Without that parameter the script does nothing. It sends on every press: slide number, presses shown, slide count, the heading, and the slide's visible text in order. Never speaker notes, never beats not shown yet. Presenter, mirror, and remote windows don't send.
 
+**During a meeting, every lead's own backend.** Each lead runs their own dev deployment, so the presenting tab adds `&bridge-site=<name>,<name>` (deployment names, like `quaint-swan-637`) and sends to all of them instead of `data-site`. Each of those deployments needs the same `DECK_BRIDGE_KEY` (`npx convex env set DECK_BRIDGE_KEY <the value Sam gives you>`). The 10-29 deck sends on channel `gdg`.
+
 **Reading, in the app:**
 
 ```tsx
