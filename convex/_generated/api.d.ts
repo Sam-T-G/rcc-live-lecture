@@ -9,10 +9,13 @@
  */
 
 import type * as ai from "../ai.js";
+import type * as checkin_read from "../checkin/read.js";
 import type * as deck from "../deck.js";
+import type * as dev_seed from "../dev/seed.js";
 import type * as http from "../http.js";
 import type * as lab from "../lab.js";
 import type * as lib from "../lib.js";
+import type * as live_read from "../live/read.js";
 
 import type {
   ApiFromModules,
@@ -22,10 +25,13 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
+  "checkin/read": typeof checkin_read;
   deck: typeof deck;
+  "dev/seed": typeof dev_seed;
   http: typeof http;
   lab: typeof lab;
   lib: typeof lib;
+  "live/read": typeof live_read;
 }>;
 
 /**
