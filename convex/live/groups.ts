@@ -82,7 +82,7 @@ export const mine = query({
   },
 });
 
-// For a student who checked in before teams existed: gives them one now. Checked-in only.
+// For a student who checked in before teams existed: deals every team-less check-in a team in check-in order. Checked-in only.
 export const join = mutation({
   args: { channel: v.string() },
   returns: v.union(v.null(), teamInfo),
@@ -93,6 +93,10 @@ export const join = mutation({
       .withIndex("by_channel_and_user", (q) => q.eq("channel", channel).eq("user", me.tokenIdentifier))
       .unique();
     if (!here) return null;
+    // Anyone checked in without a team gets one in the order they checked in, not the order
+    // they happened to open their phone, so teams still follow attendance.
+    const all = await ctx.db.query("checkins").withIndex("by_channel", (q) => q.eq("channel", channel)).collect();
+    for (const c of all.sort((a, b) => a.at - b.at)) await ensureGroup(ctx, channel, c.user);
     return describe(await ensureGroup(ctx, channel, me.tokenIdentifier));
   },
 });
