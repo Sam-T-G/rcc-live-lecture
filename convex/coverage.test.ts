@@ -1,6 +1,7 @@
 // F39: every Convex function has a test, and every function that takes a professor key has an
-// authMatrix test. The functions come from loading each Convex module. The test files' source
-// comes in as text through Vite, with comments removed, so a name in a comment doesn't count.
+// authMatrix test that calls it as each row's caller with that row's key. The functions come from
+// loading each Convex module. The test files' source comes in as text through Vite, with comments
+// removed, so a name in a comment doesn't count.
 import { describe, expect, it } from "vitest";
 import { modules } from "./test.setup";
 
@@ -115,11 +116,51 @@ function authMatrixCalls(src: string): string[] {
 // Whether `text` names `ref` as a whole name: api.checkin.quiz.end, never api.checkin.quiz.endDay.
 const names = (text: string, ref: string) => new RegExp(`(?<![\\w$.])${ref.replace(/\./g, "\\.")}(?![\\w$])`).test(text);
 
+// The parameter names of the callback an authMatrix call starts with: `(as, key, t) =>`,
+// `async (as, key) => {`, `as =>` or `function (as, key) {`. A parameter that isn't a plain
+// name comes back as "".
+function params(call: string): string[] {
+  const bare = /^\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*=>/.exec(call);
+  if (bare) return [bare[1]];
+  const open = /^\s*(?:async\s+)?(?:function\b[^(]*)?\(/.exec(call);
+  if (!open) return [];
+  const start = open[0].length;
+  return call
+    .slice(start, skipCode(call, start, ")") - 1)
+    .split(",")
+    .map((p) => /^\s*([A-Za-z_$][\w$]*)\s*(?:[:=?]|$)/.exec(p)?.[1] ?? "");
+}
+
+// Whether a call's arguments set `key` to the parameter named `key`: `{ key }` when the parameter
+// is called key, or `{ key: k }`.
+function passesKey(args: string, key: string): boolean {
+  const k = key.replace(/\$/g, "\\$");
+  return new RegExp(`[{,]\\s*key\\s*:\\s*${k}\\s*[,}]`).test(args) || (key === "key" && /[{,]\s*key\s*[,}]/.test(args));
+}
+
+// The one function an authMatrix call checks, or null. The callback has to call exactly one
+// function through its first parameter (the row's caller), and pass its second parameter (the
+// row's key) as `key` every time. A setup step on `t` or with PROF_KEY runs the same way on every
+// row, so it checks nothing. A second function called through the row's caller could throw first
+// on a refused row, so the matrix would never find out whether the function after it refuses.
+function matrixCheck(call: string): string | null {
+  const [as, key] = params(call);
+  if (!as || !key) return null;
+  const through = new RegExp(`(?<![\\w$.])${as.replace(/\$/g, "\\$")}\\s*\\.\\s*(?:query|mutation|action)\\s*\\(`, "g");
+  const calls = [...call.matchAll(through)].map((m) => {
+    const start = m.index + m[0].length;
+    return call.slice(start, skipCode(call, start, ")") - 1);
+  });
+  const refs = new Set(calls.map((args) => /^\s*((?:api|internal)(?:\.[\w$]+)+)\s*,/.exec(args)?.[1] ?? ""));
+  const [ref] = refs;
+  return refs.size === 1 && ref && calls.every((args) => passesKey(args, key)) ? ref : null;
+}
+
 describe("F39 every Convex function is tested", async () => {
   const fns = await convexFunctions();
   const tests = Object.values(SOURCES).map(withoutComments);
   const all = tests.join("\n");
-  const matrices = tests.flatMap(authMatrixCalls).join("\n");
+  const matrices = tests.flatMap(authMatrixCalls);
 
   it("finds the functions and the test files to check", () => {
     expect(fns.length).toBeGreaterThan(0);
@@ -140,9 +181,40 @@ describe("F39 every Convex function is tested", async () => {
     expect(untested).toEqual([]);
   });
 
-  it("F39.3 every function with a key arg, except checkin.pass.amHost, is named in an authMatrix call", () => {
+  it("F39.3 every function with a key arg, except checkin.pass.amHost, is the one function an authMatrix call checks", () => {
+    const checked = new Set(matrices.map(matrixCheck));
     const keyed = fns.filter((f) => f.hasKey && !NO_MATRIX.includes(f.ref));
-    expect(keyed.filter((f) => !names(matrices, f.ref)).map((f) => f.ref)).toEqual([]);
+    expect(keyed.filter((f) => !checked.has(f.ref)).map((f) => f.ref)).toEqual([]);
+  });
+
+  it("F39.3 a function counts only when the matrix calls it, and nothing else, as the row's caller with the row's key", () => {
+    const check = (src: string) => authMatrixCalls(withoutComments(src)).map(matrixCheck);
+    // The shapes checkin/prof.test.ts uses.
+    expect(check(`authMatrix((as, key) => as.query(api.a.names, { key, channel: CH }))`)).toEqual(["api.a.names"]);
+    expect(check(`authMatrix(async (as, key) => { if (!(await as.query(api.a.canScan, { key }))) throw new Error("no"); })`)).toEqual(["api.a.canScan"]);
+    expect(
+      check(`authMatrix(async (as, key, t) => {
+        const poll = await t.mutation(api.setup.ask, { key: PROF_KEY, channel: CH });
+        await as.mutation(api.a.end, { key, poll });
+      })`),
+    ).toEqual(["api.a.end"]);
+    expect(check(`authMatrix(async function (who, k) { await who.mutation(api.a.end, { poll, key: k }); })`)).toEqual(["api.a.end"]);
+    // Used only as a setup step, on `t` or as the row's caller with PROF_KEY: not checked.
+    expect(check(`authMatrix(async (as, key, t) => { await t.mutation(api.setup.ask, { key: PROF_KEY }); })`)).toEqual([null]);
+    expect(check(`authMatrix(async (as, key) => { await as.mutation(api.setup.ask, { key: PROF_KEY }); })`)).toEqual([null]);
+    // Called without the row's key: not checked.
+    expect(check(`authMatrix((as, k) => as.query(api.a.names, { key }))`)).toEqual([null]);
+    expect(check(`authMatrix((as, key) => as.query(api.a.names, { channel: key }))`)).toEqual([null]);
+    expect(check(`authMatrix((as) => as.query(api.a.names, {}))`)).toEqual([null]);
+    // Two functions called as the row's caller: answer throws first on a refused row, so share is never tried there.
+    expect(
+      check(`authMatrix(async (as, key) => {
+        await as.mutation(api.a.answer, { key, id });
+        await as.mutation(api.a.share, { key, id });
+      })`),
+    ).toEqual([null]);
+    // A function passed by name: no callback to read.
+    expect(check(`authMatrix(tryNames)`)).toEqual([null]);
   });
 
   it("F39.3 the scan reads authMatrix calls, strings and comments the way a test file has them", () => {
@@ -157,6 +229,7 @@ describe("F39 every Convex function is tested", async () => {
     const calls = authMatrixCalls(src);
     expect(calls).toHaveLength(1);
     expect(names(calls[0], "api.checkin.quiz.end")).toBe(true);
+    expect(matrixCheck(calls[0])).toBe("api.checkin.quiz.end");
     expect(names(calls[0], "api.outside.theCall")).toBe(false);
     expect(names(src, "api.outside.theCall")).toBe(true);
     expect(names(src, "api.only.inAComment")).toBe(false);
