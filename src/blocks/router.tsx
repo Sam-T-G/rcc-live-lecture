@@ -1,6 +1,7 @@
 // Block: routing. Hash URLs (#/kiosk/ABC) so GitHub Pages serves every page from one file.
-// Add a page in src/pages/index.ts; read its parts with useRoute().
-import { useEffect, useState, type ReactNode } from "react";
+// Add a page in src/pages/index.ts; read its parts with useRoute() and the part after "?" with
+// useHashParams().
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 export function useRoute() {
   const read = () => (location.hash.replace(/^#\/?/, "").split("?")[0] || "").split("/").filter(Boolean).map(decodeURIComponent);
@@ -11,6 +12,23 @@ export function useRoute() {
     return () => window.removeEventListener("hashchange", on);
   }, []);
   return parts;
+}
+
+// The part of the hash after the first "?": on #/checkin/stage?deck=a&bridge=b,
+// useHashParams().get("deck") is "a". It reads the hash again on every hashchange and returns
+// the same URLSearchParams object until the hash changes.
+export function useHashParams() {
+  const read = () => {
+    const at = location.hash.indexOf("?");
+    return at === -1 ? "" : location.hash.slice(at + 1);
+  };
+  const [query, setQuery] = useState(read);
+  useEffect(() => {
+    const on = () => setQuery(read());
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, []);
+  return useMemo(() => new URLSearchParams(query), [query]);
 }
 
 export function go(path: string) {

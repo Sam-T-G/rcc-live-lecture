@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { CHANNEL, useDeckSlide } from "../../blocks/deck";
-import { Big, Card, Screen, Status } from "../../blocks/ui";
+import { Link } from "../../blocks/router";
+import { Big, Card, ErrorBoundary, Screen, Status } from "../../blocks/ui";
 import { ProfGate } from "../checkin/prof";
 import AskRoom from "./AskRoom";
-import { Missing, Roster, TeamBoard } from "./Boards";
-import type { TeamName } from "./Team";
+import { PointsTab } from "./Boards";
+import { Missing } from "./Missing";
 import QA from "./QA";
 import "./host.css";
 
@@ -25,7 +26,6 @@ export default function HostPage() {
 
 function Dashboard() {
   const [tab, setTab] = useState<Tab>("Now");
-  const [team, setTeam] = useState<TeamName | "all">("all");
   const slide = useDeckSlide(CHANNEL);
   const checkedIn = useQuery(api.checkin.read.count, { channel: CHANNEL });
   const lost = useQuery(api.live.read.lostCount, slide ? { channel: CHANNEL, index: slide.index } : "skip");
@@ -44,6 +44,7 @@ function Dashboard() {
                 <h2>{slide.title}</h2>
               </>
             )}
+            <p className="host-links"><Link to="checkin/teacher">Attendance</Link></p>
           </div>
           <div className="host-counts">
             <Big value={checkedIn ?? "-"} label="checked in" />
@@ -59,18 +60,23 @@ function Dashboard() {
       </div>
 
       {tab === "Now" && (
-        <div className="host-grid host-fade" key="now">
-          <AskRoom slideIndex={slide ? slide.index : null} />
-          <Missing />
-        </div>
+        <ErrorBoundary key="now" label="The Now tab">
+          <div className="host-grid host-fade">
+            <AskRoom slideIndex={slide ? slide.index : null} />
+            <Missing />
+          </div>
+        </ErrorBoundary>
       )}
       {tab === "Points" && (
-        <div className="host-grid host-fade" key="points">
-          <TeamBoard team={team} onTeam={setTeam} />
-          <Roster team={team} onTeam={setTeam} />
-        </div>
+        <ErrorBoundary key="points" label="The Points tab">
+          <div className="host-fade"><PointsTab /></div>
+        </ErrorBoundary>
       )}
-      {tab === "Questions" && <div className="host-fade" key="q"><QA /></div>}
+      {tab === "Questions" && (
+        <ErrorBoundary key="q" label="The Questions tab">
+          <div className="host-fade"><QA /></div>
+        </ErrorBoundary>
+      )}
       </div>
     </Screen>
   );

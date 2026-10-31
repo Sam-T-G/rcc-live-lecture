@@ -3,8 +3,10 @@
 //   const hands = await loadVision("gestures");          // load once (a few MB), then reuse
 //   const s = hands.run(video);                          // each frame: { count, labels, raw }
 //   s.labels → ["Thumb_Up", "Open_Palm"]                 // what it saw, ready to count or send
-// Camera: useCamera() below, started from a button press. A team that uses the camera says so
-// in TEAM.md under "What it sees" (AGENTS.md, Privacy). BLOCKS.md has the recipes.
+// Camera: useCamera() from ./camera, re-exported here, started from a button press. A page that
+// only needs the camera imports ./camera itself, so it doesn't pull this file's MediaPipe import
+// into the bundle every phone downloads. A team that uses the camera says so in TEAM.md under
+// "What it sees" (AGENTS.md, Privacy). BLOCKS.md has the recipes.
 import {
   DrawingUtils,
   FaceDetector,
@@ -17,7 +19,9 @@ import {
   PoseLandmarker,
   type NormalizedLandmark,
 } from "@mediapipe/tasks-vision";
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
+
+export { useCamera } from "./camera";
 
 const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm";
 const M = "https://storage.googleapis.com/mediapipe-models/";
@@ -150,40 +154,6 @@ export function drawSeen(canvas: HTMLCanvasElement, kind: VisionKind, seen: Seen
       const label = name(det.categories[0] ?? {}); if (label) g.fillText(label, b.originX + 6, b.originY + 22);
     }
   }
-}
-
-// The camera, started from a button press. On a Mac it skips an iPhone (Continuity Camera)
-// and uses the built-in camera; pass a deviceId to pick another.
-export function useCamera() {
-  const video = useRef<HTMLVideoElement>(null);
-  const [on, setOn] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const stream = useRef<MediaStream | null>(null);
-
-  const stop = useCallback(() => {
-    stream.current?.getTracks().forEach((t) => t.stop());
-    stream.current = null;
-    setOn(false);
-  }, []);
-
-  const start = useCallback(async (deviceId?: string) => {
-    setError(null);
-    try {
-      if (!deviceId) {
-        const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
-        deviceId = cams.find((c) => c.label && !/iphone|ipad|continuity/i.test(c.label))?.deviceId;
-      }
-      const s = await navigator.mediaDevices.getUserMedia({ video: deviceId ? { deviceId: { exact: deviceId }, width: 1280 } : { facingMode: "user", width: 1280 }, audio: false });
-      stream.current = s;
-      if (video.current) { video.current.srcObject = s; await video.current.play(); }
-      setOn(true);
-    } catch (e) {
-      setError(e instanceof Error && e.name === "NotAllowedError" ? "Camera blocked. Allow it in the browser's address bar." : "Couldn't start the camera.");
-    }
-  }, []);
-
-  useEffect(() => stop, [stop]);
-  return { video, on, error, start, stop };
 }
 
 // Run a model on the camera, `fps` times a second, while `on`. onSeen gets each result.

@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
-import { useCamera } from "../../blocks/vision";
+import { useCamera } from "../../blocks/camera";
 import { makeQrReader } from "./qrRead";
 import { ProfGate, useProfKey } from "./prof";
 

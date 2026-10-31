@@ -133,6 +133,22 @@ export function SignInButton() {
   return <TestSignIn />;
 }
 
+// Who this browser is signed in as, so a student who typed the wrong email or picked up a
+// friend's phone can sign out and sign in again: "Signed in as Jane Doe (jane@example.edu)" and a
+// "Not you? Sign out" button. A name that is the email shows once. Nothing when signed out.
+export function SignedInAs() {
+  const { user, signOut } = useGoogleUser();
+  if (!user) return null;
+  const { name, email } = user;
+  const who = name && email && name !== email ? `${name} (${email})` : name || email;
+  return (
+    <p className="row muted">
+      <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>Signed in as {who}</span>
+      <button type="button" className="quiet" onClick={signOut}>Not you? Sign out</button>
+    </p>
+  );
+}
+
 // Typed sign-in: any name and email (convex/auth.config.ts). Never a host (convex/lib.ts).
 function TestSignIn() {
   const { signInWithToken } = useGoogleUser();

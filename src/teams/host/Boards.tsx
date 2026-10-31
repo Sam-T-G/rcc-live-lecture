@@ -1,6 +1,6 @@
-// Scores: the three teams, the top students, and the AI note on who is missing the point.
+// The Points tab: the three teams and every student's points. Tap a team to show only its students.
 import { useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Card, Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
@@ -9,6 +9,17 @@ import { TEAMS, Team, errorText } from "./Team";
 import type { TeamName } from "./Team";
 
 type Pick = TeamName | "all";
+
+// The whole Points tab. It keeps which team the roster shows, so the tab's two cards agree.
+export function PointsTab() {
+  const [team, setTeam] = useState<Pick>("all");
+  return (
+    <div className="host-grid">
+      <TeamBoard team={team} onTeam={setTeam} />
+      <Roster team={team} onTeam={setTeam} />
+    </div>
+  );
+}
 
 // Tap a team to show only its students. Tap it again to show everyone.
 export function TeamBoard({ team, onTeam }: { team: Pick; onTeam: (t: Pick) => void }) {
@@ -82,47 +93,6 @@ export function Roster({ team, onTeam }: { team: Pick; onTeam: (t: Pick) => void
                   ))}
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </Card>
-  );
-}
-
-export function Missing() {
-  const key = useProfKey();
-  const rows = useQuery(api.host.board.missing, { key, channel: CHANNEL });
-  const feedback = useAction(api.host.ai.feedback);
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function ask() {
-    setBusy(true);
-    setError("");
-    try {
-      setNote(await feedback({ key, channel: CHANNEL }));
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Card title="Who is missing it">
-      <button className="host-main" onClick={ask} disabled={busy}>{busy ? "Reading..." : "Ask the AI"}</button>
-      {error && <Status kind="error">{error}</Status>}
-      {note && <p className="host-note">{note}</p>}
-      {rows === undefined && <Status kind="loading">Loading...</Status>}
-      {rows?.length === 0 && <Status kind="empty">Nobody got it wrong yet.</Status>}
-      {rows && rows.length > 0 && (
-        <table className="host-table">
-          <thead><tr><th>Name</th><th>Team</th><th>Picked</th></tr></thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={i}><td>{r.name}</td><td><Team name={r.team} /></td><td>{r.choice}</td></tr>
             ))}
           </tbody>
         </table>

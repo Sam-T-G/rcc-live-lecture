@@ -1,6 +1,6 @@
 // Block: shared screen parts, so every team's pages look like one app without anyone
 // designing a button. Styles are in src/index.css. BLOCKS.md shows each one.
-import type { ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 
 // A whole page. `wide` is for big screens (kiosk, professor view); phones get the narrow one.
 export function Screen({ title, wide, children }: { title?: string; wide?: boolean; children?: ReactNode }) {
@@ -50,4 +50,37 @@ export function Card({ title, children }: { title?: string; children: ReactNode 
       {children}
     </section>
   );
+}
+
+// Wrap each part of a page that reads its own data, so an error there leaves the rest of the page
+// up. A Convex query that fails (a function a deploy renamed, a server limit) throws while its part
+// renders, and with no boundary React empties the whole page, the slide included.
+//   <ErrorBoundary label="The leaderboard"><Leaderboard /></ErrorBoundary>
+// When the part throws, it shows "The leaderboard didn't load." ("This part of the page didn't
+// load." with no label) and a Try again button that renders the part again from the start. The
+// error goes to the browser console with the label.
+type BoundaryProps = { label?: string; children?: ReactNode };
+
+export class ErrorBoundary extends Component<BoundaryProps, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: unknown, info: ErrorInfo) {
+    console.error(`${this.props.label || "This part of the page"} didn't load:`, error, info.componentStack);
+  }
+
+  retry = () => this.setState({ failed: false });
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="row">
+        <Status kind="error">{`${this.props.label || "This part of the page"} didn't load.`}</Status>
+        <button type="button" className="quiet" onClick={this.retry}>Try again</button>
+      </div>
+    );
+  }
 }

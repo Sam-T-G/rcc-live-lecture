@@ -29,6 +29,7 @@
 .host-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
 .host-head h2 { font-size: 1.9rem; font-weight: 600; letter-spacing: -0.01em; text-transform: none; color: var(--text); margin: 2px 0 0; }
 .host-head p { margin: 0; }
+.host-head .host-links { margin-top: 10px; font-weight: 500; }
 .host-counts { display: flex; gap: 36px; }
 .host-head .big__value { font-size: 3.2rem; font-weight: 500; letter-spacing: -0.03em; transition: color 0.2s; }
 .host-head .big__label { font-size: 0.85rem; }
@@ -68,6 +69,9 @@
 .team--red::before { background: var(--red); }
 .team--yellow::before { background: var(--yellow); }
 .team--blue::before { background: var(--blue); }
+/* A team from live.groups: the dot takes --group from its .group--<color> class (live.css) */
+.team-chip { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text); }
+.team-chip::before { content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--group, currentColor); }
 
 /* Tables */
 .host-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
