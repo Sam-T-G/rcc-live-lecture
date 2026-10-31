@@ -142,8 +142,9 @@ describe("F8 classes: one lectures window per class", () => {
     profEnv();
     const t = setup();
     expect(await win(t)).toEqual({ lecture: null, start: 0, startsAt: null, graceMin: 0 });
-    // Prod before the first class: the start time the professor saved the old way decides lateness.
-    await admin(t).mutation(api.checkin.attendance.setClassStart, { channel: CH, startsAt: T0 + 30 * MIN, graceMin: 5 });
+    // Prod before the first class: the start time the professor saved the old way (a classStarts
+    // row; attendance.setClassStart opens a class now) decides lateness.
+    await t.run((ctx) => ctx.db.insert("classStarts", { channel: CH, startsAt: T0 + 30 * MIN, graceMin: 5 }));
     expect(await win(t)).toEqual({ lecture: null, start: 0, startsAt: T0 + 30 * MIN, graceMin: 5 });
 
     vi.setSystemTime(T0 + 10 * MIN);

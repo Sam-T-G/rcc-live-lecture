@@ -1,88 +1,101 @@
-// #/checkin/teacher: the professor's laptop, for professors and admins on the staff list
-// (StaffGate). The camera reads students' passes, the page lists who has checked in, and the
-// professor sets when class starts and downloads the attendance sheet.
+// #/checkin/teacher: attendance on the professor's laptop, for professors and admins (StaffGate).
+// Everything on it is for the class running now (convex/checkin/attendance.ts says what a class
+// is). The laptop camera reads students' passes (makeQrReader in qrRead.ts: the browser's own
+// reader in Chrome on a Mac, jsQR in Safari, Firefox and Chrome on Windows), or the professor
+// types the code from a student's phone. The page lists who checked in, each with a Remove for a
+// wrong check-in; the professor sets when class starts and how many minutes of grace come before
+// "late"; and downloads attendance as a CSV for this class or any past one. End day on the
+// Professor view's Points tab ends the class.
+import "./teacher.css";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { Badge, Button, ConfirmButton, Field, Stat } from "../../blocks/kit";
 import { Link } from "../../blocks/router";
-import { Big, Card, Screen, Status } from "../../blocks/ui";
+import { Card, ErrorBoundary, Screen, Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
 import { useCamera } from "../../blocks/camera";
+import { makeQrReader } from "./qrRead";
 import { StaffGate } from "./prof";
+import { classFile, classLabel, dateFile, day, dayTime, hhmm, nearestStart, sameDay, saveCsv, timeOrDay, type ClassRow } from "./sheet";
 import { clock, why } from "./util";
 
+const MIN = 60_000;
+
 export function Teacher() {
-  return <StaffGate title="Teacher check-in"><Scanner /></StaffGate>;
-}
-
-// The host sets when class starts and the grace minutes. Check-ins after that are late.
-export function ClassStart() {
-  const start = useQuery(api.checkin.attendance.classStart, { channel: CHANNEL });
-  const set = useMutation(api.checkin.attendance.setClassStart);
-  const [time, setTime] = useState("14:30");
-  const [grace, setGrace] = useState("5");
-  const [err, setErr] = useState("");
-
-  function save(e: FormEvent) {
-    e.preventDefault();
-    const [h, m] = time.split(":").map(Number);
-    const d = new Date();
-    d.setHours(h, m, 0, 0);
-    set({ channel: CHANNEL, startsAt: d.getTime(), graceMin: Number(grace) || 0 }).then(() => setErr("")).catch((x) => setErr(why(x)));
-  }
-
   return (
-    <form className="row" onSubmit={save}>
-      <label>Class starts <input type="time" value={time} onChange={(e) => setTime(e.target.value)} required /></label>
-      <label>Late after <input type="number" min={0} max={60} value={grace} onChange={(e) => setGrace(e.target.value)} className="late__grace" /> min</label>
-      <button type="submit" className="quiet">Save</button>
-      <span className="muted">
-        {start ? `Late after ${clock(start.startsAt + start.graceMin * 60_000)}` : "No start time yet, so nobody is late."}
-      </span>
-      {err && <Status kind="error">{err}</Status>}
-    </form>
+    <StaffGate title="Attendance">
+      <Scanner />
+    </StaffGate>
   );
 }
 
-// The attendance sheet for the professor: name, email, time in, minutes late.
-export function Download() {
+// Each part that reads its own data has its own ErrorBoundary, so a list that fails to load
+// leaves the camera and the typed code working.
+export function Scanner() {
+  return (
+    <Screen title="Attendance" wide>
+      <div className="row att-status">
+        <ErrorBoundary label="The class status">
+          <ClassStatus />
+        </ErrorBoundary>
+        <Link to="host">End the class: Professor view, Points</Link>
+      </div>
+      <ErrorBoundary label="The counts">
+        <Counts />
+      </ErrorBoundary>
+      <div className="scanner">
+        <ScanPasses />
+        <div>
+          <ErrorBoundary label="The class start">
+            <ClassStart />
+          </ErrorBoundary>
+          <Card title="This class">
+            <ErrorBoundary label="This class's attendance">
+              <Download />
+              <Names />
+            </ErrorBoundary>
+          </Card>
+          <ErrorBoundary label="Past classes">
+            <PastClasses />
+          </ErrorBoundary>
+          <p>
+            <Link to="checkin/quiz">Ask a question or start a vote</Link>
+          </p>
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+// How many checked in to this class, and how many of them late.
+function Counts() {
+  const names = useQuery(api.checkin.read.names, { channel: CHANNEL });
   const sheet = useQuery(api.checkin.attendance.sheet, { channel: CHANNEL });
-  if (!sheet) return null;
-  function save() {
-    const cell = (x: string) => `"${x.replace(/"/g, '""')}"`;
-    const rows = [["Name", "Email", "Checked in", "Minutes late"], ...sheet!.map((r) => [r.name, r.email, new Date(r.at).toLocaleString(), r.lateMin === null ? "0" : String(r.lateMin)])];
-    const blob = new Blob([rows.map((r) => r.map(cell).join(",")).join("\n")], { type: "text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `attendance-${CHANNEL}-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-  const late = sheet.filter((r) => r.lateMin !== null).length;
+  const late = sheet?.filter((r) => r.lateMin !== null).length;
   return (
-    <p className="row">
-      <button onClick={save} disabled={sheet.length === 0}>Download attendance (CSV)</button>
-      <span className="muted">{late} late</span>
-    </p>
+    <div className="att-stats">
+      <Stat value={names?.length ?? "…"} label="checked in" accent />
+      <Stat value={late ?? "…"} label="late" />
+    </div>
   );
+}
+
+// Whether a class is running, and since when.
+function ClassStatus() {
+  const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
+  const open = classes?.find((c) => c.open);
+  return <span>{classes === undefined ? "Loading…" : open ? `Class started ${dayTime(open.startedAt)}` : "No class running."}</span>;
 }
 
 type Result = { ok: true; name: string; email: string; already: boolean } | { ok: false; text: string };
 
-// Chrome and Edge read QR codes on their own (BarcodeDetector). Safari and Firefox don't,
-// so those get the typed code only.
-type Detector = { detect: (src: HTMLVideoElement) => Promise<{ rawValue: string }[]> };
-function makeDetector(): Detector | null {
-  const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => Detector }).BarcodeDetector;
-  return BD ? new BD({ formats: ["qr_code"] }) : null;
-}
-
-export function Scanner() {
-  const count = useQuery(api.checkin.read.count, { channel: CHANNEL });
-  const names = useQuery(api.checkin.read.names, { channel: CHANNEL });
+// The camera and the typed code. A pass the camera reads, or a code typed in, checks that
+// student in to this class.
+function ScanPasses() {
   const scan = useMutation(api.checkin.pass.scan);
   const cam = useCamera();
-  const [detector] = useState(makeDetector);
+  const [read] = useState(makeQrReader);
   const [result, setResult] = useState<Result | null>(null);
   const [typed, setTyped] = useState("");
   const last = useRef({ code: "", at: 0 });
@@ -99,57 +112,237 @@ export function Scanner() {
     }
   }
   const sendRef = useRef(send);
-  useEffect(() => { sendRef.current = send; });
+  useEffect(() => {
+    sendRef.current = send;
+  });
 
   // Read the camera 4 times a second while it's on.
   useEffect(() => {
-    if (!cam.on || !detector) return;
+    if (!cam.on) return;
     let busy = false;
     const t = setInterval(async () => {
       const v = cam.video.current;
       if (busy || !v || v.readyState < 2) return;
       busy = true;
       try {
-        const found = await detector.detect(v);
-        const raw = found.find((f) => f.rawValue.startsWith("RCC-"))?.rawValue;
-        if (raw) await sendRef.current(raw);
-      } catch { /* a frame that fails to read is skipped */ }
+        const raw = await read(v);
+        if (raw && raw.startsWith("RCC-")) await sendRef.current(raw);
+      } catch {
+        /* a frame that fails to read is skipped */
+      }
       busy = false;
     }, 250);
     return () => clearInterval(t);
-  }, [cam.on, cam.video, detector]);
+  }, [cam.on, cam.video, read]);
+
+  function sendTyped(e: FormEvent) {
+    e.preventDefault();
+    if (!typed.trim()) return;
+    last.current.code = "";
+    void send(typed);
+    setTyped("");
+  }
 
   return (
-    <Screen title="Teacher check-in" wide>
-      <div className="scanner">
-        <div>
-          <video ref={cam.video} className={cam.on ? "scanner__video" : "scanner__video scanner__video--off"} muted playsInline />
-          <p className="row">
-            {cam.on
-              ? <button className="quiet" onClick={cam.stop}>Stop camera</button>
-              : <button onClick={() => cam.start()} disabled={!detector}>Start scanning</button>}
-          </p>
-          {!detector && <Status kind="empty">This browser can’t read QR codes. Open this page in Chrome, or type the code below.</Status>}
-          {cam.error && <Status kind="error">{cam.error}</Status>}
-          <form className="row" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { last.current.code = ""; send(typed); setTyped(""); } }}>
-            <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Code on their phone" aria-label="Code on their phone" autoCapitalize="characters" />
-            <button type="submit" className="quiet">Check in</button>
-          </form>
-          {result && (result.ok
-            ? <Card title={result.already ? "Already checked in" : "Checked in"}><p className="pass__name">{result.name}</p><p className="muted">{result.email}</p></Card>
-            : <Status kind="error">{result.text}</Status>)}
-        </div>
-        <div>
-          <ClassStart />
-          <p className="row"><Link to="checkin/quiz">Ask a question or start a vote</Link></p>
-          <Big value={count ?? "…"} label="checked in" />
-          <Download />
-          {names && names.length === 0 && <Status kind="empty">No one yet.</Status>}
-          <ul className="scanner__names">
-            {(names ?? []).map((n) => <li key={n.at + n.name}>{n.name} <span className="muted">{new Date(n.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></li>)}
-          </ul>
-        </div>
-      </div>
-    </Screen>
+    <section>
+      <video ref={cam.video} className={cam.on ? "scanner__video" : "scanner__video scanner__video--off"} muted playsInline />
+      <p className="row">
+        {cam.on ? (
+          <Button variant="secondary" onClick={cam.stop}>
+            Stop camera
+          </Button>
+        ) : (
+          <Button onClick={() => void cam.start()}>Start scanning</Button>
+        )}
+      </p>
+      {cam.error && <Status kind="error">{cam.error}</Status>}
+      <form className="att-code" onSubmit={sendTyped}>
+        <Field label="Code on their phone">
+          {(f) => (
+            <input {...f} value={typed} onChange={(e) => setTyped(e.target.value)} autoCapitalize="characters" autoComplete="off" spellCheck={false} />
+          )}
+        </Field>
+        <Button type="submit" variant="secondary">
+          Check in
+        </Button>
+      </form>
+      {result &&
+        (result.ok ? (
+          <Card title={result.already ? "Already checked in" : "Checked in"}>
+            <p className="pass__name">{result.name}</p>
+            <p className="muted">{result.email}</p>
+          </Card>
+        ) : (
+          <Status kind="error">{result.text}</Status>
+        ))}
+    </section>
+  );
+}
+
+// When this class starts and how many minutes of grace come before "late". The fields show the
+// saved start; with none saved, the last class's time of day, ready to save for this one.
+export function ClassStart() {
+  const start = useQuery(api.checkin.attendance.classStart, { channel: CHANNEL });
+  const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
+  const set = useMutation(api.checkin.attendance.setClassStart);
+  // What the professor typed; null shows the saved (or the last class's) value.
+  const [time, setTime] = useState<string | null>(null);
+  const [grace, setGrace] = useState<string | null>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const lastClass = classes?.find((c) => !c.open && c.startsAt !== null);
+  const base = start ?? (lastClass && lastClass.startsAt !== null ? { startsAt: lastClass.startsAt, graceMin: lastClass.graceMin } : null);
+  const shownTime = time ?? (base ? hhmm(base.startsAt) : "");
+  const shownGrace = grace ?? String(base?.graceMin ?? 5);
+  const now = Date.now();
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    // An unchanged time keeps the saved start's own day.
+    const startsAt = time === null && start ? start.startsAt : nearestStart(shownTime, Date.now());
+    if (startsAt === null) {
+      setErr("Pick the time class starts.");
+      return;
+    }
+    if (!shownGrace.trim()) {
+      setErr("Grace has to be 0 to 60 minutes.");
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    try {
+      await set({ channel: CHANNEL, startsAt, graceMin: Number(shownGrace) });
+      setTime(null);
+      setGrace(null);
+    } catch (x) {
+      setErr(why(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card title="Class start">
+      <form onSubmit={save}>
+        <fieldset className="att-start" disabled={start === undefined}>
+          <Field label="Class starts" hint={start && !sameDay(start.startsAt, now) ? day(start.startsAt) : undefined}>
+            {(f) => <input {...f} type="time" value={shownTime} onChange={(e) => setTime(e.target.value)} />}
+          </Field>
+          <Field label="Late after (minutes)">
+            {(f) => <input {...f} type="number" min={0} max={60} step={1} inputMode="numeric" value={shownGrace} onChange={(e) => setGrace(e.target.value)} />}
+          </Field>
+          <Button type="submit" variant="secondary" busy={busy}>
+            Save
+          </Button>
+        </fieldset>
+      </form>
+      {start !== undefined && (
+        <p className="muted att-start__saved">
+          {start ? `Late after ${timeOrDay(start.startsAt + start.graceMin * MIN, now)}` : "No start time yet, so nobody is late."}
+        </p>
+      )}
+      {err && <Status kind="error">{err}</Status>}
+    </Card>
+  );
+}
+
+// This class's attendance as a CSV, and how many were late.
+export function Download() {
+  const sheet = useQuery(api.checkin.attendance.sheet, { channel: CHANNEL });
+  const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
+  if (sheet === undefined) return null;
+  const open = classes?.find((c) => c.open);
+  const late = sheet.filter((r) => r.lateMin !== null).length;
+  return (
+    <p className="row">
+      <Button
+        variant="secondary"
+        small
+        disabled={sheet.length === 0}
+        onClick={() => saveCsv(sheet, open ? classFile(open) : dateFile(Date.now()))}
+      >
+        Download attendance (CSV)
+      </Button>
+      <span className="muted">{late} late</span>
+    </p>
+  );
+}
+
+// Who checked in to this class, newest first. Remove takes a wrong check-in off, and that
+// student's phone shows the pass again.
+function Names() {
+  const names = useQuery(api.checkin.read.names, { channel: CHANNEL });
+  const remove = useMutation(api.checkin.attendance.removeCheckin);
+  if (names === undefined) return <Status kind="loading">Loading…</Status>;
+  if (names.length === 0) return <Status kind="empty">No one yet.</Status>;
+  return (
+    <ul className="list">
+      {names.map((n) => (
+        <li key={n.id} className="att-row">
+          <span className="att-row__main">
+            <span className="att-row__name">{n.name}</span> <span className="muted">{clock(n.at)}</span>
+          </span>
+          <span className="att-row__action">
+            <ConfirmButton
+              question={`Remove ${n.name} from this class? Their phone shows their pass again.`}
+              confirm="Remove"
+              onConfirm={() => remove({ checkin: n.id })}
+            >
+              Remove<span className="sr-only"> {n.name}</span>
+            </ConfirmButton>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// Every class with check-ins, this one included, each with its own CSV.
+function PastClasses() {
+  const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
+  const convex = useConvex();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState("");
+  const shown = classes?.filter((c) => c.count > 0);
+
+  async function download(c: ClassRow) {
+    setBusy(c.lecture);
+    setErr("");
+    try {
+      saveCsv(await convex.query(api.checkin.attendance.sheet, { channel: CHANNEL, lecture: c.lecture }), classFile(c));
+    } catch (e) {
+      setErr(why(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card title="Past classes">
+      {shown === undefined ? (
+        <Status kind="loading">Loading…</Status>
+      ) : shown.length === 0 ? (
+        <Status kind="empty">No classes with check-ins yet.</Status>
+      ) : (
+        <ul className="list">
+          {shown.map((c) => (
+            <li key={c.lecture} className="att-row">
+              <span className="att-row__main">
+                <span className="att-row__name">{classLabel(c)}</span> {c.open && <Badge tone="accent">This class</Badge>}
+                <br />
+                <span className="muted">{c.count} checked in</span>
+              </span>
+              <span className="att-row__action">
+                <Button variant="secondary" small busy={busy === c.lecture} onClick={() => void download(c)}>
+                  Download CSV
+                </Button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {err && <Status kind="error">{err}</Status>}
+    </Card>
   );
 }

@@ -1,0 +1,29 @@
+/* #/checkin/teacher (Teacher.tsx): attendance on the professor's laptop, 1280 to 1440 wide. The
+   two columns and the camera come from .scanner in checkin.css. Tokens only (src/styles/tokens.css). */
+
+/* "Class started Thu Nov 5, 2:28 PM", and the link to End day on the Professor view. */
+.att-status { margin: 0 0 var(--rcc-space-4); }
+
+/* The counts row at the top: checked in, late. */
+.att-stats { display: flex; flex-wrap: wrap; gap: var(--rcc-space-8); margin: 0 0 var(--rcc-space-6); }
+
+/* The typed code and its Check in button on one line, the button level with the field. */
+.att-code { display: flex; flex-wrap: wrap; gap: var(--rcc-space-3); align-items: flex-end; margin-top: var(--rcc-space-4); }
+.att-code .field { flex: 1 1 12rem; margin: 0; }
+
+/* Class starts, Late after and Save on one line where they fit. */
+.att-start { display: flex; flex-wrap: wrap; gap: var(--rcc-space-3) var(--rcc-space-4); align-items: flex-end; margin: 0; }
+.att-start .field { margin: 0; }
+.att-start .field:first-child { flex: 1 1 10rem; }
+.att-start .field:nth-child(2) { flex: 0 1 10rem; }
+.att-start__saved { margin: var(--rcc-space-3) 0 0; }
+
+/* Who checked in, and the past classes: one row each, the button on the right. */
+.att-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--rcc-space-2) var(--rcc-space-3); }
+.att-row__main { min-width: 0; overflow-wrap: anywhere; }
+.att-row__name { font-weight: var(--rcc-weight-strong); }
+.att-row__action { flex: none; }
+/* Remove asks first: its question box takes the row's full width. */
+.att-row__action:has(.confirm) { flex: 1 1 100%; }
+/* The Remove button at the laptop size (.btn--small), so a list of 40 names stays short. */
+.att-row__action > .btn { min-height: var(--rcc-control-sm); padding-block: var(--rcc-space-1); padding-inline: var(--rcc-space-4); font-size: var(--fs-small); }
