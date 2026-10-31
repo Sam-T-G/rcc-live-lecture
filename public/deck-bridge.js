@@ -9,13 +9,18 @@
 
    The script reads ?bridge= once, keeps it in this tab's sessionStorage (one entry per deck
    page) and takes it out of the address bar, so the key never shows on the projector and a
-   reload keeps sending. ?bridge=off, or any value without a channel and a key, stops sending
-   from this tab. Closing the tab does too.
+   reload (the browser's reload button or key) keeps sending. Any other load of the deck
+   without ?bridge= (a link, a typed address, back or forward) sends nothing and forgets the
+   saved key. ?bridge=off, or any value without a channel and a key, stops sending from this
+   tab. Closing the tab does too. Inside an iframe (the stage, #/checkin/stage) the script
+   never saves or reads the key: the stage hands it over on every load, so taking ?bridge=saved
+   out of the stage's link stops the slides.
 
    To feed other backends instead (each lead's own dev deployment during a meeting), add
-   &bridge-site=<deployment>,<deployment> with their names (e.g. quaint-swan-637). Every
-   one of them needs the same DECK_BRIDGE_KEY in its Convex env. The script stores that
-   list with the key and takes it out of the address bar too.
+   &bridge-site=<deployment>,<deployment> with their names (e.g. quaint-swan-637) to the same
+   link as ?bridge=. Every one of them needs the same DECK_BRIDGE_KEY in its Convex env. The
+   script stores that list with the key and takes it out of the address bar too. A
+   &bridge-site= without ?bridge= sends nothing and stays in the address bar.
 
    It sends when the slide or the number of presses shown on it changes:
      index   the slide, 0-based
@@ -37,8 +42,9 @@
   var given = (/[?&]bridge=([^&]*)/.exec(search) || [])[1];
   var givenSites = (/[?&]bridge-site=([^&]*)/.exec(search) || [])[1];
 
-  // Take the key out of the address bar first, in every window that has it.
-  if (given !== undefined || givenSites !== undefined) {
+  // Take the key out of the address bar first, in every window that has it. A bridge-site with
+  // no bridge stays there, since the script sends nothing for it.
+  if (given !== undefined) {
     var rest = search.slice(1).split('&').filter(function (p) {
       var name = p.split('=')[0];
       return p && name !== 'bridge' && name !== 'bridge-site';
@@ -60,11 +66,26 @@
   }
   function decode(s) { try { return decodeURIComponent(s); } catch (e) { return ''; } }
 
-  var link = given !== undefined ? { bridge: decode(given), sites: givenSites === undefined ? '' : decode(givenSites) } : recall('link');
+  // In an iframe (the stage, #/checkin/stage), whose page hands over the key on every load.
+  var framed = true;
+  try { framed = window.self !== window.top; } catch (e) { /* a cross-origin parent can throw: count it as framed */ }
+  // The browser's reload of this page, not a link, a typed address or an iframe's new src.
+  var reloaded = false;
+  try {
+    var nav = performance.getEntriesByType('navigation')[0];
+    reloaded = nav ? nav.type === 'reload' : performance.navigation.type === 1;
+  } catch (e) { /* no navigation timing: count it as a new load */ }
+
+  // The saved link counts only for a reload of the deck's own tab with no bridge-site of its own.
+  // Any other load without ?bridge= forgets it, so taking ?bridge= out of a link stops the slides.
+  var link = null;
+  if (given !== undefined) link = { bridge: decode(given), sites: givenSites === undefined ? '' : decode(givenSites) };
+  else if (givenSites !== undefined) console.warn('deck-bridge: &bridge-site= works only with ?bridge=<channel>.<key> on the same link; sending nothing');
+  else if (reloaded && !framed) link = recall('link');
   var bridge = link && typeof link.bridge === 'string' ? link.bridge : '';
   var cut = bridge.lastIndexOf('.');
   if (cut < 1 || cut === bridge.length - 1) { keep('link', null); return; }
-  if (given !== undefined) keep('link', link);
+  if (given !== undefined) keep('link', framed ? null : link);
   var channel = bridge.slice(0, cut), key = bridge.slice(cut + 1);
   var named = typeof link.sites === 'string' ? link.sites : '';
   var sites = named

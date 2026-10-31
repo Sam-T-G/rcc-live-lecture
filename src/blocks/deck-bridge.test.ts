@@ -7,6 +7,7 @@
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
+import { frameSrc } from "../teams/checkin/stageLink";
 
 const SOURCE = readFileSync(new URL("../../public/deck-bridge.js", import.meta.url), "utf8");
 const DECK = "https://sam-t-g.github.io/rcc-gdg/decks/build-with-ai/";
@@ -18,9 +19,14 @@ type Sent = { to: string; body: Record<string, unknown> };
 type Tab = { storage: Map<string, string>; sent: Sent[] };
 const newTab = (storage = new Map<string, string>()): Tab => ({ storage, sent: [] });
 
+// How the page load came about: "navigate" (a link, a typed address, an iframe given a new src) or
+// "reload" (the browser's reload), as performance.getEntriesByType("navigation") reports it, and
+// whether the deck sits in an iframe (the stage, #/checkin/stage).
+type Load = { how?: "navigate" | "reload"; framed?: boolean };
+
 // Loads the deck at `href` in `tab`: runs the bridge the way its script tag does. `go` moves the
 // deck and runs the bridge's next 300 ms check; `check` runs that check without moving.
-function open(tab: Tab, href: string) {
+function open(tab: Tab, href: string, { how = "navigate", framed = false }: Load = {}) {
   const url = new URL(href);
   const location = { href: url.href, pathname: url.pathname, search: url.search, hash: url.hash };
   const history = {
@@ -33,6 +39,9 @@ function open(tab: Tab, href: string) {
   const slide = { querySelectorAll: () => [], querySelector: () => ({ textContent: "Trees" }), getAttribute: () => null };
   const deck = { i: 0, b: 0 };
   let check: () => void = () => {};
+  const win: Record<string, unknown> = { __deck: { state: () => ({ ...deck }) } };
+  win.self = win;
+  win.top = framed ? { stage: true } : win;
   runInNewContext(SOURCE, {
     document: {
       currentScript: { getAttribute: (name: string) => (name === "data-site" ? SITE : null) },
@@ -45,7 +54,8 @@ function open(tab: Tab, href: string) {
       setItem: (k: string, v: string) => void tab.storage.set(k, String(v)),
       removeItem: (k: string) => void tab.storage.delete(k),
     },
-    window: { __deck: { state: () => ({ ...deck }) } },
+    window: win,
+    performance: { getEntriesByType: (type: string) => (type === "navigation" ? [{ type: how }] : []) },
     crypto: globalThis.crypto,
     fetch: (to: string, init: { body: string }) => {
       tab.sent.push({ to, body: JSON.parse(init.body) });
@@ -76,7 +86,7 @@ describe("public/deck-bridge.js", () => {
     deck.check();
     expect(tab.sent.map((s) => [s.to, s.body.channel, s.body.key])).toEqual([[`${SITE}/deck`, "gdg", KEY]]);
 
-    const reload = open(tab, deck.location.href);
+    const reload = open(tab, deck.location.href, { how: "reload" });
     reload.check();
     expect(tab.sent.map((s) => [s.to, s.body.channel, s.body.key])).toEqual([
       [`${SITE}/deck`, "gdg", KEY],
@@ -89,7 +99,7 @@ describe("public/deck-bridge.js", () => {
     const tab = newTab();
     const deck = open(tab, `${DECK}?bridge=gdg.${KEY}&bridge-site=quaint-swan-637,sample-dev-123`);
     expect(deck.location.href).toBe(DECK);
-    open(tab, deck.location.href).check();
+    open(tab, deck.location.href, { how: "reload" }).check();
     expect(tab.sent.map((s) => s.to)).toEqual(["https://quaint-swan-637.convex.site/deck", "https://sample-dev-123.convex.site/deck"]);
   });
 
@@ -100,7 +110,7 @@ describe("public/deck-bridge.js", () => {
     deck.check(); // nothing moved: nothing sent
     deck.go(1);
     deck.go(1, 1);
-    open(tab, deck.location.href).go(1, 1); // a reload sends the slide it opens on
+    open(tab, deck.location.href, { how: "reload" }).go(1, 1); // a reload sends the slide it opens on
     const bodies = tab.sent.map((s) => s.body);
     expect(bodies.map((b) => [b.index, b.beat, b.count, b.title])).toEqual([
       [0, 0, 6, "Trees"],
@@ -150,5 +160,44 @@ describe("public/deck-bridge.js", () => {
     expect(off.location.href).toBe(DECK);
     open(tab, DECK).check();
     expect(tab.sent).toHaveLength(1);
+  });
+
+  it("DECK-access-2 once the key has left the address bar, only a reload of that same page keeps sending: opening the deck again without ?bridge= sends nothing and forgets the key", () => {
+    const tab = newTab();
+    open(tab, `${DECK}?bridge=gdg.${KEY}`).check();
+    expect(tab.sent).toHaveLength(1);
+    open(tab, DECK).check(); // the plain deck link again, in the same tab
+    expect(tab.sent).toHaveLength(1);
+    open(tab, DECK, { how: "reload" }).check(); // and a reload after that doesn't bring the key back
+    expect(tab.sent).toHaveLength(1);
+  });
+
+  it("DECK-spec-2 on the stage, taking ?bridge=saved out of the link stops the slides: the deck in the iframe never reads a key it saved earlier", () => {
+    const tab = newTab();
+    const deck = new URL(DECK);
+    open(tab, frameSrc(deck, `gdg.${KEY}`, "quaint-swan-637"), { framed: true }).check();
+    expect(tab.sent.map((s) => s.to)).toEqual(["https://quaint-swan-637.convex.site/deck"]);
+    // The professor removes bridge=saved: the stage gives the iframe the deck with bridge-site only,
+    // or with neither when the link had no bridge-site.
+    open(tab, frameSrc(deck, null, "quaint-swan-637"), { framed: true }).check();
+    open(tab, frameSrc(deck, null, null), { framed: true }).check();
+    // Reloading the stage reloads the iframe too.
+    open(tab, frameSrc(deck, null, null), { how: "reload", framed: true }).check();
+    expect(tab.sent).toHaveLength(1);
+    // With bridge=saved still in the link, the stage hands the key over on every load.
+    open(tab, frameSrc(deck, `gdg.${KEY}`, "quaint-swan-637"), { how: "reload", framed: true }).check();
+    expect(tab.sent).toHaveLength(2);
+  });
+
+  it("DECK-spec-1 &bridge-site= without ?bridge= sends nothing, even in a tab that saved a key, and stays in the address bar", () => {
+    const tab = newTab();
+    open(tab, `${DECK}?bridge=gdg.${KEY}`).check();
+    expect(tab.sent.map((s) => s.to)).toEqual([`${SITE}/deck`]);
+    for (const how of ["navigate", "reload"] as const) {
+      const lone = open(tab, `${DECK}?bridge-site=quaint-swan-637`, { how });
+      lone.check();
+      expect(lone.location.href).toBe(`${DECK}?bridge-site=quaint-swan-637`);
+    }
+    expect(tab.sent).toHaveLength(1); // nothing more went to the script tag's site (prod, for a published deck)
   });
 });
