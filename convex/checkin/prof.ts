@@ -1,21 +1,26 @@
-// The professor key: a shared passcode that opens the professor pages without Google
-// sign-in (an iPad at the door, a borrowed laptop). It lives in the PROFESSOR_KEY env var,
-// never in the repo. Host-only functions take an optional `key` and call requireProf.
+// Who can open the professor pages: a Google account on HOST_EMAILS, or anyone with the professor
+// key (a passcode for a professor who doesn't sign in with Google). The key's value is set only in
+// the PROFESSOR_KEY env var, never in the repo. Every host-only function takes `key:
+// v.optional(v.string())` and calls requireProf(ctx, key) first.
+// The kiosk key (KIOSK_KEY env var) is a second passcode for the iPad at the door: it opens the
+// pass scanner (checkin.pass.scan and canScan) and nothing else.
 import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { isHostIdentity, requireHost } from "../lib";
 
-// Demo only: a key anyone can read in this public repo, so the professor pages open with
-// no sign-in during the 10-29 demos. Delete it (and the client's copy in prof.tsx) after.
-export const DEMO_KEY = "gdg-demo-1029";
-
+// True only when PROFESSOR_KEY is set and the key matches it. Spaces around a typed key are ignored.
 export function keyOk(key: string | undefined) {
-  if (!key) return false;
   const k = process.env.PROFESSOR_KEY;
-  return key.trim() === DEMO_KEY || (!!k && key.trim() === k);
+  return !!key && !!k && key.trim() === k;
 }
 
-// A host signed in with Google, or anyone with the professor key.
+// True only when KIOSK_KEY is set, at least 16 characters long, and the key matches it.
+export function kioskKeyOk(key: string | undefined) {
+  const k = process.env.KIOSK_KEY;
+  return !!key && !!k && k.length >= 16 && key.trim() === k;
+}
+
+// A host signed in with Google, or anyone with the professor key. The kiosk key never passes.
 export async function requireProf(ctx: QueryCtx | MutationCtx, key: string | undefined) {
   if (keyOk(key)) return;
   if (key) {
@@ -23,4 +28,10 @@ export async function requireProf(ctx: QueryCtx | MutationCtx, key: string | und
     if (!isHostIdentity(me)) throw new ConvexError("That professor key is wrong.");
   }
   await requireHost(ctx);
+}
+
+// The pass scanner at the door: the kiosk key, the professor key, or a Google host.
+export async function requireScanner(ctx: QueryCtx | MutationCtx, key: string | undefined) {
+  if (kioskKeyOk(key)) return;
+  await requireProf(ctx, key);
 }

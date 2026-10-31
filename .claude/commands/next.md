@@ -14,5 +14,5 @@ Before writing any code:
 Then:
 
 3. Build it in the smallest step that runs. Stay in our team's folders. Reuse a block from BLOCKS.md before writing new plumbing.
-4. Run `npm run build`. If it fails, fix it before you answer.
+4. Run the gate: `npm run build && npm run lint && npm test && npm run typecheck:convex` (0 lint errors). If any step fails, fix it before you answer.
 5. Reply in two or three plain sentences: what changed, and exactly what to open, click, or tap to see it. The lead reads this out loud to the team.

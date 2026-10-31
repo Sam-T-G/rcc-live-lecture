@@ -4,7 +4,7 @@
 import { mutation, query } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import { isHostIdentity, randomCode, requireUser } from "../lib";
-import { keyOk, requireProf } from "./prof";
+import { keyOk, kioskKeyOk, requireScanner } from "./prof";
 import { ensureGroup } from "../live/groups";
 
 const EVERY = 20_000; // ms between codes
@@ -16,6 +16,17 @@ export const amHost = query({
   returns: v.boolean(),
   handler: async (ctx, { key }) => {
     if (keyOk(key)) return true;
+    const me = await ctx.auth.getUserIdentity();
+    return isHostIdentity(me);
+  },
+});
+
+// Whether this device can scan passes at the door: the kiosk key, the professor key, or a Google host.
+export const canScan = query({
+  args: { key: v.optional(v.string()) },
+  returns: v.boolean(),
+  handler: async (ctx, { key }) => {
+    if (kioskKeyOk(key) || keyOk(key)) return true;
     const me = await ctx.auth.getUserIdentity();
     return isHostIdentity(me);
   },
@@ -52,12 +63,12 @@ export const refresh = mutation({
   },
 });
 
-// The teacher scans (or types) a pass code. Checks the student in on this channel once.
+// The teacher or the door kiosk scans (or types) a pass code. Checks the student in on this channel once.
 export const scan = mutation({
   args: { key: v.optional(v.string()), channel: v.string(), code: v.string() },
   returns: v.object({ name: v.string(), email: v.string(), already: v.boolean() }),
   handler: async (ctx, { key, channel, code }) => {
-    await requireProf(ctx, key);
+    await requireScanner(ctx, key);
     const c = code.trim().toUpperCase().replace(/^RCC-/, "");
     if (!c) throw new ConvexError("No code.");
     const now = Date.now();

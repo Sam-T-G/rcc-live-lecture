@@ -1,0 +1,26 @@
+# The gate from AGENTS.md on every push to main and every pull request. Uses no secrets and
+# never touches a Convex deployment: the tests run against convex-test's in-memory backend.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lint
+      - run: npm test
+      - run: npm run typecheck:convex

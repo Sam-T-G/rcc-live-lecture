@@ -1,6 +1,7 @@
-// The professor key on the client. Typed once, kept in this browser, and sent with every
-// host-only call, so the professor pages work without Google sign-in.
-// <ProfGate> shows its children to a Google host or anyone with the right key.
+// The professor key on the client. The professor types it once; this browser saves it in
+// localStorage and sends it as `key` with every host-only call, so the professor pages work
+// without Google sign-in. Nothing is saved until someone types a key.
+// <ProfGate> shows its children to a Google host or to anyone whose saved key works.
 import { useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -21,13 +22,9 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l);
 }
 
-// Demo only: the same key as DEMO_KEY in convex/checkin/prof.ts, used when none is saved, so
-// the professor pages open with nothing to type. Delete both after the 10-29 demos.
-const DEMO_KEY = "gdg-demo-1029";
-
-// The saved key, else the demo key. Pass it as `key` to every host-only function.
-export function useProfKey() {
-  return useSyncExternalStore(subscribe, read) ?? DEMO_KEY;
+// The saved key, or undefined when none is saved. Pass it as `key` to every host-only function.
+export function useProfKey(): string | undefined {
+  return useSyncExternalStore(subscribe, read);
 }
 
 export function ProfGate({ title, children }: { title: string; children: ReactNode }) {

@@ -37,7 +37,7 @@ For Sam (deploy, merge) and Josh (professor view). Everything here is on `main` 
 
 - **`convex/checkin/pass.ts`:** one line in `scan` calls `ensureGroup` (from `convex/live/groups.ts`) so a team is dealt when the teacher scans a pass. If Check-in rewrites `scan`, keep that line or teams stop being dealt (a student who opens `#/live` still gets one, via `groups.join`, which deals every team-less check-in in check-in order).
 - **`polls` and `pollAnswers` (Check-in's quiz):** the leaderboard and past questions read `correct`, `open`, `kind`, `choices` and the answers. Renaming those breaks both.
-- **`convex/checkin/prof.ts` / `amHost`:** `setSize` uses `requireProf`, so it follows the professor key. The demo key is readable in this public repo, so anyone who knows it can change the team size. Check-in plans to remove it after 10-29.
+- **`convex/checkin/prof.ts` / `amHost`:** `setSize` calls `requireProf`, so changing the team size needs the professor key (`PROFESSOR_KEY`) or a Google host.
 - **`convex/_generated/api.d.ts`:** I added entries by hand. Run `npx convex codegen` after merging.
 
 ## Backup branch warning
