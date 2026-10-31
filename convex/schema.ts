@@ -50,10 +50,10 @@ export default defineSchema({
     email: v.string(), // trimmed and lower case
     role: roleValidator,
     addedBy: v.string(), // the admin's email, "HOST_EMAILS import" or "devGrant"
-    at: v.number(), // when it was added; for a "devGrant" row, when devGrant last ran for it
+    at: v.number(), // when it was added; for a test email (@test.local), when its 2 hours started
   })
     .index("by_email", ["email"])
-    .index("by_addedBy", ["addedBy"]), // staff:devRevoke finds the devGrant rows
+    .index("by_addedBy", ["addedBy"]), // who added a row
 
   // Block: access. Every change to the staff list and the door iPads: who made it, and what changed.
   staffEvents: defineTable({
@@ -80,7 +80,7 @@ export default defineSchema({
   // Block: access. A door iPad waiting to pair: the 6-digit code its screen shows, for 10
   // minutes. Approving the code (or the code expiring) deletes the row.
   pairings: defineTable({
-    code: v.string(), // 6 digits, unique among the codes still open
+    code: v.string(), // 6 digits (the 6th checks the first 5), unique among the codes still open
     tokenHash: v.string(), // SHA-256 of the iPad's device token, as hex
     expiresAt: v.number(),
   })

@@ -13,7 +13,7 @@ The building blocks (Google sign-in, live data, QR codes, phone location, the sl
 2. `git clone https://github.com/Sam-T-G/rcc-live-lecture && cd rcc-live-lecture && npm install`
 3. `npx convex dev`: log in, pick the existing project `rcc-live-lecture`. This makes your own dev backend and writes `.env.local`. Leave it running.
 4. Set your dev backend's env vars: `npx convex env set HOST_EMAILS "you@gmail.com"` and `npx convex env set DECK_BRIDGE_KEY <the value Sam sends you>` (`GEMINI_API_KEY` only if your team adds AI).
-5. `scripts/doctor.sh` until it says Ready, and send Sam the dev deployment name it prints.
+5. `scripts/doctor.sh` until it says Ready, and send Sam the dev deployment name it prints. Typed test sign-ins (`staff:devGrant`) hold roles only on the dev backends in `DEV_HOSTS` in `convex/checkin/prof.ts`; add your deployment's host (`<name>.convex.cloud`) there to use them on yours.
 6. `npm run dev`, open <http://localhost:5173/#/lab>, and check each panel.
 
 ## Google sign-in

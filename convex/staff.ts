@@ -22,7 +22,9 @@
 //   api.staff.remove          { email } -> null                                           admin
 //       Emails are trimmed and lower-cased. Adding someone already on the list with that role,
 //       or removing someone who isn't on it, changes nothing. ADMIN_EMAILS admins can't be
-//       added, changed or removed here.
+//       added, changed or removed here. A test email (@test.local) holds its role for 2 hours,
+//       then its row is removed. A typed test sign-in (dev only) adds, changes and removes only
+//       test emails, and a test email it adds keeps its role only as long as its own role lasts.
 //   api.staff.changes         {} -> the last 50 changes, newest first                     admin
 //       [{ _id, at, by, action, email, role, oldRole, label, text }]: action is "add", "role",
 //       "remove", "pair" or "unpair"; fields that don't apply are null; text is the change as
@@ -33,7 +35,8 @@
 //       Newest first. lastUsedAt is the iPad's last scan, or null.
 //   api.staff.approvePairing  { code, label } -> Id<"devices">                            professor
 //       code: the 6 digits on the iPad (spaces and dashes are ignored). label: a name like
-//       "A-210 door", 1 to 40 characters.
+//       "A-210 door", 1 to 40 characters. An iPad a typed test sign-in pairs scans only while
+//       that test role lasts (2 hours, or until staff:devRevoke).
 //   api.staff.unpair          { device: Id<"devices"> } -> null                           professor
 //       The iPad's token stops working at once and its screen goes back to pairing.
 //
@@ -42,9 +45,9 @@
 //   api.staff.requestPairing  { token } -> { status: "waiting", code, expiresAt }
 //                                       | { status: "paired", label }                    anyone
 //       Gets a 6-digit code that works for 10 minutes. Asking again with the same token gives
-//       the same code until it expires. At most 200 codes are open at once: a new request past
-//       that ends the oldest one (that iPad's status goes to "none", so it asks again), so
-//       requests from signed-out callers can't keep a door iPad from getting a code.
+//       the same code until it expires. No request ends another one, so requests from
+//       signed-out callers never end a code an iPad is showing. The 6th digit checks the first
+//       5, so a professor's one-digit typo or swapped neighbors never match another open code.
 //   api.staff.deviceStatus    { token } -> { status: "none" } | { status: "waiting", code,
 //                                          expiresAt } | { status: "paired", label }       anyone
 //       Live: "paired" once a professor approves the code; "none" once the code expires (call
@@ -55,17 +58,19 @@
 //
 // For the CLI (internal: npx convex run, never from a page):
 //   staff:devGrant '{"email":"prof1@test.local","role":"professor"}'   a role for a test email; dev backends only
-//       Only @test.local emails, never one an admin or the import added. A typed sign-in with
-//       that email holds the role for 2 hours (run devGrant again to start the 2 hours again);
-//       then dropDevGrant removes the row. The typed signing key is public, so anyone can sign
-//       in as a test email on dev while its role lasts: keep real student data off dev.
-//   staff:devRevoke                                                     removes every devGrant role now; run it after a browser check
+//       Only @test.local emails, and only on the dev backends in DEV_HOSTS (convex/checkin/prof.ts;
+//       a lead's own dev backend gets added there). A typed sign-in with that email holds the
+//       role for 2 hours (run devGrant again to start the 2 hours again); then dropDevGrant
+//       removes the row. The typed signing key is public, so anyone can sign in as a test email
+//       on dev while its role lasts: keep real student data off dev.
+//   staff:devRevoke                                                     removes every test-email role, and every iPad a test sign-in paired, now; run it after a browser check
 //   staff:importHostEmails                                             every HOST_EMAILS address without a role (and not in ADMIN_EMAILS) becomes a professor; safe to run again
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import {
+  cloudHost,
   DEV_GRANT,
   DEV_GRANT_MS,
   deviceByHash,
@@ -80,16 +85,13 @@ import {
   requireAdmin,
   requireProf,
   roleValidator,
+  type Staff,
   tokenHash,
 } from "./checkin/prof";
 import { randomCode } from "./lib";
 import { staffActionValidator } from "./schema";
 
 const PAIR_MS = 10 * 60_000; // a pairing code works this long
-// Open pairing codes at once. A professor's typo matches someone else's open code at most
-// 200 times in 10^6. Past the cap, a new request ends the oldest one instead of being refused,
-// so blocking a door iPad takes 200 requests between its code showing and the professor typing it.
-const MAX_WAITING = 200;
 const LABEL_MAX = 40;
 const STAFF_MAX = 500; // rows People reads
 const CHANGES = 50;
@@ -113,6 +115,44 @@ function cleanEmail(raw: string) {
   const email = normEmail(raw);
   if (!EMAIL.test(email) || email.length > 254) throw new ConvexError("Type a whole email address, like name@example.edu.");
   return email;
+}
+
+// Damm check digits: the 6th digit of a pairing code checks the first 5. Every one-digit
+// change and every swap of two neighboring digits fails the check, so a professor's typo is
+// refused instead of pairing whichever iPad holds that code. Open codes don't need a cap to
+// keep typos safe, so no request ever ends another one (a flood of signed-out requests can't
+// end the code a door iPad shows).
+const DAMM = [
+  [0, 3, 1, 7, 5, 9, 8, 6, 4, 2],
+  [7, 0, 9, 2, 1, 5, 4, 8, 6, 3],
+  [4, 2, 0, 6, 8, 7, 1, 3, 5, 9],
+  [1, 7, 5, 0, 9, 8, 3, 4, 2, 6],
+  [6, 1, 2, 3, 0, 4, 5, 9, 7, 8],
+  [3, 6, 7, 4, 2, 0, 9, 5, 8, 1],
+  [5, 8, 6, 9, 7, 2, 0, 1, 3, 4],
+  [8, 9, 4, 5, 3, 6, 2, 0, 1, 7],
+  [9, 4, 3, 8, 6, 1, 7, 2, 0, 5],
+  [2, 5, 8, 1, 4, 3, 6, 7, 9, 0],
+];
+const damm = (digits: string) => [...digits].reduce((acc, d) => DAMM[acc][Number(d)], 0);
+// True for 6 digits whose last digit checks the first 5.
+export function pairingCodeOk(code: string) {
+  return /^\d{6}$/.test(code) && damm(code) === 0;
+}
+
+// A test sign-in (a typed sign-in on a dev backend; no Google account has a test email) may add,
+// change and remove only test emails, so it can't give a real account a role that outlasts its own.
+function onlyTestEmails(me: Staff, email: string) {
+  if (isTestEmail(me.email) && !isTestEmail(email)) {
+    throw new ConvexError("A test sign-in can add, change and remove only test emails (@test.local).");
+  }
+}
+
+// When a test email's 2 hours start: `from`, or for one a test sign-in adds or changes, no later
+// than the start of that sign-in's own 2 hours, so it ends when the test sign-in's role does.
+async function testStart(ctx: MutationCtx, me: Staff, from: number) {
+  if (!isTestEmail(me.email)) return from;
+  return Math.min(from, (await findStaff(ctx, me.email))?.at ?? from);
 }
 
 async function findStaff(ctx: QueryCtx | MutationCtx, email: string) {
@@ -178,11 +218,14 @@ export const add = mutation({
     const me = await requireAdmin(ctx);
     const email = cleanEmail(raw);
     if (envAdmins().includes(email)) throw new ConvexError(`${email} is a permanent admin already (set in the server settings).`);
+    onlyTestEmails(me, email);
     const row = await findStaff(ctx, email);
     if (row?.role === role) return null;
     if (row) throw new ConvexError(`${email} is on the staff list already (${row.role}). Change the role in the list.`);
-    await ctx.db.insert("staff", { email, role, addedBy: me.email, at: Date.now() });
+    const at = await testStart(ctx, me, Date.now());
+    await ctx.db.insert("staff", { email, role, addedBy: me.email, at });
     await log(ctx, { by: me.email, action: "add", email, role });
+    if (isTestEmail(email)) await ctx.scheduler.runAt(at + DEV_GRANT_MS, internal.staff.dropDevGrant, { email });
     return null;
   },
 });
@@ -194,10 +237,11 @@ export const setRole = mutation({
     const me = await requireAdmin(ctx);
     const email = normEmail(raw);
     if (envAdmins().includes(email)) throw new ConvexError(`${email} is a permanent admin (set in the server settings), so their role can't change here.`);
+    onlyTestEmails(me, email);
     const row = await findStaff(ctx, email);
     if (!row) throw new ConvexError(`${email} isn't on the staff list.`);
     if (row.role === role) return null;
-    await ctx.db.patch("staff", row._id, { role });
+    await ctx.db.patch("staff", row._id, { role, at: await testStart(ctx, me, row.at) });
     await log(ctx, { by: me.email, action: "role", email, role, oldRole: row.role });
     return null;
   },
@@ -210,6 +254,7 @@ export const remove = mutation({
     const me = await requireAdmin(ctx);
     const email = normEmail(raw);
     if (envAdmins().includes(email)) throw new ConvexError(`${email} is a permanent admin (set in the server settings), so they can't be removed here.`);
+    onlyTestEmails(me, email);
     const rows = await ctx.db
       .query("staff")
       .withIndex("by_email", (q) => q.eq("email", email))
@@ -275,6 +320,8 @@ export const approvePairing = mutation({
     const me = await requireProf(ctx);
     const code = rawCode.replace(/[\s-]/g, "");
     if (!/^\d{6}$/.test(code)) throw new ConvexError("Type the 6-digit code from the iPad.");
+    const wrong = "That code is wrong or expired. Check the code on the iPad.";
+    if (!pairingCodeOk(code)) throw new ConvexError(wrong);
     const label = rawLabel.trim().replace(/\s+/g, " ");
     if (!label) throw new ConvexError("Name the iPad, for example A-210 door.");
     if (label.length > LABEL_MAX) throw new ConvexError(`Keep the name to ${LABEL_MAX} characters.`);
@@ -284,7 +331,7 @@ export const approvePairing = mutation({
       .withIndex("by_code", (q) => q.eq("code", code))
       .take(10);
     const pairing = sameCode.find((p) => p.expiresAt > now);
-    if (!pairing) throw new ConvexError("That code is wrong or expired. Check the code on the iPad.");
+    if (!pairing) throw new ConvexError(wrong);
     // A code pairs once: the request is gone after this.
     await ctx.db.delete("pairings", pairing._id);
     const had = await deviceByHash(ctx, pairing.tokenHash);
@@ -319,10 +366,11 @@ async function openPairing(ctx: QueryCtx | MutationCtx, hash: string, now: numbe
   return rows.find((p) => p.expiresAt > now) ?? null;
 }
 
-// A 6-digit code no open request is using.
+// A 6-digit code no open request is using: 5 random digits and their check digit.
 async function freeCode(ctx: MutationCtx, now: number) {
   for (let i = 0; i < 20; i++) {
-    const code = randomCode(6, "0123456789");
+    const five = randomCode(5, "0123456789");
+    const code = five + String(damm(five));
     const same = await ctx.db
       .query("pairings")
       .withIndex("by_code", (q) => q.eq("code", code))
@@ -343,12 +391,6 @@ export const requestPairing = mutation({
     const now = Date.now();
     const open = await openPairing(ctx, hash, now);
     if (open) return { status: "waiting" as const, code: open.code, expiresAt: open.expiresAt };
-    const waitingNow = await ctx.db
-      .query("pairings")
-      .withIndex("by_expiresAt", (q) => q.gt("expiresAt", now))
-      .take(MAX_WAITING);
-    // Full: end the oldest open request (by_expiresAt is oldest first) so this iPad gets a code.
-    if (waitingNow.length >= MAX_WAITING) await ctx.db.delete("pairings", waitingNow[0]._id);
     const code = await freeCode(ctx, now);
     const expiresAt = now + PAIR_MS;
     const pairing = await ctx.db.insert("pairings", { code, tokenHash: hash, expiresAt });
@@ -385,22 +427,26 @@ export const dropPairing = internalMutation({
 // ---------- The CLI ----------
 
 // Gives a test email (@test.local) a role on a dev backend for 2 hours, for browser checks with
-// the typed sign-in. Refuses on prod (convex/checkin/prof.ts isDevBackend), where a typed sign-in
-// never holds a role, and refuses any email that isn't a test email or whose row someone else
-// added. Running it again starts the 2 hours again.
+// the typed sign-in. Refuses on any backend not in DEV_HOSTS (convex/checkin/prof.ts
+// isDevBackend), prod included, where a typed sign-in never holds a role, and refuses any email
+// that isn't a test email. It also changes a test email an admin added on #/admin. Running it
+// again starts the 2 hours again.
 export const devGrant = internalMutation({
   args: { email: v.string(), role: roleValidator },
   returns: v.string(),
   handler: async (ctx, { email: raw, role }) => {
-    if (!isDevBackend()) throw new ConvexError("staff:devGrant runs only on a dev backend.");
+    if (!isDevBackend()) {
+      const host = cloudHost();
+      throw new ConvexError(
+        "staff:devGrant runs only on the dev backends in DEV_HOSTS in convex/checkin/prof.ts, and " +
+          (host ? `${host} isn't one of them. If it's your own dev backend (never prod), add it there.` : "this backend isn't one of them."),
+      );
+    }
     const email = cleanEmail(raw);
     if (!isTestEmail(email) || envAdmins().includes(email)) {
       throw new ConvexError(`staff:devGrant takes only test emails ending in ${TEST_DOMAIN}, like prof1${TEST_DOMAIN}.`);
     }
     const row = await findStaff(ctx, email);
-    if (row && row.addedBy !== DEV_GRANT) {
-      throw new ConvexError(`${email} is on the staff list already, added by ${shownAs(row.addedBy)}. staff:devGrant changes only rows it added.`);
-    }
     const now = Date.now();
     let said: string;
     if (row?.role === role) {
@@ -420,14 +466,14 @@ export const devGrant = internalMutation({
   },
 });
 
-// Removes a devGrant row once its 2 hours are up. devGrant schedules it each time it runs; a row
-// devGrant ran for again since then is kept until its own job.
+// Removes a test email's row once its 2 hours are up. devGrant and #/admin's add schedule it;
+// a row devGrant ran for again since then is kept until its own job.
 export const dropDevGrant = internalMutation({
   args: { email: v.string() },
   returns: v.null(),
   handler: async (ctx, { email }) => {
     const row = await findStaff(ctx, email);
-    if (row && row.addedBy === DEV_GRANT && row.at + DEV_GRANT_MS <= Date.now()) {
+    if (row && isTestEmail(row.email) && row.at + DEV_GRANT_MS <= Date.now()) {
       await ctx.db.delete("staff", row._id);
       await log(ctx, { by: DEV_GRANT, action: "remove", email, oldRole: row.role });
     }
@@ -435,21 +481,30 @@ export const dropDevGrant = internalMutation({
   },
 });
 
-// Removes every devGrant row now, so no test email holds a role on dev until devGrant runs again.
-// Runs anywhere (prod has no devGrant rows).
+// Removes every test email's row (and any row a test sign-in added) and unpairs every iPad a
+// test sign-in paired, now, so nothing a test sign-in did keeps working until devGrant runs
+// again. Runs anywhere (prod has no rows a test sign-in made).
 export const devRevoke = internalMutation({
   args: {},
   returns: v.string(),
   handler: async (ctx) => {
-    const rows = await ctx.db
-      .query("staff")
-      .withIndex("by_addedBy", (q) => q.eq("addedBy", DEV_GRANT))
-      .take(STAFF_MAX);
-    for (const row of rows) {
+    const staff = await ctx.db.query("staff").withIndex("by_email").take(STAFF_MAX);
+    let roles = 0;
+    for (const row of staff) {
+      if (!isTestEmail(row.email) && !isTestEmail(row.addedBy)) continue;
       await ctx.db.delete("staff", row._id);
       await log(ctx, { by: DEV_GRANT, action: "remove", email: row.email, oldRole: row.role });
+      roles++;
     }
-    return `Removed ${rows.length} test roles.`;
+    const devices = await ctx.db.query("devices").take(STAFF_MAX);
+    let iPads = 0;
+    for (const device of devices) {
+      if (!isTestEmail(device.pairedBy)) continue;
+      await ctx.db.delete("devices", device._id);
+      await log(ctx, { by: DEV_GRANT, action: "unpair", device: device._id, label: device.label });
+      iPads++;
+    }
+    return `Removed test roles: ${roles}. Unpaired iPads a test sign-in paired: ${iPads}.`;
   },
 });
 

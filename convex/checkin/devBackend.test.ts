@@ -43,7 +43,7 @@ describe("ROLES isDevBackend fails closed", () => {
         "Only professors can do that.",
       );
       await expect(t.mutation(internal.staff.devGrant, { email: "prof1@test.local", role: "professor" })).rejects.toThrow(
-        "staff:devGrant runs only on a dev backend.",
+        "staff:devGrant runs only on the dev backends in DEV_HOSTS in convex/checkin/prof.ts, and ",
       );
       // Google sign-ins keep their roles whatever the URL.
       expect(await admin(t).query(api.checkin.pass.amHost, {})).toBe(true);

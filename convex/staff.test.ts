@@ -4,6 +4,7 @@
 // tested in convex/checkin/prof.test.ts.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
+import { pairingCodeOk } from "./staff";
 import {
   ADMIN_EMAIL,
   ADMIN_ONLY,
@@ -411,44 +412,48 @@ describe("ROLES pairing: expiry, single use, unpair revokes, only staff approve,
   it("ROLES pairing: codes are unique among open requests, and throwaway requests from a signed-out caller never keep a door iPad from getting a code", async () => {
     const t = setup();
     const first = await codeFor(t, tokenN(0));
-    // Make the next code come out the same as the first one: the request picks another.
-    const next = first === "424242" ? "131313" : "424242";
+    expect(pairingCodeOk(first)).toBe(true);
+    // Make the next code's 5 random digits come out the same as the first one's: the request picks
+    // others. The 6th digit is the check digit of the 5.
+    const nextFive = first.startsWith("42424") ? "13131" : "42424";
     const real = crypto.getRandomValues.bind(crypto);
-    let sixes = 0;
+    let fives = 0;
     const spy = vi.spyOn(crypto, "getRandomValues").mockImplementation(((array: ArrayBufferView) => {
-      if (!ArrayBuffer.isView(array) || array.byteLength !== 6) return real(array as Uint8Array);
-      const digits = sixes++ === 0 ? first : next;
-      const bytes = new Uint8Array(array.buffer, array.byteOffset, 6);
-      for (let i = 0; i < 6; i++) bytes[i] = Number(digits[i]);
+      if (!ArrayBuffer.isView(array) || array.byteLength !== 5) return real(array as Uint8Array);
+      const digits = fives++ === 0 ? first : nextFive;
+      const bytes = new Uint8Array(array.buffer, array.byteOffset, 5);
+      for (let i = 0; i < 5; i++) bytes[i] = Number(digits[i]);
       return array;
     }) as typeof crypto.getRandomValues);
+    let next: string;
     try {
-      expect(await codeFor(t, tokenN(1))).toBe(next);
-      expect(sixes).toBe(2);
+      next = await codeFor(t, tokenN(1));
+      expect(next.slice(0, 5)).toBe(nextFive);
+      expect(pairingCodeOk(next)).toBe(true);
+      expect(fives).toBe(2);
     } finally {
       spy.mockRestore();
     }
 
-    // Someone signed out fills every open slot (200) with throwaway tokens. The codes stay unique.
+    // Someone signed out sends 200 throwaway requests. The codes stay unique and none is ended.
     const codes = [first, next];
     for (let n = 2; n < 200; n++) codes.push(await codeFor(t, tokenN(n)));
     expect(new Set(codes).size).toBe(200);
-    // The door iPad still gets a code: the oldest throwaway request makes room.
+    // The door iPad still gets a code, and the throwaway requests are all still open.
     const door = await codeFor(t, DEVICE_TOKEN);
-    expect(door).toMatch(/^\d{6}$/);
-    expect(await pairingCount(t)).toBe(200);
-    expect(await t.query(api.staff.deviceStatus, { token: tokenN(0) })).toEqual({ status: "none" });
-    expect(await t.query(api.staff.deviceStatus, { token: tokenN(1) })).toMatchObject({ status: "waiting", code: next });
+    expect(pairingCodeOk(door)).toBe(true);
+    expect(await pairingCount(t)).toBe(201);
+    expect(await t.query(api.staff.deviceStatus, { token: tokenN(0) })).toMatchObject({ status: "waiting", code: first });
     // A professor types the door iPad's code and it pairs.
     await (await professor(t)).mutation(api.staff.approvePairing, { code: door, label: "A-210 door" });
     expect(await t.query(api.staff.deviceStatus, { token: DEVICE_TOKEN })).toEqual({ status: "paired", label: "A-210 door" });
-    // An iPad already waiting gets its own code back without pushing anyone out.
+    // An iPad already waiting gets its own code back.
     expect(await codeFor(t, tokenN(5))).toBe(codes[5]);
     expect(await t.query(api.staff.deviceStatus, { token: tokenN(1) })).toMatchObject({ status: "waiting", code: next });
     // A second round of throwaway tokens doesn't stop the next iPad either.
     for (let n = 200; n < 230; n++) await codeFor(t, tokenN(n));
-    expect(await codeFor(t, OTHER_TOKEN)).toMatch(/^\d{6}$/);
-    expect(await pairingCount(t)).toBe(200);
+    expect(pairingCodeOk(await codeFor(t, OTHER_TOKEN))).toBe(true);
+    expect(await pairingCount(t)).toBe(231);
   });
 });
 
@@ -458,7 +463,7 @@ describe("ROLES devGrant and importHostEmails (CLI only)", () => {
     for (const url of [PROD_URL, undefined]) {
       vi.stubEnv("CONVEX_CLOUD_URL", url);
       await expect(t.mutation(internal.staff.devGrant, { email: "prof1@test.local", role: "professor" })).rejects.toThrow(
-        "staff:devGrant runs only on a dev backend.",
+        "staff:devGrant runs only on the dev backends in DEV_HOSTS in convex/checkin/prof.ts, and ",
       );
     }
     expect((await rows(t)).staff).toEqual([]);
@@ -554,22 +559,19 @@ describe("ROLES-API-risk-1 a typed sign-in on dev holds only a fresh devGrant ro
       expect(await typed(t, "Sample professor", email).query(api.checkin.pass.amHost, {})).toBe(false);
       expect(await google(t, "Sample professor", email).query(api.checkin.pass.amHost, {})).toBe(true);
     }
-    // An admin who adds a test email by hand doesn't open it to typed sign-ins either.
+    // A test email an admin adds by hand works for the typed sign-in (ROLES-API-fixcheck-4).
     await admin(t).mutation(api.staff.add, { email: TEST_PROF, role: "professor" });
-    expect(await typed(t, "Sample professor 1", TEST_PROF).query(api.checkin.pass.amHost, {})).toBe(false);
+    expect(await typed(t, "Sample professor 1", TEST_PROF).query(api.checkin.pass.amHost, {})).toBe(true);
   });
 
-  it("ROLES-API-risk-1 devGrant takes only @test.local emails and never changes a row it didn't add", async () => {
+  it("ROLES-API-risk-1 devGrant takes only @test.local emails and never changes a real person's row", async () => {
     vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
     const t = setup();
-    await admin(t).mutation(api.staff.add, { email: "prof2@test.local", role: "scanner" });
+    await admin(t).mutation(api.staff.add, { email: PROF_EMAIL, role: "scanner" });
     for (const email of [PROF_EMAIL, ADMIN_EMAIL, "student1@example.edu", "prof1@test.local.example.edu"]) {
       await expect(t.mutation(internal.staff.devGrant, { email, role: "admin" })).rejects.toThrow("staff:devGrant takes only test emails");
     }
-    await expect(t.mutation(internal.staff.devGrant, { email: "prof2@test.local", role: "admin" })).rejects.toThrow(
-      "prof2@test.local is on the staff list already, added by admin@example.edu.",
-    );
-    expect((await rows(t)).staff.map((s) => [s.email, s.role])).toEqual([["prof2@test.local", "scanner"]]);
+    expect((await rows(t)).staff.map((s) => [s.email, s.role])).toEqual([[PROF_EMAIL, "scanner"]]);
   });
 
   it("ROLES-API-risk-1 a devGrant role lasts 2 hours, a second devGrant starts the 2 hours again, and then the row is gone", async () => {
@@ -600,9 +602,144 @@ describe("ROLES-API-risk-1 a typed sign-in on dev holds only a fresh devGrant ro
     await grant(t, PROF_EMAIL, "professor");
     await t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "admin" });
     await t.mutation(internal.staff.devGrant, { email: "door1@test.local", role: "scanner" });
-    expect(await t.mutation(internal.staff.devRevoke, {})).toBe("Removed 2 test roles.");
+    expect(await t.mutation(internal.staff.devRevoke, {})).toBe("Removed test roles: 2. Unpaired iPads a test sign-in paired: 0.");
     expect((await rows(t)).staff.map((s) => s.email)).toEqual([PROF_EMAIL]);
     expect(await typed(t, "Sample professor 1", TEST_PROF).query(api.checkin.pass.amHost, {})).toBe(false);
-    expect(await t.mutation(internal.staff.devRevoke, {})).toBe("Removed 0 test roles.");
+    expect(await t.mutation(internal.staff.devRevoke, {})).toBe("Removed test roles: 0. Unpaired iPads a test sign-in paired: 0.");
+  });
+});
+
+// Fixes from the ROLES-API fix check: floods of pairing requests, durable access a typed test
+// sign-in could leave behind, the devGrant message on a dev backend the code doesn't list, and a
+// test email an admin adds by hand.
+describe("ROLES-API-fixcheck pairing floods, test sign-ins leave nothing behind, devGrant on any test row", () => {
+  const TEST_PROF = "prof1@test.local";
+  const HOUR = 60 * MIN;
+
+  it("ROLES-API-fixcheck-1 throwaway requests after the door iPad's code shows never end that code: the professor still pairs it", async () => {
+    const t = setup();
+    const door = await codeFor(t, DEVICE_TOKEN);
+    // Someone signed out sends 250 throwaway requests while the professor walks to the laptop.
+    for (let n = 0; n < 250; n++) await codeFor(t, tokenN(n));
+    expect(await t.query(api.staff.deviceStatus, { token: DEVICE_TOKEN })).toMatchObject({ status: "waiting", code: door });
+    await (await professor(t)).mutation(api.staff.approvePairing, { code: door, label: "A-210 door" });
+    expect(await t.query(api.staff.deviceStatus, { token: DEVICE_TOKEN })).toEqual({ status: "paired", label: "A-210 door" });
+    // The throwaway requests are all still open; none of them paired.
+    expect(await pairingCount(t)).toBe(250);
+  });
+
+  it("ROLES-API-fixcheck-1 a professor's one-digit typo or swapped neighbors never match an open code: the last digit checks the other five", async () => {
+    const t = setup();
+    const codes: string[] = [];
+    for (let n = 0; n < 250; n++) codes.push(await codeFor(t, tokenN(n)));
+    const open = new Set(codes);
+    const professorAs = await professor(t);
+    for (const code of codes) {
+      expect(pairingCodeOk(code)).toBe(true);
+      const typos: string[] = [];
+      for (let i = 0; i < 6; i++) {
+        for (const d of "0123456789") if (d !== code[i]) typos.push(code.slice(0, i) + d + code.slice(i + 1));
+        if (i < 5 && code[i] !== code[i + 1]) typos.push(code.slice(0, i) + code[i + 1] + code[i] + code.slice(i + 2));
+      }
+      for (const typo of typos) {
+        expect([code, typo, pairingCodeOk(typo)]).toEqual([code, typo, false]);
+        expect(open.has(typo)).toBe(false);
+      }
+    }
+    await expect(professorAs.mutation(api.staff.approvePairing, { code: codes[0].slice(0, 5) + String((Number(codes[0][5]) + 1) % 10), label: "A-210 door" })).rejects.toThrow(
+      "That code is wrong or expired. Check the code on the iPad.",
+    );
+    expect((await rows(t)).devices).toEqual([]);
+  });
+
+  it("ROLES-API-fixcheck-2 a typed test admin can't give a real email a role or change a real person's", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
+    const t = setup();
+    await admin(t).mutation(api.staff.add, { email: PROF_EMAIL, role: "professor" });
+    await t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "admin" });
+    const tester = typed(t, "Sample professor 1", TEST_PROF);
+    const refused = "A test sign-in can add, change and remove only test emails (@test.local).";
+    await expect(tester.mutation(api.staff.add, { email: "stranger@gmail.com", role: "admin" })).rejects.toThrow(refused);
+    await expect(tester.mutation(api.staff.setRole, { email: PROF_EMAIL, role: "admin" })).rejects.toThrow(refused);
+    await expect(tester.mutation(api.staff.remove, { email: PROF_EMAIL })).rejects.toThrow(refused);
+    expect(await google(t, "Stranger", "stranger@gmail.com").query(api.staff.me, {})).toMatchObject({ role: null });
+    expect((await rows(t)).staff.map((s) => [s.email, s.role])).toEqual([
+      [PROF_EMAIL, "professor"],
+      [TEST_PROF, "admin"],
+    ]);
+    // Test emails work, so #/admin can be checked in a browser: add, change, remove.
+    await tester.mutation(api.staff.add, { email: "prof2@test.local", role: "scanner" });
+    await tester.mutation(api.staff.setRole, { email: "prof2@test.local", role: "professor" });
+    expect(await typed(t, "Sample professor 2", "prof2@test.local").query(api.checkin.pass.amHost, {})).toBe(true);
+    await tester.mutation(api.staff.remove, { email: "prof2@test.local" });
+    expect(await typed(t, "Sample professor 2", "prof2@test.local").query(api.checkin.pass.amHost, {})).toBe(false);
+  });
+
+  it("ROLES-API-fixcheck-2 devRevoke ends every role and door iPad a test sign-in gave, and nothing a test sign-in gave outlasts its own 2 hours", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
+    const t = setup();
+    await t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "admin" });
+    const tester = typed(t, "Sample professor 1", TEST_PROF);
+    // An hour in, the test admin adds a second test admin and pairs an iPad of its own.
+    vi.advanceTimersByTime(HOUR);
+    await tester.mutation(api.staff.add, { email: "prof2@test.local", role: "admin" });
+    await tester.mutation(api.staff.approvePairing, { code: await codeFor(t, OTHER_TOKEN), label: "mine" });
+    expect(await t.query(api.checkin.pass.canScan, { device: OTHER_TOKEN })).toBe(true);
+    const second = typed(t, "Sample professor 2", "prof2@test.local");
+    expect(await second.query(api.checkin.pass.amHost, {})).toBe(true);
+    // The second admin's role ends when the first one's does, 2 hours after devGrant, and so does the iPad.
+    vi.advanceTimersByTime(HOUR - 1);
+    expect(await second.query(api.checkin.pass.amHost, {})).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(await second.query(api.checkin.pass.amHost, {})).toBe(false);
+    expect(await t.query(api.checkin.pass.canScan, { device: OTHER_TOKEN })).toBe(false);
+    expect(await t.query(api.staff.deviceStatus, { token: OTHER_TOKEN })).toEqual({ status: "none" });
+    await t.finishInProgressScheduledFunctions();
+    expect((await rows(t)).staff).toEqual([]);
+
+    // devRevoke ends them at once, and a professor grant alone pairs nothing that outlasts it.
+    await t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "professor" });
+    await tester.mutation(api.staff.approvePairing, { code: await codeFor(t, DEVICE_TOKEN), label: "mine too" });
+    expect(await t.query(api.checkin.pass.canScan, { device: DEVICE_TOKEN })).toBe(true);
+    expect(await t.mutation(internal.staff.devRevoke, {})).toBe("Removed test roles: 1. Unpaired iPads a test sign-in paired: 2.");
+    expect(await t.query(api.checkin.pass.canScan, { device: DEVICE_TOKEN })).toBe(false);
+    expect(await t.query(api.staff.deviceStatus, { token: DEVICE_TOKEN })).toEqual({ status: "none" });
+    expect(await tester.query(api.checkin.pass.amHost, {})).toBe(false);
+    expect((await rows(t)).devices).toEqual([]);
+    // A door iPad a Google professor paired stays.
+    await pairDevice(t);
+    expect(await t.mutation(internal.staff.devRevoke, {})).toBe("Removed test roles: 0. Unpaired iPads a test sign-in paired: 0.");
+    expect(await t.query(api.checkin.pass.canScan, { device: DEVICE_TOKEN })).toBe(true);
+  });
+
+  it("ROLES-API-fixcheck-3 devGrant on a dev backend the code doesn't list says to add its host to DEV_HOSTS", async () => {
+    const t = setup();
+    vi.stubEnv("CONVEX_CLOUD_URL", "https://happy-lion-42.convex.cloud");
+    await expect(t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "professor" })).rejects.toThrow(
+      "staff:devGrant runs only on the dev backends in DEV_HOSTS in convex/checkin/prof.ts, and happy-lion-42.convex.cloud isn't one of them. If it's your own dev backend (never prod), add it there.",
+    );
+    vi.stubEnv("CONVEX_CLOUD_URL", undefined);
+    await expect(t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "professor" })).rejects.toThrow(
+      "staff:devGrant runs only on the dev backends in DEV_HOSTS in convex/checkin/prof.ts, and this backend isn't one of them.",
+    );
+  });
+
+  it("ROLES-API-fixcheck-4 a test email an admin adds on #/admin works for the typed sign-in on dev for 2 hours, and devGrant can change it", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
+    const t = setup();
+    const tester = typed(t, "Sample professor 2", "prof2@test.local");
+    expect(await tester.query(api.staff.me, {})).toEqual({ email: "prof2@test.local", role: null, canHoldRole: true });
+    await admin(t).mutation(api.staff.add, { email: "prof2@test.local", role: "professor" });
+    expect(await tester.query(api.staff.me, {})).toEqual({ email: "prof2@test.local", role: "professor", canHoldRole: true });
+    expect(await t.mutation(internal.staff.devGrant, { email: "prof2@test.local", role: "admin" })).toBe("prof2@test.local is admin now, for 2 hours.");
+    expect(await tester.query(api.staff.me, {})).toMatchObject({ role: "admin" });
+    vi.advanceTimersByTime(2 * HOUR);
+    expect(await tester.query(api.staff.me, {})).toMatchObject({ role: null });
+    await t.finishInProgressScheduledFunctions();
+    expect((await rows(t)).staff).toEqual([]);
+    // On prod the same row would hold nothing for a typed sign-in.
+    await admin(t).mutation(api.staff.add, { email: "prof2@test.local", role: "professor" });
+    vi.stubEnv("CONVEX_CLOUD_URL", PROD_URL);
+    expect(await tester.query(api.staff.me, {})).toMatchObject({ role: null, canHoldRole: false });
   });
 });
