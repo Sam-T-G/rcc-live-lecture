@@ -6,14 +6,17 @@
 //                "scanner" or null).
 //   <StaffGate title="Live quiz">...</StaffGate>   the page, for professors and admins. Anyone
 //                else sees how to sign in, or why their sign-in doesn't open it.
-//   <DoorGate>{(device) => <Scanner device={device} />}</DoorGate>   #/checkin/kiosk. Staff who
-//                are signed in (any role) scan as themselves (device is undefined); a paired iPad
-//                scans with its device token; anyone else gets the pairing screen.
+//   <DoorGate>{(device) => <Scanner device={device} />}</DoorGate>   #/checkin/kiosk. A paired
+//                iPad scans with its device token; a scanner who signs in scans as themselves
+//                (device is undefined); anyone else, professors and admins included, gets the
+//                pairing screen, so their sign-in isn't left on a door iPad that anyone in line can
+//                use to open #/admin or the attendance list. Whenever someone is signed in, the
+//                scanner shows who and a Sign out button.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
-import { SignInButton, useGoogleUser } from "../../blocks/auth";
+import { SignedInAs, SignInButton, useGoogleUser } from "../../blocks/auth";
 import { Button } from "../../blocks/kit";
 import { Big, Card, Screen, Status } from "../../blocks/ui";
 import { clock, why } from "./util";
@@ -32,17 +35,40 @@ export function useStaff(): StaffMe | undefined {
   return isLoading ? undefined : me;
 }
 
-// What a staff page shows to someone it doesn't open for, and how they get in. A typed sign-in
-// that can't hold a role (on prod) gets Sign out, which brings back the Google button: Convex
-// keeps using the token it has until it refreshes it, so a Google sign-in made on top of a typed
-// one wouldn't reach the server before a reload.
+// True for a Google ID token whose email Google hasn't verified. The server gives such a sign-in
+// no role (provenEmail in convex/checkin/prof.ts), and this is the same token Convex was sent.
+const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
+function isUnverifiedGoogle(token: string | undefined) {
+  if (!token) return false;
+  try {
+    const p = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return GOOGLE_ISSUERS.includes(p.iss) && p.email_verified !== true;
+  } catch {
+    return false;
+  }
+}
+
+// What a staff page shows to someone it doesn't open for, and how they get in. A sign-in that
+// can't hold a role gets Sign out, which brings back the Google button: Convex keeps using the
+// token it has until it refreshes it, so a new sign-in made on top of the old one wouldn't reach
+// the server before a reload. A Google account is told its email isn't verified; a typed
+// sign-in (on prod, or on dev without a test email) is told to use Google.
 export function NotStaff({ me }: { me: StaffMe }) {
-  const { signOut } = useGoogleUser();
+  const { user, signOut } = useGoogleUser();
   if (me === null)
     return (
       <>
         <p>Sign in with the Google account your admin added.</p>
         <SignInButton />
+      </>
+    );
+  if (!me.canHoldRole && isUnverifiedGoogle(user?.token))
+    return (
+      <>
+        <p>Google hasn't verified {me.email}, so the app can't check that it's yours. Verify the email in your Google account, then sign out and sign in again.</p>
+        <p>
+          <Button variant="secondary" onClick={signOut}>Sign out</Button>
+        </p>
       </>
     );
   if (!me.canHoldRole)
@@ -136,8 +162,8 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
     if (!token) newDeviceToken();
   }, [token]);
 
-  if (token && status?.status === "paired") return <>{children(token)}</>;
-  if (me?.role) return <>{children(undefined)}</>;
+  if (token && status?.status === "paired") return <WhoIsSignedIn>{children(token)}</WhoIsSignedIn>;
+  if (me?.role === "scanner") return <WhoIsSignedIn>{children(undefined)}</WhoIsSignedIn>;
   // (status can't be "paired" here; saying so lets TypeScript narrow it for PairScreen.)
   if (me === undefined || !token || status === undefined || status.status === "paired")
     return (
@@ -146,6 +172,21 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
       </Screen>
     );
   return <PairScreen me={me} token={token} status={status} />;
+}
+
+// The scanner, with "Signed in as …" and Sign out above it whenever someone is signed in on the
+// iPad, so the next person at the door can see the sign-in and end it.
+function WhoIsSignedIn({ children }: { children: ReactNode }) {
+  const { user } = useGoogleUser();
+  if (!user) return <>{children}</>;
+  return (
+    <>
+      <div style={{ padding: "8px 24px 0" }}>
+        <SignedInAs />
+      </div>
+      {children}
+    </>
+  );
 }
 
 type Code = { code: string; expiresAt: number };
@@ -170,19 +211,17 @@ function usePassed(at: number | undefined) {
   return at !== undefined && at <= now;
 }
 
-// A code that's gone from the server this long before its time ended early: the server ends the
-// oldest of its 200 open codes to make room for a new request (convex/staff.ts requestPairing).
-const ENDED_EARLY_MS = 5_000;
-
 // The pairing screen, shown from the status query (api.staff.deviceStatus). It asks for a code
-// when it opens, unless this iPad is waiting on one already (a reload shows the same code). A code
-// the server ends early is replaced at once. A code that runs its 10 minutes waits for a press on
-// "Get a new code", so a tab left open somewhere doesn't keep making codes.
+// when it opens, unless this iPad is waiting on one already (a reload shows the same code). The
+// server ends a code only when its 10 minutes run out (approval shows "paired" instead), so a
+// code that goes away always shows "The code expired." and waits for a press on "Get a new code",
+// even when the iPad's clock is behind the server's. A tab left open somewhere doesn't keep
+// making codes.
 export function PairScreen({ me, token, status }: { me: StaffMe; token: string; status: Unpaired }) {
   const request = useMutation(api.staff.requestPairing);
+  const { signOut } = useGoogleUser();
   const [phase, setPhase] = useState<"asking" | "showing" | "expired" | "error">(status.status === "waiting" ? "showing" : "asking");
   const [error, setError] = useState("");
-  const shown = useRef<Code | null>(status.status === "waiting" ? status : null);
   const asked = useRef(false);
 
   // The code comes back through the status query, as does "paired" (then DoorGate opens the scanner).
@@ -205,14 +244,11 @@ export function PairScreen({ me, token, status }: { me: StaffMe; token: string; 
 
   useEffect(() => {
     if (status.status === "waiting") {
-      shown.current = status;
       setPhase("showing");
     } else if (phase === "showing") {
-      const last = shown.current;
-      if (last && Date.now() < last.expiresAt - ENDED_EARLY_MS) void ask();
-      else setPhase("expired");
+      setPhase("expired");
     }
-  }, [status, phase, ask]);
+  }, [status, phase]);
 
   const expired = usePassed(status.status === "waiting" ? status.expiresAt : undefined);
   const live = status.status === "waiting" && !expired ? status : null;
@@ -242,16 +278,29 @@ export function PairScreen({ me, token, status }: { me: StaffMe; token: string; 
       ) : (
         <Status kind="loading">Getting a code…</Status>
       )}
-      <Card title="Or sign in">
-        {me === null ? (
-          <>
-            <p>Scanners, professors and admins can sign in here instead of pairing.</p>
-            <SignInButton />
-          </>
-        ) : (
-          <NotStaff me={me} />
-        )}
-      </Card>
+      {me !== null && isProfRole(me.role) ? (
+        <Card title="Signed in on this iPad">
+          <p>
+            {me.email} is signed in as {me.role === "admin" ? "an admin" : "a professor"}. The door iPad opens the scanner only once it's paired or a
+            scanner signs in, so nobody in line can open #/admin or the attendance list on your account.
+          </p>
+          <p>Sign out here, then type the code above on #/admin, under Pair a door iPad, from your own laptop or phone.</p>
+          <p>
+            <Button variant="secondary" onClick={signOut}>Sign out</Button>
+          </p>
+        </Card>
+      ) : (
+        <Card title="Or sign in">
+          {me === null ? (
+            <>
+              <p>Scanners can sign in here instead of pairing.</p>
+              <SignInButton />
+            </>
+          ) : (
+            <NotStaff me={me} />
+          )}
+        </Card>
+      )}
     </Screen>
   );
 }

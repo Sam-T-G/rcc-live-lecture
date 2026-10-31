@@ -114,12 +114,16 @@ describe("ROLES the door iPad's pairing screen", () => {
     expect(request).not.toHaveBeenCalled();
   });
 
-  it("ROLES a code the server ends early (200 codes open) is replaced at once", () => {
-    render(waiting("482913", T0 + 300_000));
-    vi.setSystemTime(T0 + 60_000);
+  // The server ends a code only at its expiry (or by approval, which shows paired), so a code that
+  // goes away while the iPad still counts time left means the iPad's clock is behind the server's.
+  it("ROLES a code that goes away before the iPad's own expiry time (iPad clock 6 s behind) shows 'The code expired.' and asks for nothing", () => {
+    render(waiting("482913", T0 + 600_000));
+    vi.setSystemTime(T0 + 600_000 - 6_000);
     render(none);
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(words(render(none))).toContain("Getting a code…");
+    const el = render(none);
+    expect(words(el)).toContain("The code expired.");
+    expect(button(el, "Get a new code")).toBeDefined();
+    expect(request).not.toHaveBeenCalled();
   });
 
   it("ROLES a code that runs its 10 minutes shows 'The code expired.' and waits for 'Get a new code'", () => {

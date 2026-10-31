@@ -25,6 +25,7 @@ vi.mock("convex/react", () => ({
 vi.mock("../../blocks/auth", () => ({
   SignInButton: () => "[Google button, typed sign-in under it]",
   GoogleButton: () => "[Google button]",
+  SignedInAs: () => null,
   useGoogleUser: () => ({ user: null, signOut: () => {} }),
 }));
 
@@ -119,7 +120,7 @@ describe("ROLES DoorGate and the pairing screen on #/checkin/kiosk", () => {
     expect(words(html)).toContain("A professor or admin types this code on #/admin, under Pair a door iPad.");
     expect(words(html)).toContain("The code works until");
     expect(html).not.toContain("[scanner");
-    // Staff can sign in instead of pairing.
+    // A scanner can sign in instead of pairing (prof.access.test.ts: professors and admins can't).
     expect(html).toContain("[Google button, typed sign-in under it]");
     expect(asked).toContainEqual(["staff:deviceStatus", { token: TOKEN }]);
   });
@@ -131,12 +132,16 @@ describe("ROLES DoorGate and the pairing screen on #/checkin/kiosk", () => {
     expect(kiosk()).toBe(`[scanner, device ${TOKEN}]`);
   });
 
-  it("ROLES anyone on the staff list who signs in on the iPad gets the scanner without pairing", () => {
-    for (const role of ["scanner", "professor", "admin"] as const) {
-      results["staff:me"] = staff("door@example.edu", role);
-      store.set(DEVICE, TOKEN);
-      results["staff:deviceStatus"] = { status: "none" };
-      expect(kiosk()).toBe("[scanner, device none]");
+  it("ROLES a scanner who signs in on the iPad gets the scanner without pairing; a professor or admin gets the pairing screen", () => {
+    store.set(DEVICE, TOKEN);
+    results["staff:deviceStatus"] = { status: "none" };
+    results["staff:me"] = staff("door@example.edu", "scanner");
+    expect(kiosk()).toBe("[scanner, device none]");
+    for (const role of ["professor", "admin"] as const) {
+      results["staff:me"] = staff("prof@example.edu", role);
+      const html = kiosk();
+      expect(html).toContain("<h1>Pair this iPad</h1>");
+      expect(html).not.toContain("[scanner");
     }
   });
 
