@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { HideLate } from "./Student";
 
 vi.mock("convex/react", () => ({ useQuery: () => false, useMutation: () => async () => null }));
-vi.mock("../../blocks/auth", () => ({ SignInButton: () => null, useGoogleUser: () => ({ user: null }) }));
+vi.mock("../../blocks/auth", () => ({ StudentSignIn: () => null, useGoogleUser: () => ({ user: null }) }));
 
 describe("HideLate, the late-banner opt-out", () => {
   it("its label has no .row class, so the checkbox stays beside its words (DC-1, DESIGN-design-8)", () => {

@@ -1,8 +1,9 @@
 // Block: sign-in. Google Identity Services gives the browser an ID token; Convex checks it
 // (convex/auth.config.ts). Wrap the app in <AuthProvider>, put <SignInButton/> where people sign
 // in, and read the user server-side with ctx.auth.getUserIdentity().
-// <SignInButton/> shows Google's button with the typed sign-in (any name and email) under it;
-// <GoogleButton/> is Google's button on its own. Show either one only to someone signed out:
+// <SignInButton/> shows Google's button with the typed sign-in (any name and email) under it, for
+// staff screens; <StudentSignIn/> is the typed sign-in on its own, for student screens;
+// <GoogleButton/> is Google's button on its own. Show any of them only to someone signed out:
 // Convex keeps using the token it has until it refreshes it, so a new sign-in on top of a live
 // one reaches the server only after a reload. Staff roles count only for a Google sign-in on
 // prod (convex/checkin/prof.ts).
@@ -183,14 +184,23 @@ export function GoogleButton() {
   );
 }
 
-// Everyone signs in here: Google's button, with the typed sign-in (a name and an email) under it.
+// Staff sign in here: Google's button, with the typed sign-in (a name and an email) under it.
 export function SignInButton() {
   return (
     <div>
       <GoogleButton />
-      <TestSignIn />
+      <TestSignIn heading="Or type your name and email" />
     </div>
   );
+}
+
+// Students sign in here: the typed sign-in only. Google and the typed sign-in give the same email
+// two identities (tokenIdentifier is issuer|subject), so a student who checked in one way and
+// signs back in the other way would be a new student to the server: no check-in, a second pass,
+// a second attendance row (ROLES-UI-risk-2). Students have typed since 2026-10-29, so they keep
+// typing until prod stops taking typed sign-ins and this becomes Google's button.
+export function StudentSignIn() {
+  return <TestSignIn />;
 }
 
 // Who this browser is signed in as, so a student who typed the wrong email or picked up a
@@ -211,7 +221,7 @@ export function SignedInAs() {
 
 // Typed sign-in: any name and email (convex/auth.config.ts). Anyone can type any email, so a
 // typed sign-in holds a staff role only on a dev backend (convex/checkin/prof.ts).
-function TestSignIn() {
+function TestSignIn({ heading }: { heading?: string }) {
   const { signInWithToken } = useGoogleUser();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -227,7 +237,7 @@ function TestSignIn() {
   }
   return (
     <form onSubmit={go} style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16, alignItems: "center" }}>
-      <strong style={{ width: "100%" }}>Or type your name and email</strong>
+      {heading && <strong style={{ width: "100%" }}>{heading}</strong>}
       <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Your name" placeholder="Your name" required autoComplete="name" />
       <input value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Your email" placeholder="Your email" type="email" required autoComplete="email" />
       <button type="submit">Sign in</button>

@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { SignInButton, useGoogleUser } from "../../blocks/auth";
+import { StudentSignIn, useGoogleUser } from "../../blocks/auth";
 import { CHANNEL } from "../../blocks/deck";
 import { Card, Status } from "../../blocks/ui";
 
@@ -69,7 +69,7 @@ export default function Questions({ index }: { index: number | null }) {
       ) : (
         <>
           <p className="muted">Sign in to post and upvote.</p>
-          <SignInButton />
+          <StudentSignIn />
         </>
       )}
       {error && <Status kind="error">{error}</Status>}

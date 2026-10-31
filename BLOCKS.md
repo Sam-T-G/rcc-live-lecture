@@ -7,13 +7,14 @@ Everything the product needs that isn't the product. Each block is tested on the
 **Browser:** the app is already wrapped in `<AuthProvider>` (`src/main.tsx`).
 
 ```tsx
-import { SignInButton, SignedInAs, useGoogleUser } from "../blocks/auth";
+import { SignInButton, SignedInAs, StudentSignIn, useGoogleUser } from "../blocks/auth";
 
 const { user, signOut } = useGoogleUser(); // user: { name, email, picture } or null
-return user ? <SignedInAs /> : <SignInButton />; // Google's button, with the typed form under it
+return user ? <SignedInAs /> : <SignInButton />;  // staff screens: Google's button, with the typed form under it
+return user ? <SignedInAs /> : <StudentSignIn />; // student screens: the typed form only
 ```
 
-`<SignedInAs />` is "Signed in as Jane Doe (jane@example.edu)" with a "Not you? Sign out" button. `<GoogleButton />` is Google's button on its own. Show either button only to someone signed out: Convex keeps the token it has until it refreshes it, so a sign-in on top of a live one reaches the server only after a reload.
+Student screens show one way to sign in: Google and the typed form give the same email two identities on the server (`tokenIdentifier` is issuer|subject), so a student who checked in with one and signs back in with the other has no check-in, gets a second pass and a second attendance row. `<SignedInAs />` is "Signed in as Jane Doe (jane@example.edu)" with a "Not you? Sign out" button. `<GoogleButton />` is Google's button on its own. Show any of these only to someone signed out: Convex keeps the token it has until it refreshes it, so a sign-in on top of a live one reaches the server only after a reload.
 
 **Server:**
 

@@ -1,4 +1,4 @@
-// #/checkin/student (also #/checkin/join): the student signs in (Google, or a typed name and email), and
+// #/checkin/student (also #/checkin/join): the student signs in (a typed name and email; StudentSignIn says why not Google yet), and
 // the phone shows their QR pass until the professor or the door kiosk scans it.
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -7,7 +7,7 @@ import { Link } from "../../blocks/router";
 import { Screen, Status } from "../../blocks/ui";
 import { QR } from "../../blocks/qr";
 import { CHANNEL } from "../../blocks/deck";
-import { SignInButton, useGoogleUser } from "../../blocks/auth";
+import { StudentSignIn, useGoogleUser } from "../../blocks/auth";
 import LateBanner from "./LateBanner";
 import { QuizCard } from "./Quiz";
 import { why } from "./util";
@@ -18,7 +18,7 @@ export function Student() {
     return (
       <Screen title="Your check-in pass">
         <p>Sign in to get your pass.</p>
-        <SignInButton />
+        <StudentSignIn />
       </Screen>
     );
   return <StudentPass />;
