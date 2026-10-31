@@ -1,13 +1,13 @@
 // @vitest-environment node
 // DESIGN: the colors every page uses pass WCAG AA in light and dark (4.5:1 for words, 3:1 for
 // large words, edges, rings and bars), measured from the stylesheets themselves. The CSS is read
-// from disk (Vitest blanks CSS imports, ?raw included) and the small parser below reads its
+// from disk (Vitest blanks CSS imports, ?raw included) and the small parser in cssRules.ts reads its
 // rules, so a changed hex in tokens.css, a new rule in a team stylesheet or a dark block that
 // drifts fails here.
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { PAIRS, contrastRatio, parseColor, type Rgb } from "./contrast";
-import { parse, type Rule } from "./cssRules";
+import { parse, splitTop, type Rule } from "./cssRules";
 
 const SRC = new URL("../", import.meta.url);
 const TOKENS = readFileSync(new URL("styles/tokens.css", SRC), "utf8");
