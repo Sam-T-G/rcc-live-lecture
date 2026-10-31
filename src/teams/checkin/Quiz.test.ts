@@ -1,34 +1,111 @@
 // @vitest-environment node
-// #/checkin/quiz after the professor ends a quiz. The server is swapped for fixed answers, so the
-// test checks only what the page draws.
+// #/checkin/quiz and the student's quiz card, rendered to HTML. The server is swapped for fixed
+// answers, so the tests check only what the page draws.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getFunctionName } from "convex/server";
-import { describe, expect, it, vi } from "vitest";
-import { Professor } from "./Quiz";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Professor, QuizCard } from "./Quiz";
 
-const answers: Record<string, unknown> = {
-  "checkin/quiz:current": { id: "p1", kind: "quiz", question: "What does a capacitor store?", choices: ["Charge", "Current"], open: false },
-  "checkin/quiz:stats": { answered: 1, checkedIn: 12, counts: [1, 0], correct: 0, rightPct: 100, medianSec: 225 },
-  "checkin/quiz:history": [],
-};
+const answers: Record<string, unknown> = {};
+const who = vi.hoisted(() => ({ user: null as null | { name: string; email: string } }));
 
 vi.mock("convex/react", () => ({
-  useQuery: (ref: Parameters<typeof getFunctionName>[0]) => answers[getFunctionName(ref)],
+  useQuery: (ref: Parameters<typeof getFunctionName>[0], args: unknown) => (typeof args === "object" ? answers[getFunctionName(ref)] : undefined),
   useMutation: () => async () => null,
 }));
 vi.mock("./prof", () => ({
   StaffGate: ({ children }: { children: unknown }) => children,
 }));
+vi.mock("../../blocks/auth", () => ({ useGoogleUser: () => ({ user: who.user }) }));
+
+const ended = { id: "p1", kind: "quiz", question: "What does a capacitor store?", choices: ["Charge", "Current"], open: false };
+const open = (kind: "quiz" | "vote") => ({
+  id: "p2",
+  kind,
+  question: "Which law gives V = IR?",
+  choices: ["Ohm", "Coulomb", "Faraday"],
+  open: true,
+  answered: 0,
+  results: null,
+});
+
+beforeEach(() => {
+  for (const k of Object.keys(answers)) delete answers[k];
+  who.user = null;
+});
+
+const page = () => renderToStaticMarkup(createElement(Professor)).replace(/<!-- -->/g, "");
+const card = () => renderToStaticMarkup(createElement(QuizCard)).replace(/<!-- -->/g, "");
+const CHECK_IN_LINK = /<a href="#\/checkin\/student"[^>]*>Check in<\/a>/;
 
 describe("#/checkin/quiz, ended quiz", () => {
   it("shows answered, right and median time as three Stats in one row, with no Big number above 'Ask another'", () => {
-    const html = renderToStaticMarkup(createElement(Professor));
+    Object.assign(answers, {
+      "checkin/quiz:current": ended,
+      "checkin/quiz:stats": { answered: 1, checkedIn: 12, counts: [1, 0], correct: 0, rightPct: 100, medianSec: 225 },
+      "checkin/quiz:history": [],
+    });
+    const html = page();
     const stats = html.slice(html.indexOf('class="quiz__stats"'), html.indexOf("Ask another"));
     expect(stats).not.toContain("big__value");
     expect(stats.match(/class="stat__value"/g)).toHaveLength(3);
     expect(stats).toContain('<span class="stat__value">1 / 12</span><span class="stat__label">answered</span>');
     expect(stats).toContain('<span class="stat__value">100%</span><span class="stat__label">got it right</span>');
     expect(stats).toContain('<span class="stat__value">225 s</span><span class="stat__label">median time to answer</span>');
+  });
+});
+
+describe("#/checkin/quiz, 'This class'", () => {
+  it("F41.1 says 'Loading…' while the list loads, and 'No questions yet.' only once it's empty", () => {
+    answers["checkin/quiz:current"] = null;
+    const loading = page();
+    const side = (html: string) => html.slice(html.indexOf("<h2>This class</h2>"));
+    expect(side(loading)).toContain('<p class="status status--loading" role="status">Loading…</p>');
+    expect(side(loading)).not.toContain("No questions yet.");
+    answers["checkin/quiz:history"] = [];
+    expect(side(page())).toContain('<p class="status status--empty" role="status">No questions yet.</p>');
+  });
+});
+
+describe("the quiz card before check-in (#/live)", () => {
+  it("F21.2 checkin-frontend-19 signed out: the question and its choices, 'Sign in and check in to answer.' and a link to #/checkin/student, and no answer buttons", () => {
+    Object.assign(answers, { "checkin/quiz:current": open("quiz"), "checkin/quiz:mine": null, "checkin/read:me": false });
+    const html = card();
+    expect(html).toContain("Which law gives V = IR?");
+    expect(html).toContain("<b>C</b> Faraday");
+    expect(html).toContain("<p>Sign in and check in to answer.</p>");
+    expect(html).toMatch(CHECK_IN_LINK);
+    expect(html).not.toContain("<button");
+  });
+
+  it("F21.2 checkin-frontend-19 signed in but not checked in: 'Check in to answer.' ('Check in to vote.' on a vote) and the link, no buttons; checked in: one button per choice and no line", () => {
+    who.user = { name: "Ada Lovelace", email: "ada@example.edu" };
+    Object.assign(answers, { "checkin/quiz:current": open("quiz"), "checkin/quiz:mine": null, "checkin/read:me": false });
+    let html = card();
+    expect(html).toContain("<p>Check in to answer.</p>");
+    expect(html).toMatch(CHECK_IN_LINK);
+    expect(html).not.toContain("<button");
+
+    answers["checkin/quiz:current"] = open("vote");
+    html = card();
+    expect(html).toContain("<p>Check in to vote.</p>");
+    expect(html).not.toContain("<button");
+
+    answers["checkin/read:me"] = true;
+    html = card();
+    expect(html.match(/<button/g)).toHaveLength(3);
+    expect(html).toContain("<b>C</b> Faraday</button>");
+    expect(html).not.toContain("Check in to");
+    expect(html).not.toMatch(CHECK_IN_LINK);
+  });
+
+  it("F21.2 checkin-frontend-19 while the check-in status loads, the question and choices show with no buttons and no check-in line", () => {
+    who.user = { name: "Ada Lovelace", email: "ada@example.edu" };
+    Object.assign(answers, { "checkin/quiz:current": open("quiz"), "checkin/quiz:mine": null });
+    const html = card();
+    expect(html).toContain("<b>A</b> Ohm");
+    expect(html).not.toContain("<button");
+    expect(html).not.toContain("Check in to");
   });
 });

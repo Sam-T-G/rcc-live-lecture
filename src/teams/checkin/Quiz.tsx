@@ -1,23 +1,45 @@
 // Live quiz and vote. Two parts:
 //   <Professor />: #/checkin/quiz, for professors and admins (StaffGate). Ask a question, watch
 //     answers come in, end it, see the results.
-//   <QuizCard />: the student's side. Shows on the phone after check-in; Live slides can drop
-//     it on #/live too with <QuizCard />.
-import { useState, type FormEvent } from "react";
+//   <QuizCard />: the student's side, on #/checkin/student after check-in and on #/live. Anyone
+//     can read the open question and its choices; only a checked-in student gets answer buttons.
+//     Signed out it says "Sign in and check in to answer.", signed in "Check in to answer." (on a
+//     vote, "... to vote."), with a "Check in" link to #/checkin/student.
+// A button that sends something ignores presses until the server answers (usePending), so a
+// double click asks the room once and a double tap sends one answer.
+import { useRef, useState, type FormEvent } from "react";
 import "./checkin.css";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
 import { Big, Card, Screen, Status } from "../../blocks/ui";
-import { Stat } from "../../blocks/kit";
+import { Button, Stat } from "../../blocks/kit";
+import { Link } from "../../blocks/router";
+import { useGoogleUser } from "../../blocks/auth";
 import { CHANNEL } from "../../blocks/deck";
 import { StaffGate } from "./prof";
+import { why } from "./util";
 
 const LETTERS = ["A", "B", "C", "D"];
 
-function why(e: unknown) {
-  const x = e as { data?: unknown };
-  return typeof x?.data === "string" ? x.data : "Something went wrong. Try again.";
+// One request at a time. run(send) does nothing while the last send is still out; `pending` is
+// true until it settles, for the button's busy or disabled look. It checks a ref as well as the
+// state, so a second press that lands before React draws the disabled button still sends
+// nothing. `send` catches its own errors.
+function usePending() {
+  const [pending, setPending] = useState(false);
+  const out = useRef(false);
+  async function run(send: () => Promise<void>) {
+    if (out.current) return;
+    out.current = true;
+    setPending(true);
+    try {
+      await send();
+    } finally {
+      out.current = false;
+      setPending(false);
+    }
+  }
+  return [pending, run] as const;
 }
 
 // One bar per choice. The right answer (quiz) or the top pick (vote) is highlighted.
@@ -63,7 +85,7 @@ function ProfessorBoard() {
           {poll === undefined && <Status kind="loading">Loading…</Status>}
           {showForm
             ? <AskForm onDone={() => setAsking(false)} />
-            : poll && <Running poll={poll} onNew={() => setAsking(true)} />}
+            : poll && <Running key={poll.id} poll={poll} onNew={() => setAsking(true)} />}
         </div>
         <History />
       </div>
@@ -78,19 +100,38 @@ function AskForm({ onDone }: { onDone: () => void }) {
   const [choices, setChoices] = useState(["", "", "", ""]);
   const [correct, setCorrect] = useState<number | null>(null);
   const [err, setErr] = useState("");
+  const [sending, run] = usePending();
 
   function send(e: FormEvent) {
     e.preventDefault();
+    // The page checks these two and says what's wrong (noValidate turns off the browser's own
+    // message for the required question); the server checks the question again, and the number
+    // of choices.
+    const right = kind === "quiz" ? correct : null;
+    if (!question.trim()) {
+      setErr("Type a question.");
+      return;
+    }
+    if (right !== null && !choices[right].trim()) {
+      setErr("Type the right answer’s choice.");
+      return;
+    }
     // Blank choices drop out, so the right answer's index has to follow its choice.
     const kept = choices.map((c, i) => ({ c: c.trim(), i })).filter((x) => x.c);
-    const at = kind === "quiz" && correct !== null ? kept.findIndex((x) => x.i === correct) : -1;
-    ask({ channel: CHANNEL, kind, question, choices: kept.map((x) => x.c), correct: at >= 0 ? at : undefined })
-      .then(() => { setErr(""); onDone(); })
-      .catch((x) => setErr(why(x)));
+    const at = right === null ? -1 : kept.findIndex((x) => x.i === right);
+    void run(async () => {
+      try {
+        await ask({ channel: CHANNEL, kind, question, choices: kept.map((x) => x.c), correct: at >= 0 ? at : undefined });
+        setErr("");
+        onDone();
+      } catch (x) {
+        setErr(why(x));
+      }
+    });
   }
 
   return (
-    <form onSubmit={send} className="ask">
+    <form onSubmit={send} className="ask" noValidate>
       <div className="row" role="radiogroup" aria-label="Quiz or vote">
         <button type="button" className={kind === "quiz" ? "" : "quiet"} onClick={() => setKind("quiz")} aria-pressed={kind === "quiz"}>Quiz</button>
         <button type="button" className={kind === "vote" ? "" : "quiet"} onClick={() => setKind("vote")} aria-pressed={kind === "vote"}>Vote</button>
@@ -116,7 +157,7 @@ function AskForm({ onDone }: { onDone: () => void }) {
         </div>
       ))}
       <p className="row">
-        <button type="submit">{kind === "quiz" ? "Ask the room" : "Start the vote"}</button>
+        <Button type="submit" busy={sending}>{kind === "quiz" ? "Ask the room" : "Start the vote"}</Button>
         {kind === "quiz" && correct !== null && <button type="button" className="quiet" onClick={() => setCorrect(null)}>No right answer</button>}
       </p>
       {err && <Status kind="error">{err}</Status>}
@@ -127,10 +168,26 @@ function AskForm({ onDone }: { onDone: () => void }) {
 type Poll = NonNullable<ReturnType<typeof useCurrent>>;
 function useCurrent() { return useQuery(api.checkin.quiz.current, { channel: CHANNEL }); }
 
+// One question, open or ended. ProfessorBoard keys it by poll, so an End error never carries over
+// to the next question.
 function Running({ poll, onNew }: { poll: Poll; onNew: () => void }) {
   const stats = useQuery(api.checkin.quiz.stats, { poll: poll.id });
   const end = useMutation(api.checkin.quiz.end);
+  const [err, setErr] = useState("");
+  const [ending, run] = usePending();
   const vote = poll.kind === "vote";
+
+  function stop() {
+    void run(async () => {
+      try {
+        await end({ poll: poll.id });
+        setErr("");
+      } catch (x) {
+        setErr(why(x));
+      }
+    });
+  }
+
   return (
     <div>
       <p className="muted">{vote ? "Vote" : "Quiz"} · {poll.open ? "open" : "ended"}</p>
@@ -139,7 +196,8 @@ function Running({ poll, onNew }: { poll: Poll; onNew: () => void }) {
         <>
           <Big value={stats ? `${stats.answered} / ${stats.checkedIn}` : "…"} label="checked-in students answered" />
           <ul className="quiz__list">{poll.choices.map((c, i) => <li key={i}><b>{LETTERS[i]}</b> {c}</li>)}</ul>
-          <p className="row"><button onClick={() => end({ poll: poll.id })}>{vote ? "End the vote" : "End the question"}</button></p>
+          <p className="row"><Button busy={ending} onClick={stop}>{vote ? "End the vote" : "End the question"}</Button></p>
+          {err && <Status kind="error">{err}</Status>}
         </>
       ) : stats ? (
         <>
@@ -158,20 +216,25 @@ function Running({ poll, onNew }: { poll: Poll; onNew: () => void }) {
 
 function History() {
   const past = useQuery(api.checkin.quiz.history, { channel: CHANNEL });
-  if (!past || past.length === 0) return <div><h2>This class</h2><Status kind="empty">No questions yet.</Status></div>;
   return (
     <div>
       <h2>This class</h2>
-      <ul className="scanner__names">
-        {past.map((p) => (
-          <li key={p.id}>
-            {p.question}{" "}
-            <span className="muted">
-              {p.kind === "vote" ? "vote" : "quiz"} · {p.answered} answered{p.rightPct !== null ? ` · ${p.rightPct}% right` : ""}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {past === undefined ? (
+        <Status kind="loading">Loading…</Status>
+      ) : past.length === 0 ? (
+        <Status kind="empty">No questions yet.</Status>
+      ) : (
+        <ul className="scanner__names">
+          {past.map((p) => (
+            <li key={p.id}>
+              {p.question}{" "}
+              <span className="muted">
+                {p.kind === "vote" ? "vote" : "quiz"} · {p.answered} answered{p.rightPct !== null ? ` · ${p.rightPct}% right` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -181,14 +244,11 @@ function History() {
 export function QuizCard() {
   const poll = useCurrent();
   const mine = useQuery(api.checkin.quiz.mine, poll ? { poll: poll.id } : "skip");
-  const answer = useMutation(api.checkin.quiz.answer);
-  const [err, setErr] = useState("");
+  // Read here, not in Answer, so the check-in status stays loaded from one question to the next.
+  const here = useQuery(api.checkin.read.me, { channel: CHANNEL });
+  const { user } = useGoogleUser();
   if (!poll) return null;
   const vote = poll.kind === "vote";
-
-  function pick(id: Id<"polls">, i: number) {
-    answer({ poll: id, choice: i }).then(() => setErr("")).catch((e) => setErr(why(e)));
-  }
 
   if (!poll.open && poll.results)
     return (
@@ -201,19 +261,57 @@ export function QuizCard() {
       </Card>
     );
 
+  return <Answer key={poll.id} poll={poll} mine={mine} here={here} signedIn={!!user} />;
+}
+
+// The open question. Keyed by poll in QuizCard, so a failed answer's error and a send still out
+// never carry over to the next question. `here` is checkin.read.me: undefined while it loads.
+function Answer({ poll, mine, here, signedIn }: { poll: Poll; mine: number | null | undefined; here: boolean | undefined; signedIn: boolean }) {
+  const answer = useMutation(api.checkin.quiz.answer);
+  const [sending, run] = usePending();
+  // A failed answer, with what `mine` was when the student tapped. Its words stay up until the
+  // answer lands (`mine` changes). A quiz that has an answer shows "Answer sent." and no error:
+  // a second send that comes back "You already answered." has nothing left to fix.
+  const [failed, setFailed] = useState<{ mine: number | null | undefined; text: string } | null>(null);
+  const vote = poll.kind === "vote";
   const locked = !vote && mine !== null && mine !== undefined;
+  const err = failed && failed.mine === mine && !locked ? failed.text : "";
+
+  function pick(choice: number) {
+    const before = mine;
+    void run(async () => {
+      try {
+        await answer({ poll: poll.id, choice });
+        setFailed(null);
+      } catch (e) {
+        setFailed({ mine: before, text: why(e) });
+      }
+    });
+  }
+
+  const how = (signedIn ? "Check in to " : "Sign in and check in to ") + (vote ? "vote." : "answer.");
   return (
     <Card title={vote ? "Vote now" : "Question"}>
       <p className="quiz__q">{poll.question}</p>
-      <div className="quiz__picks">
-        {poll.choices.map((c, i) => (
-          <button key={i} className={mine === i ? "quiz__pick quiz__pick--mine" : "quiz__pick quiet"} disabled={locked} onClick={() => pick(poll.id, i)} aria-pressed={mine === i}>
-            <b>{LETTERS[i]}</b> {c}
-          </button>
-        ))}
-      </div>
-      {locked && <p className="muted">Answer sent. Results show when the professor ends the question.</p>}
-      {vote && mine !== null && mine !== undefined && <p className="muted">You picked {LETTERS[mine]}. Tap another to change it.</p>}
+      {here ? (
+        <div className="quiz__picks">
+          {poll.choices.map((c, i) => (
+            <button key={i} type="button" className={mine === i ? "quiz__pick quiz__pick--mine" : "quiz__pick quiet"} disabled={locked || sending} onClick={() => pick(i)} aria-pressed={mine === i}>
+              <b>{LETTERS[i]}</b> {c}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <ul className="quiz__list">{poll.choices.map((c, i) => <li key={i}><b>{LETTERS[i]}</b> {c}</li>)}</ul>
+      )}
+      {here === false && (
+        <>
+          <p>{how}</p>
+          <Link to="checkin/student" className="btn btn--quiet btn--flush">Check in</Link>
+        </>
+      )}
+      {here && locked && <p className="muted">Answer sent. Results show when the professor ends the question.</p>}
+      {here && vote && mine !== null && mine !== undefined && <p className="muted">You picked {LETTERS[mine]}. Tap another to change it.</p>}
       {err && <Status kind="error">{err}</Status>}
     </Card>
   );
