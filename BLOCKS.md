@@ -142,6 +142,18 @@ MediaPipe models that run in the browser: no key, nothing leaves the device, off
 | `objects` | everyday objects with boxes | Phones out, laptops open, a book on the desk |
 | `classify` | what the whole picture is | "What is this?" from a photo |
 
+A page that only needs the camera picture (the teacher scanner, the door kiosk) imports `useCamera` from `src/blocks/camera.ts`, which doesn't load MediaPipe:
+
+```tsx
+import { useCamera } from "../../blocks/camera";
+
+const cam = useCamera();                       // { video, on, error, start, stop }
+// <button onClick={() => cam.start()}>Start camera</button>
+// <video ref={cam.video} playsInline muted />  and show cam.error when it's set
+```
+
+A page that runs a model imports from `vision.ts`, which re-exports the same `useCamera`:
+
 ```tsx
 import { loadVision, useCamera, useVisionLoop, drawSeen, type Runner } from "../../blocks/vision";
 
@@ -156,7 +168,7 @@ useVisionLoop(cam.video, runner, cam.on, (seen) => {
 ```
 
 - **Load it lazily.** The library is about 160 KB; import the page or component that uses it with `React.lazy` (as `src/pages/Lab.tsx` does), so phones on other pages never download it. Each model is a few MB the first time, then cached.
-- **The camera** starts only from a button press. On a Mac, `useCamera` skips an iPhone (Continuity Camera) and uses the built-in one.
+- **The camera** (`useCamera`, in `src/blocks/camera.ts`) starts only from a button press. On a Mac it skips an iPhone (Continuity Camera) and uses the built-in one. Import it from `camera.ts` unless the page also runs a model, so MediaPipe stays out of that page's bundle.
 - **Privacy:** send counts or labels to Convex, never frames or face data. Say what the camera sees in TEAM.md.
 - **A still picture:** `loadVision(kind, "IMAGE")`, then `run(img)` on a loaded `<img>`.
 - **Gemini** reads pictures too (`gemini()` with an image part, above). Use it when you need words about a picture; use MediaPipe when you need it live, many times a second.
