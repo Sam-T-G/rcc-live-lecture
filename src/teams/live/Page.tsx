@@ -65,8 +65,10 @@ export function LiveSlides({ pin = null }: { pin?: number | null }) {
   const earlier = pinned !== null ? shown?.find((x) => x.index === pinned) : undefined;
   const looking = earlier !== undefined; // on a slide the student paged back to
   const slide = earlier ? { ...earlier, count: live?.count ?? 0 } : live;
-  const here = slide ? slide.index : null;
-  const before = shown && here !== null ? [...shown].reverse().find((x) => x.index < here) : undefined;
+  // The slide on screen: undefined while the deck loads, null before the slides start. Questions
+  // reads undefined as "Loading questions…" and null as "You can ask once the slides start."
+  const here = slide === undefined ? undefined : slide ? slide.index : null;
+  const before = shown && typeof here === "number" ?[...shown].reverse().find((x) => x.index < here) : undefined;
   const after = earlier && shown ? shown.find((x) => x.index > earlier.index) : undefined;
   function next() {
     if (!after || (live && after.index >= live.index)) setPinned(null);

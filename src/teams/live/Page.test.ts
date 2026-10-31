@@ -19,6 +19,8 @@ const calls = vi.hoisted(() => ({
   mutations: [] as { name: string; args: unknown }[],
   // Props of every kit <Button> rendered, so a test can press one by calling its onClick.
   buttons: [] as { className?: string; onClick?: () => unknown }[],
+  // The index prop of every Questions card rendered.
+  questions: [] as unknown[],
 }));
 const auth = vi.hoisted(() => ({ user: null as null | { name: string; email: string } }));
 vi.mock("convex/react", () => ({
@@ -64,7 +66,12 @@ vi.mock("../../blocks/kit", async (importOriginal) => {
 vi.mock("../checkin/Quiz", () => ({ QuizCard: () => "[quiz card]" }));
 vi.mock("../checkin/LateBanner", () => ({ default: () => "[late banner]" }));
 vi.mock("./PastQuestions", () => ({ default: () => "[past quizzes and votes]" }));
-vi.mock("./Questions", () => ({ default: () => "[questions]" }));
+vi.mock("./Questions", () => ({
+  default: ({ index }: { index: unknown }) => {
+    calls.questions.push(index);
+    return "[questions]";
+  },
+}));
 vi.mock("../../blocks/ui", async (importOriginal) => {
   const { createElement } = await import("react");
   return {
@@ -89,6 +96,7 @@ beforeEach(() => {
   calls.queries.length = 0;
   calls.mutations.length = 0;
   calls.buttons.length = 0;
+  calls.questions.length = 0;
   Object.assign(results, {
     "checkin/pass:amHost": true, // a professor is signed in on the projector laptop
     "live/groups:status": { size: 3, locked: true, locksAt: null },
@@ -317,6 +325,17 @@ describe("#/live, the student phone", () => {
     expect(html).toContain("← Back");
     expect(html).toContain("Next →");
     expect(html).not.toContain("Back to live"); // following the professor
+  });
+
+  it("UC-risk-3 the Questions card gets index undefined while the deck loads, null before the slides start, and the slide on screen after", () => {
+    results["deck:current"] = undefined;
+    open("#/live");
+    expect(calls.questions).toEqual([undefined]);
+    results["deck:current"] = null;
+    open("#/live");
+    deckOn(2);
+    open("#/live");
+    expect(calls.questions).toEqual([undefined, null, 2]);
   });
 
   it("live-frontend-18 a phone that paged back follows live again once the professor reaches or goes back past its slide", () => {
