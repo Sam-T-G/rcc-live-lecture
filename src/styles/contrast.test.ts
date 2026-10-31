@@ -132,3 +132,130 @@ describe("contrast: every text/background token pair the app uses passes WCAG AA
     expect(used.filter(([, name]) => !set.has(name)).map(([file, name]) => `${file}: ${name}`)).toEqual([]);
   });
 });
+
+// A small selector matcher for the cascade tests below. An element is a tag and its classes.
+// `may` answers "could this compound selector match it?": it reads the tag, classes, :is(),
+// :where() and :not(), and treats any other pseudo-class or [attr] as "could", so it errs
+// toward yes. `:not(X)` rules the element out only when X surely matches it (X is only a tag
+// and classes).
+type El = { tag: string; classes: string[] };
+function compoundParts(sel: string) {
+  let tag = "";
+  const classes: string[] = [];
+  const fns: { name: string; args: string[] }[] = [];
+  let i = 0;
+  const word = () => /^[\w-]*/.exec(sel.slice(i))![0];
+  while (i < sel.length) {
+    const ch = sel[i];
+    if (i === 0 && /[a-z*]/i.test(ch)) {
+      tag = ch === "*" ? "" : word();
+      i += Math.max(1, tag.length);
+    } else if (ch === ".") {
+      i++;
+      const w = word();
+      classes.push(w);
+      i += w.length;
+    } else if (ch === "[" || ch === ":") {
+      let name = "";
+      if (ch === ":") {
+        i += sel[i + 1] === ":" ? 2 : 1;
+        name = word();
+        i += name.length;
+        if (sel[i] !== "(") continue;
+      }
+      const close = ch === "[" ? "]" : ")";
+      const start = i + 1;
+      let depth = 0;
+      for (; i < sel.length; i++) {
+        if (sel[i] === "(" || sel[i] === "[") depth++;
+        else if (sel[i] === ")" || sel[i] === "]") depth--;
+        if (depth === 0) break;
+      }
+      if (close === ")") fns.push({ name, args: splitTop(sel.slice(start, i), ",") });
+      i++;
+    } else i++;
+  }
+  return { tag, classes, fns };
+}
+function surely(sel: string, el: El) {
+  const p = compoundParts(sel);
+  return /^[\w.-]+$/.test(sel) && (!p.tag || p.tag === el.tag) && p.classes.every((c) => el.classes.includes(c));
+}
+function may(sel: string, el: El): boolean {
+  const p = compoundParts(sel);
+  if (p.tag && p.tag !== el.tag) return false;
+  if (!p.classes.every((c) => el.classes.includes(c))) return false;
+  for (const f of p.fns) {
+    if (["is", "where", "matches"].includes(f.name) && !f.args.some((a) => may(a, el))) return false;
+    if (f.name === "not" && f.args.some((a) => surely(a, el))) return false;
+  }
+  return true;
+}
+// Could `selector` reach `el` through an ancestor in `around` (and only those)? A selector with
+// no ancestor isn't about the surroundings, and one that needs any other ancestor (.host-tabs,
+// .q__meta) is a team's own part.
+function reaches(selector: string, el: El, around: string[]) {
+  const parts = splitTop(selector.replace(/\s*([>+~])\s*/g, " "), " ");
+  const subject = parts.pop() ?? "";
+  return parts.length > 0 && parts.every((p) => /^\.[\w-]+$/.test(p) && around.includes(p.slice(1))) && may(subject, el);
+}
+
+describe("cascade: a kit part keeps its own colors wherever a page puts it", () => {
+  const rules = Object.entries(SHEETS).flatMap(([file, css]) => parse(css).map((r) => ({ file, ...r })));
+  const layered = (r: Rule) => r.at.some((a) => a.startsWith("@layer"));
+
+  it("a filled button inside a Banner keeps the button's word color (DESIGN-spec-2)", () => {
+    // <Banner action={<a className="btn" href=...>}>, and the same with btn--danger: the
+    // banner's own ink on the green or red fill is 1.3 to 2.7:1. Outlined and quiet buttons
+    // take the ink on purpose: they have no fill of their own.
+    const filled: El[] = [
+      { tag: "a", classes: ["btn"] },
+      { tag: "a", classes: ["btn", "btn--danger"] },
+      { tag: "button", classes: ["btn"] },
+      { tag: "button", classes: ["btn", "btn--danger"] },
+    ];
+    const wrong = rules.flatMap((r) =>
+      r.decls.some(([k]) => k === "color")
+        ? r.selectors.filter((s) => filled.some((el) => reaches(s, el, ["banner"]))).map((s) => `${r.file}: ${s}`)
+        : [],
+    );
+    expect(wrong).toEqual([]);
+  });
+
+  it("no unlayered team rule under a page's root class restyles a kit Button or tab (DESIGN-risk-2)", () => {
+    // Team stylesheets aren't in a layer, so their rules beat the kit whatever the selector:
+    // `.host-root button {...}` turned every kit Button on #/host, the danger one included, into
+    // host's transparent pill.
+    const kit: El[] = [
+      { tag: "button", classes: ["btn"] },
+      { tag: "button", classes: ["btn", "btn--danger"] },
+      { tag: "button", classes: ["tabs__tab"] },
+    ];
+    const roots = [...new Set(Object.values(SHEETS).flatMap((css) => [...css.matchAll(/\.([\w-]+-root)\b/g)].map((m) => m[1])))];
+    expect(roots).toContain("host-root");
+    // Turning motion off (host.css's reduced-motion `.host-root *`) is fine on any part.
+    const motionOnly = (r: Rule) => r.decls.every(([k]) => /^(transition|animation)/.test(k));
+    const wrong = rules
+      .filter((r) => r.file.startsWith("teams") && !layered(r) && !motionOnly(r))
+      .flatMap((r) => r.selectors.filter((s) => kit.some((el) => reaches(s, el, roots))).map((s) => `${r.file}: ${s}`));
+    expect(wrong).toEqual([]);
+  });
+
+  it("the matcher reads the selectors those two tests meet", () => {
+    const a: El = { tag: "a", classes: ["btn"] };
+    expect(reaches(".banner :is(.muted, a)", a, ["banner"])).toBe(true);
+    expect(reaches(".banner :is(.muted, a:not(.btn))", a, ["banner"])).toBe(false);
+    expect(reaches(".banner :is(.muted, a:not(.btn))", { tag: "a", classes: [] }, ["banner"])).toBe(true);
+    expect(reaches(".banner :is(.btn--secondary, .btn--quiet)", a, ["banner"])).toBe(false);
+    expect(reaches(".banner :is(.btn--secondary, .btn--quiet)", { tag: "a", classes: ["btn", "btn--quiet"] }, ["banner"])).toBe(true);
+    expect(reaches(".card a", a, ["banner"])).toBe(false);
+    const b: El = { tag: "button", classes: ["btn", "btn--danger"] };
+    expect(reaches(".host-root button", b, ["host-root"])).toBe(true);
+    expect(reaches(".host-root > button", b, ["host-root"])).toBe(true);
+    expect(reaches(".host-root button:hover:not(:disabled)", b, ["host-root"])).toBe(true);
+    expect(reaches(".host-root button:where(:not(.btn, .tabs__tab)):hover:not(:disabled)", b, ["host-root"])).toBe(false);
+    expect(reaches(".host-root button.host-main", b, ["host-root"])).toBe(false);
+    expect(reaches(".host-root .host-tabs button", b, ["host-root"])).toBe(false);
+    expect(reaches(".host-root button[aria-pressed=\"true\"]", b, ["host-root"])).toBe(true);
+  });
+});

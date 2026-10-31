@@ -1,25 +1,42 @@
 // #/ui: every color token and every kit part in every state, light and dark side by side, for
 // design reviews and screenshots. The ratios are measured from what the browser draws.
-// #/ui/projector shows the projector layout at the window's size. docs/design.md says when to
-// use each part.
+// #/ui/projector shows the projector layout at the window's size, and #/ui/projector/dark the
+// same layout dark. docs/design.md says when to use each part.
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ConvexError } from "convex/values";
 import { useRoute } from "../blocks/router";
 import { Big, Card, Status } from "../blocks/ui";
-import { Badge, Banner, Button, ConfirmButton, EmptyState, Field, Projector, Segmented, Skeleton, Stat, Tabs, type ButtonVariant } from "../blocks/kit";
+import {
+  Badge,
+  Banner,
+  BannerStack,
+  Button,
+  ConfirmButton,
+  EmptyState,
+  Field,
+  Projector,
+  Segmented,
+  Skeleton,
+  Stat,
+  Tabs,
+  type ButtonVariant,
+} from "../blocks/kit";
 import { PAIRS, contrastRatio, parseColor, toHex, type Pair } from "../styles/contrast";
 import "../styles/uikit.css";
 
 export default function UIKit() {
-  const [, sub] = useRoute();
-  if (sub === "projector") return <ProjectorSample />;
+  const [, sub, theme] = useRoute();
+  if (sub === "projector") return <ProjectorSample theme={theme === "dark" ? "dark" : "light"} />;
   return (
     <main className="page page--wide">
       <h1>UI kit</h1>
       <p className="muted">When to use each part: docs/design.md in the repo.</p>
-      <p>
+      <p className="row">
         <a className="btn btn--secondary" href="#/ui/projector">
           Projector layout
+        </a>
+        <a className="btn btn--secondary" href="#/ui/projector/dark">
+          Projector layout, dark
         </a>
       </p>
       <div className="uikit">
@@ -352,15 +369,22 @@ function Choices() {
       <Tabs
         label="Professor view"
         tabs={[
-          { id: "now", label: "Now", panel: <p>The slide, the quiz and who's lost.</p> },
-          { id: "questions", label: "Questions", panel: <p>Student questions, most votes first.</p> },
-          { id: "teams", label: "Teams", panel: <p>Teams and points.</p> },
+          { id: "now", label: "Now", panel: <p>Slide 12 of 30 · 3 students lost on this slide</p> },
+          { id: "questions", label: "Questions", panel: <p>Why does the loop stop at 9? · 6 votes</p> },
+          { id: "teams", label: "Teams", panel: <p>1. Green · 6 right · 2.0 per student</p> },
         ]}
       />
       <div className="uikit-states">
         <State name="Hover">
           <div className="tabs__list">
             <button type="button" className="tabs__tab" data-force="hover">
+              Questions
+            </button>
+          </div>
+        </State>
+        <State name="Pressed">
+          <div className="tabs__list">
+            <button type="button" className="tabs__tab" data-force="active">
               Questions
             </button>
           </div>
@@ -394,7 +418,37 @@ function Choices() {
         ]}
       />
       <Segmented label="Disabled" disabled value="4" onChange={() => {}} options={[{ value: "3", label: "3" }, { value: "4", label: "4" }]} />
+      <div className="uikit-states">
+        <State name="Hover on 3">
+          <SegmentedState force="hover" />
+        </State>
+        <State name="Keyboard focus on 4">
+          <SegmentedState force="focus" />
+        </State>
+      </div>
     </>
+  );
+}
+
+// <Segmented>'s markup by hand, with "4" chosen and `force` drawn on one option: hover on "3",
+// the keyboard focus ring on "4".
+function SegmentedState({ force }: { force: "hover" | "focus" }) {
+  const name = useId();
+  const on = force === "hover" ? "3" : "4";
+  return (
+    <fieldset className="seg-field">
+      <legend className="sr-only">Team size</legend>
+      <div className="seg">
+        {["3", "4", "5"].map((v) => (
+          <label key={v} className="seg__option">
+            <input className="seg__input" type="radio" name={name} value={v} defaultChecked={v === "4"} />
+            <span className="seg__label" data-force={v === on ? force : undefined}>
+              {v}
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
@@ -416,6 +470,22 @@ function BadgesAndBanners() {
       <Banner tone="error" title="The quiz didn't load." action={<Button variant="secondary">Try again</Button>}>
         Check the connection.
       </Banner>
+      <Banner
+        tone="success"
+        title="You're checked in."
+        action={
+          <a className="btn" href="#/live">
+            Follow the slides
+          </a>
+        }
+      />
+      <p className="text-label">Banner stack (on a page it's pinned to the bottom of the screen)</p>
+      <div className="uikit-pinned">
+        <BannerStack>
+          <Banner tone="warn" title="⏰ Ana walked in 4 min late." />
+          <Banner tone="warn" title="⏰ Leo walked in 6 min late." />
+        </BannerStack>
+      </div>
     </>
   );
 }
@@ -472,7 +542,7 @@ function EmptyAndConfirm() {
   return (
     <>
       <EmptyState title="No questions yet" action={<Button variant="secondary">Copy the student link</Button>}>
-        Students ask from #/live on their phones.
+        Students ask from the Live slides page on their phones.
       </EmptyState>
       <Skeleton />
       <Skeleton height="6rem" />
@@ -502,9 +572,19 @@ function EmptyAndConfirm() {
   );
 }
 
-function ProjectorSample() {
+// The way back to #/ui sits in the ledger line: one more line under the Big number made the
+// stage taller than a 1920 x 1080 screen.
+function ProjectorSample({ theme }: { theme: "light" | "dark" }) {
   return (
-    <Projector ledger="A-210 · Thu 2:30 PM · slide 12 of 30" title="Team board">
+    <Projector
+      theme={theme}
+      ledger={
+        <>
+          A-210 · Thu 2:30 PM · slide 12 of 30 · <a href="#/ui">Back to the UI kit</a>
+        </>
+      }
+      title="Team board"
+    >
       <ol className="list uikit-board">
         <li>
           <b>1. Green</b> 6 right · 2.0 per student <Badge tone="accent">+5 extra credit</Badge>
@@ -517,9 +597,6 @@ function ProjectorSample() {
         </li>
       </ol>
       <Big value={42} label="checked in" />
-      <p className="text-small">
-        <a href="#/ui">Back to the UI kit</a>
-      </p>
     </Projector>
   );
 }

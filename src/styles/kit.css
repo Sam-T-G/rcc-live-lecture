@@ -114,6 +114,7 @@
   @media (hover: hover) {
     .seg__option:hover .seg__label { background-color: color-mix(in srgb, currentColor var(--rcc-state-hover), transparent); }
   }
+  .seg__label[data-force="hover"] { background-color: color-mix(in srgb, currentColor var(--rcc-state-hover), transparent); }
   .seg__input:checked + .seg__label {
     background-color: var(--accent-soft);
     color: var(--accent-soft-text);
@@ -171,8 +172,9 @@
   .banner--warn { background: var(--warn); color: var(--warn-text); }
   .banner--error { background: var(--error-soft); color: var(--error-soft-text); }
   /* Inside a banner, quiet words and links take the banner's own ink, which
-     is measured against its fill. */
-  .banner :is(.muted, a) { color: inherit; }
+     is measured against its fill. A filled <a class="btn"> keeps its own
+     words: the banner's ink on the green or red fill is under 3:1. */
+  .banner :is(.muted, a:not(.btn)) { color: inherit; }
   .banner :is(.btn--secondary, .btn--quiet) { color: inherit; }
   .banner .btn--secondary { box-shadow: inset 0 0 0 var(--rcc-hairline) currentColor; }
   /* <BannerStack>: banners pinned to the bottom of the screen, above the

@@ -2,7 +2,7 @@
 
 How every screen looks: the tokens, the base elements, the kit, and a short rule list for each place the app shows up (student phone, professor laptop, projector, door iPad). The look is the GDG on Campus RCC design system ([github.com/Sam-T-G/rcc-gdg](https://github.com/Sam-T-G/rcc-gdg), `docs/04-brand/design-system/`): green leads, Google Sans, depth from tone before shadow, and nothing moves unless it's the thing the screen is about. Read its `README.md`, `foundations.md`, `components.md`, `motion.md` and `bright-lines.md` before a design change; this file says how the app applies them.
 
-Open **#/ui** to see every color with its contrast ratio and every part in every state, light and dark side by side. **#/ui/projector** shows the projector layout at the window's size.
+Open **#/ui** to see every color with its contrast ratio and every part in every state, light and dark side by side. **#/ui/projector** shows the projector layout at the window's size, and **#/ui/projector/dark** the same layout dark.
 
 ## Files
 
@@ -20,7 +20,7 @@ Open **#/ui** to see every color with its contrast ratio and every part in every
 `tokens.css` declares three cascade layers in order: `tokens`, `base` (`index.css`), `kit` (`kit.css`). Team stylesheets have no layer, so **a team rule beats every base and kit rule, whatever its selector**. Two things follow:
 
 - A page can restyle a kit part with one plain class rule, no `!important` and no long selectors.
-- A broad team rule such as `.host-root button { background: transparent }` also restyles every kit `Button` inside `.host-root`. Scope team rules to the team's own classes.
+- A broad team rule such as `.host-root button { background: transparent }` also restyles every kit `Button` inside `.host-root`. Scope team rules to the team's own classes, or skip the kit's with `:where(:not(.btn, .tabs__tab))` as host.css does. `src/styles/contrast.test.ts` fails when an element rule under a page's `-root` class reaches a kit button or tab.
 
 Two base rules use `!important` on purpose, and in a layer that beats every team rule: `[hidden]` always hides, and reduced motion cuts every animation and transition to 1ms.
 
@@ -169,7 +169,7 @@ Pick one of 2 to 5 short options. Real radio buttons, so arrow keys and screen r
 </Banner>
 ```
 
-Tones `info`, `success`, `warn`, `error`. An error banner is announced at once (`role="alert"`); the others when they change (`role="status"`). `BannerStack` pins banners to the bottom of the screen above the iPhone home bar (the late banner).
+Tones `info`, `success`, `warn`, `error`. An error banner is announced at once (`role="alert"`); the others when they change (`role="status"`). `BannerStack` pins banners to the bottom of the screen above the iPhone home bar (the late banner). Inside a banner, links, `.muted` words and outlined or quiet buttons take the banner's ink; a filled `<a className="btn">` keeps its own words.
 
 ### Stat
 
@@ -177,7 +177,7 @@ Tones `info`, `success`, `warn`, `error`. An error banner is announced at once (
 
 ### EmptyState
 
-`<EmptyState title="No questions yet" action={...}>Students ask from #/live on their phones.</EmptyState>`: what a list shows before it has anything. Say what will show up and how it gets there.
+`<EmptyState title="No questions yet" action={...}>Students ask from the Live slides page on their phones.</EmptyState>`: what a list shows before it has anything. Say what will show up and how it gets there, naming the page people see (its title), never a #/ route.
 
 ### Skeleton
 

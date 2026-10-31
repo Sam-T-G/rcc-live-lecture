@@ -228,7 +228,8 @@ export function Stat({ value, label, accent }: { value: ReactNode; label: ReactN
 }
 
 // What a list shows before it has anything: say what will show up and how it gets there
-// ("No questions yet. Students ask from #/live."), with an optional action.
+// ("No questions yet. Students ask from the Live slides page on their phones."), with an
+// optional action. Name the page people see, never a #/ route.
 export function EmptyState({ title, children, action }: { title: ReactNode; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="empty">

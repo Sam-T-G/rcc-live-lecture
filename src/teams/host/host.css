@@ -11,11 +11,13 @@
 .host-root h2 { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; }
 .host-root h3 { font-size: 1.05rem; margin: 14px 0 6px; }
 
-/* Buttons: quiet by default, solid for the one main action */
-.host-root button { background: transparent; color: var(--text); border: 1px solid var(--line-strong); border-radius: 999px; min-height: 36px; padding: 4px 14px; font-weight: 500; transition: background 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.1s var(--ease); }
-.host-root button:hover:not(:disabled) { background: var(--soft); border-color: var(--muted); }
-.host-root button:active:not(:disabled) { transform: scale(0.97); }
-.host-root button:focus-visible, .host-root input:focus-visible, .host-root textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Buttons: quiet by default, solid for the one main action. This sheet isn't in a cascade layer,
+   so these rules would beat the kit's whatever the selector: they skip kit buttons and tabs
+   (.btn, .tabs__tab). :where() keeps each selector's specificity as it was. */
+.host-root button:where(:not(.btn, .tabs__tab)) { background: transparent; color: var(--text); border: 1px solid var(--line-strong); border-radius: 999px; min-height: 36px; padding: 4px 14px; font-weight: 500; transition: background 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.1s var(--ease); }
+.host-root button:where(:not(.btn, .tabs__tab)):hover:not(:disabled) { background: var(--soft); border-color: var(--muted); }
+.host-root button:where(:not(.btn, .tabs__tab)):active:not(:disabled) { transform: scale(0.97); }
+.host-root button:where(:not(.btn, .tabs__tab)):focus-visible, .host-root input:focus-visible, .host-root textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .host-root button.host-main { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .host-root button.host-main:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
 .host-root button.host-small { min-height: 28px; padding: 0 10px; font-size: 0.85rem; }
