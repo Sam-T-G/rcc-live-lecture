@@ -104,9 +104,10 @@ describe("F39.6 small helpers", () => {
     expect(cleanName(ch(0x200b, 0xfeff, 0x200b))).toBe("Student");
     expect(cleanName(ch(0x2060, 0x200d))).toBe("Student");
     expect(cleanName(ch(0x301, 0x301))).toBe("Student"); // accent marks with no letter under them
-    // Letters and symbols that draw nothing (Hangul fillers, the blank Braille pattern) and the
-    // combining grapheme joiner are dropped too, so a name made of them gets the fallback.
-    for (const blank of [0x3164, 0x115f, 0x1160, 0xffa0, 0x2800, 0x34f]) {
+    // Letters and symbols that draw nothing (Hangul fillers, the blank Braille pattern, the null
+    // notehead U+1D159) and the combining grapheme joiner are dropped too, so a name made of them
+    // gets the fallback.
+    for (const blank of [0x3164, 0x115f, 0x1160, 0xffa0, 0x2800, 0x34f, 0x1d159]) {
       expect(cleanName(ch(blank))).toBe("Student");
       expect(cleanName(ch(blank, blank, blank))).toBe("Student");
       expect(cleanName("Jane" + ch(blank) + " Doe " + ch(blank))).toBe("Jane Doe");

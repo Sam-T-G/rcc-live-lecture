@@ -77,9 +77,11 @@ export function metersBetween(aLat: number, aLng: number, bLat: number, bLng: nu
 export const LECTURE_MS = 12 * 60 * 60_000;
 
 // When a class nobody ends closes itself: 12 hours after it opened, or 12 hours after its saved
-// start time when that is later. A class opened the evening before (the professor saves the next
-// morning's start, or rehearses the deck) then stays open through the morning's class instead of
-// closing in the middle of it.
+// start time when that is later. A class opened the evening before by saving the next morning's
+// start then stays open through the morning's class instead of closing in the middle of it.
+// Open question for Sam (U0-API-fixcheck-1): a class opened the evening before with no saved start
+// (a deck rehearsal, a test scan or quiz) still closes 12 hours after it opened, in the middle of
+// the next morning's class, and a start saved the next morning joins that evening class.
 export function lectureClosesAt(lecture: Doc<"lectures">) {
   return Math.max(lecture.startedAt, lecture.startsAt ?? lecture.startedAt) + LECTURE_MS;
 }
@@ -176,12 +178,12 @@ const NAME_MAX = 60;
 // hide a name or flip the text after it: the soft hyphen, zero-width space, direction marks, bidi
 // embeddings, overrides and isolates, the word joiner and the byte-order mark. Also the
 // characters Unicode counts as letters or symbols that draw nothing (the Hangul fillers U+115F,
-// U+1160, U+3164 and U+FFA0, and the blank Braille pattern U+2800, the usual tricks for a blank
-// name) and the combining grapheme joiner. The zero-width joiner (U+200D) stays, because emoji
+// U+1160, U+3164 and U+FFA0, the blank Braille pattern U+2800, the usual tricks for a blank name,
+// and the musical null notehead U+1D159) and the combining grapheme joiner. The zero-width joiner (U+200D) stays, because emoji
 // made of several emoji (a family, a person at a laptop) are joined with it, and so do tag
 // characters, which spell out flags such as Scotland's. U+034F, U+115F and U+1160 sit outside the
 // brackets because they join the character before them, which lint flags inside a class.
-const HIDDEN = /\u034F|\u115F|\u1160|[\p{Cc}\u00AD\u061C\u180E\u200B\u200E\u200F\u202A-\u202E\u2060-\u206F\u2800\u3164\uFEFF\uFFA0]/gu;
+const HIDDEN = /\u034F|\u115F|\u1160|[\p{Cc}\u00AD\u061C\u180E\u200B\u200E\u200F\u202A-\u202E\u2060-\u206F\u2800\u3164\uFEFF\uFFA0\u{1D159}]/gu;
 // What's left has to hold at least one letter, digit, punctuation mark or symbol, so a name never
 // shows as a blank on the projector.
 const VISIBLE = /[\p{L}\p{N}\p{P}\p{S}]/u;
