@@ -16,9 +16,11 @@ const COLORS = ["red", "blue", "yellow", "green", "orange", "purple", "pink", "t
 const EC = [5, 3, 1];
 
 const color = v.string();
-const teamInfo = v.object({ team: v.number(), color, label: v.string() });
+// A team as the screens show it: its number, its color (a `.group--<color>` style) and its label.
+export const teamInfo = v.object({ team: v.number(), color, label: v.string() });
 
-function describe(team: number) {
+// Team number -> { team, color, label }: 0 is Red, 1 Blue, 2 Yellow; past the last color, "Red 2".
+export function describe(team: number) {
   const c = COLORS[team % COLORS.length];
   const round = Math.floor(team / COLORS.length) + 1;
   return { team, color: c, label: c[0].toUpperCase() + c.slice(1) + (round > 1 ? " " + round : "") };
@@ -103,9 +105,10 @@ export async function ensureGroup(ctx: MutationCtx, channel: string, user: strin
 }
 
 // Lock the teams once the 5 minutes are up: re-deal everyone so every team has 3 or 4. If the class
-// start moved later, wait again. `force` locks now (for testing from the CLI).
+// start moved later, wait again. `force` locks now (for testing from the CLI). `lecture` is the
+// class the lock was queued for; it's accepted and not read yet.
 export const lock = internalMutation({
-  args: { channel: v.string(), force: v.optional(v.boolean()) },
+  args: { channel: v.string(), force: v.optional(v.boolean()), lecture: v.optional(v.id("lectures")) },
   returns: v.null(),
   handler: async (ctx, { channel, force }) => {
     const set = await settings(ctx, channel);

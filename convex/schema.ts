@@ -1,10 +1,13 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
-// Only the plumbing tables live here before the meeting. Product tables (sessions,
-// check-ins, anything a team builds) get added at the bottom, one commented block each.
+// Every table: the plumbing blocks first, then one commented block per team. Prod has rows in
+// these tables, so a change only adds tables, indexes or optional fields: a new required field,
+// or a renamed or removed one, fails the deploy.
 export default defineSchema({
-  // Block: deck bridge. The latest slide a deck is on, per channel (BLOCKS.md, "Deck bridge").
+  // Block: deck bridge. The latest slide a deck is on, one row per channel (BLOCKS.md, "Deck
+  // bridge"). Each press replaces the row, which keeps its old _creationTime, so a read for the
+  // current class compares `at` with the class window's start.
   deckChannels: defineTable({
     channel: v.string(),
     index: v.number(), // 0-based slide number
@@ -13,10 +16,13 @@ export default defineSchema({
     title: v.string(),
     lines: v.array(v.string()), // the slide's visible text, in order
     at: v.number(),
+    run: v.optional(v.string()), // which open deck sent it: an id the deck keeps for its browser tab, so a reload keeps it; missing on old rows
+    seq: v.optional(v.number()), // counts up with each send from that deck, so a send that arrives after a newer one can be ignored
   }).index("by_channel", ["channel"]),
 
   // Block: deck bridge. Every slide a deck has shown, one row per slide, at the most presses
-  // shown so far. Lets a phone page back through earlier slides while the deck moves on.
+  // shown so far. Lets a phone page back through earlier slides while the deck moves on. Rows
+  // are replaced too, so a read for the current class compares `at` with the window's start.
   deckSlides: defineTable({
     channel: v.string(),
     index: v.number(),
@@ -32,13 +38,14 @@ export default defineSchema({
     at: v.number(),
   }),
 
-  // Team tables. Agreed before the meeting so the teams never wait on each other: every
-  // lecture is one deck channel ("gdg" on 10-29), and docs/contracts.md says who writes
-  // each table and who reads it. A team may add fields; tell the team that reads the table
-  // before renaming or removing one.
+  // Team tables. Every class runs on one deck channel ("gdg"). A row belongs to the class whose
+  // window holds its _creationTime (the `lectures` table below and lib.lectureWindow), so reads
+  // for this class use .gte("_creationTime", start) on the index. docs/contracts.md says who
+  // writes each table and who reads it.
 
-  // team: checkin. One kiosk per channel: the code its QR shows now and the one before it
-  // (a phone that scanned a second before it changed still gets in), and where the room is.
+  // team: checkin. One kiosk per channel: the code its QR shows now and the one before it, and
+  // where the room is. Nothing reads or writes this table since the student passes replaced the
+  // kiosk QR; it stays because prod may hold rows.
   kiosks: defineTable({
     channel: v.string(),
     code: v.string(),
@@ -49,15 +56,15 @@ export default defineSchema({
     radius: v.optional(v.number()), // meters
   }).index("by_channel", ["channel"]),
 
-  // team: checkin. One row per student per channel.
+  // team: checkin. One row per student per class.
   checkins: defineTable({
     channel: v.string(),
     user: v.string(), // identity.tokenIdentifier
     name: v.string(),
     at: v.number(),
-    meters: v.optional(v.number()), // distance from the room when they checked in; never their coordinates
+    meters: v.optional(v.number()), // distance from the room at check-in; no page reads it, and it stays because prod rows may have it
     email: v.optional(v.string()), // for the professor's attendance sheet; hosts only
-    lateMin: v.optional(v.number()), // minutes after class start plus grace; missing = on time
+    lateMin: v.optional(v.number()), // minutes after class start (legacy; late minutes are now worked out when read, from `at` and the class's startsAt and graceMin)
   })
     .index("by_channel", ["channel"])
     .index("by_channel_and_user", ["channel", "user"]),
@@ -78,11 +85,24 @@ export default defineSchema({
     .index("by_prevCode", ["prevCode"]),
 
   // team: checkin. When class starts on a channel, set by a host. A check-in after
-  // startsAt + graceMin counts as late.
+  // startsAt + graceMin counts as late. Legacy: read only while no lectures row exists
+  // (lib.lectureWindow); from the first class on, each class keeps its own start in `lectures`.
   classStarts: defineTable({
     channel: v.string(),
     startsAt: v.number(),
     graceMin: v.number(),
+  }).index("by_channel", ["channel"]),
+
+  // team: checkin. One row per class on a channel. A class opens when lib.ensureLecture runs
+  // (the professor's actions that start class activity call it) and ends with End day
+  // (lib.endLecture) or by itself 12 hours after it opened (convex/lectures.ts). Nothing is
+  // deleted at the end: rows from earlier classes stay and drop out of this class's reads.
+  lectures: defineTable({
+    channel: v.string(),
+    startedAt: v.number(), // when the class opened
+    startsAt: v.optional(v.number()), // when class starts, set by the professor; missing = nobody is late
+    graceMin: v.optional(v.number()), // minutes after startsAt before a check-in counts as late
+    endedAt: v.optional(v.number()), // when End day ended it, or startedAt + 12 h for a class nobody ended; missing = still open
   }).index("by_channel", ["channel"]),
 
   // team: checkin. Live quiz or vote: a host asks one question at a time on a channel;
@@ -93,6 +113,8 @@ export default defineSchema({
     choices: v.array(v.string()),
     correct: v.optional(v.number()), // index into choices; never set on a vote
     kind: v.optional(v.union(v.literal("quiz"), v.literal("vote"))), // missing = quiz
+    index: v.optional(v.number()), // the slide the deck was on when it was asked, 0-based
+    aiDraft: v.optional(v.boolean()), // the professor started from the AI's draft
     open: v.boolean(),
     at: v.number(),
     closedAt: v.optional(v.number()),
@@ -108,7 +130,8 @@ export default defineSchema({
     .index("by_poll", ["poll"])
     .index("by_poll_and_user", ["poll", "user"]),
 
-  // team: live. One row per student per slide they said they're lost on.
+  // team: live. One row per student per slide they said they're lost on, in each class.
+  // by_channel reads one class's taps on every slide, from the class's start.
   lost: defineTable({
     channel: v.string(),
     index: v.number(), // the slide, 0-based, as in deckChannels
@@ -116,10 +139,12 @@ export default defineSchema({
     at: v.number(),
   })
     .index("by_channel_and_index", ["channel", "index"])
-    .index("by_channel_and_index_and_user", ["channel", "index", "user"]),
+    .index("by_channel_and_index_and_user", ["channel", "index", "user"])
+    .index("by_channel", ["channel"]),
 
   // team: live. A question or comment a student posts beside a slide. `name` is left out when
   // they post anonymously, and no query ever returns `user`; it is only for "mine" and delete.
+  // by_channel reads one class's questions on every slide, from the class's start.
   questions: defineTable({
     channel: v.string(),
     index: v.number(), // the slide it was posted on, 0-based
@@ -127,10 +152,17 @@ export default defineSchema({
     name: v.optional(v.string()),
     text: v.string(),
     votes: v.number(), // upvotes, kept in step with questionVotes
+    private: v.optional(v.boolean()), // only the author and the professor see it; nobody upvotes it
+    answer: v.optional(v.string()), // the professor's typed answer
+    shared: v.optional(v.boolean()), // the professor showed the answer to the room
+    status: v.optional(v.union(v.literal("keep"), v.literal("dismissed"))), // the professor's sorting; missing = new
+    topic: v.optional(v.string()), // AI grouping, professor view only
+    cluster: v.optional(v.string()), // AI label for questions that ask the same thing, professor view only
     at: v.number(),
   })
     .index("by_channel_and_index", ["channel", "index"])
-    .index("by_channel_and_user", ["channel", "user"]),
+    .index("by_channel_and_user", ["channel", "user"])
+    .index("by_channel", ["channel"]),
 
   // team: live. One row per student per question they upvoted.
   questionVotes: defineTable({
@@ -144,7 +176,7 @@ export default defineSchema({
   // team: live. The small team a student plays on. Teams are numbered from 0 and dealt in arrival
   // order, three at a time: the 1st student is team 0 (Red), the 2nd team 1 (Blue), the 3rd team 2
   // (Yellow), then around again until each has the professor's team size; then the next three teams
-  // open (Green, Orange, Purple, and on through a longer color list). One row per student per channel.
+  // open (Green, Orange, Purple, and on through a longer color list). One row per student per class.
   groups: defineTable({
     channel: v.string(),
     user: v.string(), // identity.tokenIdentifier
@@ -155,12 +187,38 @@ export default defineSchema({
 
   // team: live. How many students per team the professor chose: 3 or 4 (no row means 4), and when
   // the teams were locked. Teams lock 5 minutes after class starts (or after the first check-in when
-  // no start time is set); `scheduled` means that lock is already queued.
+  // no start time is set); `scheduled` means that lock is already queued. Each class gets its own
+  // row, with the size carried over from the class before.
   groupSettings: defineTable({
     channel: v.string(),
     size: v.number(),
     lockedAt: v.optional(v.number()),
     scheduled: v.optional(v.boolean()),
+  }).index("by_channel", ["channel"]),
+
+  // team: live. Points the professor adds or takes off by hand, with a reason. A row for one
+  // student (`user`) counts for that student's current team, like a right answer; a row for a
+  // team (`team`) stays with that team. Only rows from the current class count.
+  groupPoints: defineTable({
+    channel: v.string(),
+    user: v.optional(v.string()), // identity.tokenIdentifier; never returned by a query
+    team: v.optional(v.number()),
+    delta: v.number(), // a whole number of points: 1 to 5 added, or -1 to -5 taken off; never 0
+    reason: v.string(),
+    at: v.number(),
+  }).index("by_channel", ["channel"]),
+
+  // team: live. Extra credit saved by End day: one row per student on a team with members, with
+  // that team's rank, points and extra credit in the class that ended.
+  groupResults: defineTable({
+    channel: v.string(),
+    lecture: v.id("lectures"), // the class that ended
+    endedAt: v.number(),
+    user: v.string(), // identity.tokenIdentifier; never returned by a query
+    team: v.number(),
+    rank: v.number(),
+    points: v.number(), // the team's points in that class
+    ec: v.number(), // 5, 3, 1 or 0; teams that tie split the places they fill (two tied for 3rd get 0.5 each)
   }).index("by_channel", ["channel"]),
 
   // team: host. A question the professor asked the room on one slide. `correct` never goes to

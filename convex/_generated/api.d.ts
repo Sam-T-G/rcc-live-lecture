@@ -26,6 +26,7 @@ import type * as host_seed from "../host/seed.js";
 import type * as host_teams from "../host/teams.js";
 import type * as http from "../http.js";
 import type * as lab from "../lab.js";
+import type * as lectures from "../lectures.js";
 import type * as lib from "../lib.js";
 import type * as live_groups from "../live/groups.js";
 import type * as live_past from "../live/past.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   "host/teams": typeof host_teams;
   http: typeof http;
   lab: typeof lab;
+  lectures: typeof lectures;
   lib: typeof lib;
   "live/groups": typeof live_groups;
   "live/past": typeof live_past;
