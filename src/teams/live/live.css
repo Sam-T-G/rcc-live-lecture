@@ -101,6 +101,11 @@
 .lost__note { margin: 0; font-size: var(--fs-small); }
 .lost__button[aria-pressed="true"] { background-color: var(--accent-soft); color: var(--accent-soft-text); box-shadow: inset 0 0 0 var(--rcc-hairline) var(--accent); }
 
+/* "Check in to answer, ask and join a team." and the Check in link, under the title (Page.tsx
+   CheckInFirst), for a signed-in student who isn't checked in, with or without a slide up. */
+.live-checkin { display: grid; gap: var(--rcc-space-2); margin-bottom: var(--rcc-space-4); }
+.live-checkin__note { margin: 0; }
+
 /* The late banner on #/live/leaderboard, in projector sizes so the back of the room can read it
    (docs/design.md: nothing on the projector under 32px; body words 48px). The wrapper takes no
    space, so the projector's column gap doesn't add a row under the board. */

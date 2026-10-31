@@ -12,13 +12,55 @@ import LivePage, { LiveSlides } from "./Page";
 import { Leaderboard } from "./Leaderboard";
 
 const results: Record<string, unknown> = {};
+// Every query the page asked for and every mutation it sent, with their args, so a test can check
+// which slide "I'm lost" reads and taps.
+const calls = vi.hoisted(() => ({
+  queries: [] as { name: string; args: unknown }[],
+  mutations: [] as { name: string; args: unknown }[],
+  // Props of every kit <Button> rendered, so a test can press one by calling its onClick.
+  buttons: [] as { className?: string; onClick?: () => unknown }[],
+}));
 const auth = vi.hoisted(() => ({ user: null as null | { name: string; email: string } }));
 vi.mock("convex/react", () => ({
-  useQuery: (ref: FunctionReference<"query">, args?: unknown) => (args === "skip" ? undefined : results[getFunctionName(ref)]),
-  useMutation: () => async () => null,
+  useQuery: (ref: FunctionReference<"query">, args?: unknown) => {
+    if (args === "skip") return undefined;
+    calls.queries.push({ name: getFunctionName(ref), args });
+    return results[getFunctionName(ref)];
+  },
+  useMutation: (ref: FunctionReference<"mutation">) => async (args: unknown) => {
+    calls.mutations.push({ name: getFunctionName(ref), args });
+    return true;
+  },
 }));
 vi.mock("../../blocks/auth", () => ({ useGoogleUser: () => auth, SignedInAs: () => "[signed in as]" }));
-vi.mock("../../blocks/deck", () => ({ CHANNEL: "gdg", useDeckSlide: () => results["deck:current"] }));
+// The deck's live slide is results["deck:current"]. With deck.steps set, it is instead each of
+// those slides in turn within one render: the hook moves to the next one while the page is
+// rendering, so React renders the same LiveSlides again with its state kept, the way an open page
+// re-renders when the professor moves.
+const deck = vi.hoisted(() => ({ steps: null as unknown[] | null }));
+vi.mock("../../blocks/deck", async () => {
+  const { useState } = await import("react");
+  return {
+    CHANNEL: "gdg",
+    useDeckSlide: () => {
+      const [step, setStep] = useState(0);
+      if (deck.steps === null) return results["deck:current"];
+      if (step < deck.steps.length - 1) setStep(step + 1);
+      return deck.steps[step];
+    },
+  };
+});
+vi.mock("../../blocks/kit", async (importOriginal) => {
+  const kit = await importOriginal<typeof import("../../blocks/kit")>();
+  const { createElement } = await import("react");
+  return {
+    ...kit,
+    Button: (props: Parameters<typeof kit.Button>[0]) => {
+      calls.buttons.push(props as (typeof calls.buttons)[number]);
+      return createElement(kit.Button, props);
+    },
+  };
+});
 vi.mock("../checkin/Quiz", () => ({ QuizCard: () => "[quiz card]" }));
 vi.mock("../checkin/LateBanner", () => ({ default: () => "[late banner]" }));
 vi.mock("./PastQuestions", () => ({ default: () => "[past quizzes and votes]" }));
@@ -43,6 +85,10 @@ const STUDENT = { name: "Sample student 1", email: "student1@example.edu" };
 beforeEach(() => {
   for (const k of Object.keys(results)) delete results[k];
   auth.user = null;
+  deck.steps = null;
+  calls.queries.length = 0;
+  calls.mutations.length = 0;
+  calls.buttons.length = 0;
   Object.assign(results, {
     "checkin/pass:amHost": true, // a professor is signed in on the projector laptop
     "live/groups:status": { size: 3, locked: true, locksAt: null },
@@ -64,6 +110,12 @@ function boundary(html: string, label: string) {
   const at = html.indexOf(start);
   if (at < 0) return null;
   return html.slice(at + start.length, html.indexOf("</section>", at));
+}
+// The check-in line and link #/live shows a signed-in student who isn't checked in.
+const CHECKIN_BOX =
+  '<div class="live-checkin"><p class="live-checkin__note">Check in to answer, ask and join a team.</p><a href="#/checkin/student" class="btn btn--secondary btn--block">Check in</a></div>';
+function checkinBox(html: string) {
+  return /<div class="live-checkin">.*?<\/a><\/div>/.exec(html)?.[0] ?? null;
 }
 // The text of the page's I'm lost slot, tags dropped.
 function lostSlot(html: string) {
@@ -183,14 +235,61 @@ describe("#/live, the student phone", () => {
     expect(html).not.toContain("aria-busy");
   });
 
-  it("F21.2 a signed-in student who isn't checked in sees 'Check in to answer, ask and join a team.' and a link to #/checkin/student, and no I'm lost button", () => {
+  it("LIVE-risk-1 I'm lost reads and taps the slide on screen: the live one, or the one the student paged back to", async () => {
+    auth.user = STUDENT;
+    results["checkin/read:me"] = true;
+    results["live/read:mine"] = false;
+    const mineArgs = () => calls.queries.filter((q) => q.name === "live/read:mine").map((q) => q.args);
+    // Press the I'm lost button the last render drew, and return what it sent.
+    async function press() {
+      const button = calls.buttons.filter((b) => b.className?.includes("lost__button")).at(-1);
+      expect(button).toBeDefined();
+      calls.mutations.length = 0;
+      await button!.onClick!();
+      return calls.mutations;
+    }
+
+    // Following the professor on slide 7.
+    deckOn(6);
+    renderToStaticMarkup(createElement(LiveSlides));
+    expect(mineArgs()).toEqual([{ channel: "gdg", index: 6 }]);
+    expect(await press()).toEqual([{ name: "live/lost:toggle", args: { channel: "gdg", index: 6 } }]);
+
+    // Paged back to slide 4 while the professor stays on slide 7.
+    calls.queries.length = 0;
+    const html = renderToStaticMarkup(createElement(LiveSlides, { pin: 3 }));
+    expect(html).toContain('<h2 class="slide__title">Slide 4</h2>');
+    expect(mineArgs()).toEqual([{ channel: "gdg", index: 3 }]);
+    expect(await press()).toEqual([{ name: "live/lost:toggle", args: { channel: "gdg", index: 3 } }]);
+  });
+
+  it("F21.2 a signed-in student who isn't checked in sees 'Check in to answer, ask and join a team.' and a link to #/checkin/student above the slide, and no I'm lost button", () => {
     deckOn(2);
     auth.user = STUDENT;
     results["checkin/read:me"] = false;
     const html = open("#/live");
-    expect(lostSlot(html)).toBe("Check in to answer, ask and join a team. Check in");
-    expect(boundary(html, "The I’m lost button")).toContain('<a href="#/checkin/student" class="btn btn--secondary btn--block">Check in</a>');
+    expect(checkinBox(html)).toBe(CHECKIN_BOX);
+    expect(html.indexOf(CHECKIN_BOX)).toBeLessThan(html.indexOf('<div class="live">'));
+    expect(lostSlot(html)).toBe(""); // shown once, above the slide
     expect(html).not.toContain("lost__button");
+  });
+
+  it("LIVE-spec-2 the check-in line and link show with no slide up and no quiz open too", () => {
+    auth.user = STUDENT;
+    results["checkin/read:me"] = false;
+    for (const current of [null, undefined]) {
+      results["deck:current"] = current; // waiting for the slides, or loading them
+      expect(checkinBox(open("#/live")), String(current)).toBe(CHECKIN_BOX);
+    }
+    // Checked in, or the check-in state still loading: no check-in line.
+    results["checkin/read:me"] = true;
+    expect(checkinBox(open("#/live"))).toBeNull();
+    delete results["checkin/read:me"];
+    expect(checkinBox(open("#/live"))).toBeNull();
+    // Signed out: no check-in line; the Questions card has the sign-in form.
+    auth.user = null;
+    results["checkin/read:me"] = false;
+    expect(checkinBox(open("#/live"))).toBeNull();
   });
 
   it("F20.6 signed out: 'Sign in to tap I’m lost' instead of the button", () => {
@@ -245,6 +344,34 @@ describe("#/live, the student phone", () => {
 
     // The deck stops (End day): the phone waits for the next slides.
     results["deck:current"] = null;
+    expect(at(3)).toContain("Waiting for the slides to start.");
+  });
+
+  it("LIVE-risk-3 an open phone paged back to slide 4 follows live when the professor moves, without reopening the page", () => {
+    const on = (index: number, title = `Slide ${index + 1}`) => ({ index, beat: 0, count: 10, title, lines: [], at: 0 });
+    deckOn(6); // slides 1 to 7 shown this class
+    const at = (pin: number) => renderToStaticMarkup(createElement(LiveSlides, { pin }));
+
+    // The professor stays on slide 7: the phone stays on slide 4 the whole time.
+    deck.steps = [on(6), on(6)];
+    let html = at(3);
+    expect(html).toContain('<h2 class="slide__title">Slide 4</h2>');
+    expect(html).toContain("The professor is on slide 7 now.");
+
+    // The professor goes back to slide 3 while the phone is on slide 4: it follows live.
+    deck.steps = [on(6), on(2)];
+    html = at(3);
+    expect(html).toContain('<h2 class="slide__title">Slide 3</h2>');
+    expect(html).not.toContain("Back to live");
+
+    // The professor reaches slide 4: live again.
+    deck.steps = [on(6), on(3, "Slide 4 live")];
+    html = at(3);
+    expect(html).toContain('<h2 class="slide__title">Slide 4 live</h2>');
+    expect(html).not.toContain("Back to live");
+
+    // The deck stops (End day): the phone waits for the next slides.
+    deck.steps = [on(6), null];
     expect(at(3)).toContain("Waiting for the slides to start.");
   });
 

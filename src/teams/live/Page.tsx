@@ -2,9 +2,10 @@
 //   #/live: the slide the professor is on, live. The student can page back through slides this
 //     class has shown without moving the projector; a phone that paged back follows live again
 //     when the professor reaches or goes back past that slide, the same rule as #/portal. Under the
-//     slide: "I'm lost" for the slide on screen (convex/live/lost.ts), or what to do first: sign in
-//     (the button jumps to the sign-in form in the Questions card) or check in (a link to
-//     #/checkin/student). Beside it: the quiz, the team leaderboard, past quizzes and votes, and the
+//     slide: "I'm lost" for the slide on screen (convex/live/lost.ts), or, signed out, a button that
+//     jumps to the sign-in form in the Questions card. A signed-in student who isn't checked in
+//     gets the check-in line and a link to #/checkin/student under the title, with or without a
+//     slide up. Beside the slide: the quiz, the team leaderboard, past quizzes and votes, and the
 //     questions board, each in its own ErrorBoundary, so a card whose query fails shows its own
 //     error and the slide stays up.
 //   #/live/leaderboard: the team board on the projector.
@@ -75,6 +76,9 @@ export function LiveSlides({ pin = null }: { pin?: number | null }) {
   return (
     <Screen title="Live slides" wide>
       <SignedInAs />
+      <ErrorBoundary label="Check in">
+        <CheckInFirst />
+      </ErrorBoundary>
       <ErrorBoundary label="Your team">
         <GroupBadge />
       </ErrorBoundary>
@@ -144,8 +148,26 @@ function toSignIn() {
   field?.focus({ preventScroll: true });
 }
 
+// Under the title, for a signed-in student who isn't checked in this class: the line and a link to
+// #/checkin/student. It shows whether or not a slide is up, so a student who opens #/live before
+// the professor presents can still check in. Nothing while signed out (the Questions card has the
+// sign-in form) or while the check-in state loads.
+function CheckInFirst() {
+  const { user } = useGoogleUser();
+  const checkedIn = useQuery(api.checkin.read.me, user ? { channel: CHANNEL } : "skip");
+  if (!user || checkedIn !== false) return null;
+  return (
+    <div className="live-checkin">
+      <p className="live-checkin__note">Check in to answer, ask and join a team.</p>
+      <Link to="checkin/student" className="btn btn--secondary btn--block">Check in</Link>
+    </div>
+  );
+}
+
 // Under the slide on screen: "I'm lost" for a checked-in student (pressed while they're counted
-// as lost on it), or what to do first. The professor's #/host shows the count for each slide.
+// as lost on it), or "Sign in to tap I'm lost" while signed out. A signed-in student who isn't
+// checked in gets nothing here: CheckInFirst sits above the slide. The professor's #/host shows
+// the count for each slide.
 function Lost({ index }: { index: number }) {
   const { user } = useGoogleUser();
   const checkedIn = useQuery(api.checkin.read.me, user ? { channel: CHANNEL } : "skip");
@@ -161,13 +183,7 @@ function Lost({ index }: { index: number }) {
       </div>
     );
   if (checkedIn === undefined) return <div className="lost" aria-busy="true" />;
-  if (!checkedIn)
-    return (
-      <div className="lost">
-        <p className="lost__note">Check in to answer, ask and join a team.</p>
-        <Link to="checkin/student" className="btn btn--secondary btn--block">Check in</Link>
-      </div>
-    );
+  if (!checkedIn) return null; // CheckInFirst, above the slide, says what to do
 
   async function tap() {
     setBusy(true);

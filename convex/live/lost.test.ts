@@ -134,6 +134,24 @@ describe("F21 only checked-in students tap I'm lost", () => {
     expect(await rows(t)).toHaveLength(3);
   });
 
+  it("LIVE-risk-5 a class that opens before the deck sends refuses last class's live slide", async () => {
+    const t = setup();
+    await openClass(t);
+    await showSlides(t, 5); // last class ended on slide 6
+    later(60 * MIN);
+    await endClass(t);
+    later(DAY);
+    await openClass(t); // a scan or a quiz opens this class; the deck hasn't sent anything yet
+    const s = student(t, 1);
+    await checkIn(t, s);
+
+    expect(await t.query(api.deck.current, { channel: CH })).toBeNull(); // the phone waits for the slides
+    for (const index of [5, 0]) {
+      await expect(toggle(s, index), `index ${index}`).rejects.toThrow("That slide hasn't been shown yet.");
+    }
+    expect(await rows(t)).toEqual([]);
+  });
+
   it("the slide the deck is on counts as shown, even when last class showed it with more presses", async () => {
     const t = setup();
     await openClass(t);

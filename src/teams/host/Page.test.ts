@@ -4,15 +4,24 @@
 // for a <section> that carries its label, so the test checks only what Page.tsx decides: the
 // header (its link and the "Lost by slide" line), the tab buttons, and which panel shows inside
 // which boundary. The cards' own headings belong to the files that own those cards.
-import { createElement, type ReactNode } from "react";
+import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import AskRoom from "./AskRoom";
+import { PointsTab } from "./Boards";
+import { Missing } from "./Missing";
 import HostPage, { Dashboard, type Tab } from "./Page";
+import QA from "./QA";
 
+// A query's made-up result, or a function of its args that gives the result.
 const results: Record<string, unknown> = {};
 vi.mock("convex/react", () => ({
-  useQuery: (ref: FunctionReference<"query">, args?: unknown) => (args === "skip" ? undefined : results[getFunctionName(ref)]),
+  useQuery: (ref: FunctionReference<"query">, args?: unknown) => {
+    if (args === "skip") return undefined;
+    const r = results[getFunctionName(ref)];
+    return typeof r === "function" ? r(args) : r;
+  },
 }));
 vi.mock("../checkin/prof", () => ({ StaffGate: ({ children }: { children: ReactNode }) => children }));
 vi.mock("./AskRoom", () => ({ default: () => "[ask the room]" }));
@@ -52,6 +61,32 @@ function panels(html: string) {
     return { tab, mounted: m !== null, hidden: m !== null && m[1] !== undefined };
   });
 }
+// The element tree Dashboard returns when it opens on `first` (its hooks run inside Probe).
+function dashboardTree(first: Tab): ReactNode {
+  let tree: ReactNode = null;
+  function Probe() {
+    tree = Dashboard({ first });
+    return tree;
+  }
+  renderToStaticMarkup(createElement(Probe));
+  return tree;
+}
+// Where `target` sits in `node`: the type, key and place among its siblings of every element from
+// the top down to it, or null when it isn't there.
+function placeOf(node: ReactNode, target: unknown, path: string[] = []): string[] | null {
+  if (Array.isArray(node)) {
+    for (const [i, child] of node.entries()) {
+      const found = placeOf(child as ReactNode, target, [...path, `[${i}]`]);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isValidElement(node)) return null;
+  const type = node.type as string | { name?: string };
+  const here = [...path, `${typeof type === "string" ? type : (type.name ?? "?")}#${node.key ?? ""}`];
+  if (node.type === target) return here;
+  return placeOf((node.props as { children?: ReactNode }).children, target, here);
+}
 // The "Lost by slide" line's text, tags dropped.
 function lostLine(html: string) {
   const m = /<p class="host-lost">(.*?)<\/p>/.exec(html);
@@ -76,6 +111,18 @@ describe("#/host", () => {
       const html = open(first);
       expect(panels(html), first).toEqual(TABS.map((tab) => ({ tab, mounted: true, hidden: tab !== first })));
       expect(html, first).toContain('<button id="host-tab-' + first + '" role="tab" aria-selected="true"');
+    }
+  });
+
+  it("LIVE-risk-4 switching tabs keeps each tab's cards where they are, so React keeps them mounted", () => {
+    // React keeps a component and its state (a half-written question) across renders only when
+    // every element above it keeps its type, key and place. Dashboard's element tree for each open
+    // tab has to put each card at the same place.
+    const at = (first: Tab, card: unknown) => placeOf(dashboardTree(first), card);
+    for (const card of [AskRoom, Missing, PointsTab, QA]) {
+      const now = at("Now", card);
+      expect(now, String(card)).not.toBeNull();
+      for (const tab of TABS) expect(at(tab, card), `${tab}`).toEqual(now);
     }
   });
 
@@ -113,7 +160,8 @@ describe("#/host", () => {
 
   it("F20.3 the header shows how many are lost on the slide on screen", () => {
     results["deck:current"] = { index: 2, beat: 0, count: 12, title: "Slide 3", lines: [], at: 0 };
-    results["live/read:lostCount"] = 4;
+    // 4 lost on slide 3 (index 2), 9 on any other slide.
+    results["live/read:lostCount"] = (a: { channel?: string; index?: number }) => (a.channel === "gdg" && a.index === 2 ? 4 : 9);
     results["checkin/read:count"] = 30;
     const html = open("Now");
     expect(html).toContain('<span class="big__value">4</span><span class="big__label">lost on this slide</span>');
