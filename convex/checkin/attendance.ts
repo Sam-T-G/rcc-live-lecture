@@ -21,8 +21,8 @@ export const classStart = query({
 export const setClassStart = mutation({
   args: { key: v.optional(v.string()), channel: v.string(), startsAt: v.number(), graceMin: v.number() },
   returns: v.null(),
-  handler: async (ctx, { key, channel, startsAt, graceMin }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel, startsAt, graceMin }) => {
+    await requireProf(ctx);
     if (graceMin < 0 || graceMin > 60) throw new ConvexError("Grace has to be 0 to 60 minutes.");
     const row = await ctx.db.query("classStarts").withIndex("by_channel", (q) => q.eq("channel", channel)).unique();
     if (row) await ctx.db.patch(row._id, { startsAt, graceMin });
@@ -35,8 +35,8 @@ export const setClassStart = mutation({
 export const sheet = query({
   args: { key: v.optional(v.string()), channel: v.string() },
   returns: v.array(v.object({ name: v.string(), email: v.string(), at: v.number(), lateMin: v.union(v.null(), v.number()) })),
-  handler: async (ctx, { key, channel }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel }) => {
+    await requireProf(ctx);
     const rows = await ctx.db.query("checkins").withIndex("by_channel", (q) => q.eq("channel", channel)).collect();
     return rows.map((r) => ({ name: r.name, email: r.email ?? "", at: r.at, lateMin: r.lateMin ?? null }));
   },

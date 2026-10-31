@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import { api } from "../_generated/api";
-import { at, checkIn, profEnv, setup, slide, TYPED_ISSUER, typed, type T } from "../test.helpers";
+import { ADMIN_EMAIL, admin, at, checkIn, google, grant, profEnv, professor, SCANNER_EMAIL, setup, slide, TYPED_ISSUER, typed, type T } from "../test.helpers";
 
 const CH = "gdg";
 const T0 = at(2026, 11, 5, 21, 40);
@@ -100,6 +100,21 @@ describe("F22 questions beside the slide", () => {
     await author.mutation(api.live.questions.remove, { question: q._id });
     expect(await list(t)).toEqual([]);
     expect(await voteRows(t, q._id)).toBe(0);
+  });
+
+  it("ROLES a professor or the admin deletes anyone's question; a scanner and a typed sign-in with the admin's email can't", async () => {
+    const t = setup();
+    const [author] = await room(t, 1);
+    await grant(t, SCANNER_EMAIL, "scanner");
+    await author.mutation(api.live.questions.ask, { channel: CH, index: 0, text: "Can you go back one slide?", anonymous: true });
+    vi.setSystemTime(T0 + 6_000);
+    await author.mutation(api.live.questions.ask, { channel: CH, index: 0, text: "Is this on the exam?", anonymous: false });
+    const [first, second] = (await list(t)).sort((a, b) => a.at - b.at);
+    for (const as of [google(t, "Sample scanner", SCANNER_EMAIL), typed(t, "Sample admin", ADMIN_EMAIL)])
+      await expect(as.mutation(api.live.questions.remove, { question: first._id })).rejects.toThrow("Only the author or a professor can delete this.");
+    await (await professor(t)).mutation(api.live.questions.remove, { question: first._id });
+    await admin(t).mutation(api.live.questions.remove, { question: second._id });
+    expect(await list(t)).toEqual([]);
   });
 
   it("F22.6 anonymous stores no name and list never returns user", async () => {

@@ -41,8 +41,8 @@ export const ask = mutation({
 export const list = query({
   args: { key: v.optional(v.string()), channel: v.string() },
   returns: v.array(forHostShape),
-  handler: async (ctx, { key, channel }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel }) => {
+    await requireProf(ctx);
     const rows = await ctx.db.query("studentQuestions").withIndex("by_channel", (q) => q.eq("channel", channel)).order("desc").collect();
     return rows.map((r) => ({
       _id: r._id,
@@ -73,8 +73,8 @@ export const shared = query({
 export const setStatus = mutation({
   args: { key: v.optional(v.string()), id: v.id("studentQuestions"), status: statusValidator },
   returns: v.null(),
-  handler: async (ctx, { key, id, status }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { id, status }) => {
+    await requireProf(ctx);
     await ctx.db.patch(id, status === "dismissed" ? { status, shared: false } : { status });
     return null;
   },
@@ -84,8 +84,8 @@ export const setStatus = mutation({
 export const answer = mutation({
   args: { key: v.optional(v.string()), id: v.id("studentQuestions"), text: v.string() },
   returns: v.null(),
-  handler: async (ctx, { key, id, text }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { id, text }) => {
+    await requireProf(ctx);
     const clean = text.trim();
     await ctx.db.patch(id, { answer: clean || undefined, ...(clean ? { status: "keep" as const } : {}) });
     return null;
@@ -96,8 +96,8 @@ export const answer = mutation({
 export const share = mutation({
   args: { key: v.optional(v.string()), id: v.id("studentQuestions"), shared: v.boolean() },
   returns: v.null(),
-  handler: async (ctx, { key, id, shared }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { id, shared }) => {
+    await requireProf(ctx);
     const row = await ctx.db.get(id);
     if (!row) throw new ConvexError("That question is gone.");
     if (shared && row.visibility === "private") throw new ConvexError("That question is private.");

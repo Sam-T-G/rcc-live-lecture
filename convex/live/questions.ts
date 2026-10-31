@@ -2,7 +2,8 @@
 // `user` is stored for "mine", "no voting for yourself", and delete, but is never returned.
 import { mutation, query } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
-import { isHostIdentity, requireUser } from "../lib";
+import { requireUser } from "../lib";
+import { isProf, staffRole } from "../checkin/prof";
 
 const MAX_LENGTH = 280;
 const MIN_GAP_MS = 5000; // one post per person every 5 seconds
@@ -107,7 +108,7 @@ export const vote = mutation({
   },
 });
 
-// Delete a question: its author can, and so can hosts.
+// Delete a question: its author can, and so can professors and admins.
 export const remove = mutation({
   args: { question: v.id("questions") },
   returns: v.null(),
@@ -115,8 +116,8 @@ export const remove = mutation({
     const me = await requireUser(ctx);
     const row = await ctx.db.get(question);
     if (!row) return null;
-    if (row.user !== me.tokenIdentifier && !isHostIdentity(me))
-      throw new ConvexError("Only the author or a host can delete this.");
+    if (row.user !== me.tokenIdentifier && !isProf(await staffRole(ctx)))
+      throw new ConvexError("Only the author or a professor can delete this.");
     const votes = await ctx.db.query("questionVotes").withIndex("by_question_and_user", (q) => q.eq("question", question)).collect();
     for (const x of votes) await ctx.db.delete(x._id);
     await ctx.db.delete(question);

@@ -1,7 +1,8 @@
-// F39: every Convex function has a test, every function that takes a professor key has an
-// authMatrix test that calls it as each row's caller with that row's key, and every Convex test
-// runs. The functions come from loading each Convex module. The test files' source comes in as
-// text through Vite and is read with comments removed, so a name in a comment doesn't count.
+// F39: every Convex function has a test, every host-only function has an authMatrix test that
+// calls it as each row's caller, and every Convex test runs. The functions come from loading each
+// Convex module; which ones are host-only comes from reading each module's source for the staff
+// checks (convex/checkin/prof.ts). The test files' source comes in as text through Vite and is
+// read with comments removed, so a name in a comment doesn't count.
 import { describe, expect, it } from "vitest";
 import SELF from "./coverage.test.ts?raw";
 import { modules } from "./test.setup";
@@ -11,24 +12,29 @@ import { modules } from "./test.setup";
 const SOURCES = import.meta.glob<string>("./**/*.test.ts", { query: "?raw", import: "default", eager: true });
 // Every Convex test file, this one included, for the skip check.
 const ALL_SOURCES: Record<string, string> = { ...SOURCES, "./coverage.test.ts": SELF };
+// Every Convex module's source as text: the same files test.setup.ts loads, minus _generated/.
+const MODULE_SOURCES = import.meta.glob<string>("./**/!(*.*.*)*.ts", { query: "?raw", import: "default", eager: true });
 // convex/host/ is left out until UZ deletes it (and this skip with it).
 const SKIP_MODULES = ["host/"];
-// amHost answers true or false for any caller, so it has no refused row to check.
-const NO_MATRIX = ["api.checkin.pass.amHost"];
-// The door scanner's functions, the only ones an authMatrix call may check against SCANNER (the
-// kiosk key gets through). Every other function with a key arg is checked against HOST_ONLY.
-const DOOR = ["api.checkin.pass.scan", "api.checkin.pass.canScan"];
+// The staff checks: a function whose handler calls one of these, or calls a function in its own
+// file that does, is host-only (requireHost in convex/lib.ts is requireProf by another name).
+const GUARDS = ["requireProf", "requireAdmin", "requireScanner", "requireHost"];
+// Functions that answer whether the caller may do something, instead of refusing. Their tests
+// throw when the answer is no, so authMatrix checks them like any host-only function.
+const ANSWERS = ["api.checkin.pass.amHost", "api.checkin.pass.canScan"];
 
-type Fn = { ref: string; hasKey: boolean };
+type Fn = { ref: string; hasKey: boolean; guarded: boolean };
 type Registered = { isQuery?: boolean; isMutation?: boolean; isAction?: boolean; isInternal?: boolean; exportArgs?: () => string };
 
 // Every query, mutation and action a Convex module exports, as `api.<module>.<name>` or
-// `internal.<module>.<name>`, and whether its args include `key`.
+// `internal.<module>.<name>`, whether its args include `key` (host-only functions still accept
+// one until ROLES-UI removes it), and whether it calls a staff check.
 async function convexFunctions(): Promise<Fn[]> {
   const out: Fn[] = [];
   for (const [file, load] of Object.entries(modules)) {
     const mod = file.replace(/^\.\//, "").replace(/\.[cm]?[jt]s$/, "");
     if (mod.startsWith("_generated/") || SKIP_MODULES.some((s) => mod.startsWith(s))) continue;
+    const guarded = guardedNames(MODULE_SOURCES[file] ?? "");
     for (const [name, value] of Object.entries((await load()) as Record<string, unknown>)) {
       const f = value as Registered;
       if (typeof value !== "function" || !(f.isQuery || f.isMutation || f.isAction)) continue;
@@ -36,6 +42,7 @@ async function convexFunctions(): Promise<Fn[]> {
       out.push({
         ref: `${f.isInternal ? "internal" : "api"}.${mod.split("/").join(".")}.${name}`,
         hasKey: args.type === "object" && !!args.value && "key" in args.value,
+        guarded: guarded.has(name),
       });
     }
   }
@@ -147,6 +154,37 @@ const withoutComments = (src: string) => blank(src, false);
 // Only the code: no comments, strings, templates or regexes.
 const codeOnly = (src: string) => blank(src, true);
 
+// A module's top-level declarations (function, const, let, var, exported or not), each with the
+// code after its name up to the next one. Top-level means the line starts with it, as Prettier
+// writes every file here.
+function declarations(code: string): { name: string; text: string }[] {
+  const starts = [...code.matchAll(/^(?:export\s+)?(?:async\s+)?(?:function\s*\*?\s*|const\s+|let\s+|var\s+)([A-Za-z_$][\w$]*)/gm)];
+  return starts.map((m, i) => ({ name: m[1], text: code.slice(m.index + m[0].length, starts[i + 1]?.index ?? code.length) }));
+}
+
+// Whether `code` calls `name` (`name(` or `x.name(`, never `rename(`), or uses it as a Convex
+// function's handler (`handler: name`).
+const callsName = (code: string, name: string) => {
+  const n = name.replace(/\$/g, "\\$");
+  return new RegExp(`(?<![\\w$])${n}\\s*\\(`).test(code) || new RegExp(`(?<![\\w$])handler\\s*:\\s*${n}(?![\\w$])`).test(code);
+};
+
+// The names of a module's top-level declarations that call a staff check, directly or through
+// other declarations in the same module. Comments, strings and regexes don't count.
+function guardedNames(src: string): Set<string> {
+  const decls = declarations(codeOnly(src));
+  const out = new Set<string>();
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const d of decls) {
+      if (out.has(d.name) || ![...GUARDS, ...out].some((g) => callsName(d.text, g))) continue;
+      out.add(d.name);
+      grew = true;
+    }
+  }
+  return out;
+}
+
 type MatrixCall = { awaited: boolean; args: string };
 
 // Every authMatrix(...) call: the text inside its parentheses, and whether `await` comes right
@@ -176,36 +214,28 @@ function params(call: string): string[] {
     .map((p) => /^\s*([A-Za-z_$][\w$]*)\s*(?:[:=?]|$)/.exec(p)?.[1] ?? "");
 }
 
-// Whether a call's arguments set `key` to the parameter named `key`: `{ key }` when the parameter
-// is called key, or `{ key: k }`.
-function passesKey(args: string, key: string): boolean {
-  const k = key.replace(/\$/g, "\\$");
-  return new RegExp(`[{,]\\s*key\\s*:\\s*${k}\\s*[,}]`).test(args) || (key === "key" && /[{,]\s*key\s*[,}]/.test(args));
-}
-
 // The one function an authMatrix call checks, or null. The call has to be awaited, so its test
 // can't end before authMatrix compares the rows, and its first argument has to be the matrix it
-// compares them with: HOST_ONLY, or SCANNER for the door scanner. Its callback has to call
-// exactly one function through its first parameter (the row's caller), and pass its second
-// parameter (the row's key) as `key` every time. A setup step on `t` or with PROF_KEY runs the
-// same way on every row, so it checks nothing. A second function called through the row's caller
-// could throw first on a refused row, so the matrix would never find out whether the function
-// after it refuses.
+// compares them with: HOST_ONLY, ADMIN_ONLY or SCANNER from test.helpers.ts. Its callback has to
+// call exactly one function through its first parameter (the row's caller). A setup step on `t`
+// runs the same way on every row, so it checks nothing. A second function called through the
+// row's caller could throw first on a refused row, so the matrix would never find out whether
+// the function after it refuses. Which matrix fits is checked when the test runs: authMatrix
+// fails when any row's result differs from it.
 function matrixCheck({ awaited, args }: MatrixCall): string | null {
-  const matrix = /^\s*(HOST_ONLY|SCANNER)\s*,/.exec(args);
+  const matrix = /^\s*(HOST_ONLY|ADMIN_ONLY|SCANNER)\s*,/.exec(args);
   if (!awaited || !matrix) return null;
   const call = args.slice(matrix[0].length);
-  const [as, key] = params(call);
-  if (!as || !key) return null;
+  const [as] = params(call);
+  if (!as) return null;
   const through = new RegExp(`(?<![\\w$.])${as.replace(/\$/g, "\\$")}\\s*\\.\\s*(?:query|mutation|action)\\s*\\(`, "g");
-  const calls = [...call.matchAll(through)].map((m) => {
+  const called = [...call.matchAll(through)].map((m) => {
     const start = m.index + m[0].length;
     return call.slice(start, skipCode(call, start, ")") - 1);
   });
-  const refs = new Set(calls.map((a) => /^\s*((?:api|internal)(?:\.[\w$]+)+)\s*,/.exec(a)?.[1] ?? ""));
+  const refs = new Set(called.map((a) => /^\s*((?:api|internal)(?:\.[\w$]+)+)\s*(?:,|$)/.exec(a)?.[1] ?? ""));
   const [ref] = refs;
-  if (refs.size !== 1 || !ref || !calls.every((a) => passesKey(a, key))) return null;
-  return matrix[1] === "HOST_ONLY" || DOOR.includes(ref) ? ref : null;
+  return refs.size === 1 && ref ? ref : null;
 }
 
 // What makes vitest skip a test, or pass it when it throws, while `vitest run` still exits 0:
@@ -229,11 +259,14 @@ describe("F39 every Convex function is tested", async () => {
   const all = tests.join("\n");
   const matrices = tests.flatMap(authMatrixCalls);
 
-  it("finds the functions and the test files to check", () => {
+  it("finds the functions, their sources and the test files to check", () => {
     expect(fns.length).toBeGreaterThan(0);
     expect(fns.some((f) => f.ref.startsWith("internal."))).toBe(true);
-    expect(fns.some((f) => f.hasKey)).toBe(true);
+    expect(fns.some((f) => f.guarded)).toBe(true);
     expect(tests.length).toBeGreaterThan(0);
+    // The source glob reads exactly the modules test.setup.ts loads, so no module goes unread.
+    const loaded = Object.keys(modules).filter((f) => !f.startsWith("./_generated/"));
+    expect(Object.keys(MODULE_SOURCES).sort()).toEqual(loaded.sort());
   });
 
   it("F39.2 every exported function outside convex/host/ is named in a test", () => {
@@ -248,52 +281,86 @@ describe("F39 every Convex function is tested", async () => {
     expect(untested).toEqual([]);
   });
 
-  it("F39.3 every function with a key arg, except checkin.pass.amHost, is the one function an awaited authMatrix(HOST_ONLY or SCANNER, ...) call checks", () => {
+  it("F39.3 every host-only public function (it calls requireProf, requireAdmin, requireScanner or requireHost, or a function in its own file that does), every function with a key arg, and amHost and canScan, is the one function an awaited authMatrix(HOST_ONLY, ADMIN_ONLY or SCANNER, ...) call checks", () => {
     const checked = new Set(matrices.map(matrixCheck));
-    const keyed = fns.filter((f) => f.hasKey && !NO_MATRIX.includes(f.ref));
-    expect(keyed.filter((f) => !checked.has(f.ref)).map((f) => f.ref)).toEqual([]);
+    const hostOnly = fns.filter((f) => f.ref.startsWith("api.") && (f.guarded || f.hasKey || ANSWERS.includes(f.ref)));
+    expect(hostOnly.filter((f) => !checked.has(f.ref)).map((f) => f.ref)).toEqual([]);
   });
 
-  it("F39.3 a function counts only when an awaited authMatrix(HOST_ONLY or SCANNER, ...) calls it, and nothing else, as the row's caller with the row's key", () => {
-    const check = (src: string) => authMatrixCalls(withoutComments(src)).map(matrixCheck);
-    // The shapes checkin/prof.test.ts uses.
-    expect(check(`await authMatrix(HOST_ONLY, (as, key) => as.query(api.a.names, { key, channel: CH }))`)).toEqual(["api.a.names"]);
+  it("F39.3 the staff-check scan finds the host-only functions in the real modules and leaves the open ones out", () => {
+    const guarded = fns.filter((f) => f.guarded).map((f) => f.ref);
+    expect(guarded).toEqual(
+      expect.arrayContaining([
+        "api.checkin.read.names",
+        "api.checkin.quiz.ask",
+        "api.checkin.attendance.sheet",
+        "api.checkin.pass.scan",
+        "api.live.groups.setSize",
+        "api.staff.people",
+        "api.staff.add",
+        "api.staff.approvePairing",
+        "api.staff.unpair",
+      ]),
+    );
+    for (const open of ["api.checkin.read.count", "api.checkin.pass.refresh", "api.live.questions.remove", "api.staff.me", "api.staff.requestPairing", "api.staff.deviceStatus"])
+      expect(guarded).not.toContain(open);
+  });
+
+  it("F39.3 the staff-check scan follows helpers in the same file and skips comments, strings and longer names", () => {
+    const scan = (src: string) => [...guardedNames(src)].sort();
+    expect(scan(`export const a = query({ handler: async (ctx) => { await requireProf(ctx); } });\nexport const b = query({ handler: async () => 1 });`)).toEqual(["a"]);
+    // Through a helper in the same file, two levels deep, and through a module object.
     expect(
-      check(`await authMatrix(SCANNER, async (as, key) => { if (!(await as.query(api.checkin.pass.canScan, { key }))) throw new Error("no"); })`),
+      scan(
+        `async function load(ctx) {\n  await requireAdmin(ctx);\n}\nconst outer = async (ctx) => load(ctx);\nexport const c = mutation({ handler: async (ctx) => { await outer(ctx); } });\nexport const d = query({ handler: async (ctx) => prof.requireScanner(ctx) });`,
+      ),
+    ).toEqual(["c", "d", "load", "outer"]);
+    // A named function used as the handler.
+    expect(scan(`async function askHandler(ctx, args) {\n  await requireProf(ctx);\n}\nexport const h = mutation({ args: {}, handler: askHandler });\nexport const i = mutation({ args: {}, handler: askHandlerTwo });`)).toEqual([
+      "askHandler",
+      "h",
+    ]);
+    // Not a call: a comment, a string, a longer name, or the name without a call.
+    expect(
+      scan(
+        `// requireProf(ctx)\nexport const e = query({ handler: async () => "requireProf(ctx)" });\nexport const f = query({ handler: async (ctx) => myrequireProf(ctx) });\nexport const g = query({ handler: async () => requireProf });`,
+      ),
+    ).toEqual([]);
+  });
+
+  it("F39.3 a function counts only when an awaited authMatrix(HOST_ONLY, ADMIN_ONLY or SCANNER, ...) calls it, and nothing else, as the row's caller", () => {
+    const check = (src: string) => authMatrixCalls(withoutComments(src)).map(matrixCheck);
+    // The shapes the tests use.
+    expect(check(`await authMatrix(HOST_ONLY, (as) => as.query(api.a.names, { channel: CH }))`)).toEqual(["api.a.names"]);
+    expect(check(`await authMatrix(ADMIN_ONLY, (as) => as.query(api.staff.people))`)).toEqual(["api.staff.people"]);
+    expect(
+      check(`await authMatrix(SCANNER, async (as, t, device) => { if (!(await as.query(api.checkin.pass.canScan, { device }))) throw new Error("no"); })`),
     ).toEqual(["api.checkin.pass.canScan"]);
     expect(
-      check(`await authMatrix(HOST_ONLY, async (as, key, t) => {
-        const poll = await t.mutation(api.setup.ask, { key: PROF_KEY, channel: CH });
-        await as.mutation(api.a.end, { key, poll });
+      check(`await authMatrix(HOST_ONLY, async (as, t) => {
+        const poll = await admin(t).mutation(api.setup.ask, { channel: CH });
+        await as.mutation(api.a.end, { poll });
       })`),
     ).toEqual(["api.a.end"]);
-    expect(check(`const m = await authMatrix(HOST_ONLY, async function (who, k) { await who.mutation(api.a.end, { poll, key: k }); })`)).toEqual([
-      "api.a.end",
-    ]);
-    // Without HOST_ONLY or SCANNER first, nothing compares the rows, so a function anyone can call passes.
-    expect(check(`await authMatrix((as, key) => as.query(api.a.names, { key }))`)).toEqual([null]);
-    expect(check(`expect(await authMatrix((as, key) => as.query(api.a.names, { key }))).toMatchObject({ googleHost: true, profKey: true })`)).toEqual([
-      null,
-    ]);
-    expect(check(`await authMatrix(OPEN, (as, key) => as.query(api.a.names, { key }))`)).toEqual([null]);
-    expect(check(`await authMatrix({ ...HOST_ONLY, typedHostEmail: true }, (as, key) => as.query(api.a.names, { key }))`)).toEqual([null]);
-    // SCANNER lets the kiosk key through, so it checks only the door scanner's two functions.
-    expect(check(`await authMatrix(SCANNER, (as, key) => as.query(api.a.names, { key }))`)).toEqual([null]);
+    expect(check(`const m = await authMatrix(HOST_ONLY, async function (who) { await who.mutation(api.a.end, { poll }); })`)).toEqual(["api.a.end"]);
+    // Without a matrix from test.helpers.ts first, nothing compares the rows, so a function anyone can call passes.
+    expect(check(`await authMatrix((as) => as.query(api.a.names, {}))`)).toEqual([null]);
+    expect(check(`expect(await authMatrix((as) => as.query(api.a.names, {}))).toMatchObject({ googleAdmin: true })`)).toEqual([null]);
+    expect(check(`await authMatrix(OPEN, (as) => as.query(api.a.names, {}))`)).toEqual([null]);
+    expect(check(`await authMatrix({ ...HOST_ONLY, googleStudent: true }, (as) => as.query(api.a.names, {}))`)).toEqual([null]);
     // Not awaited: the test can end before authMatrix compares the rows.
-    expect(check(`authMatrix(HOST_ONLY, (as, key) => as.query(api.a.names, { key }))`)).toEqual([null]);
-    expect(check(`void authMatrix(HOST_ONLY, (as, key) => as.query(api.a.names, { key }))`)).toEqual([null]);
-    // Used only as a setup step, on `t` or as the row's caller with PROF_KEY: not checked.
-    expect(check(`await authMatrix(HOST_ONLY, async (as, key, t) => { await t.mutation(api.setup.ask, { key: PROF_KEY }); })`)).toEqual([null]);
-    expect(check(`await authMatrix(HOST_ONLY, async (as, key) => { await as.mutation(api.setup.ask, { key: PROF_KEY }); })`)).toEqual([null]);
-    // Called without the row's key: not checked.
-    expect(check(`await authMatrix(HOST_ONLY, (as, k) => as.query(api.a.names, { key }))`)).toEqual([null]);
-    expect(check(`await authMatrix(HOST_ONLY, (as, key) => as.query(api.a.names, { channel: key }))`)).toEqual([null]);
-    expect(check(`await authMatrix(HOST_ONLY, (as) => as.query(api.a.names, {}))`)).toEqual([null]);
+    expect(check(`authMatrix(HOST_ONLY, (as) => as.query(api.a.names, {}))`)).toEqual([null]);
+    expect(check(`void authMatrix(HOST_ONLY, (as) => as.query(api.a.names, {}))`)).toEqual([null]);
+    // Only a setup step on `t`: every row runs it the same way, so it checks nothing.
+    expect(check(`await authMatrix(HOST_ONLY, async (as, t) => { await admin(t).mutation(api.setup.ask, {}); })`)).toEqual([null]);
+    expect(check(`await authMatrix(HOST_ONLY, async (as, t) => { await t.mutation(api.setup.ask, {}); })`)).toEqual([null]);
+    // A function value run as the row's caller (convex-test runs it inline) names no Convex function.
+    expect(check(`await authMatrix(HOST_ONLY, (as) => as.query(readRole))`)).toEqual([null]);
     // Two functions called as the row's caller: answer throws first on a refused row, so share is never tried there.
     expect(
-      check(`await authMatrix(HOST_ONLY, async (as, key) => {
-        await as.mutation(api.a.answer, { key, id });
-        await as.mutation(api.a.share, { key, id });
+      check(`await authMatrix(HOST_ONLY, async (as) => {
+        await as.mutation(api.a.answer, { id });
+        await as.mutation(api.a.share, { id });
       })`),
     ).toEqual([null]);
     // A function passed by name: no callback to read.
@@ -303,18 +370,18 @@ describe("F39 every Convex function is tested", async () => {
   it("F39.3 the scan reads authMatrix calls, strings, regexes and comments the way a test file has them", () => {
     const src = withoutComments(`
       // await authMatrix(HOST_ONLY, as => as.query(api.only.inAComment, {}))
-      await authMatrix(HOST_ONLY, async (as, key) => {
+      await authMatrix(HOST_ONLY, async (as) => {
         const label = "a ) inside a string";
         const re = /[)'"]/g;
-        await as.mutation(api.checkin.quiz.end, { key, poll: \`\${(1 + 2) / 3}\` });
+        await as.mutation(api.checkin.quiz.end, { poll: \`\${(1 + 2) / 3}\` });
       });
       as.query(api.outside.theCall, {});
       /* api.block.comment */`);
-    const calls = authMatrixCalls(src);
-    expect(calls).toHaveLength(1);
-    expect(names(calls[0].args, "api.checkin.quiz.end")).toBe(true);
-    expect(matrixCheck(calls[0])).toBe("api.checkin.quiz.end");
-    expect(names(calls[0].args, "api.outside.theCall")).toBe(false);
+    const found = authMatrixCalls(src);
+    expect(found).toHaveLength(1);
+    expect(names(found[0].args, "api.checkin.quiz.end")).toBe(true);
+    expect(matrixCheck(found[0])).toBe("api.checkin.quiz.end");
+    expect(names(found[0].args, "api.outside.theCall")).toBe(false);
     expect(names(src, "api.outside.theCall")).toBe(true);
     expect(names(src, "api.only.inAComment")).toBe(false);
     expect(names(src, "api.block.comment")).toBe(false);

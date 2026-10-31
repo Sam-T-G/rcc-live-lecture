@@ -32,6 +32,7 @@ import type * as live_groups from "../live/groups.js";
 import type * as live_past from "../live/past.js";
 import type * as live_questions from "../live/questions.js";
 import type * as live_read from "../live/read.js";
+import type * as staff from "../staff.js";
 
 import type {
   ApiFromModules,
@@ -64,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   "live/past": typeof live_past;
   "live/questions": typeof live_questions;
   "live/read": typeof live_read;
+  staff: typeof staff;
 }>;
 
 /**

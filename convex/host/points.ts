@@ -11,8 +11,8 @@ const EXTRA_CREDIT = 1; // each student on the winning team
 export const adjust = mutation({
   args: { key: v.optional(v.string()), channel: v.string(), user: v.string(), name: v.string(), delta: v.number(), reason: v.optional(v.string()) },
   returns: v.null(),
-  handler: async (ctx, { key, channel, user, name, delta, reason }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel, user, name, delta, reason }) => {
+    await requireProf(ctx);
     if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 10) throw new ConvexError("Change points by 1 to 10.");
     await ctx.db.insert("pointEvents", { channel, user, name, delta, reason: reason?.trim() || (delta < 0 ? "Deduction" : "Bonus"), at: Date.now() });
     return null;
@@ -24,8 +24,8 @@ export const adjust = mutation({
 export const endDay = mutation({
   args: { key: v.optional(v.string()), channel: v.string() },
   returns: v.string(),
-  handler: async (ctx, { key, channel }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel }) => {
+    await requireProf(ctx);
     const roster = await buildRoster(ctx, channel);
     const today = TEAMS.map((team) => ({ team, points: roster.filter((r) => r.team === team).reduce((n, r) => n + r.today, 0) })).sort((a, b) => b.points - a.points);
     if (today[0].points === 0) return "No points today. Nothing to award.";

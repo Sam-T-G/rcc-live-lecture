@@ -3,59 +3,46 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import {
-  checkedIn,
-  cleanName,
-  endLecture,
-  ensureLecture,
-  isHostEmail,
-  isHostIdentity,
-  LECTURE_MS,
-  lectureWindow,
-  metersBetween,
-  randomCode,
-  requireHost,
-  requireUser,
-} from "./lib";
+import { checkedIn, cleanName, endLecture, ensureLecture, LECTURE_MS, lectureWindow, metersBetween, randomCode, requireHost, requireUser } from "./lib";
+import * as lib from "./lib";
 import { describe as teamOf, teamInfo } from "./live/groups";
-import { at, GOOGLE_ISSUER, googleHost, HOST_EMAIL, PROF_KEY, profEnv, setup, TYPED_ISSUER, typed, type T } from "./test.helpers";
+import {
+  ADMIN_EMAIL,
+  admin,
+  at,
+  google,
+  GOOGLE_ISSUER,
+  grant,
+  PROD_URL,
+  PROF_EMAIL,
+  profEnv,
+  professor,
+  SCANNER_EMAIL,
+  setup,
+  TYPED_ISSUER,
+  typed,
+  type T,
+} from "./test.helpers";
 
-describe("F1 hosts are Google accounts on HOST_EMAILS", () => {
-  it("F1.4 isHostIdentity is false for a typed identity whose email is on HOST_EMAILS and true for a Google identity with that email", async () => {
+describe("F1 hosts are professors and admins on the staff list", () => {
+  it("ROLES requireHost is the same check as requireProf: 'Sign in first.' signed out, 'Only professors can do that.' for a student, a scanner and a typed sign-in with the admin's email on prod; a professor and an admin get their identity back", async () => {
     profEnv();
-    expect(isHostIdentity({ issuer: TYPED_ISSUER, email: HOST_EMAIL, emailVerified: true })).toBe(false);
-    expect(isHostIdentity({ issuer: GOOGLE_ISSUER, email: HOST_EMAIL, emailVerified: true })).toBe(true);
-    expect(isHostIdentity({ issuer: GOOGLE_ISSUER, email: HOST_EMAIL, emailVerified: false })).toBe(false);
-    expect(isHostIdentity({ issuer: GOOGLE_ISSUER, email: "student1@example.edu", emailVerified: true })).toBe(false);
-    expect(isHostIdentity(null)).toBe(false);
-
+    vi.stubEnv("CONVEX_CLOUD_URL", PROD_URL);
+    vi.stubEnv("HOST_EMAILS", "host@example.edu");
     const t = setup();
-    expect(await typed(t, "Sample professor", HOST_EMAIL).query(api.checkin.pass.amHost, {})).toBe(false);
-    await expect(typed(t, "Sample professor", HOST_EMAIL).query(api.checkin.read.names, { channel: "gdg" })).rejects.toThrow("Only hosts can do that.");
-    expect(await googleHost(t).query(api.checkin.pass.amHost, {})).toBe(true);
-  });
-
-  it("F1.4 isHostEmail is case-insensitive and ignores spaces and empty entries", () => {
-    vi.stubEnv("HOST_EMAILS", " Prof@Example.edu , ,second@example.edu");
-    expect(isHostEmail("prof@example.edu")).toBe(true);
-    expect(isHostEmail("PROF@EXAMPLE.EDU")).toBe(true);
-    expect(isHostEmail("second@example.edu")).toBe(true);
-    expect(isHostEmail("student1@example.edu")).toBe(false);
-    expect(isHostEmail("")).toBe(false);
-    expect(isHostEmail(undefined)).toBe(false);
-    vi.stubEnv("HOST_EMAILS", undefined);
-    expect(isHostEmail("prof@example.edu")).toBe(false);
-  });
-
-  it("F1.4 requireUser throws 'Sign in first.' signed out; requireHost throws 'Only hosts can do that.' for a typed sign-in on HOST_EMAILS", async () => {
-    profEnv();
-    const t = setup();
+    await grant(t, SCANNER_EMAIL, "scanner");
     await expect(t.run((ctx) => requireUser(ctx))).rejects.toThrow("Sign in first.");
     await expect(t.run((ctx) => requireHost(ctx))).rejects.toThrow("Sign in first.");
     const me = await typed(t, "Sample student 1", "student1@example.edu").run((ctx) => requireUser(ctx));
     expect(me).toMatchObject({ issuer: TYPED_ISSUER, email: "student1@example.edu" });
-    await expect(typed(t, "Sample professor", HOST_EMAIL).run((ctx) => requireHost(ctx))).rejects.toThrow("Only hosts can do that.");
-    expect(await googleHost(t).run((ctx) => requireHost(ctx))).toMatchObject({ issuer: GOOGLE_ISSUER, email: HOST_EMAIL });
+    // HOST_EMAILS no longer makes anyone a host.
+    for (const as of [typed(t, "Sample student 1", "student1@example.edu"), google(t, "Sample scanner", SCANNER_EMAIL), typed(t, "Sample admin", ADMIN_EMAIL), google(t, "Sample host", "host@example.edu")])
+      await expect(as.run((ctx) => requireHost(ctx))).rejects.toThrow("Only professors can do that.");
+    expect(await (await professor(t)).run((ctx) => requireHost(ctx))).toMatchObject({ issuer: GOOGLE_ISSUER, email: PROF_EMAIL });
+    expect(await admin(t).run((ctx) => requireHost(ctx))).toMatchObject({ issuer: GOOGLE_ISSUER, email: ADMIN_EMAIL });
+    // The HOST_EMAILS checks are gone from lib.ts; roles live in convex/checkin/prof.ts.
+    expect(Object.keys(lib)).not.toContain("isHostEmail");
+    expect(Object.keys(lib)).not.toContain("isHostIdentity");
   });
 });
 
@@ -156,7 +143,7 @@ describe("F8 classes: one lectures window per class", () => {
     const t = setup();
     expect(await win(t)).toEqual({ lecture: null, start: 0, startsAt: null, graceMin: 0 });
     // Prod before the first class: the start time the professor saved the old way decides lateness.
-    await t.mutation(api.checkin.attendance.setClassStart, { key: PROF_KEY, channel: CH, startsAt: T0 + 30 * MIN, graceMin: 5 });
+    await admin(t).mutation(api.checkin.attendance.setClassStart, { channel: CH, startsAt: T0 + 30 * MIN, graceMin: 5 });
     expect(await win(t)).toEqual({ lecture: null, start: 0, startsAt: T0 + 30 * MIN, graceMin: 5 });
 
     vi.setSystemTime(T0 + 10 * MIN);

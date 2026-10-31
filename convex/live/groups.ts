@@ -139,13 +139,13 @@ export const status = query({
   },
 });
 
-// A host (or the professor key) picks 3 or 4 students per team. Before the lock, students already on
+// A professor or admin picks 3 or 4 students per team. Before the lock, students already on
 // a team keep it; after the lock, everyone is re-dealt to match the new size.
 export const setSize = mutation({
   args: { key: v.optional(v.string()), channel: v.string(), size: v.number() },
   returns: v.null(),
-  handler: async (ctx, { key, channel, size }) => {
-    await requireProf(ctx, key); // a Google host, or the professor key
+  handler: async (ctx, { channel, size }) => {
+    await requireProf(ctx);
     if (size !== 3 && size !== 4) throw new ConvexError("Pick teams of 3 or 4.");
     const set = await settings(ctx, channel);
     if (set) await ctx.db.patch(set._id, { size });

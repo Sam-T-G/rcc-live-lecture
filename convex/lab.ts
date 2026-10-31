@@ -2,16 +2,18 @@
 // Safe to leave in; nothing product-facing depends on them.
 import { v } from "convex/values";
 import { query, mutation, action } from "./_generated/server";
-import { requireUser, isHostIdentity } from "./lib";
+import { requireUser } from "./lib";
+import { isProf, staffRole } from "./checkin/prof";
 import { geminiText } from "./ai";
 
+// isHost: a professor or admin on the staff list (convex/checkin/prof.ts).
 export const whoami = query({
   args: {},
   returns: v.union(v.null(), v.object({ name: v.string(), email: v.string(), isHost: v.boolean() })),
   handler: async (ctx) => {
     const me = await ctx.auth.getUserIdentity();
     if (!me) return null;
-    return { name: me.name ?? "", email: me.email ?? "", isHost: isHostIdentity(me) };
+    return { name: me.name ?? "", email: me.email ?? "", isHost: isProf(await staffRole(ctx)) };
   },
 });
 

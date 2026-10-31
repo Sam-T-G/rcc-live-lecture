@@ -1,7 +1,7 @@
 // checkin/read: what the other modules read from Check-in (docs/contracts.md).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../_generated/api";
-import { at, checkIn, google, googleHost, PROF_KEY, profEnv, setup, typed, WRONG_KEY } from "../test.helpers";
+import { admin, at, checkIn, google, profEnv, professor, setup, typed } from "../test.helpers";
 
 const CH = "gdg";
 const T0 = at(2026, 11, 5, 21, 30);
@@ -39,24 +39,25 @@ describe("checkin.read", () => {
     expect(await student(t, 2).query(api.checkin.read.me, { channel: CH })).toBe(false);
   });
 
-  it("names lists who checked in, newest first, with the time; hosts only", async () => {
+  it("names lists who checked in, newest first, with the time; professors and admins only", async () => {
     const t = setup();
     await checkIn(t, student(t, 1));
     vi.setSystemTime(T0 + 60_000);
     await checkIn(t, student(t, 2));
     vi.setSystemTime(T0 + 120_000);
     await checkIn(t, student(t, 3));
-    const names = await t.query(api.checkin.read.names, { key: PROF_KEY, channel: CH });
+    const names = await admin(t).query(api.checkin.read.names, { channel: CH });
     expect(names).toEqual([
       { name: "Sample student 3", at: T0 + 120_000 },
       { name: "Sample student 2", at: T0 + 60_000 },
       { name: "Sample student 1", at: T0 },
     ]);
-    expect(await googleHost(t).query(api.checkin.read.names, { channel: CH })).toEqual(names);
+    expect(await (await professor(t)).query(api.checkin.read.names, { channel: CH })).toEqual(names);
 
     await expect(t.query(api.checkin.read.names, { channel: CH })).rejects.toThrow("Sign in first.");
-    await expect(student(t, 1).query(api.checkin.read.names, { channel: CH })).rejects.toThrow("Only hosts can do that.");
-    await expect(google(t, "Sample student 4", "student4@example.edu").query(api.checkin.read.names, { channel: CH })).rejects.toThrow("Only hosts can do that.");
-    await expect(t.query(api.checkin.read.names, { key: WRONG_KEY, channel: CH })).rejects.toThrow("That professor key is wrong.");
+    await expect(student(t, 1).query(api.checkin.read.names, { channel: CH })).rejects.toThrow("Only professors can do that.");
+    await expect(google(t, "Sample student 4", "student4@example.edu").query(api.checkin.read.names, { channel: CH })).rejects.toThrow(
+      "Only professors can do that.",
+    );
   });
 });

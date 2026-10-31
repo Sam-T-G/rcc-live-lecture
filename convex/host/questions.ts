@@ -8,8 +8,8 @@ import { TEAMS, saltFor, teamOf, teamValidator } from "./teams";
 export const open = mutation({
   args: { key: v.optional(v.string()), channel: v.string(), index: v.number(), text: v.string(), choices: v.array(v.string()), correct: v.number(), points: v.optional(v.number()) },
   returns: v.id("quizQuestions"),
-  handler: async (ctx, { key, channel, index, text, choices, correct, points = 10 }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel, index, text, choices, correct, points = 10 }) => {
+    await requireProf(ctx);
     const clean = choices.map((c) => c.trim()).filter(Boolean);
     if (!text.trim()) throw new ConvexError("Write the question first.");
     if (clean.length < 2 || clean.length > 4) throw new ConvexError("Give 2 to 4 choices.");
@@ -23,8 +23,8 @@ export const open = mutation({
 export const close = mutation({
   args: { key: v.optional(v.string()), questionId: v.id("quizQuestions") },
   returns: v.null(),
-  handler: async (ctx, { key, questionId }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { questionId }) => {
+    await requireProf(ctx);
     await ctx.db.patch(questionId, { status: "closed" });
     return null;
   },
@@ -60,8 +60,8 @@ export const forHost = query({
     }),
     v.null(),
   ),
-  handler: async (ctx, { key, channel }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel }) => {
+    await requireProf(ctx);
     const row = await ctx.db.query("quizQuestions").withIndex("by_channel", (q) => q.eq("channel", channel)).order("desc").first();
     if (!row) return null;
     const answers = await ctx.db.query("answers").withIndex("by_question", (q) => q.eq("questionId", row._id)).collect();

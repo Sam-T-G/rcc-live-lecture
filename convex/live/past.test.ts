@@ -1,7 +1,7 @@
 // live/past: the quizzes and votes the professor has ended, for students to look back on.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../_generated/api";
-import { at, checkIn, PROF_KEY, profEnv, setup, typed, type T } from "../test.helpers";
+import { admin, at, checkIn, profEnv, setup, typed, type T } from "../test.helpers";
 
 const CH = "gdg";
 const T0 = at(2026, 11, 5, 21, 40);
@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 const ask = (t: T, kind: "quiz" | "vote", question: string, choices: string[], correct?: number) =>
-  t.mutation(api.checkin.quiz.ask, { key: PROF_KEY, channel: CH, kind, question, choices, correct });
+  admin(t).mutation(api.checkin.quiz.ask, { channel: CH, kind, question, choices, correct });
 
 describe("F23 past questions on the phone", () => {
   it("F23.1 ended quizzes and votes newest first with counts and the caller's pick", async () => {
@@ -29,11 +29,11 @@ describe("F23 past questions on the phone", () => {
     const quiz = await ask(t, "quiz", "What is 2 + 2?", ["3", "4"], 1);
     await a.mutation(api.checkin.quiz.answer, { poll: quiz, choice: 1 });
     await b.mutation(api.checkin.quiz.answer, { poll: quiz, choice: 0 });
-    await t.mutation(api.checkin.quiz.end, { key: PROF_KEY, poll: quiz });
+    await admin(t).mutation(api.checkin.quiz.end, { poll: quiz });
     vi.setSystemTime(T0 + 60_000);
     const vote = await ask(t, "vote", "Pizza or tacos?", ["Pizza", "Tacos"]);
     await a.mutation(api.checkin.quiz.answer, { poll: vote, choice: 0 });
-    await t.mutation(api.checkin.quiz.end, { key: PROF_KEY, poll: vote });
+    await admin(t).mutation(api.checkin.quiz.end, { poll: vote });
 
     expect(await a.query(api.live.past.past, { channel: CH })).toMatchObject([
       { id: vote, kind: "vote", question: "Pizza or tacos?", choices: ["Pizza", "Tacos"], correct: null, counts: [1, 0], mine: 0, at: T0 + 60_000 },
@@ -50,7 +50,7 @@ describe("F23 past questions on the phone", () => {
     const first = await ask(t, "quiz", "What is 2 + 2?", ["3", "4"], 1);
     await a.mutation(api.checkin.quiz.answer, { poll: first, choice: 1 });
     expect(await a.query(api.live.past.past, { channel: CH })).toEqual([]);
-    await t.mutation(api.checkin.quiz.end, { key: PROF_KEY, poll: first });
+    await admin(t).mutation(api.checkin.quiz.end, { poll: first });
     vi.setSystemTime(T0 + 60_000);
     await ask(t, "quiz", "What is 3 + 3?", ["6", "7"], 0);
     expect((await a.query(api.live.past.past, { channel: CH })).map((p) => p.question)).toEqual(["What is 2 + 2?"]);

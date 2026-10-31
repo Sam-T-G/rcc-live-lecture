@@ -3,6 +3,7 @@ import { ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
+import { requireProf } from "./checkin/prof";
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -14,29 +15,11 @@ export async function requireUser(ctx: Ctx) {
   return me;
 }
 
-// Hosts (professors, officers) are the Google accounts in the HOST_EMAILS env var,
-// comma-separated: `npx convex env set HOST_EMAILS "a@x.com,b@y.com"`. Never in the repo.
-export function isHostEmail(email: string | undefined) {
-  if (!email) return false;
-  const list = (process.env.HOST_EMAILS ?? "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  return list.includes(email.toLowerCase());
-}
-
-// A host is a Google account on HOST_EMAILS. Typed sign-in (src/blocks/devLogin.ts) lets
-// anyone claim any email, so it never counts as a host; hosts without Google use the
-// professor key (convex/checkin/prof.ts).
-export function isHostIdentity(me: { issuer: string; email?: string; emailVerified?: boolean } | null) {
-  return !!me && me.issuer === "https://accounts.google.com" && me.emailVerified !== false && isHostEmail(me.email);
-}
-
+// Hosts are professors and admins on the staff list: the same check as requireProf
+// (convex/checkin/prof.ts, which also says who holds a role). Returns the signed-in identity.
 export async function requireHost(ctx: Ctx) {
-  const me = await requireUser(ctx);
-  if (!isHostIdentity(me))
-    throw new ConvexError("Only hosts can do that.");
-  return me;
+  await requireProf(ctx);
+  return await requireUser(ctx);
 }
 
 // Random string from an alphabet. Works in queries, mutations, and actions.

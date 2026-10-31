@@ -51,8 +51,8 @@ const rosterShape = v.object({
 export const teams = query({
   args: { key: v.optional(v.string()), channel: v.string() },
   returns: v.array(v.object({ team: teamValidator, students: v.number(), today: v.number(), total: v.number() })),
-  handler: async (ctx, { key, channel }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel }) => {
+    await requireProf(ctx);
     const roster = await buildRoster(ctx, channel);
     return TEAMS.map((team) => {
       const mine = roster.filter((r) => r.team === team);
@@ -65,8 +65,8 @@ export const teams = query({
 export const students = query({
   args: { key: v.optional(v.string()), channel: v.string(), limit: v.optional(v.number()) },
   returns: v.array(rosterShape),
-  handler: async (ctx, { key, channel, limit = 200 }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel, limit = 200 }) => {
+    await requireProf(ctx);
     const roster = await buildRoster(ctx, channel);
     return roster.sort((a, b) => b.total - a.total || b.right - a.right || a.name.localeCompare(b.name)).slice(0, Math.max(1, Math.min(limit, 500)));
   },
@@ -76,8 +76,8 @@ export const students = query({
 export const missing = query({
   args: { key: v.optional(v.string()), channel: v.string() },
   returns: v.array(v.object({ name: v.string(), team: teamValidator, choice: v.string() })),
-  handler: async (ctx, { key, channel }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel }) => {
+    await requireProf(ctx);
     const question = await ctx.db.query("quizQuestions").withIndex("by_channel", (q) => q.eq("channel", channel)).order("desc").first();
     if (!question) return [];
     const salt = await saltFor(ctx, channel);

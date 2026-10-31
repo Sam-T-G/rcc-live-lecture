@@ -2,7 +2,7 @@
 // banner's feed with each student's opt-out. Late minutes are read through sheet and lateFeed.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../_generated/api";
-import { at, checkIn, google, googleHost, HOST_EMAIL, PROF_KEY, profEnv, setup, typed, TYPED_ISSUER, WRONG_KEY } from "../test.helpers";
+import { ADMIN_EMAIL, admin, at, checkIn, google, profEnv, professor, setup, typed, TYPED_ISSUER } from "../test.helpers";
 
 const CH = "gdg";
 const T0 = at(2026, 11, 5, 21, 30); // class starts
@@ -19,8 +19,8 @@ afterEach(() => {
 });
 
 const setStart = (t: ReturnType<typeof setup>, graceMin: number) =>
-  t.mutation(api.checkin.attendance.setClassStart, { key: PROF_KEY, channel: CH, startsAt: T0, graceMin });
-const sheet = (t: ReturnType<typeof setup>) => t.query(api.checkin.attendance.sheet, { key: PROF_KEY, channel: CH });
+  admin(t).mutation(api.checkin.attendance.setClassStart, { channel: CH, startsAt: T0, graceMin });
+const sheet = (t: ReturnType<typeof setup>) => admin(t).query(api.checkin.attendance.sheet, { channel: CH });
 
 describe("F14 attendance for the professor", () => {
   it("F14.1 one checkins row per student with name, email and time", async () => {
@@ -36,15 +36,16 @@ describe("F14 attendance for the professor", () => {
     ]);
   });
 
-  it("F14.4 sheet is host-only", async () => {
+  it("F14.4 sheet is for professors and admins only", async () => {
     const t = setup();
     await checkIn(t, student(t, 1));
     await expect(t.query(api.checkin.attendance.sheet, { channel: CH })).rejects.toThrow("Sign in first.");
-    await expect(student(t, 1).query(api.checkin.attendance.sheet, { channel: CH })).rejects.toThrow("Only hosts can do that.");
-    await expect(typed(t, "Sample professor", HOST_EMAIL).query(api.checkin.attendance.sheet, { channel: CH })).rejects.toThrow("Only hosts can do that.");
-    await expect(google(t, "Sample student 2", "student2@example.edu").query(api.checkin.attendance.sheet, { channel: CH })).rejects.toThrow("Only hosts can do that.");
-    await expect(t.query(api.checkin.attendance.sheet, { key: WRONG_KEY, channel: CH })).rejects.toThrow("That professor key is wrong.");
-    expect(await googleHost(t).query(api.checkin.attendance.sheet, { channel: CH })).toHaveLength(1);
+    await expect(student(t, 1).query(api.checkin.attendance.sheet, { channel: CH })).rejects.toThrow("Only professors can do that.");
+    await expect(typed(t, "Sample admin", ADMIN_EMAIL).query(api.checkin.attendance.sheet, { channel: CH })).rejects.toThrow("Only professors can do that.");
+    await expect(google(t, "Sample student 2", "student2@example.edu").query(api.checkin.attendance.sheet, { channel: CH })).rejects.toThrow(
+      "Only professors can do that.",
+    );
+    expect(await (await professor(t)).query(api.checkin.attendance.sheet, { channel: CH })).toHaveLength(1);
     expect(await sheet(t)).toHaveLength(1);
   });
 });

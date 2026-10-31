@@ -1,34 +1,31 @@
 // Check-in by QR pass: each student's phone shows a QR with their pass code, and the
-// teacher's laptop scans it. The code changes every 20 seconds (refresh), so a screenshot
-// only works for about 40 seconds. Writes `passes` and `checkins`.
+// teacher's laptop or the paired door iPad scans it. The code changes every 20 seconds
+// (refresh), so a screenshot only works for about 40 seconds. Writes `passes` and `checkins`.
 import { mutation, query } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
-import { isHostIdentity, randomCode, requireUser } from "../lib";
-import { keyOk, kioskKeyOk, requireScanner } from "./prof";
+import { randomCode, requireUser } from "../lib";
+import { isProf, pairedDevice, requireScanner, staffRole } from "./prof";
 import { ensureGroup } from "../live/groups";
 
 const EVERY = 20_000; // ms between codes
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no look-alikes, so a teacher can type one
 
-// Whether the signed-in person can open the teacher page.
+// Whether the signed-in person can open the professor pages: a professor or admin on the staff
+// list (checkin/prof.ts). `key` is ignored; the professor pages still send it.
 export const amHost = query({
   args: { key: v.optional(v.string()) },
   returns: v.boolean(),
-  handler: async (ctx, { key }) => {
-    if (keyOk(key)) return true;
-    const me = await ctx.auth.getUserIdentity();
-    return isHostIdentity(me);
-  },
+  handler: async (ctx) => isProf(await staffRole(ctx)),
 });
 
-// Whether this device can scan passes at the door: the kiosk key, the professor key, or a Google host.
+// Whether this device can scan passes at the door: a paired door iPad (its device token), or
+// anyone signed in with a role (scanner, professor, admin). `key` is ignored.
 export const canScan = query({
-  args: { key: v.optional(v.string()) },
+  args: { key: v.optional(v.string()), device: v.optional(v.string()) },
   returns: v.boolean(),
-  handler: async (ctx, { key }) => {
-    if (kioskKeyOk(key) || keyOk(key)) return true;
-    const me = await ctx.auth.getUserIdentity();
-    return isHostIdentity(me);
+  handler: async (ctx, { device }) => {
+    if (await pairedDevice(ctx, device)) return true;
+    return (await staffRole(ctx)) !== null;
   },
 });
 
@@ -63,12 +60,15 @@ export const refresh = mutation({
   },
 });
 
-// The teacher or the door kiosk scans (or types) a pass code. Checks the student in on this channel once.
+// The teacher or the door iPad scans (or types) a pass code. Checks the student in on this
+// channel once. A paired iPad passes its device token as `device`; `key` is ignored.
 export const scan = mutation({
-  args: { key: v.optional(v.string()), channel: v.string(), code: v.string() },
+  args: { key: v.optional(v.string()), device: v.optional(v.string()), channel: v.string(), code: v.string() },
   returns: v.object({ name: v.string(), email: v.string(), already: v.boolean() }),
-  handler: async (ctx, { key, channel, code }) => {
-    await requireScanner(ctx, key);
+  handler: async (ctx, { device, channel, code }) => {
+    const iPad = await requireScanner(ctx, device);
+    // Last used on #/admin: the iPad's last scan (a scan that throws below rolls this back too).
+    if (iPad) await ctx.db.patch("devices", iPad._id, { lastUsedAt: Date.now() });
     const c = code.trim().toUpperCase().replace(/^RCC-/, "");
     if (!c) throw new ConvexError("No code.");
     const now = Date.now();

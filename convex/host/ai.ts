@@ -13,8 +13,8 @@ const draftShape = v.object({ text: v.string(), choices: v.array(v.string()), co
 export const draftQuestion = action({
   args: { key: v.optional(v.string()), channel: v.string() },
   returns: draftShape,
-  handler: async (ctx, { key, channel }): Promise<Draft> => {
-    await ctx.runQuery(api.host.questions.forHost, { key, channel }); // throws unless the caller is a host
+  handler: async (ctx, { channel }): Promise<Draft> => {
+    await ctx.runQuery(api.host.questions.forHost, { channel }); // throws unless the caller is a host
     const slide = await ctx.runQuery(api.deck.current, { channel });
     if (!slide) throw new ConvexError("The deck hasn't sent a slide yet.");
     const reply = await gemini({
@@ -43,8 +43,8 @@ export const draftQuestion = action({
 export const feedback = action({
   args: { key: v.optional(v.string()), channel: v.string() },
   returns: v.string(),
-  handler: async (ctx, { key, channel }): Promise<string> => {
-    const q = await ctx.runQuery(api.host.questions.forHost, { key, channel }); // host only
+  handler: async (ctx, { channel }): Promise<string> => {
+    const q = await ctx.runQuery(api.host.questions.forHost, { channel }); // host only
     if (!q) throw new ConvexError("Ask the room a question first.");
     if (q.answered === 0) throw new ConvexError("No answers yet.");
     const lines = q.choices.map((c, i) => `${String.fromCharCode(65 + i)}. ${c}${i === q.correct ? " (right)" : ""}: ${q.picks[i]} picked`);
@@ -65,8 +65,8 @@ export const feedback = action({
 export const organize = action({
   args: { key: v.optional(v.string()), channel: v.string() },
   returns: v.number(),
-  handler: async (ctx, { key, channel }): Promise<number> => {
-    const all = await ctx.runQuery(api.host.qa.list, { key, channel }); // host only
+  handler: async (ctx, { channel }): Promise<number> => {
+    const all = await ctx.runQuery(api.host.qa.list, { channel }); // host only
     const rows = all.filter((r) => r.status !== "dismissed");
     if (rows.length === 0) throw new ConvexError("No questions to organize yet.");
     const reply = await gemini({

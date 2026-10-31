@@ -1,7 +1,7 @@
 // checkin/quiz: the live quiz and vote. The professor asks and ends; checked-in students answer.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../_generated/api";
-import { at, checkIn, PROF_KEY, profEnv, setup, typed } from "../test.helpers";
+import { admin, at, checkIn, profEnv, setup, typed } from "../test.helpers";
 
 const CH = "gdg";
 const T0 = at(2026, 11, 5, 21, 40);
@@ -17,8 +17,8 @@ afterEach(() => {
 });
 
 const ask = (t: ReturnType<typeof setup>, kind: "quiz" | "vote", question: string, choices: string[], correct?: number) =>
-  t.mutation(api.checkin.quiz.ask, { key: PROF_KEY, channel: CH, kind, question, choices, correct });
-const end = (t: ReturnType<typeof setup>, poll: Awaited<ReturnType<typeof ask>>) => t.mutation(api.checkin.quiz.end, { key: PROF_KEY, poll });
+  admin(t).mutation(api.checkin.quiz.ask, { channel: CH, kind, question, choices, correct });
+const end = (t: ReturnType<typeof setup>, poll: Awaited<ReturnType<typeof ask>>) => admin(t).mutation(api.checkin.quiz.end, { poll });
 
 // n checked-in students.
 async function room(t: ReturnType<typeof setup>, n: number) {
@@ -70,10 +70,10 @@ describe("F17 the professor asks, ends and sees the numbers", () => {
     vi.setSystemTime(T0 + 10_000);
     await ss[1].mutation(api.checkin.quiz.answer, { poll, choice: 0 });
     // While open the professor sees how many answered out of how many checked in.
-    expect(await t.query(api.checkin.quiz.stats, { key: PROF_KEY, poll })).toMatchObject({ answered: 3, checkedIn: 4 });
+    expect(await admin(t).query(api.checkin.quiz.stats, { poll })).toMatchObject({ answered: 3, checkedIn: 4 });
     await end(t, poll);
     // 2 of 3 right is 67%; the answers took 2, 4 and 10 seconds, so the median is 4.
-    expect(await t.query(api.checkin.quiz.stats, { key: PROF_KEY, poll })).toMatchObject({
+    expect(await admin(t).query(api.checkin.quiz.stats, { poll })).toMatchObject({
       counts: [1, 2, 0],
       answered: 3,
       checkedIn: 4,
@@ -93,7 +93,7 @@ describe("F17 the professor asks, ends and sees the numbers", () => {
     await ss[0].mutation(api.checkin.quiz.answer, { poll: quiz, choice: 1 });
     await ss[1].mutation(api.checkin.quiz.answer, { poll: quiz, choice: 1 });
     await end(t, quiz);
-    const history = await t.query(api.checkin.quiz.history, { key: PROF_KEY, channel: CH });
+    const history = await admin(t).query(api.checkin.quiz.history, { channel: CH });
     expect(history.map((h) => [h.id, h.kind, h.question, h.answered, h.rightPct])).toEqual([
       [quiz, "quiz", "What is 2 + 2?", 2, 100],
       [vote, "vote", "Pizza or tacos?", 1, null],

@@ -50,8 +50,8 @@ export async function reshuffleRoom(ctx: MutationCtx, channel: string, newDay: b
 export const reshuffle = mutation({
   args: { key: v.optional(v.string()), channel: v.string() },
   returns: v.null(),
-  handler: async (ctx, { key, channel }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel }) => {
+    await requireProf(ctx);
     if (!channel) throw new ConvexError("Pick a lecture first.");
     await reshuffleRoom(ctx, channel, false);
     return null;

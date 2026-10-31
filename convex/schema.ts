@@ -1,6 +1,11 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+// A staff member's role (convex/checkin/prof.ts says what each one may do).
+export const roleValidator = v.union(v.literal("admin"), v.literal("professor"), v.literal("scanner"));
+// What a staffEvents row records: someone added, a role changed, someone removed, an iPad paired or unpaired.
+export const staffActionValidator = v.union(v.literal("add"), v.literal("role"), v.literal("remove"), v.literal("pair"), v.literal("unpair"));
+
 // Every table: the plumbing blocks first, then one commented block per team. Prod has rows in
 // these tables, so a change only adds tables, indexes or optional fields: a new required field,
 // or a renamed or removed one, fails the deploy.
@@ -37,6 +42,49 @@ export default defineSchema({
     user: v.string(),
     at: v.number(),
   }),
+
+  // Block: access (convex/staff.ts, convex/checkin/prof.ts). Who may use the professor pages and
+  // the door scanner, by email: one row per email with a role. Admins in the ADMIN_EMAILS env var
+  // count as admins with or without a row here, and #/admin can't change or remove them.
+  staff: defineTable({
+    email: v.string(), // trimmed and lower case
+    role: roleValidator,
+    addedBy: v.string(), // the admin's email, "HOST_EMAILS import" or "devGrant"
+    at: v.number(),
+  }).index("by_email", ["email"]),
+
+  // Block: access. Every change to the staff list and the door iPads: who made it, and what changed.
+  staffEvents: defineTable({
+    by: v.string(), // the email of who made the change, "HOST_EMAILS import" or "devGrant"
+    action: staffActionValidator,
+    email: v.optional(v.string()), // add, role, remove: whose role changed
+    role: v.optional(roleValidator), // add, role: the role they have now
+    oldRole: v.optional(roleValidator), // role, remove: the role they had
+    device: v.optional(v.id("devices")), // pair, unpair (an unpaired iPad's row is gone)
+    label: v.optional(v.string()), // pair, unpair: the iPad's name
+    at: v.number(),
+  }),
+
+  // Block: access. A paired door iPad. It scans passes by sending its device token; only the
+  // token's SHA-256 is stored. Unpairing deletes the row, so the token stops working.
+  devices: defineTable({
+    tokenHash: v.string(), // SHA-256 of the device token, as hex
+    label: v.string(), // the name a professor gave it, like "A-210 door"
+    pairedBy: v.string(), // the email of the professor or admin who approved it
+    pairedAt: v.number(),
+    lastUsedAt: v.optional(v.number()), // the last scan it made
+  }).index("by_tokenHash", ["tokenHash"]),
+
+  // Block: access. A door iPad waiting to pair: the 6-digit code its screen shows, for 10
+  // minutes. Approving the code (or the code expiring) deletes the row.
+  pairings: defineTable({
+    code: v.string(), // 6 digits, unique among the codes still open
+    tokenHash: v.string(), // SHA-256 of the iPad's device token, as hex
+    expiresAt: v.number(),
+  })
+    .index("by_code", ["code"])
+    .index("by_tokenHash", ["tokenHash"])
+    .index("by_expiresAt", ["expiresAt"]),
 
   // Team tables. Every class runs on one deck channel ("gdg"). A row belongs to the class whose
   // window holds its _creationTime (the `lectures` table below and lib.lectureWindow), so reads

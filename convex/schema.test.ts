@@ -56,7 +56,7 @@ describe("old rows keep working", () => {
     expect(byChannel).toEqual({ questions: ["Why does the loop stop?"], lost: [2] });
   });
 
-  it("every index that existed before the class model is unchanged, and the only new ones are by_channel on lectures, groupPoints, groupResults, questions and lost", () => {
+  it("every index that existed before the class model is unchanged, and the only new ones are by_channel on lectures, groupPoints, groupResults, questions and lost, plus the access tables' (ROLES)", () => {
     const before: Record<string, Record<string, string[]>> = {
       deckChannels: { by_channel: ["channel"] },
       deckSlides: { by_channel_and_index: ["channel", "index"] },
@@ -84,6 +84,11 @@ describe("old rows keep working", () => {
       groupResults: { by_channel: ["channel"] },
       questions: { by_channel: ["channel"] },
       lost: { by_channel: ["channel"] },
+      // ROLES: new tables for the staff list and the door iPads.
+      staff: { by_email: ["email"] },
+      staffEvents: {},
+      devices: { by_tokenHash: ["tokenHash"] },
+      pairings: { by_code: ["code"], by_tokenHash: ["tokenHash"], by_expiresAt: ["expiresAt"] },
     };
     const expected = Object.fromEntries(
       [...new Set([...Object.keys(before), ...Object.keys(added)])].map((table) => [table, { ...before[table], ...added[table] }]),

@@ -60,8 +60,8 @@ export const mine = query({
 export const ask = mutation({
   args: { key: v.optional(v.string()), channel: v.string(), kind, question: v.string(), choices: v.array(v.string()), correct: v.optional(v.number()) },
   returns: v.id("polls"),
-  handler: async (ctx, { key, channel, kind, question, choices, correct }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel, kind, question, choices, correct }) => {
+    await requireProf(ctx);
     const q = question.trim();
     const cs = choices.map((c) => c.trim()).filter(Boolean);
     if (!q) throw new ConvexError("Type a question.");
@@ -79,8 +79,8 @@ export const ask = mutation({
 export const end = mutation({
   args: { key: v.optional(v.string()), poll: v.id("polls") },
   returns: v.null(),
-  handler: async (ctx, { key, poll }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { poll }) => {
+    await requireProf(ctx);
     const p = await ctx.db.get(poll);
     if (p?.open) await ctx.db.patch(poll, { open: false, closedAt: Date.now() });
     return null;
@@ -125,8 +125,8 @@ export const stats = query({
       medianSec: v.union(v.null(), v.number()),
     }),
   ),
-  handler: async (ctx, { key, poll }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { poll }) => {
+    await requireProf(ctx);
     const p = await ctx.db.get(poll);
     if (!p) return null;
     const { rows, counts } = await tally(ctx, poll, p.choices.length);
@@ -148,8 +148,8 @@ export const stats = query({
 export const history = query({
   args: { key: v.optional(v.string()), channel: v.string() },
   returns: v.array(v.object({ id: v.id("polls"), kind, question: v.string(), answered: v.number(), rightPct: v.union(v.null(), v.number()) })),
-  handler: async (ctx, { key, channel }) => {
-    await requireProf(ctx, key);
+  handler: async (ctx, { channel }) => {
+    await requireProf(ctx);
     const polls = await ctx.db.query("polls").withIndex("by_channel", (q) => q.eq("channel", channel)).order("desc").take(50);
     const out = [];
     for (const p of polls) {
