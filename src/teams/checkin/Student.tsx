@@ -1,4 +1,4 @@
-// #/checkin/student (also #/checkin/join): the student signs in by typing a name and email, and
+// #/checkin/student (also #/checkin/join): the student signs in (Google, or a typed name and email), and
 // the phone shows their QR pass until the professor or the door kiosk scans it.
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -17,7 +17,7 @@ export function Student() {
   if (!user)
     return (
       <Screen title="Your check-in pass">
-        <p>Type your name and email to get your pass.</p>
+        <p>Sign in to get your pass.</p>
         <SignInButton />
       </Screen>
     );

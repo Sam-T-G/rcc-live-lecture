@@ -28,6 +28,16 @@ function decode(token: string): Stored | null {
   }
 }
 
+// Whether Google issued this token (the typed sign-in has its own issuer, src/blocks/devLogin.ts).
+function isGoogle(token: string) {
+  try {
+    const iss = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).iss;
+    return iss === "https://accounts.google.com" || iss === "accounts.google.com";
+  } catch {
+    return false;
+  }
+}
+
 function load(): Stored | null {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || "null") as Stored | null;
@@ -97,12 +107,21 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
       });
   }, []);
 
-  // ID tokens last an hour. When one runs out, drop it so the page asks again.
+  // Google ID tokens last an hour, and a class runs longer. 5 minutes before one runs out, ask
+  // Google for a new one: prompt() with auto_select signs the same account back in with no click,
+  // and the callback above saves it in the old one's place. Convex reads the saved token on its
+  // next refresh (useConvexAuth), so nobody is signed out and no page unmounts. If nothing comes,
+  // ask once more 2 minutes before, then drop the token a minute before it runs out so the page
+  // asks again. A typed sign-in never asks Google: that would swap the student for a Google
+  // identity, which the server counts as a different person.
   useEffect(() => {
     if (!user) return;
-    const t = setTimeout(() => { localStorage.removeItem(KEY); setUser(null); }, Math.max(0, user.exp - 60_000 - Date.now()));
-    return () => clearTimeout(t);
-  }, [user]);
+    const left = user.exp - Date.now();
+    const asks = ready && !failed && isGoogle(user.token) ? [left - 5 * 60_000, left - 2 * 60_000] : [];
+    const timers = asks.map((ms) => setTimeout(() => window.google?.accounts.id.prompt(), Math.max(0, ms)));
+    timers.push(setTimeout(() => { localStorage.removeItem(KEY); setUser(null); }, Math.max(0, left - 60_000)));
+    return () => timers.forEach(clearTimeout);
+  }, [user, ready, failed]);
 
   const signOut = useCallback(() => {
     localStorage.removeItem(KEY);

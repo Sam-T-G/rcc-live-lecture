@@ -61,7 +61,9 @@ export const refresh = mutation({
 });
 
 // The teacher or the door iPad scans (or types) a pass code. Checks the student in on this
-// channel once. A paired iPad passes its device token as `device`.
+// channel once. A paired iPad passes its device token as `device`. The reply has the student's
+// email only for a professor or admin (the teacher scanner shows it); a paired iPad and the
+// scanner role get "" there, since students' emails are otherwise professor-only.
 export const scan = mutation({
   args: { device: v.optional(v.string()), channel: v.string(), code: v.string() },
   returns: v.object({ name: v.string(), email: v.string(), already: v.boolean() }),
@@ -91,6 +93,7 @@ export const scan = mutation({
       await ctx.db.insert("checkins", { channel, user: p.user, name: p.name, email: p.email, at: now, lateMin });
     }
     await ensureGroup(ctx, channel, p.user); // Live slides: deals a team in arrival order (Red, Blue, Yellow, ...)
-    return { name: p.name, email: p.email, already: !!row };
+    const email = isProf(await staffRole(ctx)) ? p.email : "";
+    return { name: p.name, email, already: !!row };
   },
 });

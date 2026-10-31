@@ -18,7 +18,9 @@ const MODULE_SOURCES = import.meta.glob<string>("./**/!(*.*.*)*.ts", { query: "?
 // host-only functions are still deployed, so each one still needs its authMatrix test.
 const SKIP_MODULES = ["host/"];
 // The staff checks: a function whose handler calls one of these, or calls a function in its own
-// file that does, is host-only (requireHost in convex/lib.ts is requireProf by another name).
+// file that does, is host-only (requireHost in convex/lib.ts is requireProf by another name). So is
+// one that runs a host-only function through ctx.runQuery, runMutation or runAction, in any module
+// (host/ai.ts gates its Gemini calls that way): the caller's sign-in goes along to that function.
 const GUARDS = ["requireProf", "requireAdmin", "requireScanner", "requireHost"];
 // Functions that answer whether the caller may do something, instead of refusing. Their tests
 // throw when the answer is no, so authMatrix checks them like any host-only function.
@@ -35,25 +37,40 @@ type Registered = { isQuery?: boolean; isMutation?: boolean; isAction?: boolean;
 // function takes a key arg" test below), whether it calls a staff check, and whether its module
 // is in SKIP_MODULES.
 async function convexFunctions(): Promise<Fn[]> {
-  const out: Fn[] = [];
+  type Found = Omit<Fn, "guarded"> & { file: string; name: string };
+  const found: Found[] = [];
   for (const [file, load] of Object.entries(modules)) {
     const mod = file.replace(/^\.\//, "").replace(/\.[cm]?[jt]s$/, "");
     if (mod.startsWith("_generated/")) continue;
     const skipped = SKIP_MODULES.some((s) => mod.startsWith(s));
-    const guarded = guardedNames(MODULE_SOURCES[file] ?? "");
     for (const [name, value] of Object.entries((await load()) as Record<string, unknown>)) {
       const f = value as Registered;
       if (typeof value !== "function" || !(f.isQuery || f.isMutation || f.isAction)) continue;
       const args = JSON.parse(f.exportArgs?.() ?? "{}") as { type?: string; value?: Record<string, unknown> };
-      out.push({
+      found.push({
+        file,
+        name,
         ref: `${f.isInternal ? "internal" : "api"}.${mod.split("/").join(".")}.${name}`,
         hasKey: args.type === "object" && !!args.value && "key" in args.value,
-        guarded: guarded.has(name),
         skipped,
       });
     }
   }
-  return out.sort((a, b) => a.ref.localeCompare(b.ref));
+  // Host-only refs, until no module adds one: a function that runs a host-only function in
+  // another module can make a third module's function host-only in the next round.
+  const refs = new Set<string>();
+  for (let grew = true; grew; ) {
+    grew = false;
+    const byFile = new Map(Object.keys(MODULE_SOURCES).map((file) => [file, guardedNames(MODULE_SOURCES[file], refs)]));
+    for (const f of found) {
+      if (refs.has(f.ref) || !byFile.get(f.file)?.has(f.name)) continue;
+      refs.add(f.ref);
+      grew = true;
+    }
+  }
+  return found
+    .map((f) => ({ ref: f.ref, hasKey: f.hasKey, skipped: f.skipped, guarded: refs.has(f.ref) }))
+    .sort((a, b) => a.ref.localeCompare(b.ref));
 }
 
 // Every route on the HTTP router, as [path, method].
@@ -176,15 +193,24 @@ const callsName = (code: string, name: string) => {
   return new RegExp(`(?<![\\w$])${n}\\s*\\(`).test(code) || new RegExp(`(?<![\\w$])handler\\s*:\\s*${n}(?![\\w$])`).test(code);
 };
 
-// The names of a module's top-level declarations that call a staff check, directly or through
-// other declarations in the same module. Comments, strings and regexes don't count.
-function guardedNames(src: string): Set<string> {
+// Whether `code` runs one of `refs` through ctx.runQuery, runMutation or runAction (any receiver,
+// the ref as the first argument).
+const runsRef = (code: string, refs: ReadonlySet<string>) =>
+  [...code.matchAll(/(?<![\w$])run(?:Query|Mutation|Action)\s*\(\s*((?:api|internal)(?:\s*\.\s*[\w$]+)+)/g)].some((m) =>
+    refs.has(m[1].replace(/\s+/g, "")),
+  );
+
+// The names of a module's top-level declarations that call a staff check, or run one of `refs`
+// (host-only functions in any module), directly or through other declarations in the same
+// module. Comments, strings and regexes don't count.
+function guardedNames(src: string, refs: ReadonlySet<string> = new Set()): Set<string> {
   const decls = declarations(codeOnly(src));
   const out = new Set<string>();
   for (let grew = true; grew; ) {
     grew = false;
     for (const d of decls) {
-      if (out.has(d.name) || ![...GUARDS, ...out].some((g) => callsName(d.text, g))) continue;
+      if (out.has(d.name)) continue;
+      if (![...GUARDS, ...out].some((g) => callsName(d.text, g)) && !runsRef(d.text, refs)) continue;
       out.add(d.name);
       grew = true;
     }
@@ -290,7 +316,7 @@ describe("F39 every Convex function is tested", async () => {
     expect(untested).toEqual([]);
   });
 
-  it("F39.3 every host-only public function (it calls requireProf, requireAdmin, requireScanner or requireHost, or a function in its own file that does), every function with a key arg, and amHost and canScan, is the one function an awaited authMatrix(HOST_ONLY, ADMIN_ONLY or SCANNER, ...) call checks", () => {
+  it("F39.3 every host-only public function (it calls requireProf, requireAdmin, requireScanner or requireHost, or a function in its own file that does, or runs a host-only function through ctx.runQuery, runMutation or runAction), every function with a key arg, and amHost and canScan, is the one function an awaited authMatrix(HOST_ONLY, ADMIN_ONLY or SCANNER, ...) call checks", () => {
     const checked = new Set(matrices.map(matrixCheck));
     const hostOnly = fns.filter((f) => f.ref.startsWith("api.") && (f.guarded || f.hasKey || ANSWERS.includes(f.ref)));
     expect(hostOnly.filter((f) => !checked.has(f.ref)).map((f) => f.ref)).toEqual([]);
@@ -342,6 +368,24 @@ describe("F39 every Convex function is tested", async () => {
         `// requireProf(ctx)\nexport const e = query({ handler: async () => "requireProf(ctx)" });\nexport const f = query({ handler: async (ctx) => myrequireProf(ctx) });\nexport const g = query({ handler: async () => requireProf });`,
       ),
     ).toEqual([]);
+  });
+
+  it("ROLES-UI-convex-1 a function that gates itself by running a host-only function (ctx.runQuery, runMutation or runAction) is host-only too, across modules", () => {
+    const guarded = fns.filter((f) => f.guarded).map((f) => f.ref);
+    // host/ai.ts gates each Gemini call through ctx.runQuery(api.host.questions.forHost or api.host.qa.list).
+    expect(guarded).toEqual(expect.arrayContaining(["api.host.ai.draftQuestion", "api.host.ai.feedback", "api.host.ai.organize"]));
+    const scan = (src: string, refs: string[]) => [...guardedNames(src, new Set(refs))].sort();
+    const refs = ["api.host.qa.list", "internal.staff.check"];
+    expect(
+      scan(
+        `export const a = action({ handler: async (ctx) => { await ctx.runQuery(api.host.qa.list, { channel }); } });\n` +
+          `export const b = action({ handler: async (ctx) => ctx.runMutation(\n  internal.staff.check,\n  {},\n) });\n` +
+          `export const c = action({ handler: async (ctx) => { await ctx.runAction(api.host.qa.listAll, {}); } });\n` +
+          `export const d = action({ handler: async (ctx) => { await ctx.runQuery(api.deck.current, {}); } });\n` +
+          `export const e = action({ handler: async (ctx) => { /* ctx.runQuery(api.host.qa.list) */ return "ctx.runQuery(api.host.qa.list)"; } });`,
+        refs,
+      ),
+    ).toEqual(["a", "b"]);
   });
 
   it("F39.3 a function counts only when an awaited authMatrix(HOST_ONLY, ADMIN_ONLY or SCANNER, ...) calls it, and nothing else, as the row's caller", () => {

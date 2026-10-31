@@ -1,0 +1,18 @@
+// @vitest-environment node
+// Student (Student.tsx) signed out: the line above the sign-in matches it. SignInButton shows
+// Google's button first and the typed form under it, so the line can't say to type (ROLES-UI-risk-5).
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+import { Student } from "./Student";
+
+vi.mock("convex/react", () => ({ useQuery: () => undefined, useMutation: () => async () => null }));
+vi.mock("../../blocks/auth", () => ({ SignInButton: () => "[sign-in]", useGoogleUser: () => ({ user: null }) }));
+
+describe("Student signed out", () => {
+  it("ROLES-UI-risk-5 says to sign in, not to type a name and email, above the sign-in", () => {
+    const html = renderToStaticMarkup(createElement(Student));
+    expect(html).toContain("<p>Sign in to get your pass.</p>[sign-in]");
+    expect(html).not.toMatch(/type your name/i);
+  });
+});
