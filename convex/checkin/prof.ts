@@ -56,12 +56,24 @@ export function envAdmins(): string[] {
 }
 
 // The email a sign-in proves, or null: a Google sign-in with a verified email anywhere, and a
-// typed sign-in (also marked verified, by src/blocks/devLogin.ts) only on a dev backend.
-export function provenEmail(me: { issuer: string; email?: string; emailVerified?: boolean } | null): string | null {
-  if (!me || me.emailVerified !== true) return null;
+// typed sign-in only on a dev backend.
+//
+// Google: the identity must say the email is verified, as `emailVerified` (Convex's name for the
+// JWT claim) or as the raw `email_verified` claim, and only the boolean true counts. A Google
+// identity with neither claim holds no role.
+//
+// Typed: its verification claim is not checked. Convex's customJwt provider hands claims to the
+// function under their own JWT names, so a real typed token's identity has `email_verified` and
+// no `emailVerified` (on dev, staff.me said canHoldRole false for every typed sign-in when this
+// checked `emailVerified`). The claim proves nothing anyway: the signing key is public, so anyone
+// can mint a typed token with any claims. That's why a typed sign-in counts only on a dev backend.
+export function provenEmail(
+  me: { issuer: string; email?: string; emailVerified?: boolean; [claim: string]: unknown } | null,
+): string | null {
+  if (!me) return null;
   const email = normEmail(me.email);
   if (!email) return null;
-  if (me.issuer === GOOGLE_ISSUER) return email;
+  if (me.issuer === GOOGLE_ISSUER) return me.emailVerified === true || me.email_verified === true ? email : null;
   if (me.issuer === TYPED_ISSUER && isDevBackend()) return email;
   return null;
 }
