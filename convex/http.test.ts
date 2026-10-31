@@ -36,7 +36,13 @@ describe("F7 POST /deck", () => {
       expect([r.status, await r.text()]).toEqual([403, "wrong key"]);
     }
     expect((await post(t, "null")).status).toBe(403);
-    expect((await post(t, JSON.stringify({ key: BRIDGE, index: 1 }))).status).toBe(400);
+    // Valid slide numbers, so only the missing (or empty) channel can refuse it.
+    for (const body of [{ key: BRIDGE, index: 1, beat: 0, count: 1 }, { key: BRIDGE, channel: "", index: 1, beat: 0, count: 1 }]) {
+      const r = await post(t, JSON.stringify(body));
+      expect([r.status, await r.text()]).toEqual([400, "no channel"]);
+    }
+    expect(await t.query(api.deck.current, { channel: "" })).toBeNull();
+    expect(await t.run((ctx) => ctx.db.query("lectures").take(1))).toEqual([]); // a refused press opens no class
     expect(await t.query(api.deck.current, { channel: CH })).toBeNull();
 
     const ok = await post(t, JSON.stringify({ key: BRIDGE, channel: CH, index: 2, beat: 1, count: 10, title: "Teams", lines: ["Red", "Blue"] }));

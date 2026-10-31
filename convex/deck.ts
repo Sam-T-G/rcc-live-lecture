@@ -137,15 +137,29 @@ export const set = internalMutation({
 
     // For page-back, store the fullest version of each slide shown in this class: going back to a
     // slide shows it from its first press, which must not hide lines the room has already seen.
-    // A row from an earlier class is replaced whatever its presses, so this class's slide 3 never
-    // pages back to last week's. A late press counts here too, since the room saw that slide.
+    // The stored row stays only when this press is an earlier press of that same slide (fullerPress).
+    // A row from an earlier class, or a different slide at this number (another deck shown in the
+    // same class, or the slide edited since), is replaced whatever its presses, so page-back never
+    // shows a slide that isn't the one the room saw. A late press counts here too.
     const shown = await ctx.db
       .query("deckSlides")
       .withIndex("by_channel_and_index", (q) => q.eq("channel", a.channel).eq("index", a.index))
       .unique();
     const slide = { channel: a.channel, index: a.index, beat: a.beat, title: a.title, lines: a.lines, at };
     if (!shown) await ctx.db.insert("deckSlides", slide);
-    else if (shown.at < start || a.beat >= shown.beat) await ctx.db.replace("deckSlides", shown._id, slide);
+    else if (shown.at < start || !fullerPress(shown, a)) await ctx.db.replace("deckSlides", shown._id, slide);
     return null;
   },
 });
+
+// True when `stored` is a later press of the same slide as `press`: same heading, more presses,
+// and every line of `press` is in `stored`, in the same order. A press reveals lines and never
+// takes them away, so an earlier press of a slide shows some of the lines of a later one. Any other
+// slide at that number (another deck, or the slide edited) fails this. deckSlides keeps no `run`,
+// so a deck reopened in a new tab still counts as the same slide.
+function fullerPress(stored: { beat: number; title: string; lines: string[] }, press: { beat: number; title: string; lines: string[] }) {
+  if (press.beat >= stored.beat || press.title !== stored.title) return false;
+  let i = 0;
+  for (const line of stored.lines) if (i < press.lines.length && press.lines[i] === line) i++;
+  return i === press.lines.length;
+}
