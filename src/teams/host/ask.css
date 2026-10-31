@@ -1,0 +1,50 @@
+/* The Now tab's "Ask the room" (AskRoom.tsx) and "Who got it wrong" (Missing.tsx) cards. Colors,
+   space and type come from the tokens in src/styles/tokens.css; buttons, badges, fields, the
+   Quiz/Vote switch and the numbers are the kit's (src/blocks/kit.tsx). host.css styles the cards
+   around these (and its `.host-root h3` margin), so the heading rules here name their parent too. */
+
+/* The question in this class now */
+.ask-poll { display: flex; flex-direction: column; gap: var(--rcc-space-3); margin-bottom: var(--rcc-space-4); }
+.ask-poll > .ask-poll__q { margin: 0; overflow-wrap: anywhere; }
+
+/* One bar per choice: the letter, the choice and its count, with the bar under them. */
+.ask-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--rcc-space-3); }
+.ask-bar {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+  grid-template-areas: "letter text n" ". track track";
+  column-gap: var(--rcc-space-2);
+  row-gap: var(--rcc-space-1);
+  align-items: baseline;
+}
+.ask-bar__letter { grid-area: letter; }
+.ask-bar__text { grid-area: text; overflow-wrap: anywhere; }
+.ask-bar__n { grid-area: n; font-variant-numeric: tabular-nums lining-nums; font-weight: var(--rcc-weight-strong); }
+.ask-bar__track { grid-area: track; display: block; height: 0.625rem; border-radius: var(--rcc-radius-full); background: var(--fill); overflow: hidden; }
+.ask-bar__fill { display: block; height: 100%; border-radius: var(--rcc-radius-full); background: var(--muted); transition: width var(--rcc-dur-default-spatial) var(--rcc-ease-standard); }
+.ask-bar--right .ask-bar__fill { background: var(--accent); }
+.ask-bar--right .ask-bar__text { font-weight: var(--rcc-weight-strong); }
+.ask-bar__mark { color: var(--accent); }
+
+/* Answered of checked in, then % right and the median time once it has ended. */
+.ask-stats { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--rcc-space-3) var(--rcc-space-8); }
+
+/* The question being written */
+.ask-form { display: flex; flex-direction: column; gap: var(--rcc-space-3); }
+.ask-form > .field { margin-bottom: 0; }
+.ask-form__top > .seg-field { margin-bottom: 0; }
+.ask-form__rule { margin: 0; font-size: var(--fs-small); line-height: var(--lh-small); }
+
+/* Choices: the letter, the box and, on a quiz, the "Right answer" column. */
+.ask-choices { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) 7.5rem; column-gap: var(--rcc-space-3); row-gap: var(--rcc-space-2); align-items: center; }
+.ask-choices--vote { grid-template-columns: 1.75rem minmax(0, 1fr); }
+.ask-choices__head { font-size: var(--fs-label); line-height: var(--lh-label); font-weight: var(--rcc-weight-strong); color: var(--muted); }
+.ask-choices__head--right, .ask-choices__letter { text-align: center; }
+.ask-choices__right { justify-content: center; }
+
+/* Who got it wrong */
+.ask-missing__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--rcc-space-3); }
+.ask-missing__head > .ask-missing__q { margin: 0; overflow-wrap: anywhere; }
+.ask-missing__sum { margin: var(--rcc-space-1) 0 var(--rcc-space-3); font-size: var(--fs-small); line-height: var(--lh-small); }
+.ask-missing__ai { margin-top: var(--rcc-space-3); }
+.ask-note { white-space: pre-wrap; margin: var(--rcc-space-3) 0 0; padding: var(--rcc-space-3) var(--rcc-space-4); border-radius: var(--rcc-radius-md); background: var(--fill); color: var(--text); }

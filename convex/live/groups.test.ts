@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../_generated/api";
 import { admin, at, checkIn, profEnv, setup, TYPED_ISSUER, typed, type Caller, type T } from "../test.helpers";
+import { ensureLecture } from "../lib";
 import { teamsFor } from "./groups";
 
 const CH = "gdg";
@@ -119,6 +120,9 @@ describe("F24 teams and the leaderboard", () => {
 
   it("F24.2 the leaderboard counts right answers on ended quizzes only", async () => {
     const t = setup();
+    // Answers need a check-in in the open class (checkin.quiz.answer), so the class opens before
+    // the students arrive, as the first pass scan opens it once scan calls lib.ensureLecture.
+    await t.run((ctx) => ensureLecture(ctx, CH));
     const [red, blue] = await arrive(t, 3);
     const quiz = await admin(t).mutation(api.checkin.quiz.ask, { channel: CH, kind: "quiz", question: "What is 2 + 2?", choices: ["4", "5"], correct: 0 });
     await red.mutation(api.checkin.quiz.answer, { poll: quiz, choice: 0 });
