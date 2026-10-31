@@ -1,0 +1,62 @@
+/* #/checkin/stage (Stage.tsx): what the stage adds to the card's rules in checkin.css. The room
+   reads it from the back of A-210 on a 1920 x 1080 projector, so every size here is a stage size
+   (--stage-u and the --proj-* sizes in tokens.css). */
+
+/* An ended quiz: the right choice gets "✓ right answer" on its own line under its words and a
+   green edge, so it shows even when nobody picked it (its fill is 0 wide then). The edge takes 4
+   of the bar's padding, so its words line up with the other bars' words. */
+.stage__bars .stage__bar--right {
+  flex-wrap: wrap;
+  row-gap: 0;
+  padding: calc(4 * var(--stage-u)) calc(12 * var(--stage-u));
+  border: calc(4 * var(--stage-u)) solid var(--accent);
+}
+.stage__right { flex-basis: 100%; }
+
+/* No quiz or vote yet: one line under the hint. The QR keeps its full width. */
+.stage__none {
+  width: 100%;
+  margin: calc(16 * var(--stage-u)) 0 0;
+  padding-top: calc(16 * var(--stage-u));
+  border-top: max(1px, calc(2 * var(--stage-u))) solid var(--line);
+  color: var(--muted);
+  font-size: var(--proj-ledger);
+}
+
+/* The late banner (LateBanner.tsx, its colors in checkin.css) at the bottom left at projector
+   size, clear of the card: 24 + 440 + 24 stage px from the right edge. */
+.stage__late {
+  position: absolute;
+  left: calc(24 * var(--stage-u));
+  right: calc(488 * var(--stage-u));
+  bottom: calc(24 * var(--stage-u));
+  background: none;
+  pointer-events: none;
+}
+.stage__late .late {
+  position: static;
+  align-items: flex-start;
+  gap: calc(16 * var(--stage-u));
+}
+.stage__late .late__item {
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  padding: calc(16 * var(--stage-u)) calc(32 * var(--stage-u));
+  border-radius: calc(24 * var(--stage-u));
+  font-size: var(--proj-body);
+  line-height: 1.2;
+  text-align: left;
+}
+
+/* A part that didn't load (ErrorBoundary in ui.tsx): its error and its Try again button at
+   projector size. In the banner's spot they sit on a white box that takes clicks. */
+.stage .row > .status--error,
+.stage .row > button:where(:not(.btn)) { font-size: var(--proj-ledger); }
+.stage__late > .row {
+  width: fit-content;
+  padding: calc(16 * var(--stage-u)) calc(24 * var(--stage-u));
+  border-radius: calc(24 * var(--stage-u));
+  background: var(--surface);
+  pointer-events: auto;
+}

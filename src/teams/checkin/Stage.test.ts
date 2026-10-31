@@ -1,22 +1,90 @@
 // @vitest-environment node
-// #/checkin/stage, rendered to HTML with made-up query results (no backend).
-import { createElement } from "react";
+// #/checkin/stage, rendered to HTML with made-up query results (no backend), and the link helpers
+// in stageLink.ts. The late banner is a stand-in that prints its name and each ErrorBoundary prints
+// its label, so a test can see where they sit. useHashParams is the real one unless a test hands
+// the stage its own parameters.
+import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Stage from "./Stage";
+import { deckAddress, takeBridge } from "./stageLink";
 
 const results: Record<string, unknown> = {};
 vi.mock("convex/react", () => ({
   useQuery: (ref: FunctionReference<"query">) => results[getFunctionName(ref)],
 }));
+vi.mock("./LateBanner", () => ({ default: () => "[late banner]" }));
+vi.mock("../../blocks/ui", async (importOriginal) => {
+  const { createElement: h } = await import("react");
+  return {
+    ...(await importOriginal<typeof import("../../blocks/ui")>()),
+    ErrorBoundary: ({ label, children }: { label?: string; children?: ReactNode }) => h("div", { "data-boundary": label }, children),
+  };
+});
+const given = vi.hoisted(() => ({ params: null as URLSearchParams | null }));
+vi.mock("../../blocks/router", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../blocks/router")>();
+  return {
+    ...real,
+    useHashParams: () => {
+      const read = real.useHashParams();
+      return given.params ?? read;
+    },
+  };
+});
 
 const OPEN = { question: "Which route shows the board?", choices: ["A", "B"], open: true, answered: 1 };
+const DECK = "https://deck.example.com/d/";
+
+function at(hash: string, pathname = "/") {
+  vi.stubGlobal("location", { hash, href: "http://x" + pathname + hash, origin: "http://x", pathname, search: "" });
+}
+
+function open(hash: string) {
+  at(hash);
+  return renderToStaticMarkup(createElement(Stage));
+}
+
+const decode = (s: string) =>
+  s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, "&");
+
+// The iframe's address, or null when the page shows no deck.
+function frame(html: string) {
+  const m = /<iframe[^>]* src="([^"]*)"/.exec(html);
+  return m ? new URL(decode(m[1])) : null;
+}
+
+// What the page says, without its tags.
+const words = (html: string) => decode(html.replace(/<[^>]+>/g, ""));
+
+// A sessionStorage stand-in. `refuse` makes setItem throw, as a browser with storage blocked does.
+function stubStorage(refuse = false) {
+  const m = new Map<string, string>();
+  return {
+    getItem: (k: string) => m.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      if (refuse) throw new Error("QuotaExceededError");
+      m.set(k, v);
+    },
+    values: () => [...m.values()],
+  };
+}
+
+// A history stand-in whose replaceState moves the stubbed location, as the browser's does.
+function stubHistory() {
+  const replaceState = vi.fn((_state: unknown, _title: string, url: string) => {
+    location.hash = url.slice(url.indexOf("#"));
+  });
+  vi.stubGlobal("history", { state: { from: "app" }, replaceState });
+  return replaceState;
+}
 
 beforeEach(() => {
   for (const k of Object.keys(results)) delete results[k];
   Object.assign(results, { "checkin/read:count": 12, "checkin/quiz:current": OPEN });
-  vi.stubGlobal("location", { hash: "#/checkin/stage", href: "http://x/#/checkin/stage", origin: "http://x", pathname: "/" });
+  given.params = null;
+  at("#/checkin/stage");
 });
 
 describe("#/checkin/stage", () => {
@@ -35,5 +103,183 @@ describe("#/checkin/stage", () => {
     };
     const html = renderToStaticMarkup(createElement(Stage));
     expect(html.match(/<span class="stage__label">[A-D] [^<]+<\/span><b>\d+<\/b>/g)).toHaveLength(4);
+  });
+
+  it("F38.1 a deck address typed without https:// loads with https:// added (rt-17)", () => {
+    expect(frame(open("#/checkin/stage?deck=slides.example.com/deck"))?.href).toBe("https://slides.example.com/deck");
+    expect(frame(open("#/checkin/stage?deck=" + encodeURIComponent(DECK)))?.href).toBe(DECK);
+    expect(frame(open("#/checkin/stage?deck=http://localhost:8000/deck.html"))?.href).toBe("http://localhost:8000/deck.html");
+  });
+
+  it("F38.1 a deck link that can't load says 'That deck link didn't work.' instead of a blank page (rt-17, checkin-frontend-20)", () => {
+    for (const bad of [":::", "decks/week9/", "javascript:alert(1)", "ftp://files.example.com/deck"]) {
+      const html = open("#/checkin/stage?deck=" + encodeURIComponent(bad));
+      expect(frame(html), bad).toBeNull();
+      expect(words(html), bad).toContain("That deck link didn't work.");
+      expect(words(html), bad).toContain("Put your deck's address after ?deck= in this page's link.");
+      expect(html, bad).toContain('<aside class="stage__card"');
+    }
+  });
+
+  it("F38.1 with no ?deck= the stage says to add one and opens no deck, the 10-29 one included (rt-21)", () => {
+    for (const hash of ["#/checkin/stage", "#/checkin/stage?deck=", "#/checkin/stage?bridge=gdg.k1"]) {
+      const html = open(hash);
+      expect(frame(html), hash).toBeNull();
+      expect(html, hash).not.toContain("build-with-ai");
+      expect(words(html), hash).toContain("Add ?deck=<your deck's address> to this page's link.");
+      expect(html, hash).toContain('<aside class="stage__card"');
+    }
+  });
+
+  it("F38.1 ?bridge= and ?bridge-site= both go to the deck, so a deck sending to the dev backend feeds dev phones", () => {
+    const src = frame(open(`#/checkin/stage?bridge=gdg.k1&bridge-site=quaint-swan-637&deck=${DECK}`));
+    expect(src?.origin + (src?.pathname ?? "")).toBe("https://deck.example.com/d/");
+    expect(src?.searchParams.get("bridge")).toBe("gdg.k1");
+    expect(src?.searchParams.get("bridge-site")).toBe("quaint-swan-637");
+  });
+
+  it("F38.1 the stage reads ?deck=, ?bridge= and ?bridge-site= with useHashParams, which reads them again when the hash changes", () => {
+    given.params = new URLSearchParams("deck=https://two.example.com/&bridge=gdg.k2&bridge-site=quaint-swan-637");
+    const src = frame(open("#/checkin/stage?deck=https://one.example.com/"));
+    expect(src?.host).toBe("two.example.com");
+    expect(src?.searchParams.get("bridge")).toBe("gdg.k2");
+    expect(src?.searchParams.get("bridge-site")).toBe("quaint-swan-637");
+  });
+
+  it("F38.2 an ended quiz marks the right choice '✓ right answer' next to its bar, even when nobody picked it", () => {
+    const ended = (counts: number[], correct: number | null) => ({
+      question: "Which page shows the board?",
+      choices: ["#/live", "#/host"],
+      open: false,
+      answered: counts.reduce((a, b) => a + b, 0),
+      results: { counts, correct },
+    });
+    const bars = (): [string, string] => {
+      const found = renderToStaticMarkup(createElement(Stage)).match(/<li class="stage__bar[^"]*">[\s\S]*?<\/li>/g) ?? [];
+      expect(found).toHaveLength(2);
+      return [found[0] ?? "", found[1] ?? ""];
+    };
+
+    results["checkin/quiz:current"] = ended([3, 0], 1);
+    let [a, b] = bars();
+    expect(words(b)).toContain("✓ right answer");
+    expect(b).toContain('style="width:0%"');
+    expect(words(a)).not.toContain("right answer");
+
+    results["checkin/quiz:current"] = ended([0, 0], 0);
+    [a, b] = bars();
+    expect(words(a)).toContain("✓ right answer");
+    expect(words(b)).not.toContain("right answer");
+
+    results["checkin/quiz:current"] = ended([2, 1], null);
+    expect(bars().map(words).join(" ")).not.toContain("right answer");
+  });
+
+  it("F38.2 'No question open.' when the channel has no quiz or vote yet", () => {
+    results["checkin/quiz:current"] = null;
+    expect(words(renderToStaticMarkup(createElement(Stage)))).toContain("No question open.");
+    results["checkin/quiz:current"] = undefined;
+    expect(words(renderToStaticMarkup(createElement(Stage)))).not.toContain("No question open.");
+    results["checkin/quiz:current"] = OPEN;
+    expect(words(renderToStaticMarkup(createElement(Stage)))).not.toContain("No question open.");
+  });
+
+  it("F38.3 the deck can't go full screen inside the page, so its F key can't cover the card", () => {
+    const html = open(`#/checkin/stage?deck=${DECK}`);
+    expect(html).toMatch(/<iframe[^>]* allow="fullscreen &#x27;none&#x27;"/);
+    expect(html).not.toMatch(/allowfullscreen/i);
+  });
+
+  it("F38.5 the late banner shows on the stage, outside the check-in card (checkin-backend-5, rt-6)", () => {
+    const html = open(`#/checkin/stage?deck=${DECK}`);
+    expect(html).toContain('<div class="stage__late" data-theme="light"><div data-boundary="The late banner">[late banner]</div></div>');
+    expect(html.indexOf("[late banner]")).toBeLessThan(html.indexOf('<aside class="stage__card"'));
+  });
+
+  it("F38 the count, the quiz and the late banner each sit in an ErrorBoundary, so a failing query never blanks the deck or the QR", () => {
+    const html = open(`#/checkin/stage?deck=${DECK}`);
+    expect(html).toMatch(/^<div class="stage"><iframe /);
+    expect(html).toMatch(/<\/button><figure class="qr"[^>]*>[\s\S]*?<\/figure><div data-boundary="The check-in count"><p class="stage__count">/);
+    expect(html).toContain('</p></div><p class="stage__hint">Scan to check in</p><div data-boundary="The quiz"><div class="stage__poll">');
+    expect(html).toContain('<div data-boundary="The late banner">[late banner]</div>');
+  });
+
+  it("F38.6 a reload in the same tab still hands the saved bridge key to the deck (?bridge=saved)", () => {
+    vi.stubGlobal("sessionStorage", stubStorage());
+    stubHistory();
+    at(`#/checkin/stage?bridge=gdg.k1&bridge-site=quaint-swan-637&deck=${DECK}`, "/rcc-live-lecture/");
+    expect(takeBridge()).toBe("gdg.k1");
+
+    const src = frame(open(`#/checkin/stage?bridge=saved&bridge-site=quaint-swan-637&deck=${DECK}`));
+    expect(src?.searchParams.get("bridge")).toBe("gdg.k1");
+    expect(src?.searchParams.get("bridge-site")).toBe("quaint-swan-637");
+  });
+
+  it("F38.6 a new tab with ?bridge=saved has no key, so it hands the deck none (never the word 'saved')", () => {
+    vi.stubGlobal("sessionStorage", stubStorage());
+    const src = frame(open(`#/checkin/stage?bridge=saved&deck=${DECK}`));
+    expect(src?.searchParams.has("bridge")).toBe(false);
+  });
+});
+
+describe("the stage's link (stageLink.ts)", () => {
+  it("F38.6 the bridge key leaves the address bar for this tab's sessionStorage (core-backend-7)", () => {
+    const store = stubStorage();
+    vi.stubGlobal("sessionStorage", store);
+    const replace = stubHistory();
+    at(`#/checkin/stage?bridge=gdg.k1&bridge-site=quaint-swan-637&deck=${DECK}`, "/rcc-live-lecture/");
+
+    expect(takeBridge()).toBe("gdg.k1");
+    expect(store.values()).toEqual(["gdg.k1"]);
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenCalledWith(
+      { from: "app" },
+      "",
+      `/rcc-live-lecture/#/checkin/stage?bridge=saved&bridge-site=quaint-swan-637&deck=${DECK}`,
+    );
+    expect(location.hash).not.toContain("gdg.k1");
+
+    // The address bar now says ?bridge=saved: nothing more to take.
+    expect(takeBridge()).toBeNull();
+    expect(replace).toHaveBeenCalledTimes(1);
+
+    // The full link pasted in again: the key leaves again, and the other parameters stay as typed.
+    at(`#/checkin/stage?deck=${DECK}&bridge=gdg.k2`, "/rcc-live-lecture/");
+    expect(takeBridge()).toBe("gdg.k2");
+    expect(replace).toHaveBeenLastCalledWith({ from: "app" }, "", `/rcc-live-lecture/#/checkin/stage?deck=${DECK}&bridge=saved`);
+    expect(store.values()).toEqual(["gdg.k2"]);
+  });
+
+  it("F38.6 when the browser won't store the key, the key stays in the address bar, so a reload still feeds the phones", () => {
+    vi.stubGlobal("sessionStorage", stubStorage(true));
+    const replace = stubHistory();
+    at(`#/checkin/stage?bridge=gdg.k1&deck=${DECK}`);
+    expect(takeBridge()).toBe("gdg.k1");
+    expect(replace).not.toHaveBeenCalled();
+    expect(location.hash).toContain("bridge=gdg.k1");
+  });
+
+  it("F38.6 a link with no key, or another page's link, changes nothing", () => {
+    const store = stubStorage();
+    vi.stubGlobal("sessionStorage", store);
+    const replace = stubHistory();
+    for (const hash of ["#/checkin/stage", `#/checkin/stage?deck=${DECK}`, "#/checkin/stage?bridge=saved", "#/checkin/stage?bridge=", "#/live?bridge=gdg.k1", "#/checkin/student?bridge=gdg.k1"]) {
+      at(hash);
+      expect(takeBridge(), hash).toBeNull();
+    }
+    expect(replace).not.toHaveBeenCalled();
+    expect(store.values()).toEqual([]);
+  });
+
+  it("F38.1 ?deck= loads only an http or https address with a real host, adding https:// when it's missing (rt-17, checkin-frontend-20)", () => {
+    expect(deckAddress("slides.example.com/deck")?.href).toBe("https://slides.example.com/deck");
+    expect(deckAddress("  sam-t-g.github.io/rcc-gdg/decks/first-meeting/ ")?.href).toBe("https://sam-t-g.github.io/rcc-gdg/decks/first-meeting/");
+    expect(deckAddress("//slides.example.com/deck")?.href).toBe("https://slides.example.com/deck");
+    expect(deckAddress("HTTPS://Slides.Example.com/Deck")?.href).toBe("https://slides.example.com/Deck");
+    expect(deckAddress("http://localhost:8000/deck.html")?.href).toBe("http://localhost:8000/deck.html");
+    expect(deckAddress("http://127.0.0.1:8000/")?.href).toBe("http://127.0.0.1:8000/");
+    for (const bad of ["", " ", ":::", "decks/week9/", "javascript:alert(1)", "javascript://%0aalert(1)", "data:text/html,hi", "ftp://files.example.com/deck", "slides example.com"]) {
+      expect(deckAddress(bad), bad).toBeNull();
+    }
   });
 });
