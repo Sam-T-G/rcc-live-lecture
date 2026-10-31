@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Google sign-in test</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; }
+  pre { background: #f2f2f2; padding: 12px; border-radius: 8px; white-space: pre-wrap; word-break: break-word; }
+  .ok { color: #137333; font-weight: 700; } .bad { color: #b3261e; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>Google sign-in test</h1>
+<p>Sign in with Google. This page sends the sign-in to the live backend and shows what it sees. Nothing is saved.</p>
+<div id="btn"></div>
+<p id="step1"></p>
+<pre id="claims" hidden></pre>
+<p id="step2"></p>
+<pre id="convex" hidden></pre>
+<script src="https://accounts.google.com/gsi/client" async onload="start()"></script>
+<script>
+const CLIENT = "954308885597-kmeh8q5gajj5mh2vhnkgtgfd89e8son4.apps.googleusercontent.com";
+const DEV = "https://utmost-ibis-818.convex.cloud";
+const $ = (id) => document.getElementById(id);
+function claimsOf(token) {
+  const b = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b), (c) => c.charCodeAt(0))));
+}
+async function onToken({ credential }) {
+  const c = claimsOf(credential);
+  $("step1").innerHTML = '<span class="ok">1. Google signed you in.</span>';
+  $("claims").hidden = false;
+  $("claims").textContent = JSON.stringify({ iss: c.iss, aud: c.aud, email: c.email, email_verified: c.email_verified, name: c.name, expires: new Date(c.exp * 1000).toLocaleTimeString() }, null, 2);
+  try {
+    const r = await fetch(DEV + "/api/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + credential },
+      body: JSON.stringify({ path: "lab:whoami", args: {}, format: "json" }),
+    });
+    const j = await r.json();
+    $("convex").hidden = false;
+    $("convex").textContent = JSON.stringify(j, null, 2);
+    if (j.status === "success" && j.value) $("step2").innerHTML = '<span class="ok">2. The backend accepted it.</span> isHost: ' + j.value.isHost;
+    else $("step2").innerHTML = '<span class="bad">2. The backend refused it.</span>';
+  } catch (e) {
+    $("step2").innerHTML = '<span class="bad">2. Could not reach the backend: ' + e.message + '</span>';
+  }
+}
+function start() {
+  google.accounts.id.initialize({ client_id: CLIENT, callback: onToken });
+  google.accounts.id.renderButton($("btn"), { theme: "outline", size: "large", text: "signin_with" });
+}
+</script>
+</body>
+</html>
