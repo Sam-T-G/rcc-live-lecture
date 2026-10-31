@@ -3,6 +3,7 @@
 // #/ui/projector shows the projector layout at the window's size. docs/design.md says when to
 // use each part.
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { ConvexError } from "convex/values";
 import { useRoute } from "../blocks/router";
 import { Big, Card, Status } from "../blocks/ui";
 import { Badge, Banner, Button, ConfirmButton, EmptyState, Field, Projector, Segmented, Skeleton, Stat, Tabs, type ButtonVariant } from "../blocks/kit";
@@ -484,6 +485,16 @@ function EmptyAndConfirm() {
         <State name="Asking">
           <ConfirmButton defaultOpen question="Remove this question? Students won't see it again." confirm="Remove" onConfirm={() => wait(800)}>
             Remove
+          </ConfirmButton>
+        </State>
+        <State name="Failed">
+          <ConfirmButton
+            defaultOpen
+            question="End class for today?"
+            confirm="End class"
+            onConfirm={() => wait(800).then(() => Promise.reject(new ConvexError("That class already ended.")))}
+          >
+            End class
           </ConfirmButton>
         </State>
       </div>

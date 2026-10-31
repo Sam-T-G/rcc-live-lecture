@@ -115,7 +115,7 @@ What bare HTML gets with no class:
 
 ## The kit
 
-`import { Button, Field, ... } from "../../blocks/kit";` (the path from a team folder). Each part is typed, and every prop not listed passes through to the element.
+`import { Button, Field, ... } from "../../blocks/kit";` (the path from a team folder). Each part is typed. `Button` passes any other prop to its `<button>`. The other parts take only the props listed below and drop anything else: TypeScript still accepts an `aria-*` or `data-*` attribute on them, but it never reaches the page, so put those on your own element around the part.
 
 ### Button
 
@@ -191,7 +191,7 @@ Tones `info`, `success`, `warn`, `error`. An error banner is announced at once (
 </ConfirmButton>
 ```
 
-The first press asks the question with two buttons; Cancel or Escape goes back, and focus returns to the first button. The box closes when `onConfirm` finishes. When it throws, the box stays open so the person can try again; show the error on the page. `variant` is `danger` (default) or `primary`.
+The first press asks the question with two buttons; Cancel or Escape goes back, and focus returns to the first button. The box closes when `onConfirm` finishes. When it throws, the box stays open so the person can try again, and shows the error under the question: a `ConvexError`'s words ("That class already ended."), or "Something went wrong. Try again." for anything else. Pass `onError={(e) => ...}` to show it on the page instead; then the box shows nothing. Don't catch and rethrow inside `onConfirm`: the box catches the error, so it never shows up as an uncaught error in the console. `variant` is `danger` (default) or `primary`.
 
 ### Projector
 
@@ -243,7 +243,7 @@ iPhone Safari at 390 x 844, and 320 wide. One hand, a glance during a lecture. R
 
 ### iOS app
 
-The SwiftUI app in `ios/` doesn't read these stylesheets. Use the hex values in the color table, Google Sans when it's bundled, and the same phone rules.
+The SwiftUI app in `ios/` doesn't read these stylesheets. Use the hex values in the color table, the system font, and the same phone rules. Never bundle Google Sans in the app: GDG `foundations.md` §3.1 says not to self-host it, because the club has no license it can point to for handing out the font file. If the app needs a bundled font, use Inter (OFL, in `google/fonts`, `foundations.md` §3.8).
 
 ## Contrast
 

@@ -235,6 +235,7 @@
   }
   .confirm__question { margin: 0; font-weight: var(--rcc-weight-strong); }
   .confirm__actions { display: flex; flex-wrap: wrap; gap: var(--rcc-space-2); }
+  .confirm .status--error { margin-block: 0; }
 
   /* ------------------------------------------------------ <Projector> */
   /* The 1920 x 1080 stage for the room's screen. Every size below is a stage

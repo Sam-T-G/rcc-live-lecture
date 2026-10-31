@@ -3,6 +3,7 @@
 // example, and #/ui shows every part in every state, light and dark. The older parts (Screen,
 // Card, Big, Status, Todo) stay in src/blocks/ui.tsx.
 import { useEffect, useId, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode } from "react";
+import { Status } from "./ui";
 
 export type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
 
@@ -255,14 +256,17 @@ export function Skeleton({ lines = 3, height, label = "Loading" }: { lines?: num
 
 // A button for something that can't be undone (End class, Remove). The first press asks
 // `question` with two buttons: `confirm` runs onConfirm, Cancel (or Escape) goes back. The box
-// closes when onConfirm finishes; when it throws, the box stays open so the person can try again,
-// and showing the error is up to the page. `defaultOpen` starts it asking (#/ui uses it).
+// closes when onConfirm finishes. When it throws, the box stays open so the person can try again
+// and shows the error under the question (a ConvexError's words, or "Something went wrong. Try
+// again."); pass `onError` to show it on the page instead. The error never escapes as an
+// unhandled rejection. `defaultOpen` starts it asking (#/ui uses it).
 export function ConfirmButton({
   children,
   question,
   confirm,
   cancel = "Cancel",
   onConfirm,
+  onError,
   variant = "danger",
   disabled,
   defaultOpen,
@@ -272,12 +276,14 @@ export function ConfirmButton({
   confirm: ReactNode;
   cancel?: ReactNode;
   onConfirm: () => unknown;
+  onError?: (error: unknown) => void;
   variant?: "danger" | "primary";
   disabled?: boolean;
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(!!defaultOpen);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const opener = useRef<HTMLButtonElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const pressed = useRef(false); // focus moves only after a press, never on the first render
@@ -289,13 +295,18 @@ export function ConfirmButton({
 
   function show(next: boolean) {
     pressed.current = true;
+    setError("");
     setOpen(next);
   }
   async function run() {
     setBusy(true);
+    setError("");
     try {
       await onConfirm();
       show(false);
+    } catch (e) {
+      if (onError) onError(e);
+      else setError(errorWords(e));
     } finally {
       setBusy(false);
     }
@@ -319,6 +330,7 @@ export function ConfirmButton({
       <p className="confirm__question" id={questionId}>
         {question}
       </p>
+      {error && <Status kind="error">{error}</Status>}
       <div className="confirm__actions">
         <Button variant={variant} busy={busy} onClick={() => void run()}>
           {confirm}
@@ -329,6 +341,12 @@ export function ConfirmButton({
       </div>
     </div>
   );
+}
+
+// The words a ConvexError("text") carries, or a plain line for anything else.
+function errorWords(e: unknown) {
+  const data = (e as { data?: unknown } | null)?.data;
+  return typeof data === "string" ? data : "Something went wrong. Try again.";
 }
 
 // The room's screen (#/checkin/stage, #/live/leaderboard): presentation.md's 1920 x 1080 sizes

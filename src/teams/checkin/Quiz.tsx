@@ -9,6 +9,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Big, Card, Screen, Status } from "../../blocks/ui";
+import { Stat } from "../../blocks/kit";
 import { CHANNEL } from "../../blocks/deck";
 import { ProfGate, useProfKey } from "./prof";
 
@@ -146,9 +147,9 @@ function Running({ poll, onNew }: { poll: Poll; onNew: () => void }) {
         <>
           <Bars choices={poll.choices} counts={stats.counts} correct={stats.correct} />
           <div className="quiz__stats">
-            <Big value={`${stats.answered} / ${stats.checkedIn}`} label="answered" />
-            {stats.rightPct !== null && <Big value={stats.rightPct + "%"} label="got it right" />}
-            {stats.medianSec !== null && <Big value={stats.medianSec + " s"} label="median time to answer" />}
+            <Stat value={`${stats.answered} / ${stats.checkedIn}`} label="answered" accent />
+            {stats.rightPct !== null && <Stat value={stats.rightPct + "%"} label="got it right" />}
+            {stats.medianSec !== null && <Stat value={stats.medianSec + " s"} label="median time to answer" />}
           </div>
           <p className="row"><button onClick={onNew}>Ask another</button></p>
         </>
