@@ -1,6 +1,6 @@
 // @vitest-environment node
 // useHashParams (router.tsx), read during the first render. Re-reading on hashchange runs in an
-// effect, which needs a browser; the stage and portal browser checks cover it.
+// effect, which router.hashchange.test.ts runs with a stand-in for React's hooks.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";

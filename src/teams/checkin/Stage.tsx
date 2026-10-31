@@ -7,13 +7,17 @@
 // full name or an email.
 //
 // The link: #/checkin/stage?deck=<the deck's address>&bridge=<channel>.<DECK_BRIDGE_KEY>
-//   deck: the deck to show. "https://" is added when it's missing (stageLink.ts). With no ?deck=
-//     the page says to add one; an address that can't load says "That deck link didn't work."
+//   deck: the deck to show. "https://" is added when it's missing, and on the https site an
+//     http deck loads over https, since browsers block an http frame there (stageLink.ts). With
+//     no ?deck= the page says to add one; an address that can't load says "That deck link didn't
+//     work."
 //   bridge: handed to the deck, whose deck-bridge.js then sends each slide to the phones. As soon
 //     as the page has the key it saves it in this tab's sessionStorage and the address bar shows
 //     ?bridge=saved instead, so the key never shows on the projector and a reload still hands it
-//     to the deck. A new tab needs the link with the key again. Taking ?bridge=saved out of the
-//     link stops the slides going to the phones.
+//     to the deck. A new tab needs the link with the key again: a ?bridge=saved link opened in a
+//     tab that saved no key (a bookmark, a copied address bar) shows "Phones aren't getting these
+//     slides." at the top of the stage. Taking ?bridge=saved out of the link stops the slides
+//     going to the phones. When the link has more than one ?bridge=, the last key counts.
 //   bridge-site: handed to the deck too, so it sends to that Convex backend instead of the one its
 //     script tag names (prod, for the published decks). Checks on Sam's dev backend always pass
 //     bridge-site=quaint-swan-637.
@@ -34,15 +38,17 @@ import { CHANNEL } from "../../blocks/deck";
 import { Projector } from "../../blocks/kit";
 import { ErrorBoundary } from "../../blocks/ui";
 import LateBanner from "./LateBanner";
-import { SAVED, deckAddress, frameSrc, savedBridge, takeBridge } from "./stageLink";
+import { SAVED, bridgeIn, deckAddress, frameSrc, savedBridge, takeBridge } from "./stageLink";
 
 const LETTERS = ["A", "B", "C", "D"];
 
 export default function Stage() {
   const params = useHashParams();
   const link = (params.get("deck") ?? "").trim();
-  const deck = link ? deckAddress(link) : null;
-  const bridge = useBridge(params.get("bridge"));
+  const deck = link ? deckAddress(link, location.protocol === "https:") : null;
+  const inLink = bridgeIn(params);
+  const bridge = useBridge(inLink);
+  const lost = inLink === SAVED && !bridge;
   const frame = useRef<HTMLIFrameElement>(null);
   const [shown, setShown] = useState(true);
 
@@ -76,6 +82,11 @@ export default function Stage() {
           <LateBanner />
         </ErrorBoundary>
       </div>
+      {lost && (
+        <p className="stage__warn" data-theme="light" role="alert">
+          Phones aren't getting these slides. Open this page from the full link again.
+        </p>
+      )}
       {shown ? (
         <aside className="stage__card" data-theme="light">
           <button className="stage__hide" onClick={() => setShown(false)} aria-label="Hide check-in">×</button>

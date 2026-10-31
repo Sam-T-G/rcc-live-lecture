@@ -8,11 +8,16 @@ export const SAVED = "saved";
 // This tab's copy of the bridge key. sessionStorage, so it ends when the tab closes.
 const STORE = "rcc-live:stage-bridge";
 
+// Hosts a browser loads over http even inside an https page, so their decks keep http.
+const LOCAL = ["localhost", "127.0.0.1", "[::1]"];
+
 // The deck's address from ?deck=, or null when it can't load one. "https://" goes in front when the
 // address has no scheme ("slides.example.com/deck"). Only http and https addresses load, and the
-// host has to be localhost, an IP address or a name with a dot, so ":::", "decks/week9/" and
-// "javascript:..." give null.
-export function deckAddress(raw: string): URL | null {
+// host has to be localhost, an IPv6 address or a name with a dot between two non-empty parts, so
+// ":::", "decks/week9/", "../decks/week9/" (its host would be "..") and "javascript:..." give null.
+// With `onHttps` (this page is on https, like the live site), an http deck other than localhost,
+// 127.0.0.1 or [::1] gets https instead, since the browser blocks an http frame on an https page.
+export function deckAddress(raw: string, onHttps = false): URL | null {
   const text = raw.trim();
   if (!text) return null;
   let url: URL;
@@ -23,7 +28,8 @@ export function deckAddress(raw: string): URL | null {
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return null;
   const host = url.hostname;
-  if (host !== "localhost" && !host.includes(".") && !host.startsWith("[")) return null;
+  if (host !== "localhost" && !/^[^.]+(\.[^.]+)+$/.test(host) && !host.startsWith("[")) return null;
+  if (onHttps && url.protocol === "http:" && !LOCAL.includes(host)) url.protocol = "https:";
   return url;
 }
 
@@ -64,6 +70,15 @@ function hashWith(hash: string, name: string, value: string): string {
   return hash.slice(0, at + 1) + parts.join("&");
 }
 
+// The ?bridge= value the stage uses: the last one in the link that's a key (not "saved" and not
+// empty), so a key added after ?bridge=saved counts. With no key, "saved" when the link says so,
+// else null.
+export function bridgeIn(params: URLSearchParams): string | null {
+  const all = params.getAll("bridge");
+  const keys = all.filter((v) => v && v !== SAVED);
+  return keys[keys.length - 1] ?? (all.includes(SAVED) ? SAVED : null);
+}
+
 // The bridge key this tab saved from an earlier link, or null.
 export function savedBridge(): string | null {
   try {
@@ -74,15 +89,16 @@ export function savedBridge(): string | null {
 }
 
 // When the address bar has #/checkin/stage?bridge=<channel>.<key>, saves the key in this tab and
-// puts ?bridge=saved in the address bar in its place, so the key never shows on the projector and
-// a reload still finds it. Returns the key, or null when the link has none. When the browser won't
+// puts ?bridge=saved in the address bar in its place (one ?bridge=, where the first one was), so
+// the key never shows on the projector and a reload still finds it. The key is the last ?bridge=
+// that isn't "saved" or empty (bridgeIn). Returns the key, or null when the link has none. When the browser won't
 // store it (storage blocked), the key stays in the address bar, so a reload still has it. Any other
 // page's link is left alone (the hash can change to another page before the stage closes).
 export function takeBridge(): string | null {
   const at = location.hash.indexOf("?");
   const path = (at === -1 ? location.hash : location.hash.slice(0, at)).replace(/^#/, "").split("/").filter(Boolean).join("/");
   if (path !== "checkin/stage") return null;
-  const key = at === -1 ? null : new URLSearchParams(location.hash.slice(at + 1)).get("bridge");
+  const key = at === -1 ? null : bridgeIn(new URLSearchParams(location.hash.slice(at + 1)));
   if (!key || key === SAVED) return null;
   try {
     sessionStorage.setItem(STORE, key);

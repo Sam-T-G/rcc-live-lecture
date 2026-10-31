@@ -60,3 +60,20 @@
   background: var(--surface);
   pointer-events: auto;
 }
+
+/* A ?bridge=saved link opened in a tab with no saved key (Stage.tsx): one line across the top of
+   the stage, clear of the card, so the professor sees that phones aren't following the slides. */
+.stage__warn {
+  position: absolute;
+  top: calc(24 * var(--stage-u));
+  left: calc(24 * var(--stage-u));
+  width: fit-content;
+  max-width: calc(100% - 512 * var(--stage-u));
+  margin: 0;
+  padding: calc(16 * var(--stage-u)) calc(24 * var(--stage-u));
+  border-radius: calc(24 * var(--stage-u));
+  background: var(--warn);
+  color: var(--warn-text);
+  font-size: var(--proj-ledger);
+  line-height: 1.2;
+}

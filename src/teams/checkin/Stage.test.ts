@@ -37,12 +37,13 @@ vi.mock("../../blocks/router", async (importOriginal) => {
 const OPEN = { question: "Which route shows the board?", choices: ["A", "B"], open: true, answered: 1 };
 const DECK = "https://deck.example.com/d/";
 
-function at(hash: string, pathname = "/") {
-  vi.stubGlobal("location", { hash, href: "http://x" + pathname + hash, origin: "http://x", pathname, search: "" });
+function at(hash: string, pathname = "/", protocol = "http:") {
+  const origin = protocol + "//x";
+  vi.stubGlobal("location", { hash, href: origin + pathname + hash, origin, pathname, protocol, search: "" });
 }
 
-function open(hash: string) {
-  at(hash);
+function open(hash: string, protocol?: string) {
+  at(hash, "/", protocol);
   return renderToStaticMarkup(createElement(Stage));
 }
 
@@ -112,7 +113,7 @@ describe("#/checkin/stage", () => {
   });
 
   it("F38.1 a deck link that can't load says 'That deck link didn't work.' instead of a blank page (rt-17, checkin-frontend-20)", () => {
-    for (const bad of [":::", "decks/week9/", "javascript:alert(1)", "ftp://files.example.com/deck"]) {
+    for (const bad of [":::", "decks/week9/", "./decks/week9/", "../rcc-gdg/decks/week9/", "javascript:alert(1)", "ftp://files.example.com/deck"]) {
       const html = open("#/checkin/stage?deck=" + encodeURIComponent(bad));
       expect(frame(html), bad).toBeNull();
       expect(words(html), bad).toContain("That deck link didn't work.");
@@ -138,7 +139,7 @@ describe("#/checkin/stage", () => {
     expect(src?.searchParams.get("bridge-site")).toBe("quaint-swan-637");
   });
 
-  it("F38.1 the stage reads ?deck=, ?bridge= and ?bridge-site= with useHashParams, which reads them again when the hash changes", () => {
+  it("F38.1 the stage reads ?deck=, ?bridge= and ?bridge-site= from useHashParams (router.hashchange.test.ts tests the re-read on hashchange)", () => {
     given.params = new URLSearchParams("deck=https://two.example.com/&bridge=gdg.k2&bridge-site=quaint-swan-637");
     const src = frame(open("#/checkin/stage?deck=https://one.example.com/"));
     expect(src?.host).toBe("two.example.com");
@@ -220,6 +221,37 @@ describe("#/checkin/stage", () => {
     const src = frame(open(`#/checkin/stage?bridge=saved&deck=${DECK}`));
     expect(src?.searchParams.has("bridge")).toBe(false);
   });
+
+  it("F38.6 a ?bridge=saved link in a tab with no saved key says the phones aren't getting the slides (STAGE-risk-1, STAGE-spec-3)", () => {
+    const LINE = "Phones aren't getting these slides. Open this page from the full link again.";
+    vi.stubGlobal("sessionStorage", stubStorage());
+    for (const hash of [`#/checkin/stage?bridge=saved&deck=${DECK}`, "#/checkin/stage?bridge=saved"]) {
+      const html = open(hash);
+      expect(words(html), hash).toContain(LINE);
+      expect(html, hash).toMatch(/<p class="stage__warn" data-theme="light" role="alert">/);
+    }
+    // No line with a key in the link, with no ?bridge= at all, or once this tab has the key saved.
+    expect(words(open(`#/checkin/stage?bridge=gdg.k1&deck=${DECK}`))).not.toContain(LINE);
+    expect(words(open(`#/checkin/stage?deck=${DECK}`))).not.toContain(LINE);
+    stubHistory();
+    at(`#/checkin/stage?bridge=gdg.k1&deck=${DECK}`);
+    expect(takeBridge()).toBe("gdg.k1");
+    expect(words(open(`#/checkin/stage?bridge=saved&deck=${DECK}`))).not.toContain(LINE);
+  });
+
+  it("F38.6 a key added after ?bridge=saved or an empty ?bridge= goes to the deck (STAGE-risk-2)", () => {
+    vi.stubGlobal("sessionStorage", stubStorage());
+    for (const first of ["saved", ""]) {
+      const src = frame(open(`#/checkin/stage?bridge=${first}&deck=${DECK}&bridge=gdg.k2`));
+      expect(src?.searchParams.getAll("bridge"), first).toEqual(["gdg.k2"]);
+    }
+  });
+
+  it("F38.1 on the https site an http deck loads over https, so the browser doesn't block it as mixed content (STAGE-spec-2)", () => {
+    expect(frame(open("#/checkin/stage?deck=http://slides.example.com/deck", "https:"))?.href).toBe("https://slides.example.com/deck");
+    expect(frame(open("#/checkin/stage?deck=http://localhost:8000/deck.html", "https:"))?.href).toBe("http://localhost:8000/deck.html");
+    expect(frame(open("#/checkin/stage?deck=http://slides.example.com/deck", "http:"))?.href).toBe("http://slides.example.com/deck");
+  });
 });
 
 describe("the stage's link (stageLink.ts)", () => {
@@ -247,6 +279,19 @@ describe("the stage's link (stageLink.ts)", () => {
     at(`#/checkin/stage?deck=${DECK}&bridge=gdg.k2`, "/rcc-live-lecture/");
     expect(takeBridge()).toBe("gdg.k2");
     expect(replace).toHaveBeenLastCalledWith({ from: "app" }, "", `/rcc-live-lecture/#/checkin/stage?deck=${DECK}&bridge=saved`);
+    expect(store.values()).toEqual(["gdg.k2"]);
+  });
+
+  it("F38.6 a key added after ?bridge=saved or an empty ?bridge= leaves the address bar too (STAGE-risk-2)", () => {
+    const store = stubStorage();
+    vi.stubGlobal("sessionStorage", store);
+    const replace = stubHistory();
+    for (const first of ["saved", ""]) {
+      at(`#/checkin/stage?bridge=${first}&deck=${DECK}&bridge=gdg.k2`, "/rcc-live-lecture/");
+      expect(takeBridge(), first).toBe("gdg.k2");
+      expect(replace, first).toHaveBeenLastCalledWith({ from: "app" }, "", `/rcc-live-lecture/#/checkin/stage?bridge=saved&deck=${DECK}`);
+      expect(location.hash, first).not.toContain("gdg.k2");
+    }
     expect(store.values()).toEqual(["gdg.k2"]);
   });
 
@@ -278,8 +323,17 @@ describe("the stage's link (stageLink.ts)", () => {
     expect(deckAddress("HTTPS://Slides.Example.com/Deck")?.href).toBe("https://slides.example.com/Deck");
     expect(deckAddress("http://localhost:8000/deck.html")?.href).toBe("http://localhost:8000/deck.html");
     expect(deckAddress("http://127.0.0.1:8000/")?.href).toBe("http://127.0.0.1:8000/");
-    for (const bad of ["", " ", ":::", "decks/week9/", "javascript:alert(1)", "javascript://%0aalert(1)", "data:text/html,hi", "ftp://files.example.com/deck", "slides example.com"]) {
+    for (const bad of ["", " ", ":::", "decks/week9/", "./decks/week9/", "../x/", "..", "a..b/deck", ".example.com/deck", "javascript:alert(1)", "javascript://%0aalert(1)", "data:text/html,hi", "ftp://files.example.com/deck", "slides example.com"]) {
       expect(deckAddress(bad), bad).toBeNull();
+    }
+  });
+
+  it("F38.1 on an https page an http deck becomes https, except localhost, 127.0.0.1 and [::1] (STAGE-spec-2)", () => {
+    expect(deckAddress("http://slides.example.com/deck", true)?.href).toBe("https://slides.example.com/deck");
+    expect(deckAddress("http://slides.example.com/deck", false)?.href).toBe("http://slides.example.com/deck");
+    expect(deckAddress("http://slides.example.com/deck")?.href).toBe("http://slides.example.com/deck");
+    for (const local of ["http://localhost:8000/deck.html", "http://127.0.0.1:8000/", "http://[::1]:8000/"]) {
+      expect(deckAddress(local, true)?.href, local).toBe(local);
     }
   });
 });
