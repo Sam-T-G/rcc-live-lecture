@@ -3,6 +3,20 @@ import ConvexMobile
 import Foundation
 import Observation
 
+/// Convex sends numbers as Float64, which can arrive as "3.0", so the app decodes a Double and
+/// converts it. A value no Int can hold, such as 1e300, throws a DecodingError, which ends the
+/// subscription and gets retried, instead of crashing the app the way Int(Double) does (ios-4).
+/// deck:set refuses such numbers now, but a row written before that check, or a backend that
+/// doesn't have it yet, can still send one.
+func wholeNumber<Key: CodingKey>(_ c: KeyedDecodingContainer<Key>, _ key: Key) throws -> Int {
+    let d = try c.decode(Double.self, forKey: key)
+    guard let n = Int(exactly: d.rounded()) else {
+        throw DecodingError.dataCorruptedError(
+            forKey: key, in: c, debugDescription: "\(d) is not a number the app can show")
+    }
+    return n
+}
+
 /// One slide as the phone shows it: a heading and its visible lines.
 struct Slide: Decodable, Equatable, Identifiable {
     let index: Int  // 0-based
@@ -12,6 +26,11 @@ struct Slide: Decodable, Equatable, Identifiable {
     let at: Double
 
     var id: Int { index }
+
+    /// The title to show, or nil when the slide has none. #/portal skips its heading then too.
+    var heading: String? {
+        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : title
+    }
 
     init(index: Int, beat: Int, title: String, lines: [String], at: Double) {
         self.index = index
@@ -23,11 +42,10 @@ struct Slide: Decodable, Equatable, Identifiable {
 
     private enum CodingKeys: String, CodingKey { case index, beat, title, lines, at }
 
-    // Convex sends these as Float64, which can arrive as "3.0"; decode as Double and convert.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        index = Int(try c.decode(Double.self, forKey: .index))
-        beat = Int(try c.decode(Double.self, forKey: .beat))
+        index = try wholeNumber(c, .index)
+        beat = try wholeNumber(c, .beat)
         title = try c.decode(String.self, forKey: .title)
         lines = try c.decode([String].self, forKey: .lines)
         at = try c.decode(Double.self, forKey: .at)
@@ -44,7 +62,41 @@ struct LiveSlide: Decodable, Equatable {
     init(from decoder: Decoder) throws {
         slide = try Slide(from: decoder)
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        count = Int(try c.decode(Double.self, forKey: .count))
+        count = try wholeNumber(c, .count)
+    }
+}
+
+/// Why the slides aren't coming in, when they aren't.
+enum Problem: Equatable {
+    /// `deck:current` failed twice in a row: a server error or an answer the app can't read.
+    case cantLoad
+    /// No connection for 4 seconds.
+    case offline
+}
+
+/// What the app knows about `deck:current` apart from the slide itself.
+struct LoadState: Equatable {
+    /// True once `deck:current` has answered at least once.
+    private(set) var loaded = false
+    /// `deck:current` failures since its last answer. Each failure is retried after 3 seconds.
+    private(set) var failuresInARow = 0
+    /// True once the connection has been down for 4 seconds.
+    var offline = false
+
+    mutating func answered() {
+        loaded = true
+        failuresInARow = 0
+        offline = false
+    }
+
+    mutating func failed() { failuresInARow += 1 }
+
+    /// After 2 failures in a row the screen says the slides can't load, where it used to spin
+    /// forever with no words (ios-5).
+    var problem: Problem? {
+        if failuresInARow >= 2 { return .cantLoad }
+        if offline { return .offline }
+        return nil
     }
 }
 
@@ -53,13 +105,12 @@ struct LiveSlide: Decodable, Equatable {
 @MainActor
 @Observable
 final class DeckStore {
-    /// nil until the first answer from `deck:current`.
-    private(set) var loaded = false
-    /// nil when the channel has no slide yet.
+    /// nil when the channel has no slide yet, and before the first answer.
     private(set) var live: LiveSlide?
     private(set) var shown: [Slide] = []
-    /// True once the connection has been down for a few seconds.
-    private(set) var offline = false
+    private(set) var load = LoadState()
+    /// The late check-in banner, read from the same channel.
+    let late = LateBanner()
 
     let config: Config
     @ObservationIgnored private let client: ConvexClient
@@ -74,6 +125,7 @@ final class DeckStore {
         subscribeCurrent()
         subscribeSlides()
         watchConnection()
+        late.start(client: client, channel: config.channel)
     }
 
     /// Pages a student can swipe through: every slide shown so far up to the live one, with
@@ -92,19 +144,23 @@ final class DeckStore {
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { [weak self] _ in
-                    // A server error ends the subscription; try again shortly.
-                    MainActor.assumeIsolated { self?.retry(after: 3) { $0.subscribeCurrent() } }
+                    // A server error, or an answer the app can't decode, ends the subscription.
+                    // Count it and try again shortly.
+                    MainActor.assumeIsolated {
+                        guard let self else { return }
+                        self.load.failed()
+                        self.retry(after: 3) { $0.subscribeCurrent() }
+                    }
                 },
                 receiveValue: { [weak self] value in
                     MainActor.assumeIsolated {
                         guard let self else { return }
                         self.live = value
-                        self.loaded = true
                         // An answer from the server means the connection works, even if the
                         // socket state was reported before we started listening.
+                        self.load.answered()
                         self.offlineTimer?.cancel()
                         self.offlineTimer = nil
-                        self.offline = false
                     }
                 })
     }
@@ -115,7 +171,7 @@ final class DeckStore {
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { [weak self] _ in
-                    // If deck:slides isn't deployed yet, the app still shows the live slide.
+                    // The live slide still shows without this list; paging back waits for the retry.
                     MainActor.assumeIsolated { self?.retry(after: 10) { $0.subscribeSlides() } }
                 },
                 receiveValue: { [weak self] value in
@@ -135,7 +191,7 @@ final class DeckStore {
         // Short reconnects are normal; only say so after 4 seconds without a connection.
         offlineTimer = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(4))
-            if !Task.isCancelled { self?.offline = true }
+            if !Task.isCancelled { self?.load.offline = true }
         }
     }
 
@@ -151,7 +207,7 @@ final class DeckStore {
                     case .connected:
                         self.offlineTimer?.cancel()
                         self.offlineTimer = nil
-                        self.offline = false
+                        self.load.offline = false
                     case .connecting:
                         // Retries report "connecting" again every few seconds; keep the
                         // timer from the first one so the notice still shows.

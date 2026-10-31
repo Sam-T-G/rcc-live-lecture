@@ -10,6 +10,10 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "5.0"
+    # ConvexMobile's simulator library is arm64 only. Without this line a build for
+    # "Any iOS Simulator Device" (generic/platform=iOS Simulator) fails to link x86_64.
+    # Simulator builds need an Apple Silicon Mac.
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]": x86_64
 targets:
   RCCLivePortal:
     type: application
@@ -38,15 +42,33 @@ targets:
         # Release builds get no ATS exception at all.
         Debug:
           INFOPLIST_FILE: RCCLivePortal/ATS-Debug.plist
+  # Unit tests for the follow rule, decoding, the late banner and the words. They run inside
+  # the app, which opens no connection while tests run, so they need no backend.
+  RCCLivePortalTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: RCCLivePortalTests
+    dependencies:
+      - target: RCCLivePortal
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.samtg.rccliveportal.tests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
 schemes:
   RCCLivePortal:
     build:
       targets:
         RCCLivePortal: all
+        RCCLivePortalTests: [test]
     run:
       config: Debug
-      # Tick these in Edit Scheme > Run > Arguments to use the local test backend.
+      # Tick these in Edit Scheme > Run > Arguments and put your dev deployment's name in the URL.
       commandLineArguments:
-        "-convexURL http://127.0.0.1:3210": false
-        "-channel portal-ios-test": false
+        "-convexURL https://<dev deployment>.convex.cloud": false
         "-startOnSlide 2": false
+    test:
+      config: Debug
+      targets:
+        - RCCLivePortalTests

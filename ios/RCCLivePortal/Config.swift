@@ -1,10 +1,10 @@
 import Foundation
 
 /// Where the app reads slides from. Launch arguments win over environment variables,
-/// which win over the defaults (prod, channel "gdg").
+/// which win over the defaults (prod, channel "gdg", the same as the web).
 ///
-///   -convexURL http://127.0.0.1:3210     or  CONVEX_URL=...
-///   -channel portal-ios-test             or  DECK_CHANNEL=...
+///   -convexURL https://<dev deployment>.convex.cloud   or  CONVEX_URL=...
+///   -channel gdg                                       or  DECK_CHANNEL=...
 ///   -startOnSlide 2   (Debug builds only: open on slide 2, 1-based, to test browsing)
 struct Config {
     static let prodURL = "https://utmost-ibis-818.convex.cloud"
