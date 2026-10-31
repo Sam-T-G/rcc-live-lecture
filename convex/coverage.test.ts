@@ -14,7 +14,8 @@ const SOURCES = import.meta.glob<string>("./**/*.test.ts", { query: "?raw", impo
 const ALL_SOURCES: Record<string, string> = { ...SOURCES, "./coverage.test.ts": SELF };
 // Every Convex module's source as text: the same files test.setup.ts loads, minus _generated/.
 const MODULE_SOURCES = import.meta.glob<string>("./**/!(*.*.*)*.ts", { query: "?raw", import: "default", eager: true });
-// convex/host/ is left out until UZ deletes it (and this skip with it).
+// F39.2 leaves convex/host/ out until UZ deletes it (and this skip with it). F39.3 doesn't: its
+// host-only functions are still deployed, so each one still needs its authMatrix test.
 const SKIP_MODULES = ["host/"];
 // The staff checks: a function whose handler calls one of these, or calls a function in its own
 // file that does, is host-only (requireHost in convex/lib.ts is requireProf by another name).
@@ -22,18 +23,23 @@ const GUARDS = ["requireProf", "requireAdmin", "requireScanner", "requireHost"];
 // Functions that answer whether the caller may do something, instead of refusing. Their tests
 // throw when the answer is no, so authMatrix checks them like any host-only function.
 const ANSWERS = ["api.checkin.pass.amHost", "api.checkin.pass.canScan"];
+// The door scanner: the only functions a scanner and a paired iPad may call, so the only ones an
+// authMatrix(SCANNER, ...) call counts for.
+const DOOR = ["api.checkin.pass.scan", "api.checkin.pass.canScan"];
 
-type Fn = { ref: string; hasKey: boolean; guarded: boolean };
+type Fn = { ref: string; hasKey: boolean; guarded: boolean; skipped: boolean };
 type Registered = { isQuery?: boolean; isMutation?: boolean; isAction?: boolean; isInternal?: boolean; exportArgs?: () => string };
 
 // Every query, mutation and action a Convex module exports, as `api.<module>.<name>` or
 // `internal.<module>.<name>`, whether its args include `key` (host-only functions still accept
-// one until ROLES-UI removes it), and whether it calls a staff check.
+// one until ROLES-UI removes it), whether it calls a staff check, and whether its module is in
+// SKIP_MODULES.
 async function convexFunctions(): Promise<Fn[]> {
   const out: Fn[] = [];
   for (const [file, load] of Object.entries(modules)) {
     const mod = file.replace(/^\.\//, "").replace(/\.[cm]?[jt]s$/, "");
-    if (mod.startsWith("_generated/") || SKIP_MODULES.some((s) => mod.startsWith(s))) continue;
+    if (mod.startsWith("_generated/")) continue;
+    const skipped = SKIP_MODULES.some((s) => mod.startsWith(s));
     const guarded = guardedNames(MODULE_SOURCES[file] ?? "");
     for (const [name, value] of Object.entries((await load()) as Record<string, unknown>)) {
       const f = value as Registered;
@@ -43,6 +49,7 @@ async function convexFunctions(): Promise<Fn[]> {
         ref: `${f.isInternal ? "internal" : "api"}.${mod.split("/").join(".")}.${name}`,
         hasKey: args.type === "object" && !!args.value && "key" in args.value,
         guarded: guarded.has(name),
+        skipped,
       });
     }
   }
@@ -221,7 +228,7 @@ function params(call: string): string[] {
 // runs the same way on every row, so it checks nothing. A second function called through the
 // row's caller could throw first on a refused row, so the matrix would never find out whether
 // the function after it refuses. Which matrix fits is checked when the test runs: authMatrix
-// fails when any row's result differs from it.
+// fails when any row's result differs from it. SCANNER counts only for the functions in DOOR.
 function matrixCheck({ awaited, args }: MatrixCall): string | null {
   const matrix = /^\s*(HOST_ONLY|ADMIN_ONLY|SCANNER)\s*,/.exec(args);
   if (!awaited || !matrix) return null;
@@ -235,7 +242,9 @@ function matrixCheck({ awaited, args }: MatrixCall): string | null {
   });
   const refs = new Set(called.map((a) => /^\s*((?:api|internal)(?:\.[\w$]+)+)\s*(?:,|$)/.exec(a)?.[1] ?? ""));
   const [ref] = refs;
-  return refs.size === 1 && ref ? ref : null;
+  if (refs.size !== 1 || !ref) return null;
+  // SCANNER lets a scanner and a paired iPad in, so it fits only the door scanner.
+  return matrix[1] !== "SCANNER" || DOOR.includes(ref) ? ref : null;
 }
 
 // What makes vitest skip a test, or pass it when it throws, while `vitest run` still exits 0:
@@ -270,7 +279,7 @@ describe("F39 every Convex function is tested", async () => {
   });
 
   it("F39.2 every exported function outside convex/host/ is named in a test", () => {
-    expect(fns.filter((f) => !names(all, f.ref)).map((f) => f.ref)).toEqual([]);
+    expect(fns.filter((f) => !f.skipped && !names(all, f.ref)).map((f) => f.ref)).toEqual([]);
   });
 
   it("F39.2 every HTTP route is called with its method in a test", async () => {
@@ -300,6 +309,8 @@ describe("F39 every Convex function is tested", async () => {
         "api.staff.add",
         "api.staff.approvePairing",
         "api.staff.unpair",
+        "api.host.qa.list",
+        "api.host.points.adjust",
       ]),
     );
     for (const open of ["api.checkin.read.count", "api.checkin.pass.refresh", "api.live.questions.remove", "api.staff.me", "api.staff.requestPairing", "api.staff.deviceStatus"])
@@ -343,6 +354,13 @@ describe("F39 every Convex function is tested", async () => {
       })`),
     ).toEqual(["api.a.end"]);
     expect(check(`const m = await authMatrix(HOST_ONLY, async function (who) { await who.mutation(api.a.end, { poll }); })`)).toEqual(["api.a.end"]);
+    expect(check(`await authMatrix(SCANNER, (as, t, device) => as.mutation(api.checkin.pass.scan, { device, channel: CH, code }))`)).toEqual([
+      "api.checkin.pass.scan",
+    ]);
+    // SCANNER lets a scanner and a paired iPad in, so it counts only for the door scanner: a
+    // professor function checked with SCANNER would pass with the door let in.
+    expect(check(`await authMatrix(SCANNER, (as, t, device) => as.query(api.checkin.quiz.history, { device, channel: CH }))`)).toEqual([null]);
+    expect(check(`await authMatrix(SCANNER, (as) => as.query(api.host.qa.list, { channel: CH }))`)).toEqual([null]);
     // Without a matrix from test.helpers.ts first, nothing compares the rows, so a function anyone can call passes.
     expect(check(`await authMatrix((as) => as.query(api.a.names, {}))`)).toEqual([null]);
     expect(check(`expect(await authMatrix((as) => as.query(api.a.names, {}))).toMatchObject({ googleAdmin: true })`)).toEqual([null]);

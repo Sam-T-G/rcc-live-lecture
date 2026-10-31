@@ -34,15 +34,22 @@ type AnyCtx = QueryCtx | MutationCtx | ActionCtx;
 
 const GOOGLE_ISSUER = "https://accounts.google.com";
 const TYPED_ISSUER = "https://test-login.rcc-live-lecture.local";
-// The prod deployment. CONVEX_CLOUD_URL (set by Convex in every function) names it on prod.
-const PROD_DEPLOYMENT = "utmost-ibis-818";
+// The dev backends, by the host in their CONVEX_CLOUD_URL (Convex sets it in every function):
+// this laptop's dev deployment, and the sample one the tests stub (convex/test.helpers.ts
+// DEV_URL), which Convex never hands out. A new dev deployment gets added here.
+const DEV_HOSTS = ["quaint-swan-637.convex.cloud", "sample-dev-123.convex.cloud"];
 
-// True on a dev backend: CONVEX_CLOUD_URL is set and doesn't name prod. Fails closed: a backend
-// without CONVEX_CLOUD_URL counts as prod. If prod ever gets a custom canonical URL, this check
-// has to name that URL too.
+// True only on a dev backend: CONVEX_CLOUD_URL is https and its host is one of DEV_HOSTS. Fails
+// closed: prod's URL, a custom domain, a new deployment, a missing or unreadable URL all count as
+// prod, so a typed sign-in there never holds a role.
 export function isDevBackend() {
-  const url = (process.env.CONVEX_CLOUD_URL ?? "").trim().toLowerCase();
-  return url !== "" && !url.includes(PROD_DEPLOYMENT);
+  let url: URL;
+  try {
+    url = new URL((process.env.CONVEX_CLOUD_URL ?? "").trim());
+  } catch {
+    return false;
+  }
+  return url.protocol === "https:" && DEV_HOSTS.includes(url.host.toLowerCase());
 }
 
 // An email the way the staff list keeps it: trimmed and lower case. "" when there is none.
