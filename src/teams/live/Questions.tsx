@@ -27,8 +27,9 @@ function errorText(e: unknown) {
 
 const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
-// `index` is the slide on the student's screen, or null before the deck sends a slide.
-export default function Questions({ index }: { index: number | null }) {
+// `index` is the slide on the student's screen, null before the deck sends a slide, or undefined
+// while the page is still loading the deck (the card then says "Loading questions…", no form).
+export default function Questions({ index }: { index: number | null | undefined }) {
   const { user } = useGoogleUser();
   const [scope, setScope] = useState<Scope>("slide");
   const [text, setText] = useState("");
@@ -41,14 +42,19 @@ export default function Questions({ index }: { index: number | null }) {
   const ask = useMutation(api.live.questions.ask);
   const vote = useMutation(api.live.questions.vote);
   const remove = useMutation(api.live.questions.remove);
-  // Before the deck sends a slide there's no "this slide", so that tab lists nothing.
+  // Before the deck sends a slide there's no "this slide", so that tab lists nothing. While the
+  // deck is loading, that tab waits for it; "All slides" doesn't need it.
+  const loading = index === undefined;
   const noSlide = scope === "slide" && index === null;
-  const fetched = useQuery(api.live.questions.list, noSlide ? "skip" : scope === "slide" && index !== null ? { channel: CHANNEL, index } : { channel: CHANNEL });
+  const fetched = useQuery(
+    api.live.questions.list,
+    scope === "all" ? { channel: CHANNEL } : typeof index === "number" ? { channel: CHANNEL, index } : "skip",
+  );
   const rows = noSlide ? [] : fetched;
 
   async function send(e: FormEvent) {
     e.preventDefault();
-    if (index === null || sending) return;
+    if (index === null || index === undefined || sending) return;
     setSending(true);
     setError("");
     try {
@@ -79,10 +85,10 @@ export default function Questions({ index }: { index: number | null }) {
           <p className="muted">Sign in to post and upvote.</p>
           <StudentSignIn />
         </>
-      ) : index === null ? (
+      ) : loading ? null : index === null ? (
         <p className="muted">You can ask once the slides start.</p>
       ) : (
-        <form className="ask" onSubmit={send}>
+        <form className="live-ask" onSubmit={send}>
           <textarea
             value={text}
             maxLength={MAX_LENGTH}
@@ -98,8 +104,8 @@ export default function Questions({ index }: { index: number | null }) {
             <input type="checkbox" checked={onlyProfessor} onChange={(e) => setOnlyProfessor(e.target.checked)} />
             Only the professor can see it
           </label>
-          <div className="ask__foot">
-            <span className="ask__count">
+          <div className="live-ask__foot">
+            <span className="live-ask__count">
               {text.length}/{MAX_LENGTH}
             </span>
             <Button type="submit" busy={sending} disabled={!text.trim()}>

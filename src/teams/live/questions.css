@@ -1,9 +1,10 @@
 /* #/live Questions (Questions.tsx): the post form, the Private tag, the professor's answer and the
    Delete button. The list rows (.qa__list, .q, .q__vote, .q__text, .q__meta) are styled in
-   live.css. Tokens: src/styles/tokens.css. */
-.ask { display: grid; gap: var(--rcc-space-2); margin: 0 0 var(--rcc-space-4); }
-.ask__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--rcc-space-3); }
-.ask__count { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--muted); font-variant-numeric: tabular-nums; }
+   live.css. Tokens: src/styles/tokens.css. This sheet loads on every route, so the post form is
+   .live-ask: .ask is the professor's quiz form on #/checkin/quiz (checkin.css). */
+.live-ask { display: grid; gap: var(--rcc-space-2); margin: 0 0 var(--rcc-space-4); }
+.live-ask__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--rcc-space-3); }
+.live-ask__count { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--muted); font-variant-numeric: tabular-nums; }
 
 .q__body { min-width: 0; }
 /* The upvote button keeps its own height beside a long question or answer. */

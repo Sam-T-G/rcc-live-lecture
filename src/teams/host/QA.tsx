@@ -19,13 +19,24 @@ type Item = FunctionReturnType<typeof api.live.questions.forHost>[number];
 const ANSWER_MAX = 1000;
 const upvotes = (n: number) => `${n} ${n === 1 ? "upvote" : "upvotes"}`;
 
-function Question({ q }: { q: Item }) {
+// What Save does for this question's answer. Saving never changes sharing (answer() in
+// convex/live/questions.ts), so an answer that's already shared reaches every phone as soon as
+// it's saved, and a private question's answer can't be shared at all.
+function answerHint(q: Item) {
+  if (q.shared) return "Students see your changes as soon as you save.";
+  if (q.private) return "This question is private, so only you see this answer.";
+  return "Students see it only after you share it.";
+}
+
+// One question with its buttons. `open` starts with the answer editor open, the way
+// QA.hint.test.ts checks the hint; the page always starts with it closed.
+export function Question({ q, open = false }: { q: Item; open?: boolean }) {
   const setStatus = useMutation(api.live.questions.setStatus);
   const saveAnswer = useMutation(api.live.questions.answer);
   const share = useMutation(api.live.questions.share);
   const remove = useMutation(api.live.questions.remove);
-  const [typing, setTyping] = useState(false);
-  const [text, setText] = useState("");
+  const [typing, setTyping] = useState(open);
+  const [text, setText] = useState(open ? (q.answer ?? "") : "");
   const [busy, setBusy] = useState(""); // the button whose request is running
   const [error, setError] = useState("");
 
@@ -74,7 +85,7 @@ function Question({ q }: { q: Item }) {
       )}
       {typing && (
         <form className="qa-q__editor" onSubmit={save}>
-          <Field label="Your answer" hint="Students see it only after you share it.">
+          <Field label="Your answer" hint={answerHint(q)}>
             {(f) => <textarea {...f} rows={3} maxLength={ANSWER_MAX} value={text} onChange={(e) => setText(e.target.value)} />}
           </Field>
           <div className="row">
