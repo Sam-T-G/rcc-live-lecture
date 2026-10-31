@@ -62,11 +62,30 @@ function loadGsi() {
   return gsiPromise;
 }
 
+const MIN = 60_000;
+const WARN = 5 * MIN; // how long before the token runs out Google is asked and the page says so
+const DROP = MIN; // how long before the token runs out the sign-in ends
+
+// A Google sign-in whose token runs out within 5 minutes.
+function ending(s: Stored | null) {
+  return !!s && isGoogle(s.token) && s.exp - WARN <= Date.now();
+}
+
+// The door iPad (#/checkin/kiosk): Google's prompt never shows there, since anyone in line could
+// tap its "Continue as <staff email>" card.
+function onDoorIPad() {
+  return /^#\/?checkin\/kiosk(?:[/?]|$)/.test(window.location?.hash ?? "");
+}
+
 // failed: Google's script didn't load (offline, or blocked), so its button can't show.
+// endsAt: when a Google sign-in ends, from 5 minutes before its token runs out (null otherwise; the
+// sign-in ends a minute before the token does), for SignInEnding
+// (src/teams/checkin/prof.tsx) to say so with Google's button.
 type AuthState = {
   user: Stored | null;
   ready: boolean;
   failed: boolean;
+  endsAt: number | null;
   signOut: () => void;
   renderButton: (el: HTMLElement) => void;
   signInWithToken: (token: string) => void;
@@ -83,6 +102,11 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
   const [user, setUser] = useState<Stored | null>(load);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  // The token whose sign-in is in its last 5 minutes, so the page can say when it ends.
+  const [endingToken, setEndingToken] = useState<string | null>(() => {
+    const s = load();
+    return ending(s) ? s!.token : null;
+  });
 
   useEffect(() => {
     loadGsi()
@@ -108,21 +132,30 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
       });
   }, []);
 
-  // Google ID tokens last an hour, and a class runs longer. 5 minutes before one runs out, ask
-  // Google for a new one: prompt() with auto_select signs the same account back in with no click,
-  // and the callback above saves it in the old one's place. Convex reads the saved token on its
-  // next refresh (useConvexAuth), so nobody is signed out and no page unmounts. If nothing comes,
-  // ask once more 2 minutes before, then drop the token a minute before it runs out so the page
-  // asks again. A typed sign-in never asks Google: that would swap the student for a Google
-  // identity, which the server counts as a different person.
+  // Google ID tokens last an hour, and a class runs longer. The sign-in ends a minute before its
+  // token runs out (so no call goes out with a token about to lapse). 5 minutes before the token
+  // runs out, two things happen, and the callback above saves any new token in the old one's place
+  // (Convex reads it on its next refresh, so the page stays open):
+  // - prompt() asks Google for a new token. In Chrome (FedCM) auto_select signs the same account
+  //   back in with no click, unless it did so in the last 10 minutes. Safari and Firefox show a
+  //   One Tap card instead, which needs a click; anyone who dismissed the card gets none for a
+  //   while. If nothing comes, it asks once more 2 minutes before the token runs out. Never on the
+  //   door iPad (onDoorIPad).
+  // - endsAt turns on, and professor pages and #/admin show the end time with Google's button
+  //   (SignInEnding), which works in every browser.
+  // A typed sign-in never asks Google: that would swap the student for a Google identity, which
+  // the server counts as a different person.
   useEffect(() => {
     if (!user) return;
     const left = user.exp - Date.now();
-    const asks = ready && !failed && isGoogle(user.token) ? [left - 5 * 60_000, left - 2 * 60_000] : [];
-    const timers = asks.map((ms) => setTimeout(() => window.google?.accounts.id.prompt(), Math.max(0, ms)));
-    timers.push(setTimeout(() => { localStorage.removeItem(KEY); setUser(null); }, Math.max(0, left - 60_000)));
+    const google = isGoogle(user.token);
+    const asks = google && ready && !failed ? [left - WARN, left - 2 * MIN] : [];
+    const timers = asks.map((ms) => setTimeout(() => onDoorIPad() || window.google?.accounts.id.prompt(), Math.max(0, ms)));
+    if (google) timers.push(setTimeout(() => setEndingToken(user.token), Math.max(0, left - WARN)));
+    timers.push(setTimeout(() => { localStorage.removeItem(KEY); setUser(null); }, Math.max(0, left - DROP)));
     return () => timers.forEach(clearTimeout);
   }, [user, ready, failed]);
+  const endsAt = user && endingToken === user.token ? user.exp - DROP : null;
 
   const signOut = useCallback(() => {
     localStorage.removeItem(KEY);
@@ -147,8 +180,8 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
   }, []);
 
   const value = useMemo(
-    () => ({ user, ready, failed, signOut, renderButton, signInWithToken }),
-    [user, ready, failed, signOut, renderButton, signInWithToken],
+    () => ({ user, ready, failed, endsAt, signOut, renderButton, signInWithToken }),
+    [user, ready, failed, endsAt, signOut, renderButton, signInWithToken],
   );
 
   return (

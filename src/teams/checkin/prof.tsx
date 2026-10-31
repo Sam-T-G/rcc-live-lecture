@@ -6,18 +6,21 @@
 //                "scanner" or null).
 //   <StaffGate title="Live quiz">...</StaffGate>   the page, for professors and admins. Anyone
 //                else sees how to sign in, or why their sign-in doesn't open it.
+//   <SignInEnding />   for the 5 minutes before a Google sign-in ends, its end time and Google's
+//                button pinned to the bottom of the page (StaffGate and #/admin show it).
 //   <DoorGate>{(device) => <Scanner device={device} />}</DoorGate>   #/checkin/kiosk. A paired
 //                iPad scans with its device token; a scanner who signs in scans as themselves
-//                (device is undefined); anyone else, professors and admins included, gets the
-//                pairing screen, so their sign-in isn't left on a door iPad that anyone in line can
-//                use to open #/admin or the attendance list. Whenever someone is signed in, the
+//                (device is undefined). A professor or admin is never left signed in on a door
+//                iPad that anyone in line can use to open #/admin or the attendance list: on an
+//                unpaired iPad they get the pairing screen with Sign out, and on a paired one they
+//                are signed out before the scanner opens. Whenever a scanner is signed in, the
 //                scanner shows who and a Sign out button.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
-import { SignedInAs, SignInButton, useGoogleUser } from "../../blocks/auth";
-import { Button } from "../../blocks/kit";
+import { GoogleButton, SignedInAs, SignInButton, useGoogleUser } from "../../blocks/auth";
+import { Banner, BannerStack, Button } from "../../blocks/kit";
 import { Big, Card, Screen, Status } from "../../blocks/ui";
 import { clock, why } from "./util";
 
@@ -98,11 +101,33 @@ export function NotStaff({ me }: { me: StaffMe }) {
 // everyone else, under the page's title.
 export function StaffGate({ title, children }: { title: string; children: ReactNode }) {
   const me = useStaff();
-  if (me && isProfRole(me.role)) return <>{children}</>;
+  if (me && isProfRole(me.role))
+    return (
+      <>
+        <SignInEnding />
+        {children}
+      </>
+    );
   return (
     <Screen title={title} wide>
       {me === undefined ? <Status kind="loading">Checking who is signed in…</Status> : <NotStaff me={me} />}
     </Screen>
+  );
+}
+
+// A Google sign-in ends a minute before its ID token runs out (an hour after sign-in). Chrome
+// renews it with no click, but Safari and Firefox show Google's One Tap card, which needs one, so
+// for the last 5 minutes this says when the sign-in ends and shows Google's button, which works in
+// every browser. Signing in again keeps the page open; nothing shows once the new sign-in comes.
+export function SignInEnding() {
+  const { endsAt } = useGoogleUser();
+  if (endsAt == null) return null;
+  return (
+    <BannerStack>
+      <Banner tone="warn" title={`Your sign-in ends at ${clock(endsAt)}.`} action={<GoogleButton />}>
+        Sign in with Google again before then to keep this page open.
+      </Banner>
+    </BannerStack>
   );
 }
 
@@ -156,12 +181,31 @@ function useDeviceToken() {
 
 export function DoorGate({ children }: { children: (device: string | undefined) => ReactNode }) {
   const me = useStaff();
+  const { signOut } = useGoogleUser();
   const token = useDeviceToken();
   const status = useQuery(api.staff.deviceStatus, token ? { token } : "skip");
   useEffect(() => {
     if (!token) newDeviceToken();
   }, [token]);
+  // A professor or admin still signed in on a paired iPad (say, after approving its code on its
+  // own #/admin) is signed out: the iPad scans with its pairing, and their sign-in would let
+  // anyone in line open #/admin or the attendance list.
+  const paired = !!token && status?.status === "paired";
+  const staffOnPairedIPad = paired && !!me && isProfRole(me.role);
+  useEffect(() => {
+    if (staffOnPairedIPad) signOut();
+  }, [staffOnPairedIPad, signOut]);
 
+  if (staffOnPairedIPad && me)
+    return (
+      <Screen title="Check-in kiosk" wide>
+        <Status kind="loading">Signing out {me.email}…</Status>
+        <p>This iPad is paired, so it scans passes with nobody signed in.</p>
+        <p>
+          <Button variant="secondary" onClick={signOut}>Sign out</Button>
+        </p>
+      </Screen>
+    );
   if (token && status?.status === "paired") return <WhoIsSignedIn>{children(token)}</WhoIsSignedIn>;
   if (me?.role === "scanner") return <WhoIsSignedIn>{children(undefined)}</WhoIsSignedIn>;
   // (status can't be "paired" here; saying so lets TypeScript narrow it for PairScreen.)
@@ -175,7 +219,8 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
 }
 
 // The scanner, with "Signed in as …" and Sign out above it whenever someone is signed in on the
-// iPad, so the next person at the door can see the sign-in and end it.
+// iPad (a scanner, or anyone signed in on a paired iPad who isn't staff), so the next person at
+// the door can see the sign-in and end it.
 function WhoIsSignedIn({ children }: { children: ReactNode }) {
   const { user } = useGoogleUser();
   if (!user) return <>{children}</>;

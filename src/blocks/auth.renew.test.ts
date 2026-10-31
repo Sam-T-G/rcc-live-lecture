@@ -1,13 +1,15 @@
 // @vitest-environment node
 // AuthProvider (auth.tsx) keeps a Google sign-in going past the hour its ID token lasts: before
 // the token runs out it asks Google for a new one (google.accounts.id.prompt() with auto_select),
-// and the new token takes the old one's place without signing anyone out (ROLES-UI-risk-1). A
-// typed sign-in never asks Google, so it can't turn into a different person.
+// and the new token takes the old one's place without signing anyone out (ROLES-UI-risk-1). Only
+// Chrome answers that with no click, so AuthProvider also gives the page the sign-in's end time
+// for its last 5 minutes (ROLES-UI-fixcheck-2), and never asks on the door iPad
+// (ROLES-UI-fixcheck-1). A typed sign-in never asks Google, so it can't turn into a different person.
 // These tests have no browser DOM, so React's hooks are swapped for a small stand-in that keeps
 // state between renders, runs an effect after a render when its deps change and runs its cleanup
 // first, the way React would. AuthProvider is called as a plain function; Convex's provider is
 // never rendered.
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { ConvexReactClient } from "convex/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -72,6 +74,9 @@ let googleCallback: ((r: { credential: string }) => void) | undefined;
 type Auth = typeof import("./auth");
 let AuthProvider: Auth["AuthProvider"];
 let user: () => { token: string } | null;
+let last: ReactElement<{ value: { endsAt: number | null } }> | undefined; // what AuthProvider last returned
+// When the sign-in ends, as AuthProvider's context gives it to the page (null: not ending soon).
+const endsAt = () => last!.props.value.endsAt;
 
 beforeEach(async () => {
   vi.useFakeTimers();
@@ -86,6 +91,7 @@ beforeEach(async () => {
   prompt = vi.fn();
   googleCallback = undefined;
   vi.stubGlobal("window", {
+    location: { hash: "#/host" },
     google: {
       accounts: {
         id: {
@@ -118,7 +124,7 @@ async function settle() {
     hooks.at = 0;
     hooks.effects = [];
     hooks.dirty = false;
-    AuthProvider({ client: {} as ConvexReactClient, children: null });
+    last = AuthProvider({ client: {} as ConvexReactClient, children: null }) as typeof last;
     hooks.effects.forEach((e) => e());
     await vi.advanceTimersByTimeAsync(0); // Google's script loading, a timer that is due now
     if (!hooks.dirty) return;
@@ -149,7 +155,7 @@ describe("ROLES-UI-risk-1 a Google sign-in lasts the whole class", () => {
     await at(55 * MIN);
     expect(prompt).toHaveBeenCalledTimes(1);
 
-    // Google signs the same account back in with no click (auto_select).
+    // Google signs the same account back in (in Chrome with no click; elsewhere after a click).
     const second = jwt(GOOGLE, T0 + 115 * MIN);
     googleCallback!({ credential: second });
     await settle();
@@ -192,5 +198,71 @@ describe("ROLES-UI-risk-1 a Google sign-in lasts the whole class", () => {
     expect(user()).not.toBeNull();
     await at(12 * 60 * MIN - MIN);
     expect(user()).toBeNull();
+  });
+});
+
+// Google's prompt() signs someone back in with no click only in Chrome (FedCM). Safari and Firefox
+// get a One Tap card that needs a click, so the page says when the sign-in ends and offers Google's
+// button for those 5 minutes (SignInEnding in src/teams/checkin/prof.tsx reads endsAt).
+describe("ROLES-UI-fixcheck-2 the page says when a Google sign-in ends", () => {
+  it("gives the end time from 5 minutes before the token runs out, and clears it once a new token comes", async () => {
+    signedIn(GOOGLE, T0 + 60 * MIN);
+    await settle();
+    expect(endsAt()).toBeNull();
+    await at(54 * MIN);
+    expect(endsAt()).toBeNull();
+    await at(55 * MIN);
+    expect(endsAt()).toBe(T0 + 59 * MIN);
+    googleCallback!({ credential: jwt(GOOGLE, T0 + 115 * MIN) });
+    await settle();
+    expect(endsAt()).toBeNull();
+  });
+
+  it("keeps giving it while nobody clicks Google's card, until the sign-in ends", async () => {
+    signedIn(GOOGLE, T0 + 60 * MIN);
+    await settle();
+    await at(58 * MIN);
+    expect(endsAt()).toBe(T0 + 59 * MIN);
+    await at(59 * MIN);
+    expect(user()).toBeNull();
+    expect(endsAt()).toBeNull();
+  });
+
+  it("gives it on the first render for a saved Google token with under 5 minutes left", () => {
+    signedIn(GOOGLE, T0 + 3 * MIN);
+    hooks.at = 0;
+    last = AuthProvider({ client: {} as ConvexReactClient, children: null }) as typeof last;
+    expect(endsAt()).toBe(T0 + 2 * MIN);
+  });
+
+  it("never gives it for a typed sign-in", async () => {
+    signedIn(TYPED, T0 + 12 * 60 * MIN);
+    await settle();
+    await at(12 * 60 * MIN - 2 * MIN);
+    expect(endsAt()).toBeNull();
+  });
+});
+
+// A One Tap card on the door iPad would let anyone in line tap "Continue as <staff email>".
+describe("ROLES-UI-fixcheck-1 no Google prompt on the door iPad", () => {
+  const goTo = (hash: string) => ((window as unknown as { location: { hash: string } }).location.hash = hash);
+
+  for (const hash of ["#/checkin/kiosk", "#checkin/kiosk", "#/checkin/kiosk?x=1"])
+    it(`never calls prompt() on ${hash}; the sign-in ends a minute before its token`, async () => {
+      goTo(hash);
+      signedIn(GOOGLE, T0 + 60 * MIN);
+      await settle();
+      await at(58 * MIN);
+      expect(prompt).not.toHaveBeenCalled();
+      await at(59 * MIN);
+      expect(user()).toBeNull();
+    });
+
+  it("still calls prompt() on a route that only starts like the kiosk's", async () => {
+    goTo("#/checkin/kioskette");
+    signedIn(GOOGLE, T0 + 60 * MIN);
+    await settle();
+    await at(55 * MIN);
+    expect(prompt).toHaveBeenCalledTimes(1);
   });
 });

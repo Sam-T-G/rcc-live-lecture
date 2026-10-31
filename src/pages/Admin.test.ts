@@ -155,3 +155,30 @@ describe("ROLES #/admin for everyone else", () => {
     expect(pages.admin).toBeTypeOf("function");
   });
 });
+
+// ROLES-UI-fixcheck-2: Safari and Firefox need a click to renew a Google sign-in, so #/admin says
+// when it ends, with Google's button, from 5 minutes before (a minute before the token runs out).
+describe("ROLES-UI-fixcheck-2 #/admin says when a Google sign-in ends", () => {
+  const b64url = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  function openGoogle(email: string, role: "admin" | "professor", minutesLeft: number) {
+    results["staff:me"] = staff(email, role);
+    const exp = Date.now() + minutesLeft * 60_000;
+    const token = `${b64url({ alg: "RS256" })}.${b64url({ iss: "https://accounts.google.com", exp: Math.floor(exp / 1000), email })}.sig`;
+    const saved = { token, exp, name: email, email, picture: "" };
+    vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(saved), setItem() {}, removeItem() {} });
+    return { html: renderToStaticMarkup(createElement(AuthProvider, { client: {} as ConvexReactClient, children: createElement(Admin) })), endsAt: exp - 60_000 };
+  }
+  const time = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+  for (const role of ["admin", "professor"] as const)
+    it(`ROLES-UI-fixcheck-2 as ${role === "admin" ? "an admin" : "a professor"} with 3 minutes left: the end time and Google's button`, () => {
+      const { html, endsAt } = openGoogle(`${role}@example.edu`, role, 3);
+      expect(words(html)).toContain(`Your sign-in ends at ${time(endsAt)}. Sign in with Google again before then to keep this page open.`);
+      expect(html).toContain('<div aria-busy="true" style="min-height:44px"></div>');
+    });
+
+  it("ROLES-UI-fixcheck-2 with 30 minutes left: no notice", () => {
+    const { html } = openGoogle("admin@example.edu", "admin", 30);
+    expect(html).not.toContain("Your sign-in ends at");
+  });
+});

@@ -11,7 +11,7 @@ import { api } from "../../convex/_generated/api";
 import { SignedInAs } from "../blocks/auth";
 import { Badge, Button, ConfirmButton, EmptyState, Field, Segmented, type Choice } from "../blocks/kit";
 import { Card, ErrorBoundary, Screen, Status } from "../blocks/ui";
-import { NotStaff, useStaff, type StaffMe } from "../teams/checkin/prof";
+import { NotStaff, SignInEnding, useStaff, type StaffMe } from "../teams/checkin/prof";
 import { why } from "../teams/checkin/util";
 import "./admin.css";
 
@@ -28,8 +28,13 @@ const when = (ms: number) => new Date(ms).toLocaleString([], { month: "short", d
 
 export default function Admin() {
   const me = useStaff();
-  if (me?.role === "admin") return <AdminView />;
-  if (me?.role === "professor") return <ProfessorView />;
+  if (me?.role === "admin" || me?.role === "professor")
+    return (
+      <>
+        <SignInEnding />
+        {me.role === "admin" ? <AdminView /> : <ProfessorView />}
+      </>
+    );
   return (
     <Screen title="Admin" wide>
       {me === undefined ? <Status kind="loading">Checking who is signed in…</Status> : <AdminsOnly me={me} />}

@@ -36,16 +36,17 @@ Every host-only function starts with `requireProf(ctx)` (`requireHost` in `conve
 **Staff pages** (`src/teams/checkin/prof.tsx`):
 
 ```tsx
-import { DoorGate, StaffGate, useStaff } from "../checkin/prof";
+import { DoorGate, SignInEnding, StaffGate, useStaff } from "../checkin/prof";
 
 <StaffGate title="Live quiz"><ProfessorBoard /></StaffGate>       // professors and admins; anyone else sees the sign-in, or why theirs can't open the page
 const me = useStaff();                                           // undefined loading, null signed out, else { email, role, canHoldRole }
-<DoorGate>{(device) => <Scanner device={device} />}</DoorGate>   // #/checkin/kiosk: staff, a paired iPad, or the pairing screen
+<SignInEnding />                                                 // a Google sign-in's end time and Google's button, its last 5 minutes (StaffGate shows it)
+<DoorGate>{(device) => <Scanner device={device} />}</DoorGate>   // #/checkin/kiosk: a scanner, a paired iPad (it signs out a professor or admin), or the pairing screen
 ```
 
 **Testing as staff on a dev backend:** sign in with the typed form as an `@test.local` email, then `npx convex run staff:devGrant '{"email":"prof1@test.local","role":"professor"}'`. The role lasts 2 hours, and `staff:devRevoke` ends every one at once; devGrant refuses on any backend not in `DEV_HOSTS` (prod included) and refuses any other email. To test the door iPad, open #/checkin/kiosk signed out and type its code on #/admin.
 
-Google's tokens last an hour and a typed sign-in 12 hours; when one runs out the page shows the sign-in again. Convex calls fail with "Sign in first." until then.
+Google's tokens last an hour and a typed sign-in 12 hours; a sign-in ends a minute before its token runs out, and the page shows the sign-in again. For a Google sign-in, 5 minutes before its token runs out, `AuthProvider` asks Google for a new one: Chrome signs the same account back in with no click, while Safari and Firefox show Google's One Tap card, which needs a click (never on #/checkin/kiosk). Professor pages and #/admin show `<SignInEnding />` then, so a professor in any browser can sign in again before the end and keep the page open.
 
 ## Live data (Convex)
 
