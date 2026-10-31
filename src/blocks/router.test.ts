@@ -28,3 +28,18 @@ describe("useHashParams", () => {
     expect(open("")).toBe(" deck=null bridge=null");
   });
 });
+
+describe("useRoute", () => {
+  const Parts = () => JSON.stringify(useRoute());
+  const parts = (hash: string) => {
+    vi.stubGlobal("location", { hash });
+    return JSON.parse(renderToStaticMarkup(createElement(Parts)).replace(/&quot;/g, '"'));
+  };
+
+  it("blocks-frontend-13 decodes each part, and gives a path with a bad %-escape as one part, which names no page", () => {
+    expect(parts("#/live/a%20b")).toEqual(["live", "a b"]);
+    expect(parts("#/live/%E0%A4%A?deck=x")).toEqual(["live/%E0%A4%A"]);
+    expect(parts("#/%E0%A4%A/live")).toEqual(["%E0%A4%A/live"]);
+    expect(parts("#/")).toEqual([]);
+  });
+});

@@ -1,14 +1,33 @@
-import { AuthConfig } from "convex/server";
+import type { AuthConfig } from "convex/server";
 
-// Students and hosts sign in with Google (Google Identity Services). The browser gets a
-// Google ID token and hands it to Convex, which checks it against Google's keys.
-// The client is the GDG/ACM deck relay's; its Authorized JavaScript origins must list
-// every address this app is served from (README, "Google sign-in").
+// Who can sign in. Convex checks every call's token against these providers. It reads this file
+// when functions are pushed (`npx convex dev`, Sam's deploy), with CONVEX_CLOUD_URL set to that
+// backend's URL (or its custom domain, if it has one), so each backend gets its own list.
 //
-// Typed sign-in (src/blocks/devLogin.ts): students type a name and email, no Google. Its
-// signing key is public in this repo, so anyone can sign in as any email; that's why
-// convex/lib.ts never treats it as a host. Accepted on every backend, prod included (Sam,
-// 2026-10-29, for the demos).
+// Google (Google Identity Services), on every backend: students and staff sign in with Google on
+// the live site. The client is the GDG/ACM deck relay's (rcc-deck-relay), so a token from this app
+// also works on the relay's backend and the other way round; change it only together with the
+// relay. Its Authorized JavaScript origins must list every address this app is served from
+// (README, "Google sign-in").
+//
+// Typed test sign-in (src/blocks/devLogin.ts), on the dev backends in DEV_HOSTS only: a name and
+// email typed into the form that `npm run dev` builds show. Its signing key is public in this
+// repo, so anyone can make a token for any email, and prod must never list it. The check fails
+// closed, like isDevBackend in convex/checkin/prof.ts: prod (utmost-ibis-818), a custom domain, any
+// other deployment and a missing CONVEX_CLOUD_URL all get Google alone. To use the typed form on
+// your own dev deployment, add its host here and to DEV_HOSTS in convex/checkin/prof.ts, never
+// prod's; convex/auth.config.test.ts fails when the two lists differ.
+const DEV_HOSTS = ["quaint-swan-637.convex.cloud", "sample-dev-123.convex.cloud"];
+
+// Plain string checks, no URL parsing: an address in any other form counts as prod.
+const cloudUrl = (process.env.CONVEX_CLOUD_URL ?? "").trim().toLowerCase().replace(/\/$/, "");
+const devBackend = DEV_HOSTS.some((host) => cloudUrl === `https://${host}`);
+
+const google = {
+  domain: "https://accounts.google.com",
+  applicationID: "954308885597-kmeh8q5gajj5mh2vhnkgtgfd89e8son4.apps.googleusercontent.com",
+};
+
 const testLogin = {
   type: "customJwt",
   applicationID: "rcc-live-lecture-test",
@@ -18,12 +37,5 @@ const testLogin = {
 } as const;
 
 export default {
-  providers: [
-    {
-      domain: "https://accounts.google.com",
-      applicationID:
-        "954308885597-kmeh8q5gajj5mh2vhnkgtgfd89e8son4.apps.googleusercontent.com",
-    },
-    testLogin,
-  ],
+  providers: devBackend ? [google, testLogin] : [google],
 } satisfies AuthConfig;

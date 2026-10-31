@@ -1,17 +1,47 @@
-// Block: sign-in. Google Identity Services gives the browser an ID token; Convex checks it
-// (convex/auth.config.ts). Wrap the app in <AuthProvider>, put <SignInButton/> where people sign
-// in, and read the user server-side with ctx.auth.getUserIdentity().
-// <SignInButton/> shows Google's button with the typed sign-in (any name and email) under it, for
-// staff screens; <StudentSignIn/> is the typed sign-in on its own, for student screens;
-// <GoogleButton/> is Google's button on its own. Show any of them only to someone signed out:
-// Convex keeps using the token it has until it refreshes it, so a new sign-in on top of a live
-// one reaches the server only after a reload. Staff roles count only for a Google sign-in on
-// prod (convex/checkin/prof.ts).
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
+// Block: sign-in. src/main.tsx wraps the app in <AuthProvider>. Show <StudentSignIn /> (student
+// screens) or <SignInButton /> (staff screens) to someone signed out and <SignedInAs /> to someone
+// signed in; on the server, ctx.auth.getUserIdentity() says who is calling.
+//
+// Two ways to sign in:
+// - Google, in every build and on every backend. Google Identity Services gives the browser an ID
+//   token that lasts an hour, and Convex checks it against Google's keys (convex/auth.config.ts).
+//   Students and staff sign in this way on the live site. Google's script loads only on a page that
+//   shows Google's button or for someone signed in with Google (to renew the token), so the
+//   projector, the team board, #/portal and Home don't load it for someone signed out.
+// - Typed test sign-in, in `npm run dev` builds only: any name and email, signed in the browser
+//   with the key in src/blocks/devLogin.ts. That key is public in this repo, so a typed sign-in
+//   proves nothing about who someone is: `npm run build` leaves the form and devLogin.ts out of
+//   the live site, Convex accepts typed tokens only on the dev backends in convex/auth.config.ts,
+//   and a live build drops one left in the browser. It lasts 12 hours and holds a staff role only
+//   as convex/checkin/prof.ts allows.
+//
+// <StudentSignIn /> and <SignInButton /> show the same thing: Google's button, with the typed form
+// under it in dev builds. Students and staff sign in the same way, so a student is one identity
+// wherever they sign in (a Google and a typed sign-in with the same email are two people to the
+// server: two passes, two attendance rows). <GoogleButton /> is Google's button on its own.
+//
+// The sign-in is kept in localStorage, so every tab of this site has the same one: signing in or
+// out in one tab does the same in the others, and Convex always gets the sign-in the tab shows.
+// When the server refuses the sign-in (its token ran out, or the backend doesn't accept that kind),
+// it's dropped and the sign-in shows again. A lost connection never drops it.
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import { ConvexProviderWithAuth, ConvexReactClient, useConvexAuth } from "convex/react";
+import { Status } from "./ui";
 
 export const GOOGLE_CLIENT_ID = "954308885597-kmeh8q5gajj5mh2vhnkgtgfd89e8son4.apps.googleusercontent.com";
 const KEY = "rcc-live:google-id-token";
+const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Google's script has no types package here
@@ -20,32 +50,75 @@ declare global {
 
 type Stored = { token: string; exp: number; name: string; email: string; picture: string };
 
-function decode(token: string): Stored | null {
+const MIN = 60_000;
+const WARN = 5 * MIN; // how long before the token runs out Google is asked and the page says so
+const DROP = MIN; // how long before the token runs out the sign-in ends
+
+// The typed form's limits: a name fits on a pass and the late banner; an email is at most 254
+// characters (RFC 5321).
+const NAME_MAX = 60;
+const EMAIL_MAX = 254;
+
+// The claims in a token's middle part, read as UTF-8 so "José Núñez" stays as typed, or null.
+function claims(token: string): Record<string, unknown> | null {
   try {
-    const p = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return { token, exp: p.exp * 1000, name: p.name ?? "", email: p.email ?? "", picture: p.picture ?? "" };
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const p: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    return p && typeof p === "object" ? (p as Record<string, unknown>) : null;
   } catch {
     return null;
   }
+}
+
+const text = (v: unknown) => (typeof v === "string" ? v : "");
+
+function decode(token: string): Stored | null {
+  const p = claims(token);
+  if (!p || typeof p.exp !== "number") return null;
+  return { token, exp: p.exp * 1000, name: text(p.name), email: text(p.email), picture: text(p.picture) };
 }
 
 // Whether Google issued this token (the typed sign-in has its own issuer, src/blocks/devLogin.ts).
 function isGoogle(token: string) {
-  try {
-    const iss = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).iss;
-    return iss === "https://accounts.google.com" || iss === "accounts.google.com";
-  } catch {
-    return false;
-  }
+  return GOOGLE_ISSUERS.includes(text(claims(token)?.iss));
 }
 
-function load(): Stored | null {
+// Who a token says it is: its issuer and subject (for a typed sign-in, the email). The server
+// keys people the same way (tokenIdentifier), so two tokens with the same personOf are one person
+// to it.
+function personOf(token: string) {
+  const p = claims(token);
+  return p ? `${text(p.iss)}|${text(p.sub) || text(p.email)}` : token;
+}
+
+// The token saved in localStorage, as it is, or null.
+function savedToken(): string | null {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "null") as Stored | null;
-    return s && s.exp - 60_000 > Date.now() ? s : null;
+    const s = JSON.parse(localStorage.getItem(KEY) || "null") as Partial<Stored> | null;
+    return typeof s?.token === "string" ? s.token : null;
   } catch {
     return null;
   }
+}
+
+// The saved sign-in, or null when there is none, it can't be read, it ends within a minute, or it
+// is a typed sign-in in a live build (the live site signs in with Google, and prod refuses typed
+// tokens). Read from the token itself, so a name saved garbled by an older version reads right.
+function load(): Stored | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY) || "null") as Partial<Stored> | null;
+    if (typeof saved?.token !== "string") return null;
+    const s = decode(saved.token) ?? (saved as Stored);
+    if (!import.meta.env.DEV && !isGoogle(s.token)) return null;
+    return s.exp - MIN > Date.now() ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+function save(s: Stored) {
+  localStorage.setItem(KEY, JSON.stringify(s));
 }
 
 let gsiPromise: Promise<void> | null = null;
@@ -62,10 +135,6 @@ function loadGsi() {
   return gsiPromise;
 }
 
-const MIN = 60_000;
-const WARN = 5 * MIN; // how long before the token runs out Google is asked and the page says so
-const DROP = MIN; // how long before the token runs out the sign-in ends
-
 // A Google sign-in whose token runs out within 5 minutes.
 function ending(s: Stored | null) {
   return !!s && isGoogle(s.token) && s.exp - WARN <= Date.now();
@@ -77,10 +146,12 @@ function onDoorIPad() {
   return /^#\/?checkin\/kiosk(?:[/?]|$)/.test(window.location?.hash ?? "");
 }
 
+// ready: Google's script has loaded (or failed to), so its button can show. It loads once a page
+// asks for the button (renderButton) or someone is signed in with Google.
 // failed: Google's script didn't load (offline, or blocked), so its button can't show.
 // endsAt: when a Google sign-in ends, from 5 minutes before its token runs out (null otherwise; the
-// sign-in ends a minute before the token does), for SignInEnding
-// (src/teams/checkin/prof.tsx) to say so with Google's button.
+// sign-in ends a minute before the token does), for SignInEnding (src/teams/checkin/prof.tsx) to say
+// so with Google's button.
 type AuthState = {
   user: Stored | null;
   ready: boolean;
@@ -90,9 +161,11 @@ type AuthState = {
   renderButton: (el: HTMLElement) => void;
   signInWithToken: (token: string) => void;
 };
-const AuthContext = createContext<AuthState | null>(null);
+// What AuthProvider also hands Convex's provider (useAuthForConvex).
+type Shared = AuthState & { switching: boolean; fetchAccessToken: () => Promise<string | null> };
+const AuthContext = createContext<Shared | null>(null);
 
-export function useGoogleUser() {
+export function useGoogleUser(): AuthState {
   const a = useContext(AuthContext);
   if (!a) throw new Error("useGoogleUser needs <AuthProvider>");
   return a;
@@ -100,42 +173,86 @@ export function useGoogleUser() {
 
 export function AuthProvider({ client, children }: { client: ConvexReactClient; children: ReactNode }) {
   const [user, setUser] = useState<Stored | null>(load);
-  const [ready, setReady] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [gsi, setGsi] = useState<"off" | "loading" | "ready" | "failed">("off");
   // The token whose sign-in is in its last 5 minutes, so the page can say when it ends.
   const [endingToken, setEndingToken] = useState<string | null>(() => {
     const s = load();
     return ending(s) ? s!.token : null;
   });
+  // The person Convex was last told about. When the signed-in person changes (a sign-in, or another
+  // account in another tab), Convex is told "loading" for one render first (switching), so it drops
+  // the old sign-in and checks the new one from the start; DropRefused then knows the server's
+  // answer is about this sign-in.
+  const me = user ? personOf(user.token) : null;
+  const [told, setTold] = useState(me);
+  useEffect(() => setTold(me), [me]);
+  const switching = me !== null && me !== told;
 
+  // Convex asks for the token when it connects and when the server says the one it has ran out. It
+  // gets this tab's sign-in, kept in step with `user` before Convex's own effects run.
+  const token = user?.token ?? null;
+  const tokenRef = useRef(token);
+  useLayoutEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+  const fetchAccessToken = useCallback(async () => tokenRef.current, []);
+
+  const wantGoogle = useCallback(() => setGsi((s) => (s === "off" ? "loading" : s)), []);
   useEffect(() => {
+    if (gsi !== "loading") return;
+    let live = true;
     loadGsi()
       .then(() => {
-        if (gsiReady) return setReady(true);
-        gsiReady = true;
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: (r: { credential: string }) => {
-            const s = decode(r.credential);
-            if (!s) return;
-            localStorage.setItem(KEY, JSON.stringify(s));
-            setUser(s);
-          },
-          auto_select: true,
-          itp_support: true,
-        });
-        setReady(true);
+        if (!gsiReady) {
+          gsiReady = true;
+          window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: (r: { credential: string }) => {
+              const s = decode(r.credential);
+              if (!s) return;
+              save(s);
+              setUser(s);
+            },
+            auto_select: true,
+            itp_support: true,
+          });
+        }
+        if (live) setGsi("ready");
       })
       .catch(() => {
-        setFailed(true);
-        setReady(true);
+        if (live) setGsi("failed");
       });
+    return () => {
+      live = false;
+    };
+  }, [gsi]);
+  useEffect(() => {
+    if (user && isGoogle(user.token)) wantGoogle();
+  }, [user, wantGoogle]);
+
+  // Another tab signed in, signed out or renewed the sign-in: this tab follows it. pageshow covers
+  // a tab coming back from the browser's back-forward cache, which misses those events.
+  useEffect(() => {
+    const sync = () => {
+      const next = load();
+      setUser((u) => (u?.token === next?.token ? u : next));
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === KEY || e.key === null) sync();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("pageshow", sync);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("pageshow", sync);
+    };
   }, []);
 
   // Google ID tokens last an hour, and a class runs longer. The sign-in ends a minute before its
-  // token runs out (so no call goes out with a token about to lapse). 5 minutes before the token
-  // runs out, two things happen, and the callback above saves any new token in the old one's place
-  // (Convex reads it on its next refresh, so the page stays open):
+  // token runs out (so no call goes out with a token about to lapse), unless another tab saved a
+  // newer one by then. 5 minutes before the token runs out, two things happen, and the callback
+  // above saves any new token in the old one's place (Convex reads it on its next refresh, so the
+  // page stays open):
   // - prompt() asks Google for a new token. In Chrome (FedCM) auto_select signs the same account
   //   back in with no click, unless it did so in the last 10 minutes. Safari and Firefox show a
   //   One Tap card instead, which needs a click; anyone who dismissed the card gets none for a
@@ -149,12 +266,17 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
     if (!user) return;
     const left = user.exp - Date.now();
     const google = isGoogle(user.token);
-    const asks = google && ready && !failed ? [left - WARN, left - 2 * MIN] : [];
+    const asks = google && gsi === "ready" ? [left - WARN, left - 2 * MIN] : [];
     const timers = asks.map((ms) => setTimeout(() => onDoorIPad() || window.google?.accounts.id.prompt(), Math.max(0, ms)));
     if (google) timers.push(setTimeout(() => setEndingToken(user.token), Math.max(0, left - WARN)));
-    timers.push(setTimeout(() => { localStorage.removeItem(KEY); setUser(null); }, Math.max(0, left - DROP)));
+    timers.push(
+      setTimeout(() => {
+        if (savedToken() === user.token) localStorage.removeItem(KEY);
+        setUser(load());
+      }, Math.max(0, left - DROP)),
+    );
     return () => timers.forEach(clearTimeout);
-  }, [user, ready, failed]);
+  }, [user, gsi]);
   const endsAt = user && endingToken === user.token ? user.exp - DROP : null;
 
   const signOut = useCallback(() => {
@@ -163,46 +285,71 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
     setUser(null);
   }, []);
 
+  // Draws Google's button into `el`, loading Google's script first if it hasn't loaded yet.
   const renderButton = useCallback(
     (el: HTMLElement) => {
-      if (!ready || !window.google) return;
+      if (gsi !== "ready" || !window.google) return wantGoogle();
       window.google.accounts.id.renderButton(el, { theme: "outline", size: "large", shape: "pill", text: "continue_with" });
     },
-    [ready],
+    [gsi, wantGoogle],
   );
 
-  // Signs in with a token made somewhere other than Google (the dev test sign-in).
-  const signInWithToken = useCallback((token: string) => {
-    const s = decode(token);
+  // Signs in with a token made somewhere other than Google (the typed test sign-in).
+  const signInWithToken = useCallback((t: string) => {
+    const s = decode(t);
     if (!s) return;
-    localStorage.setItem(KEY, JSON.stringify(s));
+    save(s);
     setUser(s);
   }, []);
 
+  // DropRefused: the server refused this token.
+  const drop = useCallback((t: string) => {
+    if (savedToken() === t) localStorage.removeItem(KEY);
+    setUser((u) => (u?.token === t ? null : u));
+  }, []);
+
+  const ready = gsi === "ready" || gsi === "failed";
+  const failed = gsi === "failed";
   const value = useMemo(
-    () => ({ user, ready, failed, endsAt, signOut, renderButton, signInWithToken }),
-    [user, ready, failed, endsAt, signOut, renderButton, signInWithToken],
+    () => ({ user, ready, failed, endsAt, signOut, renderButton, signInWithToken, switching, fetchAccessToken }),
+    [user, ready, failed, endsAt, signOut, renderButton, signInWithToken, switching, fetchAccessToken],
   );
 
   return (
     <AuthContext.Provider value={value}>
-      <ConvexProviderWithAuth client={client} useAuth={useConvexAuth}>
+      <ConvexProviderWithAuth client={client} useAuth={useAuthForConvex}>
+        <DropRefused token={token} drop={drop} />
         {children}
       </ConvexProviderWithAuth>
     </AuthContext.Provider>
   );
 }
 
-// What Convex calls to get the token. A module-level hook, so its identity never changes.
-function useConvexAuth() {
-  const u = useContext(AuthContext)?.user ?? null;
-  const fetchAccessToken = useCallback(async () => load()?.token ?? null, []);
-  return { isLoading: false, isAuthenticated: !!u, fetchAccessToken };
+// What Convex's provider calls to learn about the sign-in. A module-level hook, so its identity
+// never changes.
+function useAuthForConvex() {
+  const a = useContext(AuthContext)!;
+  return { isLoading: a.switching, isAuthenticated: !!a.user && !a.switching, fetchAccessToken: a.fetchAccessToken };
 }
 
-// Google's "Continue with Google" button. Google's script draws it into this box once
-// AuthProvider has loaded it; the box keeps the button's height meanwhile, so nothing under it
-// jumps.
+// Drops the sign-in when the server refuses its token, so the sign-in shows again: a token that ran
+// out, or a kind the backend doesn't accept (a typed sign-in once prod stopped taking them). It
+// acts on a token only after seeing Convex check it (isLoading), which every sign-in goes through,
+// whether saved from before or new (switching). A lost connection changes nothing here, so it never
+// drops a sign-in.
+function DropRefused({ token, drop }: { token: string | null; drop: (token: string) => void }) {
+  const { isLoading, isAuthenticated } = useConvexAuth();
+  const checking = useRef<string | null>(null);
+  useEffect(() => {
+    if (!token) return;
+    if (isLoading) checking.current = token;
+    else if (!isAuthenticated && checking.current === token) drop(token);
+  }, [token, isLoading, isAuthenticated, drop]);
+  return null;
+}
+
+// Google's "Continue with Google" button. Google's script draws it into this box once it has
+// loaded; the box keeps the button's height meanwhile, so nothing under it jumps.
 export function GoogleButton() {
   const { renderButton, ready, failed } = useGoogleUser();
   const box = useRef<HTMLDivElement>(null);
@@ -217,23 +364,21 @@ export function GoogleButton() {
   );
 }
 
-// Staff sign in here: Google's button, with the typed sign-in (a name and an email) under it.
+// Staff screens: Google's button, with the typed test sign-in under it in `npm run dev` builds.
+// A live build leaves TestSignIn, and with it src/blocks/devLogin.ts, out of the bundle.
 export function SignInButton() {
   return (
     <div>
       <GoogleButton />
-      <TestSignIn heading="Or type your name and email" />
+      {import.meta.env.DEV && <TestSignIn />}
     </div>
   );
 }
 
-// Students sign in here: the typed sign-in only. Google and the typed sign-in give the same email
-// two identities (tokenIdentifier is issuer|subject), so a student who checked in one way and
-// signs back in the other way would be a new student to the server: no check-in, a second pass,
-// a second attendance row (ROLES-UI-risk-2). Students have typed since 2026-10-29, so they keep
-// typing until prod stops taking typed sign-ins and this becomes Google's button.
+// Student screens: the same as staff screens, Google's button with the typed test sign-in under
+// it in `npm run dev` builds.
 export function StudentSignIn() {
-  return <TestSignIn />;
+  return <SignInButton />;
 }
 
 // Who this browser is signed in as, so a student who typed the wrong email or picked up a
@@ -252,29 +397,44 @@ export function SignedInAs() {
   );
 }
 
-// Typed sign-in: any name and email (convex/auth.config.ts). Anyone can type any email, so a
-// typed sign-in holds a staff role only on a dev backend (convex/checkin/prof.ts).
-function TestSignIn({ heading }: { heading?: string }) {
+// The typed test sign-in (`npm run dev` only): a name and an email. The token is signed in the
+// browser with crypto.subtle, which browsers give only to https pages and localhost, so the dev
+// server's LAN address (http://192.168.x.x:5173 on a phone) says so instead of failing.
+function TestSignIn() {
   const { signInWithToken } = useGoogleUser();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [err, setErr] = useState("");
+  const heading = <strong style={{ width: "100%" }}>Test sign-in (dev only)</strong>;
+  if (globalThis.isSecureContext === false)
+    return (
+      <div style={{ marginTop: 16 }}>
+        {heading}
+        <Status kind="error">Sign-in needs https. Open the live site or localhost.</Status>
+      </div>
+    );
   async function go(e: FormEvent) {
     e.preventDefault();
+    const n = name.trim();
+    const m = email.trim();
+    // `required` lets a name of only spaces through, and the name shows on the pass, the door
+    // iPad and the late banner, so it's never replaced with the email.
+    if (!n) return setErr("Type your name.");
+    setErr("");
     try {
       const { mintTestToken } = await import("./devLogin");
-      signInWithToken(await mintTestToken(name.trim() || email.trim(), email.trim()));
+      signInWithToken(await mintTestToken(n.slice(0, NAME_MAX), m.slice(0, EMAIL_MAX)));
     } catch {
       setErr("Sign-in failed. Try again.");
     }
   }
   return (
     <form onSubmit={go} style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16, alignItems: "center" }}>
-      {heading && <strong style={{ width: "100%" }}>{heading}</strong>}
-      <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Your name" placeholder="Your name" required autoComplete="name" />
-      <input value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Your email" placeholder="Your email" type="email" required autoComplete="email" />
+      {heading}
+      <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Your name" placeholder="Your name" required maxLength={NAME_MAX} autoComplete="name" />
+      <input value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Your email" placeholder="Your email" type="email" required maxLength={EMAIL_MAX} autoComplete="email" />
       <button type="submit">Sign in</button>
-      {err && <span role="alert">{err}</span>}
+      {err && <Status kind="error">{err}</Status>}
     </form>
   );
 }

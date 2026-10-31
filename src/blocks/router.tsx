@@ -3,11 +3,23 @@
 // useHashParams().
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+// The parts of the path in the hash, decoded: #/checkin/stage?deck=x gives ["checkin", "stage"].
+// A part with a bad %-escape (#/live/%E0%A4%A) can't be decoded, so the whole path comes back as
+// one part. No page has that name, so App shows "No page" instead of a blank screen.
+function readRoute() {
+  const path = location.hash.replace(/^#\/?/, "").split("?")[0] || "";
+  const parts = path.split("/").filter(Boolean);
+  try {
+    return parts.map(decodeURIComponent);
+  } catch {
+    return [path];
+  }
+}
+
 export function useRoute() {
-  const read = () => (location.hash.replace(/^#\/?/, "").split("?")[0] || "").split("/").filter(Boolean).map(decodeURIComponent);
-  const [parts, setParts] = useState(read);
+  const [parts, setParts] = useState(readRoute);
   useEffect(() => {
-    const on = () => setParts(read());
+    const on = () => setParts(readRoute());
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);

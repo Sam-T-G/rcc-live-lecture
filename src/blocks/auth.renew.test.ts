@@ -45,17 +45,22 @@ vi.mock("react", async (orig) => {
       if (changed(s.deps, deps)) Object.assign(s, { value: make(), deps });
       return s.value;
     },
-    useEffect: (fn: () => void | (() => void), deps: unknown[]) => {
-      const s = slot<Effect>(() => ({}));
-      if (changed(s.deps, deps)) {
-        s.deps = deps;
-        hooks.effects.push(() => {
-          if (typeof s.cleanup === "function") s.cleanup();
-          s.cleanup = fn();
-        });
-      }
-    },
+    useRef: (init: unknown) => slot(() => ({ current: init })),
+    useEffect: effect,
+    // Layout effects run before effects in React; here they keep call order, which AuthProvider
+    // doesn't depend on.
+    useLayoutEffect: effect,
   };
+  function effect(fn: () => void | (() => void), deps: unknown[]) {
+    const s = slot<Effect>(() => ({}));
+    if (changed(s.deps, deps)) {
+      s.deps = deps;
+      hooks.effects.push(() => {
+        if (typeof s.cleanup === "function") s.cleanup();
+        s.cleanup = fn();
+      });
+    }
+  }
 });
 vi.mock("convex/react", () => ({ ConvexProviderWithAuth: ({ children }: { children: ReactNode }) => children, ConvexReactClient: class {} }));
 
@@ -92,6 +97,8 @@ beforeEach(async () => {
   googleCallback = undefined;
   vi.stubGlobal("window", {
     location: { hash: "#/host" },
+    addEventListener: () => {},
+    removeEventListener: () => {},
     google: {
       accounts: {
         id: {

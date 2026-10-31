@@ -1,11 +1,11 @@
 // @vitest-environment node
-// Student screens signed out show one way to sign in (ROLES-UI-risk-2). Google and the typed form
-// give the same email two identities (tokenIdentifier is issuer|subject), so a student who checks in
-// one way and signs back in the other way is a new student to the server: "Check in first." on the
-// quiz, a second pass, a second attendance row. Until prod stops taking typed sign-ins, student
-// screens show only the typed form; staff screens keep Google's button with the typed form under it.
-// Rendered inside the real AuthProvider (Convex's provider swapped for a pass-through, as in
-// auth.test.ts), so the real sign-in components render.
+// Student screens signed out (D1). On the live site students sign in with Google, the same as
+// staff, so a student is one identity wherever they sign in: a Google and a typed sign-in with the
+// same email are two people to the server (tokenIdentifier is issuer|subject), with two passes and
+// two attendance rows (ROLES-UI-risk-2). The typed form shows only in `npm run dev` builds, under
+// Google's button, and prod refuses typed tokens (convex/auth.config.ts). Rendered inside the real
+// AuthProvider (Convex's provider swapped for a pass-through, as in auth.test.ts), so the real
+// sign-in components render; a test stubs import.meta.env.DEV false for a live build.
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ConvexReactClient } from "convex/react";
@@ -17,6 +17,7 @@ import Questions from "../teams/live/Questions";
 vi.mock("convex/react", () => ({
   ConvexProviderWithAuth: ({ children }: { children: ReactNode }) => children,
   ConvexReactClient: class {},
+  useConvexAuth: () => ({ isLoading: true, isAuthenticated: false }),
   useQuery: () => undefined,
   useMutation: () => async () => null,
 }));
@@ -29,17 +30,26 @@ function signedOut(child: () => ReactNode) {
 // The box Google's script draws its button into, before the script has loaded.
 const GOOGLE_BOX = '<div aria-busy="true" style="min-height:44px"></div>';
 
-describe("student screens signed out (ROLES-UI-risk-2)", () => {
+describe("D1 student screens signed out", () => {
   const screens: [string, () => ReactNode][] = [
     ["#/checkin/student", Student],
     ["#/live questions", () => createElement(Questions, { index: 0 })],
   ];
-  for (const [name, screen] of screens)
-    it(`ROLES-UI-risk-2 ${name} shows the typed sign-in only, with no Google button`, () => {
+  for (const [name, screen] of screens) {
+    it(`D1 ${name} on the live site shows Google's button and no typed form`, () => {
+      vi.stubEnv("DEV", false);
       const html = signedOut(screen);
-      expect(html).not.toContain(GOOGLE_BOX);
-      expect(html.match(/<form/g)).toHaveLength(1);
-      expect(html).toContain('aria-label="Your email"');
-      expect(html).not.toMatch(/Or type your name/);
+      expect(html).toContain(GOOGLE_BOX);
+      expect(html).not.toContain("<form");
+      expect(html).not.toContain('aria-label="Your email"');
     });
+
+    it(`D1 ${name} in a dev build shows Google's button with the typed test sign-in under it`, () => {
+      const html = signedOut(screen);
+      expect(html).toContain(GOOGLE_BOX);
+      expect(html.match(/<form/g)).toHaveLength(1);
+      expect(html.indexOf(GOOGLE_BOX)).toBeLessThan(html.indexOf("Test sign-in (dev only)"));
+      expect(html).toContain('aria-label="Your email"');
+    });
+  }
 });

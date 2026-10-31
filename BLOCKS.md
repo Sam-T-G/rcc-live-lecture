@@ -10,11 +10,11 @@ Everything the product needs that isn't the product. Each block is tested on the
 import { SignInButton, SignedInAs, StudentSignIn, useGoogleUser } from "../blocks/auth";
 
 const { user, signOut } = useGoogleUser(); // user: { name, email, picture } or null
-return user ? <SignedInAs /> : <SignInButton />;  // staff screens: Google's button, with the typed form under it
-return user ? <SignedInAs /> : <StudentSignIn />; // student screens: the typed form only
+return user ? <SignedInAs /> : <SignInButton />;  // staff screens: Google's button, the typed test form under it in `npm run dev`
+return user ? <SignedInAs /> : <StudentSignIn />; // student screens: the same
 ```
 
-Student screens show one way to sign in: Google and the typed form give the same email two identities on the server (`tokenIdentifier` is issuer|subject), so a student who checked in with one and signs back in with the other has no check-in, gets a second pass and a second attendance row. `<SignedInAs />` is "Signed in as Jane Doe (jane@example.edu)" with a "Not you? Sign out" button. `<GoogleButton />` is Google's button on its own. Show any of these only to someone signed out: Convex keeps the token it has until it refreshes it, so a sign-in on top of a live one reaches the server only after a reload.
+On the live site everyone signs in with Google: the typed test form shows only in `npm run dev` builds, and prod refuses typed tokens (`convex/auth.config.ts` lists them only on the dev backends in `DEV_HOSTS`). Google and the typed form give the same email two identities on the server (`tokenIdentifier` is issuer|subject), so a student who checked in with one and signed back in with the other would have no check-in, a second pass and a second attendance row. `<SignedInAs />` is "Signed in as Jane Doe (jane@example.edu)" with a "Not you? Sign out" button. `<GoogleButton />` is Google's button on its own; Google's script loads only where a page shows it or someone is signed in with Google. Show a sign-in only to someone signed out. Every tab shares the sign-in (signing in or out in one tab does it in the others), and a sign-in the server refuses is dropped so the sign-in shows again.
 
 **Server:**
 
