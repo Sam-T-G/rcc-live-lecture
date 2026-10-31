@@ -33,6 +33,10 @@ const CH = "gdg";
 const T0 = at(2026, 11, 5, 21, 30);
 const MIN = 60_000;
 const NEW_EMAIL = "new@example.edu";
+// How People and Changes name who added someone when it wasn't a person.
+const SETTINGS = "Server settings"; // ADMIN_EMAILS admins
+const OLD_LIST = "Import from the old professor list"; // staff:importHostEmails
+const TEST_SETUP = "Test setup on the dev server"; // staff:devGrant
 
 // Every test runs on prod's URL, where only Google sign-ins hold roles, unless it says otherwise.
 beforeEach(() => {
@@ -64,6 +68,8 @@ async function codeFor(t: T, token: string) {
 }
 // A device token made of one byte, repeated: "00" x 32, "01" x 32, ...
 const tokenN = (n: number) => n.toString(16).padStart(2, "0").repeat(32);
+// How many pairing requests are stored (rows() reads only 100).
+const pairingCount = (t: T) => t.run(async (ctx) => (await ctx.db.query("pairings").take(1000)).length);
 
 describe("ROLES staff.me", () => {
   it("ROLES staff.me is null signed out; otherwise it gives the email, the role and whether the sign-in can hold one", async () => {
@@ -141,7 +147,7 @@ describe("ROLES admin: only admins change roles, env admins locked, every change
     await boss.mutation(api.staff.add, { email: "  New@Example.EDU ", role: "professor" });
     expect(await newcomer.query(api.checkin.pass.amHost, {})).toBe(true);
     expect(await boss.query(api.staff.people, {})).toEqual([
-      { email: ADMIN_EMAIL, role: "admin", addedBy: "ADMIN_EMAILS", at: null, locked: true },
+      { email: ADMIN_EMAIL, role: "admin", addedBy: SETTINGS, at: null, locked: true },
       { email: NEW_EMAIL, role: "professor", addedBy: ADMIN_EMAIL, at: T0, locked: false },
     ]);
 
@@ -154,7 +160,7 @@ describe("ROLES admin: only admins change roles, env admins locked, every change
     await boss.mutation(api.staff.remove, { email: NEW_EMAIL });
     expect(await newcomer.query(api.staff.me, {})).toMatchObject({ role: null });
     expect(await newcomer.query(api.checkin.pass.canScan, {})).toBe(false);
-    expect(await boss.query(api.staff.people, {})).toEqual([{ email: ADMIN_EMAIL, role: "admin", addedBy: "ADMIN_EMAILS", at: null, locked: true }]);
+    expect(await boss.query(api.staff.people, {})).toEqual([{ email: ADMIN_EMAIL, role: "admin", addedBy: SETTINGS, at: null, locked: true }]);
 
     const changes = await boss.query(api.staff.changes, {});
     expect(changes.map((c) => [c.at, c.by, c.action, c.email, c.role, c.oldRole, c.label, c.text])).toEqual([
@@ -185,21 +191,25 @@ describe("ROLES admin: only admins change roles, env admins locked, every change
     const t = setup();
     const boss = admin(t);
     for (const email of [ADMIN_EMAIL, " SECOND@example.edu "]) {
-      await expect(boss.mutation(api.staff.add, { email, role: "professor" })).rejects.toThrow("is an admin in ADMIN_EMAILS already.");
-      await expect(boss.mutation(api.staff.setRole, { email, role: "scanner" })).rejects.toThrow("is an admin in ADMIN_EMAILS, so this page can't change their role.");
-      await expect(boss.mutation(api.staff.remove, { email })).rejects.toThrow("is an admin in ADMIN_EMAILS, so this page can't remove them.");
+      await expect(boss.mutation(api.staff.add, { email, role: "professor" })).rejects.toThrow(`${email.trim().toLowerCase()} is a permanent admin already (set in the server settings).`);
+      await expect(boss.mutation(api.staff.setRole, { email, role: "scanner" })).rejects.toThrow(
+        `${email.trim().toLowerCase()} is a permanent admin (set in the server settings), so their role can't change here.`,
+      );
+      await expect(boss.mutation(api.staff.remove, { email })).rejects.toThrow(
+        `${email.trim().toLowerCase()} is a permanent admin (set in the server settings), so they can't be removed here.`,
+      );
     }
     // The second ADMIN_EMAILS admin can't remove the first either.
     await expect(google(t, "Sample admin 2", "second@example.edu").mutation(api.staff.remove, { email: ADMIN_EMAIL })).rejects.toThrow(
-      "so this page can't remove them.",
+      "so they can't be removed here.",
     );
     // A staff row with another role doesn't demote an ADMIN_EMAILS admin, and People still shows them locked.
     await grant(t, "second@example.edu", "scanner");
     await grant(t, PROF_EMAIL, "professor");
     expect(await google(t, "Sample admin 2", "second@example.edu").query(api.staff.me, {})).toMatchObject({ role: "admin" });
     expect(await boss.query(api.staff.people, {})).toEqual([
-      { email: ADMIN_EMAIL, role: "admin", addedBy: "ADMIN_EMAILS", at: null, locked: true },
-      { email: "second@example.edu", role: "admin", addedBy: "ADMIN_EMAILS", at: null, locked: true },
+      { email: ADMIN_EMAIL, role: "admin", addedBy: SETTINGS, at: null, locked: true },
+      { email: "second@example.edu", role: "admin", addedBy: SETTINGS, at: null, locked: true },
       { email: PROF_EMAIL, role: "professor", addedBy: ADMIN_EMAIL, at: T0, locked: false },
     ]);
     expect(await boss.query(api.staff.changes, {})).toEqual([]);
@@ -391,12 +401,14 @@ describe("ROLES pairing: expiry, single use, unpair revokes, only staff approve,
     await expect(t.mutation(api.checkin.pass.scan, { device: hash, channel: CH, code: pass })).rejects.toThrow("This iPad isn't paired.");
     // A token that isn't 64 lower-case hex characters is refused and reads as none.
     for (const token of ["", "short", DEVICE_TOKEN.toUpperCase(), DEVICE_TOKEN + "0", DEVICE_TOKEN.slice(1)]) {
-      await expect(t.mutation(api.staff.requestPairing, { token })).rejects.toThrow("This iPad sent a bad device token. Reload the page.");
+      await expect(t.mutation(api.staff.requestPairing, { token })).rejects.toThrow(
+        "This iPad's saved ID is broken. Clear this site's data in the iPad's settings, then open the page again.",
+      );
       expect(await t.query(api.staff.deviceStatus, { token })).toEqual({ status: "none" });
     }
   });
 
-  it("ROLES pairing: codes are unique among open requests, and at most 20 iPads wait for a code at once", async () => {
+  it("ROLES pairing: codes are unique among open requests, and throwaway requests from a signed-out caller never keep a door iPad from getting a code", async () => {
     const t = setup();
     const first = await codeFor(t, tokenN(0));
     // Make the next code come out the same as the first one: the request picks another.
@@ -417,16 +429,26 @@ describe("ROLES pairing: expiry, single use, unpair revokes, only staff approve,
       spy.mockRestore();
     }
 
+    // Someone signed out fills every open slot (200) with throwaway tokens. The codes stay unique.
     const codes = [first, next];
-    for (let n = 2; n < 20; n++) codes.push(await codeFor(t, tokenN(n)));
-    expect(new Set(codes).size).toBe(20);
-    await expect(t.mutation(api.staff.requestPairing, { token: tokenN(20) })).rejects.toThrow("Too many iPads are waiting for a code. Try again in 10 minutes.");
-    // An iPad already waiting still gets its own code back.
+    for (let n = 2; n < 200; n++) codes.push(await codeFor(t, tokenN(n)));
+    expect(new Set(codes).size).toBe(200);
+    // The door iPad still gets a code: the oldest throwaway request makes room.
+    const door = await codeFor(t, DEVICE_TOKEN);
+    expect(door).toMatch(/^\d{6}$/);
+    expect(await pairingCount(t)).toBe(200);
+    expect(await t.query(api.staff.deviceStatus, { token: tokenN(0) })).toEqual({ status: "none" });
+    expect(await t.query(api.staff.deviceStatus, { token: tokenN(1) })).toMatchObject({ status: "waiting", code: next });
+    // A professor types the door iPad's code and it pairs.
+    await (await professor(t)).mutation(api.staff.approvePairing, { code: door, label: "A-210 door" });
+    expect(await t.query(api.staff.deviceStatus, { token: DEVICE_TOKEN })).toEqual({ status: "paired", label: "A-210 door" });
+    // An iPad already waiting gets its own code back without pushing anyone out.
     expect(await codeFor(t, tokenN(5))).toBe(codes[5]);
-    // Once those codes expire, the next iPad gets one.
-    vi.advanceTimersByTime(10 * MIN);
-    await t.finishInProgressScheduledFunctions();
-    expect(await codeFor(t, tokenN(20))).toMatch(/^\d{6}$/);
+    expect(await t.query(api.staff.deviceStatus, { token: tokenN(1) })).toMatchObject({ status: "waiting", code: next });
+    // A second round of throwaway tokens doesn't stop the next iPad either.
+    for (let n = 200; n < 230; n++) await codeFor(t, tokenN(n));
+    expect(await codeFor(t, OTHER_TOKEN)).toMatch(/^\d{6}$/);
+    expect(await pairingCount(t)).toBe(200);
   });
 });
 
@@ -449,36 +471,47 @@ describe("ROLES devGrant and importHostEmails (CLI only)", () => {
     expect(await t.mutation(internal.staff.devGrant, { email: "prof1@test.local", role: "professor" })).toBe("prof1@test.local is professor already.");
     expect(await t.mutation(internal.staff.devGrant, { email: "prof1@test.local", role: "admin" })).toBe("prof1@test.local is admin now.");
     expect(await tester.query(api.staff.people, {})).toEqual([
-      { email: ADMIN_EMAIL, role: "admin", addedBy: "ADMIN_EMAILS", at: null, locked: true },
-      { email: "prof1@test.local", role: "admin", addedBy: "devGrant", at: T0, locked: false },
+      { email: ADMIN_EMAIL, role: "admin", addedBy: SETTINGS, at: null, locked: true },
+      { email: "prof1@test.local", role: "admin", addedBy: TEST_SETUP, at: T0, locked: false },
     ]);
     expect((await tester.query(api.staff.changes, {})).map((c) => c.text)).toEqual([
-      "devGrant changed prof1@test.local from professor to admin.",
-      "devGrant added prof1@test.local as professor.",
+      `${TEST_SETUP} changed prof1@test.local from professor to admin.`,
+      `${TEST_SETUP} added prof1@test.local as professor.`,
     ]);
+    expect((await tester.query(api.staff.changes, {})).map((c) => c.by)).toEqual([TEST_SETUP, TEST_SETUP]);
     // The same typed sign-in holds nothing on prod.
     vi.stubEnv("CONVEX_CLOUD_URL", PROD_URL);
     expect(await tester.query(api.checkin.pass.amHost, {})).toBe(false);
   });
 
   it("ROLES importHostEmails adds each HOST_EMAILS address as a professor once, keeps the roles people have, and a second run adds nobody", async () => {
-    vi.stubEnv("HOST_EMAILS", ` Host@Example.edu , door@example.edu,,not-an-email, host@example.edu `);
+    vi.stubEnv("HOST_EMAILS", ` Host@Example.edu , door@example.edu,,not-an-email, host@example.edu, ${ADMIN_EMAIL.toUpperCase()} `);
     const t = setup();
     await grant(t, SCANNER_EMAIL, "scanner");
     const host = google(t, "Sample host", "host@example.edu");
     expect(await host.query(api.checkin.pass.amHost, {})).toBe(false);
     expect(await t.mutation(internal.staff.importHostEmails, {})).toBe(
-      "HOST_EMAILS: 3 addresses. Added as professors: 1. Had a role already: 1. Not email addresses: 1.",
+      "HOST_EMAILS: 4 addresses. Added as professors: 1. Had a role already: 2. Not email addresses: 1.",
     );
     expect(await t.mutation(internal.staff.importHostEmails, {})).toBe(
-      "HOST_EMAILS: 3 addresses. Added as professors: 0. Had a role already: 2. Not email addresses: 1.",
+      "HOST_EMAILS: 4 addresses. Added as professors: 0. Had a role already: 3. Not email addresses: 1.",
     );
     const { staff } = await rows(t);
     expect(staff.map((s) => [s.email, s.role, s.addedBy])).toEqual([
       [SCANNER_EMAIL, "scanner", ADMIN_EMAIL],
-      ["host@example.edu", "professor", "HOST_EMAILS import"],
+      ["host@example.edu", "professor", "HOST_EMAILS import"], // stored as is; People and Changes show OLD_LIST
     ]);
-    expect((await admin(t).query(api.staff.changes, {})).map((c) => c.text)).toEqual(["HOST_EMAILS import added host@example.edu as professor."]);
+    expect((await admin(t).query(api.staff.changes, {})).map((c) => c.text)).toEqual([`${OLD_LIST} added host@example.edu as professor.`]);
+    // The ADMIN_EMAILS admin on HOST_EMAILS got no hidden professor row: People shows them once, locked.
+    expect(await admin(t).query(api.staff.people, {})).toEqual([
+      { email: ADMIN_EMAIL, role: "admin", addedBy: SETTINGS, at: null, locked: true },
+      { email: SCANNER_EMAIL, role: "scanner", addedBy: ADMIN_EMAIL, at: T0, locked: false },
+      { email: "host@example.edu", role: "professor", addedBy: OLD_LIST, at: T0, locked: false },
+    ]);
+    // If their address later leaves ADMIN_EMAILS, no leftover row keeps them on staff.
+    vi.stubEnv("ADMIN_EMAILS", "someone-else@example.edu");
+    expect(await admin(t).query(api.staff.me, {})).toMatchObject({ role: null });
+    vi.stubEnv("ADMIN_EMAILS", ADMIN_EMAIL);
     expect(await host.query(api.checkin.pass.amHost, {})).toBe(true);
 
     vi.stubEnv("HOST_EMAILS", undefined);

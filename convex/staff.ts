@@ -13,8 +13,10 @@
 //
 //   #/admin, People and Changes:
 //   api.staff.people          {} -> [{ email, role, addedBy, at, locked }]                admin
-//       ADMIN_EMAILS admins come first, with locked: true, addedBy "ADMIN_EMAILS" and at null:
-//       show them without a role picker or Remove. Then everyone else, by email.
+//       ADMIN_EMAILS admins come first, with locked: true, addedBy "Server settings" and at null:
+//       show them without a role picker or Remove. Then everyone else, by email. addedBy is an
+//       admin's email, or "Import from the old professor list" (importHostEmails) or "Test setup
+//       on the dev server" (devGrant); Changes names those two the same way, in by and text.
 //   api.staff.add             { email, role } -> null                                     admin
 //   api.staff.setRole         { email, role } -> null                                     admin
 //   api.staff.remove          { email } -> null                                           admin
@@ -40,7 +42,9 @@
 //   api.staff.requestPairing  { token } -> { status: "waiting", code, expiresAt }
 //                                       | { status: "paired", label }                    anyone
 //       Gets a 6-digit code that works for 10 minutes. Asking again with the same token gives
-//       the same code until it expires. At most 20 iPads can wait for a code at once.
+//       the same code until it expires. At most 200 codes are open at once: a new request past
+//       that ends the oldest one (that iPad's status goes to "none", so it asks again), so
+//       requests from signed-out callers can't keep a door iPad from getting a code.
 //   api.staff.deviceStatus    { token } -> { status: "none" } | { status: "waiting", code,
 //                                          expiresAt } | { status: "paired", label }       anyone
 //       Live: "paired" once a professor approves the code; "none" once the code expires (call
@@ -51,7 +55,7 @@
 //
 // For the CLI (internal: npx convex run, never from a page):
 //   staff:devGrant '{"email":"prof1@test.local","role":"professor"}'   a role for a test email; dev backends only
-//   staff:importHostEmails                                              every HOST_EMAILS address without a role becomes a professor; safe to run again
+//   staff:importHostEmails                                              every HOST_EMAILS address without a role (and not in ADMIN_EMAILS) becomes a professor; safe to run again
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -73,11 +77,23 @@ import { randomCode } from "./lib";
 import { staffActionValidator } from "./schema";
 
 const PAIR_MS = 10 * 60_000; // a pairing code works this long
-const MAX_WAITING = 20; // iPads that can wait for a code at once, so codes stay hard to hit by mistake
+// Open pairing codes at once. A professor's typo matches someone else's open code at most
+// 200 times in 10^6. Past the cap, a new request ends the oldest one instead of being refused,
+// so blocking a door iPad takes 200 requests between its code showing and the professor typing it.
+const MAX_WAITING = 200;
 const LABEL_MAX = 40;
 const STAFF_MAX = 500; // rows People reads
 const CHANGES = 50;
+// Who added a row when it wasn't a person. The stored values stay as they are (rows on dev and
+// prod have them); People and Changes show these words instead.
 const IMPORT = "HOST_EMAILS import";
+const DEV_GRANT = "devGrant";
+const SHOWN_AS: Record<string, string> = {
+  [IMPORT]: "Import from the old professor list",
+  [DEV_GRANT]: "Test setup on the dev server",
+};
+const ENV_ADMIN_BY = "Server settings";
+const shownAs = (by: string) => SHOWN_AS[by] ?? by;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const none = v.object({ status: v.literal("none") });
@@ -104,17 +120,18 @@ async function log(ctx: MutationCtx, change: Omit<Doc<"staffEvents">, "_id" | "_
 
 // One change as a sentence for #/admin's Changes list.
 function sentence(e: Doc<"staffEvents">): string {
+  const by = shownAs(e.by);
   switch (e.action) {
     case "add":
-      return `${e.by} added ${e.email} as ${e.role}.`;
+      return `${by} added ${e.email} as ${e.role}.`;
     case "role":
-      return `${e.by} changed ${e.email} from ${e.oldRole} to ${e.role}.`;
+      return `${by} changed ${e.email} from ${e.oldRole} to ${e.role}.`;
     case "remove":
-      return `${e.by} removed ${e.email} (${e.oldRole}).`;
+      return `${by} removed ${e.email} (${e.oldRole}).`;
     case "pair":
-      return `${e.by} paired the door iPad "${e.label}".`;
+      return `${by} paired the door iPad "${e.label}".`;
     case "unpair":
-      return `${e.by} unpaired the door iPad "${e.label}".`;
+      return `${by} unpaired the door iPad "${e.label}".`;
   }
 }
 
@@ -138,10 +155,10 @@ export const people = query({
     const locked = envAdmins();
     const rows = await ctx.db.query("staff").withIndex("by_email").take(STAFF_MAX);
     return [
-      ...locked.map((email) => ({ email, role: "admin" as const, addedBy: "ADMIN_EMAILS", at: null, locked: true })),
+      ...locked.map((email) => ({ email, role: "admin" as const, addedBy: ENV_ADMIN_BY, at: null, locked: true })),
       ...rows
         .filter((r) => !locked.includes(r.email))
-        .map((r) => ({ email: r.email, role: r.role, addedBy: r.addedBy, at: r.at, locked: false })),
+        .map((r) => ({ email: r.email, role: r.role, addedBy: shownAs(r.addedBy), at: r.at, locked: false })),
     ];
   },
 });
@@ -152,7 +169,7 @@ export const add = mutation({
   handler: async (ctx, { email: raw, role }) => {
     const me = await requireAdmin(ctx);
     const email = cleanEmail(raw);
-    if (envAdmins().includes(email)) throw new ConvexError(`${email} is an admin in ADMIN_EMAILS already.`);
+    if (envAdmins().includes(email)) throw new ConvexError(`${email} is a permanent admin already (set in the server settings).`);
     const row = await findStaff(ctx, email);
     if (row?.role === role) return null;
     if (row) throw new ConvexError(`${email} is on the staff list already (${row.role}). Change the role in the list.`);
@@ -168,7 +185,7 @@ export const setRole = mutation({
   handler: async (ctx, { email: raw, role }) => {
     const me = await requireAdmin(ctx);
     const email = normEmail(raw);
-    if (envAdmins().includes(email)) throw new ConvexError(`${email} is an admin in ADMIN_EMAILS, so this page can't change their role.`);
+    if (envAdmins().includes(email)) throw new ConvexError(`${email} is a permanent admin (set in the server settings), so their role can't change here.`);
     const row = await findStaff(ctx, email);
     if (!row) throw new ConvexError(`${email} isn't on the staff list.`);
     if (row.role === role) return null;
@@ -184,7 +201,7 @@ export const remove = mutation({
   handler: async (ctx, { email: raw }) => {
     const me = await requireAdmin(ctx);
     const email = normEmail(raw);
-    if (envAdmins().includes(email)) throw new ConvexError(`${email} is an admin in ADMIN_EMAILS, so this page can't remove them.`);
+    if (envAdmins().includes(email)) throw new ConvexError(`${email} is a permanent admin (set in the server settings), so they can't be removed here.`);
     const rows = await ctx.db
       .query("staff")
       .withIndex("by_email", (q) => q.eq("email", email))
@@ -218,7 +235,7 @@ export const changes = query({
     return rows.map((e) => ({
       _id: e._id,
       at: e.at,
-      by: e.by,
+      by: shownAs(e.by),
       action: e.action,
       email: e.email ?? null,
       role: e.role ?? null,
@@ -304,14 +321,14 @@ async function freeCode(ctx: MutationCtx, now: number) {
       .take(10);
     if (!same.some((p) => p.expiresAt > now)) return code;
   }
-  throw new ConvexError("Couldn't make a free code. Try again.");
+  throw new ConvexError("Couldn't find an unused code. Try again.");
 }
 
 export const requestPairing = mutation({
   args: { token: v.string() },
   returns: v.union(waiting, paired),
   handler: async (ctx, { token }) => {
-    if (!isDeviceToken(token)) throw new ConvexError("This iPad sent a bad device token. Reload the page.");
+    if (!isDeviceToken(token)) throw new ConvexError("This iPad's saved ID is broken. Clear this site's data in the iPad's settings, then open the page again.");
     const hash = await tokenHash(token);
     const device = await deviceByHash(ctx, hash);
     if (device) return { status: "paired" as const, label: device.label };
@@ -322,7 +339,8 @@ export const requestPairing = mutation({
       .query("pairings")
       .withIndex("by_expiresAt", (q) => q.gt("expiresAt", now))
       .take(MAX_WAITING);
-    if (waitingNow.length >= MAX_WAITING) throw new ConvexError("Too many iPads are waiting for a code. Try again in 10 minutes.");
+    // Full: end the oldest open request (by_expiresAt is oldest first) so this iPad gets a code.
+    if (waitingNow.length >= MAX_WAITING) await ctx.db.delete("pairings", waitingNow[0]._id);
     const code = await freeCode(ctx, now);
     const expiresAt = now + PAIR_MS;
     const pairing = await ctx.db.insert("pairings", { code, tokenHash: hash, expiresAt });
@@ -370,23 +388,25 @@ export const devGrant = internalMutation({
     if (row?.role === role) return `${email} is ${role} already.`;
     if (row) {
       await ctx.db.patch("staff", row._id, { role });
-      await log(ctx, { by: "devGrant", action: "role", email, role, oldRole: row.role });
+      await log(ctx, { by: DEV_GRANT, action: "role", email, role, oldRole: row.role });
     } else {
-      await ctx.db.insert("staff", { email, role, addedBy: "devGrant", at: Date.now() });
-      await log(ctx, { by: "devGrant", action: "add", email, role });
+      await ctx.db.insert("staff", { email, role, addedBy: DEV_GRANT, at: Date.now() });
+      await log(ctx, { by: DEV_GRANT, action: "add", email, role });
     }
     return `${email} is ${role} now.`;
   },
 });
 
 // Adds every address in the old HOST_EMAILS env var as a professor, once: an address that
-// already has a role keeps it, so running it again adds nobody. Run on dev now and on prod after
+// already has a role keeps it, so running it again adds nobody. An ADMIN_EMAILS admin counts as
+// having a role: a professor row for them would be hidden on People, and #/admin couldn't remove it. Run on dev now and on prod after
 // the deploy; after that nothing reads HOST_EMAILS.
 export const importHostEmails = internalMutation({
   args: {},
   returns: v.string(),
   handler: async (ctx) => {
     const emails = [...new Set((process.env.HOST_EMAILS ?? "").split(",").map(normEmail).filter(Boolean))];
+    const admins = envAdmins();
     let added = 0;
     let notEmails = 0;
     for (const email of emails) {
@@ -394,7 +414,7 @@ export const importHostEmails = internalMutation({
         notEmails++;
         continue;
       }
-      if (await findStaff(ctx, email)) continue;
+      if (admins.includes(email) || (await findStaff(ctx, email))) continue;
       await ctx.db.insert("staff", { email, role: "professor", addedBy: IMPORT, at: Date.now() });
       await log(ctx, { by: IMPORT, action: "add", email, role: "professor" });
       added++;
