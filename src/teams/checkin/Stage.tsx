@@ -58,7 +58,7 @@ export default function Stage() {
                     return (
                       <li key={i} className={right ? "stage__bar stage__bar--right" : "stage__bar"}>
                         <span className="stage__fill" style={{ width: total ? `${(100 * n) / total}%` : 0 }} />
-                        <span>{LETTERS[i]} {c}</span><b>{n}</b>
+                        <span className="stage__label">{LETTERS[i]} {c}</span><b>{n}</b>
                       </li>
                     );
                   })}

@@ -41,12 +41,29 @@
 .board__row { display: grid; grid-template-columns: 2.2em 1fr auto auto; align-items: center; gap: 4px 14px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); border-left: 10px solid var(--group); }
 .board__rank { font-size: 1.6rem; line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; }
 .board__name { font-weight: 600; font-size: 1.15rem; }
-.board__score, .board__ec { font-variant-numeric: tabular-nums; font-weight: 600; }
+.board__score, .board__ec { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .board__ec { color: var(--accent); }
 .board small { font-weight: 400; color: var(--muted); }
 .board__members { grid-column: 2 / -1; font-size: 0.85rem; }
+/* The phone card: every row shares the list's columns (subgrid), so "12 right" and "+5 EC" line
+   up from row to row. */
+.board:not(.board--big) { grid-template-columns: 2.2em minmax(0, 1fr) auto auto; column-gap: 14px; }
+.board:not(.board--big) > .board__row { grid-column: 1 / -1; grid-template-columns: subgrid; }
+.board:not(.board--big) :is(.board__score, .board__ec) { justify-self: end; }
+/* Under 360 wide the four columns don't fit beside the name, so the score goes on the name's
+   line and the extra credit under it, beside "3 students". */
+@media (max-width: 359px) {
+  .board:not(.board--big) { grid-template-columns: 2.2em minmax(0, 1fr) auto; }
+  .board:not(.board--big) .board__rank { grid-row: 1 / span 2; }
+  .board:not(.board--big) .board__name { grid-column: 2; grid-row: 1; }
+  .board:not(.board--big) .board__score { grid-column: 3; grid-row: 1; }
+  .board:not(.board--big) .board__members { grid-column: 2; grid-row: 2; }
+  .board:not(.board--big) .board__ec { grid-column: 3; grid-row: 2; }
+}
 /* #/live/leaderboard on the 1920 x 1080 projector, inside <Projector>: stage sizes (tokens.css). */
-/* Two columns, and the rank beside both lines of a row, so about eight teams fit on one screen. */
+/* Two columns, and the rank beside both lines of a row: six teams fit on one screen. Leaderboard.tsx
+   adds .board--many past six teams: one-line rows without "3 students", so ten fit, and past ten
+   it lists the top teams and a .board__more line. */
 .board--big { grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(800 * var(--stage-u))), 1fr)); gap: calc(16 * var(--stage-u)) calc(32 * var(--stage-u)); margin: 0; }
 .board--big .board__rank { grid-row: 1 / span 2; }
 .board--big .board__row { padding: calc(24 * var(--stage-u)) calc(32 * var(--stage-u)); gap: calc(8 * var(--stage-u)) calc(32 * var(--stage-u)); border-radius: calc(16 * var(--stage-u)); border-width: max(1px, calc(2 * var(--stage-u))); border-left-width: calc(24 * var(--stage-u)); }
@@ -56,6 +73,11 @@
 .board--big .board__members { font-size: var(--proj-small); }
 .board--big small { font-size: var(--proj-small); }
 .board--big .board__row--mine { outline-width: max(2px, calc(4 * var(--stage-u))); }
+.board--many { gap: calc(12 * var(--stage-u)) calc(32 * var(--stage-u)); }
+.board--many .board__row { padding-block: calc(12 * var(--stage-u)); }
+.board--many .board__rank { grid-row: auto; font-size: var(--proj-body); line-height: 1.1; }
+.board--many .board__members { display: none; }
+.board__more { margin: 0; color: var(--muted); }
 
 /* Past questions */
 .past { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }

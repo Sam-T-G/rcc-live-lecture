@@ -146,6 +146,9 @@
     font-size: var(--fs-small);
   }
   .btn--block { width: 100%; }
+  /* A quiet button whose words line up with the text above and below it (a link list): it pulls
+     its box left by its own side padding and keeps the 48px tap height. */
+  .btn--quiet.btn--flush { margin-inline-start: calc(-1 * var(--rcc-space-3)); }
   /* State layer: the button's own word color at 8% (hover) or 10% (pressed). */
   @media (hover: hover) {
     :is(button, .btn):hover:not(:disabled, [aria-disabled="true"]) { --state: var(--rcc-state-hover); }

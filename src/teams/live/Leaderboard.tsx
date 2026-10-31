@@ -62,15 +62,33 @@ function LockNote() {
   return <p className="muted">Teams are still forming. They lock at {t}.</p>;
 }
 
+// The projector (#/live/leaderboard) fits up to BIG_MAX teams on one 1920 x 1080 screen: two
+// columns of two-line rows up to BIG_ROOMY teams, then one-line rows without "3 students".
+// Past BIG_MAX it lists BIG_MAX teams and says how many more there are; each student's phone
+// shows their own team's place.
+const BIG_ROOMY = 6;
+const BIG_MAX = 10;
+
+// The teams the projector lists: the top BIG_MAX, or, when the viewer's team is lower down (as on
+// the phone card), the top BIG_MAX - 1 and the viewer's team.
+function bigRows<T extends { team: number }>(teams: T[], mine?: number): { shown: T[]; more: number } {
+  if (teams.length <= BIG_MAX) return { shown: teams, more: 0 };
+  const me = teams.slice(BIG_MAX).find((g) => g.team === mine);
+  const shown = me ? [...teams.slice(0, BIG_MAX - 1), me] : teams.slice(0, BIG_MAX);
+  return { shown, more: teams.length - shown.length };
+}
+
 // big: the projector version (#/live/leaderboard, inside <Projector>, which gives the title). The
-// room sees it, so it has no professor buttons and lists every team instead of a fold nobody can
-// open from the seats.
+// room sees it, so it has no professor buttons and no fold nobody can open from the seats.
 export function Leaderboard({ big }: { big?: boolean }) {
   const board = useQuery(api.live.groups.leaderboard, { channel: CHANNEL });
   const me = useQuery(api.live.groups.mine, { channel: CHANNEL });
-  const cls = "board" + (big ? " board--big" : "");
-  const top = board?.teams.slice(0, big ? undefined : 3) ?? [];
-  const rest = big ? [] : (board?.teams.slice(3) ?? []);
+  const teams = board?.teams ?? [];
+  const many = big && teams.length > BIG_ROOMY;
+  const cls = "board" + (big ? " board--big" : "") + (many ? " board--many" : "");
+  const projector = bigRows(teams, me?.team);
+  const top = big ? projector.shown : teams.slice(0, 3);
+  const rest = big ? [] : teams.slice(3);
   const mineBelow = rest.find((g) => g.team === me?.team);
   const body = (
     <>
@@ -84,6 +102,9 @@ export function Leaderboard({ big }: { big?: boolean }) {
             {top.map((g) => <TeamRow key={g.team} g={g} mine={g.team === me?.team} />)}
             {mineBelow && <TeamRow g={mineBelow} mine />}
           </ol>
+          {big && projector.more > 0 && (
+            <p className="board__more">Plus {projector.more} more {projector.more === 1 ? "team" : "teams"}. Your phone shows your team’s place.</p>
+          )}
           {rest.length > 0 && (
             <details>
               <summary>All {board.teams.length} teams</summary>

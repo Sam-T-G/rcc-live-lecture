@@ -105,7 +105,7 @@ The `.text-*` classes give a role's look without its heading level, so the headi
 
 What bare HTML gets with no class:
 
-- **Buttons:** a bare `<button>` is the main button (green, 48px, fully round; pressed, it squares its corners to 8px). One class makes the others: `.btn--secondary` (outlined), `.btn--quiet` (green words only), `.btn--danger` (red, for what can't be undone), `.btn--small` (laptop pages only), `.btn--block` (full width). `<a class="btn btn--secondary">` is a link that looks like a button. Disabled is 50% opacity.
+- **Buttons:** a bare `<button>` is the main button (green, 48px, fully round; pressed, it squares its corners to 8px). One class makes the others: `.btn--secondary` (outlined), `.btn--quiet` (green words only), `.btn--danger` (red, for what can't be undone), `.btn--small` (laptop pages only), `.btn--block` (full width), `.btn--quiet.btn--flush` (a quiet button whose words line up with the text under it). `<a class="btn btn--secondary">` is a link that looks like a button. Disabled is 50% opacity.
 - **Fields:** text inputs and textareas fill their width, stand 48px tall with 17px words (16px or more, or iOS Safari zooms in), and have a `--line-strong` edge. `aria-invalid="true"` turns the edge red. A `<select>` keeps its own width in a row and fills a `<label>` it sits in. A label around a checkbox or radio is a 48px row, so the whole row is the tap target.
 - **Focus:** a 3px `--focus` outline, 2px clear of the control, on `:focus-visible`. Never remove it.
 - **Links:** green and underlined, because green beside body words is under 3:1.
@@ -210,7 +210,7 @@ The room's screen at the sizes above. Light unless you pass `theme="dark"` or `t
 iPhone Safari at 390 x 844, and 320 wide. One hand, a glance during a lecture. Routes: #/checkin/student, #/live, #/portal, the quiz card.
 
 - One main action per screen, as the primary button. The state shows without scrolling: checked in or not, quiz open or ended, which team.
-- Nothing smaller than 44 x 44 to tap: no `.btn--small`; a link on its own line gets `className="btn btn--quiet"`.
+- Nothing smaller than 44 x 44 to tap: no `.btn--small`; a link on its own line gets `className="btn btn--quiet btn--flush"`, so its words line up with the line under it.
 - No sideways scroll at 320 wide: no fixed widths over 288px, and long names and emails break (`overflow-wrap: break-word` on the page; add `anywhere` only on an element that must shrink below its longest word, like `.kiosk__name`).
 - Every screen has a loading state (`Status` or `Skeleton`), an empty state, an error state with a way to try again, and a signed-out state.
 - `.page` keeps words clear of the iPhone's corners and home bar once the viewport tag has `viewport-fit=cover` (see "Not done yet").

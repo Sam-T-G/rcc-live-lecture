@@ -13,7 +13,11 @@ const links = [...html.matchAll(/<a\b([^>]*)>([^<]*)<\/a>/g)].map((m) => ({ attr
 describe("Home", () => {
   it("lists every page as a quiet button link", () => {
     expect(links.map((l) => l.text)).toEqual(["Kiosk", "Check in", "Live slides", "Professor view", "Lab"]);
-    for (const l of links) expect(l.attrs).toMatch(/class="btn btn--quiet"/);
+    for (const l of links) expect(l.attrs).toMatch(/class="btn btn--quiet\b/);
+  });
+
+  it("each link's words line up with the description under it (btn--flush, DCHK-3)", () => {
+    for (const l of links) expect(l.attrs).toMatch(/class="btn btn--quiet btn--flush"/);
   });
 
   it("puts each description on its own line, not beside the link", () => {

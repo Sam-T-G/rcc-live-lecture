@@ -18,7 +18,7 @@ export default function Home() {
       <ul className="list">
         {PAGES.map((p) => (
           <li key={p.to}>
-            <Link to={p.to} className="btn btn--quiet">{p.name}</Link>
+            <Link to={p.to} className="btn btn--quiet btn--flush">{p.name}</Link>
             <div className="muted">{p.what}</div>
           </li>
         ))}
