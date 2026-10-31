@@ -16,11 +16,14 @@
 // `current` and `slides` return only this class's rows (lib.lectureWindow). After End day, and
 // in a new class before the deck sends, `current` is null and `slides` is empty, so #/live,
 // #/portal and the iOS app wait for the slides instead of showing the last class's. Before the
-// first class ever (prod right after the deploy) every row counts, as before classes existed.
+// first class ever (prod right after the deploy, when lectureWindow's start is 0) only rows from
+// the last 12 hours (LECTURE_MS) count, so the 10-29 deck's slides don't show as Live in the next
+// class. A query doesn't rerun as time passes, so a row that turns 12 hours old drops out at the
+// next change on the channel; the deck's first press opens a class anyway.
 // The iOS app decodes both answers field by field, so don't add, rename or remove a field.
 import { ConvexError, v } from "convex/values";
-import { internalMutation, query } from "./_generated/server";
-import { ensureLecture, lectureStart, lectureWindow } from "./lib";
+import { internalMutation, query, type QueryCtx } from "./_generated/server";
+import { ensureLecture, LECTURE_MS, lectureStart, lectureWindow } from "./lib";
 
 // The biggest slide number and press count a press may carry. deckSlides has one row per slide
 // number on a channel, so a channel never has more than SLIDE_MAX + 1 of them.
@@ -33,6 +36,13 @@ export function slideNumbers(press: { index?: unknown; beat?: unknown; count?: u
   const { index, beat, count } = press;
   const whole = (n: unknown, min: number): n is number => typeof n === "number" && Number.isInteger(n) && n >= min && n <= SLIDE_MAX;
   return whole(index, 0) && whole(beat, 0) && whole(count, 1) ? { index, beat, count } : null;
+}
+
+// The earliest `at` a deck row can have and still count: the class window's start, or 12 hours
+// ago before the first class ever (no class, start 0).
+async function deckStart(ctx: QueryCtx, channel: string) {
+  const { lecture, start } = await lectureWindow(ctx, channel);
+  return lecture === null && start === 0 ? Date.now() - LECTURE_MS : start;
 }
 
 const slideShape = v.object({
@@ -57,7 +67,7 @@ export const current = query({
     if (!row) return null;
     // Each press replaces the row, and a replaced row keeps the _creationTime of the first press
     // ever on the channel, so this compares `at` (when this slide came in) with the class's start.
-    const { start } = await lectureWindow(ctx, channel);
+    const start = await deckStart(ctx, channel);
     if (row.at < start) return null;
     return { index: row.index, beat: row.beat, count: row.count, title: row.title, lines: row.lines, at: row.at };
   },
@@ -78,7 +88,7 @@ export const slides = query({
   args: { channel: v.string() },
   returns: v.array(shownShape),
   handler: async (ctx, { channel }) => {
-    const { start } = await lectureWindow(ctx, channel);
+    const start = await deckStart(ctx, channel);
     // One row per slide number, so this reads every row on the channel. A replaced row keeps its
     // first _creationTime, so this drops the rows whose `at` (when the row last changed) is before
     // the class started.

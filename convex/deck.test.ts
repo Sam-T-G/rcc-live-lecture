@@ -102,7 +102,7 @@ describe("F19 page-back shows only this class's slides", () => {
     expect(await classes(t)).toHaveLength(2);
   });
 
-  it("F19.4 prod's 10-29 slides read as before until the first press after the deploy; that press starts a class, and page-back shows only its slides", async () => {
+  it("F19.4 before the first class ever, prod's 10-29 slides (older than 12 hours) don't show as live or in page-back; the first press starts a class, and page-back shows only its slides", async () => {
     const t = setup();
     const OCT29 = at(2026, 10, 29, 22, 0);
     await t.run(async (ctx) => {
@@ -111,12 +111,26 @@ describe("F19 page-back shows only this class's slides", () => {
       await ctx.db.insert("deckSlides", { channel: CH, index: 3, beat: 2, title: "Oct 29: Agents", lines: ["a", "b", "c"], at: OCT29 });
       await ctx.db.insert("deckSlides", { channel: CH, index: 9, beat: 0, title: "Oct 29: Teams", lines: [], at: OCT29 });
     });
-    expect(await current(t)).toMatchObject({ index: 9, title: "Oct 29: Teams" });
-    expect(await pages(t)).toEqual(["3: Oct 29: Agents", "9: Oct 29: Teams"]);
+    expect((await t.run((ctx) => lectureWindow(ctx, CH))).start).toBe(0); // no class ever
+    expect(await current(t)).toBeNull();
+    expect(await shown(t)).toEqual([]);
 
     await set(t, 3, 0, ["Base case"], "Nov 5: Recursion");
     expect(await current(t)).toMatchObject({ index: 3, title: "Nov 5: Recursion", at: T0 });
     expect(await pages(t)).toEqual(["3: Nov 5: Recursion"]);
+  });
+
+  it("F19.4 before the first class ever, slides sent in the last 12 hours (a deploy during a class) still read as before", async () => {
+    const t = setup();
+    const earlier = T0 - HOUR;
+    const stale = T0 - LECTURE_MS - MIN;
+    await t.run(async (ctx) => {
+      await ctx.db.insert("deckChannels", { channel: CH, index: 4, beat: 1, count: 40, title: "Today: Loops", lines: ["for"], at: earlier });
+      await ctx.db.insert("deckSlides", { channel: CH, index: 2, beat: 0, title: "Last week: Intro", lines: [], at: stale });
+      await ctx.db.insert("deckSlides", { channel: CH, index: 4, beat: 1, title: "Today: Loops", lines: ["for"], at: earlier });
+    });
+    expect(await current(t)).toMatchObject({ index: 4, title: "Today: Loops", at: earlier });
+    expect(await pages(t)).toEqual(["4: Today: Loops"]);
   });
 });
 
