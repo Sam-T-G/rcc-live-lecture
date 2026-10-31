@@ -7,8 +7,8 @@
 //
 //   api.staff.me              {} -> null | { email, role, canHoldRole }                  anyone
 //       null signed out. role: "admin" | "professor" | "scanner" | null. canHoldRole is false
-//       for a sign-in that can't hold a role (a typed sign-in on prod, a Google account with an
-//       unverified email), so the page offers Google sign-in instead of "not on the staff list".
+//       for a sign-in that can't hold a role (a typed sign-in on prod, a typed sign-in on dev
+//       without an @test.local email, a Google account with an unverified email), so the page offers Google sign-in instead of "not on the staff list".
 //   api.checkin.pass.amHost   {} -> boolean: a professor or admin                        anyone
 //
 //   #/admin, People and Changes:
@@ -55,16 +55,25 @@
 //
 // For the CLI (internal: npx convex run, never from a page):
 //   staff:devGrant '{"email":"prof1@test.local","role":"professor"}'   a role for a test email; dev backends only
-//   staff:importHostEmails                                              every HOST_EMAILS address without a role (and not in ADMIN_EMAILS) becomes a professor; safe to run again
+//       Only @test.local emails, never one an admin or the import added. A typed sign-in with
+//       that email holds the role for 2 hours (run devGrant again to start the 2 hours again);
+//       then dropDevGrant removes the row. The typed signing key is public, so anyone can sign
+//       in as a test email on dev while its role lasts: keep real student data off dev.
+//   staff:devRevoke                                                     removes every devGrant role now; run it after a browser check
+//   staff:importHostEmails                                             every HOST_EMAILS address without a role (and not in ADMIN_EMAILS) becomes a professor; safe to run again
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import {
+  DEV_GRANT,
+  DEV_GRANT_MS,
   deviceByHash,
   envAdmins,
   isDevBackend,
   isDeviceToken,
+  isTestEmail,
+  TEST_DOMAIN,
   type Me,
   normEmail,
   readMe,
@@ -87,7 +96,6 @@ const CHANGES = 50;
 // Who added a row when it wasn't a person. The stored values stay as they are (rows on dev and
 // prod have them); People and Changes show these words instead.
 const IMPORT = "HOST_EMAILS import";
-const DEV_GRANT = "devGrant";
 const SHOWN_AS: Record<string, string> = {
   [IMPORT]: "Import from the old professor list",
   [DEV_GRANT]: "Test setup on the dev server",
@@ -376,24 +384,72 @@ export const dropPairing = internalMutation({
 
 // ---------- The CLI ----------
 
-// Gives a test email a role on a dev backend, for browser checks with the typed sign-in.
-// Refuses on prod (convex/checkin/prof.ts isDevBackend), where a typed sign-in never holds a role.
+// Gives a test email (@test.local) a role on a dev backend for 2 hours, for browser checks with
+// the typed sign-in. Refuses on prod (convex/checkin/prof.ts isDevBackend), where a typed sign-in
+// never holds a role, and refuses any email that isn't a test email or whose row someone else
+// added. Running it again starts the 2 hours again.
 export const devGrant = internalMutation({
   args: { email: v.string(), role: roleValidator },
   returns: v.string(),
   handler: async (ctx, { email: raw, role }) => {
     if (!isDevBackend()) throw new ConvexError("staff:devGrant runs only on a dev backend.");
     const email = cleanEmail(raw);
-    const row = await findStaff(ctx, email);
-    if (row?.role === role) return `${email} is ${role} already.`;
-    if (row) {
-      await ctx.db.patch("staff", row._id, { role });
-      await log(ctx, { by: DEV_GRANT, action: "role", email, role, oldRole: row.role });
-    } else {
-      await ctx.db.insert("staff", { email, role, addedBy: DEV_GRANT, at: Date.now() });
-      await log(ctx, { by: DEV_GRANT, action: "add", email, role });
+    if (!isTestEmail(email) || envAdmins().includes(email)) {
+      throw new ConvexError(`staff:devGrant takes only test emails ending in ${TEST_DOMAIN}, like prof1${TEST_DOMAIN}.`);
     }
-    return `${email} is ${role} now.`;
+    const row = await findStaff(ctx, email);
+    if (row && row.addedBy !== DEV_GRANT) {
+      throw new ConvexError(`${email} is on the staff list already, added by ${shownAs(row.addedBy)}. staff:devGrant changes only rows it added.`);
+    }
+    const now = Date.now();
+    let said: string;
+    if (row?.role === role) {
+      await ctx.db.patch("staff", row._id, { at: now });
+      said = `${email} is ${role} already. The 2 hours start again now.`;
+    } else if (row) {
+      await ctx.db.patch("staff", row._id, { role, at: now });
+      await log(ctx, { by: DEV_GRANT, action: "role", email, role, oldRole: row.role });
+      said = `${email} is ${role} now, for 2 hours.`;
+    } else {
+      await ctx.db.insert("staff", { email, role, addedBy: DEV_GRANT, at: now });
+      await log(ctx, { by: DEV_GRANT, action: "add", email, role });
+      said = `${email} is ${role} now, for 2 hours.`;
+    }
+    await ctx.scheduler.runAt(now + DEV_GRANT_MS, internal.staff.dropDevGrant, { email });
+    return said;
+  },
+});
+
+// Removes a devGrant row once its 2 hours are up. devGrant schedules it each time it runs; a row
+// devGrant ran for again since then is kept until its own job.
+export const dropDevGrant = internalMutation({
+  args: { email: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { email }) => {
+    const row = await findStaff(ctx, email);
+    if (row && row.addedBy === DEV_GRANT && row.at + DEV_GRANT_MS <= Date.now()) {
+      await ctx.db.delete("staff", row._id);
+      await log(ctx, { by: DEV_GRANT, action: "remove", email, oldRole: row.role });
+    }
+    return null;
+  },
+});
+
+// Removes every devGrant row now, so no test email holds a role on dev until devGrant runs again.
+// Runs anywhere (prod has no devGrant rows).
+export const devRevoke = internalMutation({
+  args: {},
+  returns: v.string(),
+  handler: async (ctx) => {
+    const rows = await ctx.db
+      .query("staff")
+      .withIndex("by_addedBy", (q) => q.eq("addedBy", DEV_GRANT))
+      .take(STAFF_MAX);
+    for (const row of rows) {
+      await ctx.db.delete("staff", row._id);
+      await log(ctx, { by: DEV_GRANT, action: "remove", email: row.email, oldRole: row.role });
+    }
+    return `Removed ${rows.length} test roles.`;
   },
 });
 

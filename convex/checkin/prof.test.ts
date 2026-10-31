@@ -26,6 +26,8 @@ import {
   SCANNER_EMAIL,
   setup,
   type T,
+  TEST_PROF_EMAIL,
+  testGrant,
   typed,
   unverified,
 } from "../test.helpers";
@@ -111,13 +113,21 @@ describe("ROLES who holds a role", () => {
       expect(await role(google(t, "Sample professor", PROF_EMAIL))).toBe("professor");
       expect(await role(admin(t))).toBe("admin");
     }
-    // On a dev backend a typed sign-in holds its email's role, so browser checks can sign in that way.
+    // On a dev backend a typed sign-in holds a devGrant role on a test email, so browser checks can
+    // sign in that way. The staff's real emails still hold nothing typed: the typed key is public.
     vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
     expect(prof.isDevBackend()).toBe(true);
-    expect(await typed(t, "Sample professor", PROF_EMAIL).query(api.staff.me, {})).toEqual({ email: PROF_EMAIL, role: "professor", canHoldRole: true });
-    expect(await typed(t, "Sample admin", ADMIN_EMAIL).query(api.checkin.pass.amHost, {})).toBe(true);
-    expect(await typed(t, "Sample student 1", "student1@example.edu").query(api.staff.me, {})).toEqual({
-      email: "student1@example.edu",
+    await testGrant(t, TEST_PROF_EMAIL, "professor");
+    expect(await typed(t, "Sample professor 1", TEST_PROF_EMAIL).query(api.staff.me, {})).toEqual({
+      email: TEST_PROF_EMAIL,
+      role: "professor",
+      canHoldRole: true,
+    });
+    for (const email of [ADMIN_EMAIL, PROF_EMAIL, SCANNER_EMAIL, "student1@example.edu"]) {
+      expect(await typed(t, "Sample staff", email).query(api.staff.me, {})).toEqual({ email, role: null, canHoldRole: false });
+    }
+    expect(await typed(t, "Sample student 2", "student2@test.local").query(api.staff.me, {})).toEqual({
+      email: "student2@test.local",
       role: null,
       canHoldRole: true,
     });

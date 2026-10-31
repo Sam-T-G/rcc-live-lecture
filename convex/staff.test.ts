@@ -466,10 +466,12 @@ describe("ROLES devGrant and importHostEmails (CLI only)", () => {
     vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
     const tester = typed(t, "Sample professor 1", "prof1@test.local");
     expect(await tester.query(api.checkin.pass.amHost, {})).toBe(false);
-    expect(await t.mutation(internal.staff.devGrant, { email: " Prof1@Test.local ", role: "professor" })).toBe("prof1@test.local is professor now.");
+    expect(await t.mutation(internal.staff.devGrant, { email: " Prof1@Test.local ", role: "professor" })).toBe("prof1@test.local is professor now, for 2 hours.");
     expect(await tester.query(api.checkin.pass.amHost, {})).toBe(true);
-    expect(await t.mutation(internal.staff.devGrant, { email: "prof1@test.local", role: "professor" })).toBe("prof1@test.local is professor already.");
-    expect(await t.mutation(internal.staff.devGrant, { email: "prof1@test.local", role: "admin" })).toBe("prof1@test.local is admin now.");
+    expect(await t.mutation(internal.staff.devGrant, { email: "prof1@test.local", role: "professor" })).toBe(
+      "prof1@test.local is professor already. The 2 hours start again now.",
+    );
+    expect(await t.mutation(internal.staff.devGrant, { email: "prof1@test.local", role: "admin" })).toBe("prof1@test.local is admin now, for 2 hours.");
     expect(await tester.query(api.staff.people, {})).toEqual([
       { email: ADMIN_EMAIL, role: "admin", addedBy: SETTINGS, at: null, locked: true },
       { email: "prof1@test.local", role: "admin", addedBy: TEST_SETUP, at: T0, locked: false },
@@ -518,5 +520,89 @@ describe("ROLES devGrant and importHostEmails (CLI only)", () => {
     expect(await t.mutation(internal.staff.importHostEmails, {})).toBe(
       "HOST_EMAILS: 0 addresses. Added as professors: 0. Had a role already: 0. Not email addresses: 0.",
     );
+  });
+});
+
+// The typed sign-in's signing key is public (src/blocks/devLogin.ts), so on a dev backend anyone
+// can sign in as any email that way. A typed sign-in there holds only a role staff:devGrant gave a
+// test email (@test.local), and only for 2 hours: never an ADMIN_EMAILS admin's, a real
+// professor's or an imported one.
+describe("ROLES-API-risk-1 a typed sign-in on dev holds only a fresh devGrant role on a test email", () => {
+  const TEST_PROF = "prof1@test.local";
+  const HOUR = 60 * MIN;
+
+  it("ROLES-API-risk-1 a typed sign-in with an ADMIN_EMAILS address is no admin on dev: it can't read attendance or add staff", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
+    const t = setup();
+    const outsider = typed(t, "Sample admin", ADMIN_EMAIL);
+    expect(await outsider.query(api.staff.me, {})).toMatchObject({ email: ADMIN_EMAIL, role: null });
+    expect(await outsider.query(api.checkin.pass.amHost, {})).toBe(false);
+    await expect(outsider.query(api.checkin.attendance.sheet, { channel: CH })).rejects.toThrow("Only professors can do that.");
+    await expect(outsider.mutation(api.staff.add, { email: NEW_EMAIL, role: "admin" })).rejects.toThrow("Only admins can do that.");
+    expect((await rows(t)).staff).toEqual([]);
+    // Signed in with Google, the same address is the admin.
+    expect(await admin(t).query(api.checkin.pass.amHost, {})).toBe(true);
+  });
+
+  it("ROLES-API-risk-1 a typed sign-in with a professor's email holds nothing on dev, whether an admin added them or HOST_EMAILS did", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
+    vi.stubEnv("HOST_EMAILS", "host@example.edu");
+    const t = setup();
+    await admin(t).mutation(api.staff.add, { email: PROF_EMAIL, role: "professor" });
+    await t.mutation(internal.staff.importHostEmails, {});
+    for (const email of [PROF_EMAIL, "host@example.edu"]) {
+      expect(await typed(t, "Sample professor", email).query(api.checkin.pass.amHost, {})).toBe(false);
+      expect(await google(t, "Sample professor", email).query(api.checkin.pass.amHost, {})).toBe(true);
+    }
+    // An admin who adds a test email by hand doesn't open it to typed sign-ins either.
+    await admin(t).mutation(api.staff.add, { email: TEST_PROF, role: "professor" });
+    expect(await typed(t, "Sample professor 1", TEST_PROF).query(api.checkin.pass.amHost, {})).toBe(false);
+  });
+
+  it("ROLES-API-risk-1 devGrant takes only @test.local emails and never changes a row it didn't add", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
+    const t = setup();
+    await admin(t).mutation(api.staff.add, { email: "prof2@test.local", role: "scanner" });
+    for (const email of [PROF_EMAIL, ADMIN_EMAIL, "student1@example.edu", "prof1@test.local.example.edu"]) {
+      await expect(t.mutation(internal.staff.devGrant, { email, role: "admin" })).rejects.toThrow("staff:devGrant takes only test emails");
+    }
+    await expect(t.mutation(internal.staff.devGrant, { email: "prof2@test.local", role: "admin" })).rejects.toThrow(
+      "prof2@test.local is on the staff list already, added by admin@example.edu.",
+    );
+    expect((await rows(t)).staff.map((s) => [s.email, s.role])).toEqual([["prof2@test.local", "scanner"]]);
+  });
+
+  it("ROLES-API-risk-1 a devGrant role lasts 2 hours, a second devGrant starts the 2 hours again, and then the row is gone", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
+    const t = setup();
+    const tester = typed(t, "Sample professor 1", TEST_PROF);
+    expect(await t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "professor" })).toBe(`${TEST_PROF} is professor now, for 2 hours.`);
+    vi.advanceTimersByTime(HOUR);
+    expect(await t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "professor" })).toBe(
+      `${TEST_PROF} is professor already. The 2 hours start again now.`,
+    );
+    vi.advanceTimersByTime(2 * HOUR - 1);
+    await t.finishInProgressScheduledFunctions();
+    // The first job ran at 2 hours; the second devGrant restarted the clock, so the row stays.
+    await t.mutation(internal.staff.dropDevGrant, { email: TEST_PROF });
+    expect(await tester.query(api.checkin.pass.amHost, {})).toBe(true);
+    vi.advanceTimersByTime(1);
+    // Past the 2 hours the role counts for nothing even before the job removes the row.
+    expect(await tester.query(api.checkin.pass.amHost, {})).toBe(false);
+    await t.finishInProgressScheduledFunctions();
+    expect((await rows(t)).staff).toEqual([]);
+    expect((await admin(t).query(api.staff.changes, {})).map((c) => c.text)[0]).toBe(`${TEST_SETUP} removed ${TEST_PROF} (professor).`);
+  });
+
+  it("ROLES-API-risk-1 devRevoke removes every devGrant role at once and leaves everyone else", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
+    const t = setup();
+    await grant(t, PROF_EMAIL, "professor");
+    await t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "admin" });
+    await t.mutation(internal.staff.devGrant, { email: "door1@test.local", role: "scanner" });
+    expect(await t.mutation(internal.staff.devRevoke, {})).toBe("Removed 2 test roles.");
+    expect((await rows(t)).staff.map((s) => s.email)).toEqual([PROF_EMAIL]);
+    expect(await typed(t, "Sample professor 1", TEST_PROF).query(api.checkin.pass.amHost, {})).toBe(false);
+    expect(await t.mutation(internal.staff.devRevoke, {})).toBe("Removed 0 test roles.");
   });
 });

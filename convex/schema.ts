@@ -50,8 +50,10 @@ export default defineSchema({
     email: v.string(), // trimmed and lower case
     role: roleValidator,
     addedBy: v.string(), // the admin's email, "HOST_EMAILS import" or "devGrant"
-    at: v.number(),
-  }).index("by_email", ["email"]),
+    at: v.number(), // when it was added; for a "devGrant" row, when devGrant last ran for it
+  })
+    .index("by_email", ["email"])
+    .index("by_addedBy", ["addedBy"]), // staff:devRevoke finds the devGrant rows
 
   // Block: access. Every change to the staff list and the door iPads: who made it, and what changed.
   staffEvents: defineTable({

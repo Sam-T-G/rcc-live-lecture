@@ -3,7 +3,7 @@
 // or a URL that only mentions a dev deployment's name somewhere.
 import { describe, expect, it, vi } from "vitest";
 import { api, internal } from "../_generated/api";
-import { ADMIN_EMAIL, DEV_URL, PROF_EMAIL, admin, grant, profEnv, setup, typed } from "../test.helpers";
+import { ADMIN_EMAIL, DEV_URL, PROF_EMAIL, TEST_PROF_EMAIL, admin, grant, profEnv, setup, testGrant, typed } from "../test.helpers";
 import * as prof from "./prof";
 
 const CH = "gdg";
@@ -30,9 +30,11 @@ describe("ROLES isDevBackend fails closed", () => {
     profEnv();
     const t = setup();
     await grant(t, PROF_EMAIL, "professor");
+    await testGrant(t, TEST_PROF_EMAIL, "professor");
     for (const url of NOT_DEV) {
       vi.stubEnv("CONVEX_CLOUD_URL", url);
       expect([url, prof.isDevBackend()]).toEqual([url, false]);
+      expect(await typed(t, "Sample professor 1", TEST_PROF_EMAIL).query(api.checkin.pass.amHost, {})).toBe(false);
       const as = typed(t, "Sample admin", ADMIN_EMAIL);
       expect(await as.query(api.staff.me, {})).toEqual({ email: ADMIN_EMAIL, role: null, canHoldRole: false });
       expect(await as.query(api.checkin.pass.amHost, {})).toBe(false);
@@ -51,10 +53,11 @@ describe("ROLES isDevBackend fails closed", () => {
   it("ROLES the dev deployments the code names count as dev, in any case and with a trailing slash", async () => {
     profEnv();
     const t = setup();
+    await testGrant(t, TEST_PROF_EMAIL, "professor");
     for (const url of [LAPTOP_DEV_URL, LAPTOP_DEV_URL.toUpperCase(), `${LAPTOP_DEV_URL}/`, ` ${LAPTOP_DEV_URL} `, DEV_URL]) {
       vi.stubEnv("CONVEX_CLOUD_URL", url);
       expect([url, prof.isDevBackend()]).toEqual([url, true]);
-      expect(await typed(t, "Sample admin", ADMIN_EMAIL).query(api.checkin.pass.amHost, {})).toBe(true);
+      expect(await typed(t, "Sample professor 1", TEST_PROF_EMAIL).query(api.checkin.pass.amHost, {})).toBe(true);
     }
   });
 });

@@ -10,7 +10,9 @@
 //
 // A role counts only for a sign-in that proves its email: Google, with a verified email. Typed
 // sign-in (src/blocks/devLogin.ts) lets anyone claim any email, so it holds a role only on a dev
-// backend (isDevBackend), where browser checks sign in that way. On prod it never does.
+// backend (isDevBackend), where browser checks sign in that way, and there only a role that
+// staff:devGrant gave a test email (@test.local) in the last 2 hours. It never holds an
+// ADMIN_EMAILS admin's role or a role an admin or the HOST_EMAILS import gave. On prod it holds none.
 //
 // A door iPad doesn't sign in. It pairs once: its screen shows a 6-digit code, and a professor
 // or admin types that code on #/admin (convex/staff.ts). After that it sends its device token
@@ -62,8 +64,16 @@ export function envAdmins(): string[] {
   return [...new Set((process.env.ADMIN_EMAILS ?? "").split(",").map(normEmail).filter(Boolean))];
 }
 
+// Test emails: the only ones a typed sign-in can hold a role for (on a dev backend, through
+// staff:devGrant). No real person has one.
+export const TEST_DOMAIN = "@test.local";
+export const isTestEmail = (email: string) => email.endsWith(TEST_DOMAIN);
+// The addedBy and by of the rows staff:devGrant writes, and how long its role lasts.
+export const DEV_GRANT = "devGrant";
+export const DEV_GRANT_MS = 2 * 60 * 60_000;
+
 // The email a sign-in proves, or null: a Google sign-in with a verified email anywhere, and a
-// typed sign-in only on a dev backend.
+// typed sign-in with a test email (@test.local) only on a dev backend.
 //
 // Google: the identity must say the email is verified, as `emailVerified` (Convex's name for the
 // JWT claim) or as the raw `email_verified` claim, and only the boolean true counts. A Google
@@ -81,8 +91,19 @@ export function provenEmail(
   const email = normEmail(me.email);
   if (!email) return null;
   if (me.issuer === GOOGLE_ISSUER) return me.emailVerified === true || me.email_verified === true ? email : null;
-  if (me.issuer === TYPED_ISSUER && isDevBackend()) return email;
+  if (me.issuer === TYPED_ISSUER && isDevBackend() && isTestEmail(email)) return email;
   return null;
+}
+
+// The role a typed sign-in holds on a dev backend: the role staff:devGrant gave this email, while
+// it is less than 2 hours old (staff:dropDevGrant removes the row after that). Never ADMIN_EMAILS,
+// never a row someone else added.
+export async function devGrantRoleOf(ctx: DbCtx, email: string): Promise<Role | null> {
+  const row = await ctx.db
+    .query("staff")
+    .withIndex("by_email", (q) => q.eq("email", email))
+    .first();
+  return row && row.addedBy === DEV_GRANT && row.at + DEV_GRANT_MS > Date.now() ? row.role : null;
 }
 
 // The role an email holds: admin when ADMIN_EMAILS lists it, else its staff row's role, else null.
@@ -106,7 +127,8 @@ export async function readMe(ctx: DbCtx): Promise<Me | null> {
   const me = await ctx.auth.getUserIdentity();
   if (!me) return null;
   const proven = provenEmail(me);
-  return { email: normEmail(me.email), role: proven ? await roleOf(ctx, proven) : null, canHoldRole: proven !== null };
+  const role = !proven ? null : me.issuer === TYPED_ISSUER ? await devGrantRoleOf(ctx, proven) : await roleOf(ctx, proven);
+  return { email: normEmail(me.email), role, canHoldRole: proven !== null };
 }
 
 // Actions have no database, so they ask the staff.me query, which runs as the same caller.

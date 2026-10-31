@@ -23,9 +23,10 @@ else
   fail "no dev deployment yet" "Run: npx convex dev   (log in, pick the existing project rcc-live-lecture), leave it running."
 fi
 vars="$(npx convex env list 2>/dev/null | sed 's/=.*//')"
-for v in HOST_EMAILS DECK_BRIDGE_KEY; do
-  grep -qx "$v" <<<"$vars" && ok "env $v is set" || fail "env $v is missing" "Run: npx convex env set $v <value>   (Sam gives you the values; HOST_EMAILS is your own Gmail)"
-done
+# ADMIN_EMAILS makes you an admin on your backend (the professor pages and #/admin). HOST_EMAILS
+# opens nothing any more, so it isn't checked.
+grep -qx ADMIN_EMAILS <<<"$vars" && ok "env ADMIN_EMAILS is set" || fail "env ADMIN_EMAILS is missing" "Run: npx convex env set ADMIN_EMAILS <your Gmail>   (without it nobody can open the professor pages or #/admin)"
+grep -qx DECK_BRIDGE_KEY <<<"$vars" && ok "env DECK_BRIDGE_KEY is set" || fail "env DECK_BRIDGE_KEY is missing" "Run: npx convex env set DECK_BRIDGE_KEY <value>   (Sam gives you the value)"
 grep -qx GEMINI_API_KEY <<<"$vars" && ok "env GEMINI_API_KEY is set" || warn "env GEMINI_API_KEY is missing" "Only needed if your team adds an AI feature."
 
 echo "Build"

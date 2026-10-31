@@ -29,6 +29,9 @@ export const DEV_URL = "https://sample-dev-123.convex.cloud";
 export const ADMIN_EMAIL = "admin@example.edu"; // an admin after profEnv() (ADMIN_EMAILS)
 export const PROF_EMAIL = "prof@example.edu"; // a professor once professor(t) or grant() adds the row
 export const SCANNER_EMAIL = "door@example.edu"; // a scanner once grant() adds the row
+// The test email a typed sign-in uses on a dev backend. It holds a role only once devGrant (or
+// testGrant) gives it one, and only for 2 hours.
+export const TEST_PROF_EMAIL = "prof1@test.local";
 
 // A door iPad's device token (64 hex characters), and one that no iPad paired with.
 export const DEVICE_TOKEN = "0123456789abcdef".repeat(4);
@@ -61,6 +64,14 @@ export async function grant(t: T, email: string, role: Role) {
       .first();
     if (row) await ctx.db.patch("staff", row._id, { role });
     else await ctx.db.insert("staff", { email, role, addedBy: ADMIN_EMAIL, at: Date.now() });
+  });
+}
+
+// Gives a test email a role the way staff:devGrant does (a row added by "devGrant", now), without
+// devGrant's staffEvents row or its job that removes the row after 2 hours.
+export async function testGrant(t: T, email: string, role: Role) {
+  await t.run(async (ctx) => {
+    await ctx.db.insert("staff", { email, role, addedBy: "devGrant", at: Date.now() });
   });
 }
 
@@ -121,7 +132,7 @@ export const at = (y: number, mo: number, d: number, h = 0, mi = 0) => Date.UTC(
 // The ten callers authMatrix tries, in this order. Each row runs on its own fresh backend where
 // ADMIN_EMAIL is on ADMIN_EMAILS, PROF_EMAIL is a professor, SCANNER_EMAIL is a scanner and an
 // iPad with DEVICE_TOKEN is paired, with CONVEX_CLOUD_URL set to prod's URL (a dev backend's
-// for typedDevProf).
+// for typedDevProf, whose backend also has TEST_PROF_EMAIL as a devGrant professor).
 //   signedOut        signed out, no device token
 //   googleStudent    a Google sign-in with no role
 //   unverifiedAdmin  a Google sign-in with ADMIN_EMAIL that Google hasn't verified
@@ -129,7 +140,7 @@ export const at = (y: number, mo: number, d: number, h = 0, mi = 0) => Date.UTC(
 //   unknownDevice    signed out, a device token no iPad is paired with (OTHER_TOKEN)
 //   scanner          a Google sign-in with the scanner role
 //   pairedDevice     signed out, the paired iPad's device token (DEVICE_TOKEN)
-//   typedDevProf     a typed sign-in with the professor role, on a dev backend
+//   typedDevProf     a typed sign-in with TEST_PROF_EMAIL, a devGrant professor, on a dev backend
 //   googleProf       a Google sign-in with the professor role
 //   googleAdmin      a Google sign-in on ADMIN_EMAILS
 export const ROWS = [
@@ -192,7 +203,7 @@ export async function authMatrix(
     unknownDevice: [(t) => t, OTHER_TOKEN],
     scanner: [(t) => google(t, "Sample scanner", SCANNER_EMAIL), undefined],
     pairedDevice: [(t) => t, DEVICE_TOKEN],
-    typedDevProf: [(t) => typed(t, "Sample professor", PROF_EMAIL), undefined],
+    typedDevProf: [(t) => typed(t, "Sample professor 1", TEST_PROF_EMAIL), undefined],
     googleProf: [(t) => google(t, "Sample professor", PROF_EMAIL), undefined],
     googleAdmin: [(t) => admin(t), undefined],
   };
@@ -206,6 +217,7 @@ export async function authMatrix(
       await grant(t, PROF_EMAIL, "professor");
       await grant(t, SCANNER_EMAIL, "scanner");
       await pairDevice(t);
+      if (row === "typedDevProf") await testGrant(t, TEST_PROF_EMAIL, "professor");
       const [as, device] = who[row];
       try {
         await call(as(t), t, device);

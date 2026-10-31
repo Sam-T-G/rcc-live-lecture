@@ -85,7 +85,7 @@ describe("old rows keep working", () => {
       questions: { by_channel: ["channel"] },
       lost: { by_channel: ["channel"] },
       // ROLES: new tables for the staff list and the door iPads.
-      staff: { by_email: ["email"] },
+      staff: { by_email: ["email"], by_addedBy: ["addedBy"] },
       staffEvents: {},
       devices: { by_tokenHash: ["tokenHash"] },
       pairings: { by_code: ["code"], by_tokenHash: ["tokenHash"], by_expiresAt: ["expiresAt"] },
