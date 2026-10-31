@@ -40,6 +40,6 @@ export function pageUrl(path: string) {
   return location.origin + location.pathname + "#/" + path.replace(/^\/+/, "");
 }
 
-export function Link({ to, children }: { to: string; children: ReactNode }) {
-  return <a href={"#/" + to.replace(/^\/+/, "")}>{children}</a>;
+export function Link({ to, className, children }: { to: string; className?: string; children: ReactNode }) {
+  return <a href={"#/" + to.replace(/^\/+/, "")} className={className}>{children}</a>;
 }

@@ -71,7 +71,7 @@ export function HideLate() {
   const set = useMutation(api.checkin.attendance.setHideLate);
   if (hide === undefined) return null;
   return (
-    <label className="row muted">
+    <label className="muted">
       <input type="checkbox" checked={hide} onChange={(e) => set({ hide: e.target.checked }).catch(() => {})} />
       Don’t put my name on the slides if I’m late
     </label>

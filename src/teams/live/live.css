@@ -38,7 +38,7 @@
 .group-badge { display: inline-block; margin: 0 0 12px; padding: 6px 14px; border-radius: 999px; font-weight: 600; background: var(--group); color: var(--group-text); }
 .board { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 10px; }
 .board__row { display: grid; grid-template-columns: 2.2em 1fr auto auto; align-items: center; gap: 4px 14px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); border-left: 10px solid var(--group); }
-.board__rank { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.board__rank { font-size: 1.6rem; line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; }
 .board__name { font-weight: 600; font-size: 1.15rem; }
 .board__score, .board__ec { font-variant-numeric: tabular-nums; font-weight: 600; }
 .board__ec { color: var(--accent); }
@@ -46,8 +46,8 @@
 .board__members { grid-column: 2 / -1; font-size: 0.85rem; }
 .board--big .board__row { padding: 24px 28px; }
 .board--big .board__rank { font-size: 3.5rem; }
-.board--big .board__name { font-size: 2.2rem; }
-.board--big .board__score, .board--big .board__ec { font-size: 2.2rem; }
+.board--big .board__name { font-size: 2.2rem; line-height: 1.1; }
+.board--big .board__score, .board--big .board__ec { font-size: 2.2rem; line-height: 1.1; }
 .board--big .board__members { font-size: 1.1rem; }
 
 /* Past questions */

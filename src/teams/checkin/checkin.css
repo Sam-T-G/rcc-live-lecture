@@ -2,6 +2,7 @@
 .row { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
 button.quiet { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
 .pass { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.pass > * { max-width: 100%; }
 .pass__name { font-size: 1.5rem; font-weight: 700; margin: 12px 0 0; }
 .pass__code { font-size: 2rem; letter-spacing: 0.2em; font-family: ui-monospace, monospace; margin: 8px 0; }
 .scanner { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 48px; align-items: start; }
@@ -20,7 +21,7 @@ button.quiet { background: transparent; color: var(--accent); box-shadow: inset 
 .kiosk__left { position: relative; }
 .kiosk__video { width: 100%; border-radius: 16px; background: #000; transform: scaleX(-1); display: block; }
 .kiosk__video--off { aspect-ratio: 4 / 3; }
-.kiosk__start { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); font-size: 2rem; padding: 20px 40px; min-height: 72px; }
+.kiosk__start { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); font-size: 2rem; padding: 20px 40px; min-height: 72px; width: max-content; max-width: calc(100% - 32px); }
 .kiosk__result { min-height: 200px; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; justify-content: center; border: 4px solid var(--line); }
 .kiosk__result--ok { border-color: #137333; background: rgba(19, 115, 51, 0.12); }
 .kiosk__result--again { border-color: var(--muted); }
@@ -41,8 +42,8 @@ button.quiet { background: transparent; color: var(--accent); box-shadow: inset 
 .ask__q input { font-size: 1.2rem; }
 .ask__choice { align-items: center; margin: 6px 0; }
 .ask__choice input:not([type="radio"]) { flex: 1; min-width: 0; }
-.quiz__q { font-size: 1.6rem; font-weight: 700; margin: 8px 0 16px; }
-.quiz__list { list-style: none; padding: 0; font-size: 1.3rem; }
+.quiz__q { font-size: 1.6rem; line-height: var(--lh-h2); font-weight: 700; margin: 8px 0 16px; }
+.quiz__list { list-style: none; padding: 0; font-size: 1.3rem; line-height: var(--lh-small); }
 .quiz__list li { padding: 6px 0; }
 .quiz__stats { display: flex; flex-wrap: wrap; gap: 32px; margin: 16px 0; }
 .quiz__picks { display: grid; gap: 10px; }

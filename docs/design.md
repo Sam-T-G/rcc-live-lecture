@@ -211,7 +211,7 @@ iPhone Safari at 390 x 844, and 320 wide. One hand, a glance during a lecture. R
 
 - One main action per screen, as the primary button. The state shows without scrolling: checked in or not, quiz open or ended, which team.
 - Nothing smaller than 44 x 44 to tap: no `.btn--small`; a link on its own line gets `className="btn btn--quiet"`.
-- No sideways scroll at 320 wide: no fixed widths over 288px, and long names and emails break (`overflow-wrap: anywhere` on the page).
+- No sideways scroll at 320 wide: no fixed widths over 288px, and long names and emails break (`overflow-wrap: break-word` on the page; add `anywhere` only on an element that must shrink below its longest word, like `.kiosk__name`).
 - Every screen has a loading state (`Status` or `Skeleton`), an empty state, an error state with a way to try again, and a signed-out state.
 - `.page` keeps words clear of the iPhone's corners and home bar once the viewport tag has `viewport-fit=cover` (see "Not done yet").
 

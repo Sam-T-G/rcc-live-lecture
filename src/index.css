@@ -29,8 +29,12 @@
        foundations §2.8). Students type names and questions, so ligatures stay
        off everywhere. */
     font-variant-ligatures: none;
-    /* A long email or code breaks instead of pushing the page sideways at 320px. */
-    overflow-wrap: anywhere;
+    /* A long email or code breaks instead of pushing the page sideways at 320px.
+       break-word, not anywhere: anywhere shrinks every flex, grid and
+       shrink-to-fit box to one letter wide, so "Yellow" in a grid cell or a
+       round button's label split mid-word. Set anywhere on one element where a
+       box must shrink below its longest word (.kiosk__name, .q__text). */
+    overflow-wrap: break-word;
   }
   /* A themed scope (#/ui, the projector) paints its own ground. */
   [data-theme] {
@@ -201,10 +205,13 @@
     flex: none;
     accent-color: var(--accent);
   }
-  /* A label around a checkbox or radio is the tap target: 48px tall. */
+  /* A label around a checkbox or radio is the tap target: 48px tall. Its words
+     wrap beside the box, never under it, even inside a centered block. */
   label:has(> input[type="checkbox"], > input[type="radio"]) {
     display: flex;
+    flex-wrap: nowrap;
     align-items: center;
+    text-align: start;
     gap: var(--rcc-space-3);
     min-height: var(--rcc-target-min);
     margin-bottom: 0;
@@ -236,6 +243,8 @@
   .muted { color: var(--muted); }
   .error { color: var(--error); }
   .row { display: flex; flex-wrap: wrap; gap: var(--rcc-space-3); align-items: center; }
+  /* Lets a long email in a row shrink to the row and break, at 320 wide. */
+  .row > * { min-width: 0; }
   .stack { display: flex; flex-direction: column; gap: var(--rcc-space-3); }
   .stack > * { margin: 0; }
   /* The ledger line: dates, rooms, counters. Tokens, never a sentence (GDG §9.7). */
