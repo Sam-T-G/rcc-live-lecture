@@ -1,26 +1,65 @@
 // #/portal: a student's phone shows the slide the professor is on, live, and lets the
-// student page back through slides already shown. Paging only changes this phone's view;
-// the page only reads the deck. Test on another channel with #/portal?channel=<name>.
+// student page back through slides already shown (swipe, the arrow keys, or ← Back and
+// Next →). Paging only changes this phone's view; the page only reads the deck.
+// Under the slide, "Check in" opens the pass (#/checkin/student) and "Quiz and questions"
+// opens #/live, so a student who opened #/portal from a QR code on the deck can still check
+// in and answer the quiz. The loading and waiting screens have both links too.
+// <LateBanner /> (Check-in's) shows a late student's first name for 8 seconds.
+// Test on another channel with #/portal?channel=<name>. The late banner lists check-ins on
+// CHANNEL ("gdg") only, so it stays off on any other channel. #/portal/<part> shows
+// "No page at #/portal/<part>".
 import { useEffect, useRef, useState, type TouchEvent } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { CHANNEL, useDeckSlide } from "../blocks/deck";
-import { useRoute } from "../blocks/router";
-import { Screen, Status } from "../blocks/ui";
+import { Link, useHashParams, useRoute } from "../blocks/router";
+import { ErrorBoundary, Screen, Status } from "../blocks/ui";
+import LateBanner from "../teams/checkin/LateBanner";
 import "./portal.css";
 
-// useRoute drops the "?..." part of the hash, so read the channel from the hash directly.
-// useRoute still re-renders this page on every hash change.
-function channelFromHash() {
-  const query = location.hash.split("?")[1] ?? "";
-  return new URLSearchParams(query).get("channel")?.trim() || CHANNEL;
+export default function PortalPage() {
+  const [, ...rest] = useRoute();
+  if (rest.length > 0) {
+    return (
+      <Screen title={`No page at #/portal/${rest.join("/")}`}>
+        <p><Link to="">Go home</Link></p>
+      </Screen>
+    );
+  }
+  return <Portal />;
+}
+
+function Links() {
+  return (
+    <div className="portal__links">
+      <Link to="checkin/student" className="btn btn--secondary">Check in</Link>
+      <Link to="live" className="btn btn--secondary">Quiz and questions</Link>
+    </div>
+  );
+}
+
+function Portal() {
+  const params = useHashParams();
+  const channel = params.get("channel")?.trim() || CHANNEL;
+  // The banner sits beside the page, not inside it, so it stays mounted when the page goes from
+  // loading to waiting to a slide: a remount would cut a showing banner short and count an
+  // arrival that lands during the switch as already seen. A failing late feed shows its own
+  // error line ("The late banner didn't load.") and leaves the slide up.
+  return (
+    <>
+      <Slides channel={channel} />
+      {channel === CHANNEL && (
+        <ErrorBoundary label="The late banner">
+          <LateBanner />
+        </ErrorBoundary>
+      )}
+    </>
+  );
 }
 
 type Shown = { index: number; title: string; lines: string[] };
 
-export default function PortalPage() {
-  useRoute();
-  const channel = channelFromHash();
+function Slides({ channel }: { channel: string }) {
   const live = useDeckSlide(channel);
   const shown = useQuery(api.deck.slides, { channel });
 
@@ -107,14 +146,16 @@ export default function PortalPage() {
   if (live === undefined || shown === undefined) {
     return (
       <Screen>
-        <Status kind="loading">Loading the slides</Status>
+        <Status kind="loading">Loading the slides…</Status>
+        <Links />
       </Screen>
     );
   }
   if (live === null || at === null) {
     return (
       <Screen>
-        <Status kind="empty">Waiting for the slides to start</Status>
+        <Status kind="empty">Waiting for the slides to start.</Status>
+        <Links />
       </Screen>
     );
   }
@@ -138,7 +179,7 @@ export default function PortalPage() {
 
       {moved && (
         <div className="portal__notice" role="status">
-          <span>The professor is on slide {live.index + 1} now</span>
+          <span>The professor is on slide {live.index + 1} now.</span>
           <button type="button" onClick={() => open(liveIndex)}>
             Back to live
           </button>
@@ -164,6 +205,8 @@ export default function PortalPage() {
           Next →
         </button>
       </nav>
+
+      <Links />
     </main>
   );
 }

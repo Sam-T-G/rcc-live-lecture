@@ -1,4 +1,4 @@
-/* #/portal. Colors come from the tokens in src/index.css. */
+/* #/portal. Colors come from the tokens in src/styles/tokens.css. */
 .portal {
   max-width: 720px;
   min-height: 100dvh;
@@ -53,6 +53,12 @@
 
 .portal__nav { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .portal__nav button { min-height: 52px; }
+
+/* "Check in" and "Quiz and questions": outlined (.btn--secondary), so the green Back and Next
+   stay the main buttons. At 320 wide a label wraps to two lines inside its button. */
+.portal__links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rcc-space-3); }
+.page > .portal__links { margin-top: var(--rcc-space-4); }
+.portal__links .btn { padding-inline: var(--rcc-space-3); }
 
 @keyframes portal-in {
   from { opacity: 0; transform: translateY(6px); }
