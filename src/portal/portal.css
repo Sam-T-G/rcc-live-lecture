@@ -3,7 +3,7 @@
   max-width: 720px;
   min-height: 100dvh;
   margin: 0 auto;
-  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom) + var(--late-room, 0px));
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -59,6 +59,15 @@
 .portal__links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rcc-space-3); }
 .page > .portal__links { margin-top: var(--rcc-space-4); }
 .portal__links .btn { padding-inline: var(--rcc-space-3); }
+
+/* The late banner (LateBanner.tsx, its look in checkin.css .late) sits in .portal-late, fixed at
+   the bottom, so Page.tsx can measure it and set --late-room on .portal-room: the page's bottom
+   padding grows by the banner's height while it shows. .portal-room adds no box of its own. */
+.portal-room { display: contents; }
+.portal-room > .page { padding-bottom: calc(var(--rcc-space-16) + env(safe-area-inset-bottom, 0px) + var(--late-room, 0px)); }
+.portal-late { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 50; pointer-events: none; }
+.portal-late .late { position: static; }
+.portal-late > .row { pointer-events: auto; padding: 8px 12px; background: var(--surface); border-radius: var(--radius); }
 
 @keyframes portal-in {
   from { opacity: 0; transform: translateY(6px); }

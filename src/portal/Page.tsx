@@ -8,7 +8,7 @@
 // Test on another channel with #/portal?channel=<name>. The late banner lists check-ins on
 // CHANNEL ("gdg") only, so it stays off on any other channel. #/portal/<part> shows
 // "No page at #/portal/<part>".
-import { useEffect, useRef, useState, type TouchEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type TouchEvent } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { CHANNEL, useDeckSlide } from "../blocks/deck";
@@ -45,15 +45,34 @@ function Portal() {
   // loading to waiting to a slide: a remount would cut a showing banner short and count an
   // arrival that lands during the switch as already seen. A failing late feed shows its own
   // error line ("The late banner didn't load.") and leaves the slide up.
+  // While a banner shows, the page gets that much more room at the bottom (--late-room, the
+  // banner's height plus its 16px gap), so Back, Next and the two links move up above it.
+  const late = useRef<HTMLDivElement>(null);
+  const [lateRoom, setLateRoom] = useState(0);
+  const withBanner = channel === CHANNEL;
+  useEffect(() => {
+    const el = late.current;
+    if (!el || typeof ResizeObserver === "undefined") {
+      setLateRoom(0);
+      return;
+    }
+    const measure = () => setLateRoom(el.offsetHeight > 0 ? el.offsetHeight + 16 : 0);
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => ro.disconnect();
+  }, [withBanner]);
   return (
-    <>
+    <div className="portal-room" style={{ "--late-room": `${lateRoom}px` } as CSSProperties}>
       <Slides channel={channel} />
-      {channel === CHANNEL && (
-        <ErrorBoundary label="The late banner">
-          <LateBanner />
-        </ErrorBoundary>
+      {withBanner && (
+        <div className="portal-late" ref={late}>
+          <ErrorBoundary label="The late banner">
+            <LateBanner />
+          </ErrorBoundary>
+        </div>
       )}
-    </>
+    </div>
   );
 }
 

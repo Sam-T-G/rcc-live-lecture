@@ -86,4 +86,15 @@ describe("#/portal", () => {
     expect(html).toContain(">Next →</button>");
     expect(html).toContain("Slide title 3");
   });
+
+  it("PORTAL-check-1: the late banner sits in .portal-late inside .portal-room, which sets --late-room (0px until a banner shows) for the page's bottom padding; room2 has no .portal-late", () => {
+    for (const server of [LOADING, WAITING, ON_SLIDE_3]) {
+      const html = open("#/portal", server);
+      expect(html.startsWith('<div class="portal-room" style="--late-room:0px">')).toBe(true);
+      expect(html).toContain('<div class="portal-late">[late banner]</div></div>');
+    }
+    const other = open("#/portal?channel=room2", ON_SLIDE_3);
+    expect(other.startsWith('<div class="portal-room" style="--late-room:0px">')).toBe(true);
+    expect(other).not.toContain("portal-late");
+  });
 });
