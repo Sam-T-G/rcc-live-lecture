@@ -72,7 +72,7 @@ A team's Convex functions live in `convex/<team>/<file>.ts` and are called as `a
 
 - Never commit student names, emails, locations, or attendance. They live only in Convex.
 - Location: ask only from a button press, send it to a mutation, check distance there with `metersBetween`, and store only what the feature needs (the distance, not the coordinates, unless a team decides otherwise and says why).
-- Camera: only through `src/blocks/vision.ts`, started from a button press, frames stay on the device; send counts or labels, never images or face data. Microphone: no block uses it. A team that uses either says so in `TEAM.md` under "What it sees".
+- Camera: only through `src/blocks/camera.ts` (`useCamera`); MediaPipe only through `src/blocks/vision.ts`, loaded with `React.lazy` so it stays out of the phone bundle. Start the camera from a button press; frames stay on the device; send counts or labels, never images or face data. Microphone: no block uses it. A team that uses either says so in `TEAM.md` under "What it sees".
 
 ## Commands
 

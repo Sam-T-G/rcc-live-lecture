@@ -14,7 +14,7 @@ import QA from "./QA";
 import "./host.css";
 
 const TABS = ["Now", "Points", "Questions"] as const;
-type Tab = (typeof TABS)[number];
+export type Tab = (typeof TABS)[number];
 
 export default function HostPage() {
   return (
@@ -24,8 +24,10 @@ export default function HostPage() {
   );
 }
 
-function Dashboard() {
-  const [tab, setTab] = useState<Tab>("Now");
+// `first` is the tab it opens on ("Now" on the page); Page.test.ts opens each tab this way to
+// check which panel it shows.
+export function Dashboard({ first = "Now" }: { first?: Tab }) {
+  const [tab, setTab] = useState<Tab>(first);
   const slide = useDeckSlide(CHANNEL);
   const checkedIn = useQuery(api.checkin.read.count, { channel: CHANNEL });
   const lost = useQuery(api.live.read.lostCount, slide ? { channel: CHANNEL, index: slide.index } : "skip");
