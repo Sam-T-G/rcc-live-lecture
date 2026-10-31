@@ -117,8 +117,12 @@ describe("what the next changes write", () => {
       await ctx.db.insert("deckChannels", { channel: CH, index: 4, beat: 0, count: 12, title: "Slide 5", lines: [], at: T0, run: "run-1", seq: 7 });
     });
     expect(await t.query(api.checkin.quiz.current, { channel: CH })).toMatchObject({ kind: "vote", question: "Pick one", open: true });
-    expect(await t.query(api.live.questions.list, { channel: CH, index: 4 })).toHaveLength(1);
     expect(await t.query(api.deck.current, { channel: CH })).toMatchObject({ index: 4, title: "Slide 5" });
+    // The question is read straight from the table: who may see a private question is
+    // live.questions.list's rule (tested there), not the schema's.
+    const stored = await t.run((ctx) => ctx.db.query("questions").withIndex("by_channel_and_index", (q) => q.eq("channel", CH).eq("index", 4)).take(10));
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({ private: true, answer: "Yes, after the quiz.", shared: false, status: "keep", topic: "Loops", cluster: "Loop end conditions" });
   });
 
   it("lectures, groupPoints and groupResults take their rows and read through by_channel", async () => {

@@ -95,14 +95,15 @@ export default defineSchema({
 
   // team: checkin. One row per class on a channel. A class opens when lib.ensureLecture runs
   // (the professor's actions that start class activity call it) and ends with End day
-  // (lib.endLecture) or by itself 12 hours after it opened (convex/lectures.ts). Nothing is
+  // (lib.endLecture) or by itself 12 hours after it opened or after its saved start time,
+  // whichever is later (lib.lectureClosesAt, convex/lectures.ts). Nothing is
   // deleted at the end: rows from earlier classes stay and drop out of this class's reads.
   lectures: defineTable({
     channel: v.string(),
     startedAt: v.number(), // when the class opened
     startsAt: v.optional(v.number()), // when class starts, set by the professor; missing = nobody is late
     graceMin: v.optional(v.number()), // minutes after startsAt before a check-in counts as late
-    endedAt: v.optional(v.number()), // when End day ended it, or startedAt + 12 h for a class nobody ended; missing = still open
+    endedAt: v.optional(v.number()), // when End day ended it, or lib.lectureClosesAt for a class nobody ended; missing = still open
   }).index("by_channel", ["channel"]),
 
   // team: checkin. Live quiz or vote: a host asks one question at a time on a channel;

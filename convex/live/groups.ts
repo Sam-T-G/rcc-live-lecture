@@ -106,18 +106,18 @@ export async function ensureGroup(ctx: MutationCtx, channel: string, user: strin
 
 // Lock the teams once the 5 minutes are up: re-deal everyone so every team has 3 or 4. If the class
 // start moved later, wait again. `force` locks now (for testing from the CLI). `lecture` is the
-// class the lock was queued for; it's accepted and not read yet.
+// class the lock was queued for; it's not read yet, but a lock that waits again keeps it.
 export const lock = internalMutation({
   args: { channel: v.string(), force: v.optional(v.boolean()), lecture: v.optional(v.id("lectures")) },
   returns: v.null(),
-  handler: async (ctx, { channel, force }) => {
+  handler: async (ctx, { channel, force, lecture }) => {
     const set = await settings(ctx, channel);
     if (set?.lockedAt) return null;
     const at = await lockTime(ctx, channel);
     if (!force) {
       if (at === null) return null;
       if (Date.now() < at) {
-        await ctx.scheduler.runAfter(at - Date.now(), internal.live.groups.lock, { channel });
+        await ctx.scheduler.runAfter(at - Date.now(), internal.live.groups.lock, lecture ? { channel, lecture } : { channel });
         return null;
       }
     }

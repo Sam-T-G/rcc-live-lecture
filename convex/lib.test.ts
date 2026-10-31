@@ -104,6 +104,16 @@ describe("F39.6 small helpers", () => {
     expect(cleanName(ch(0x200b, 0xfeff, 0x200b))).toBe("Student");
     expect(cleanName(ch(0x2060, 0x200d))).toBe("Student");
     expect(cleanName(ch(0x301, 0x301))).toBe("Student"); // accent marks with no letter under them
+    // Letters and symbols that draw nothing (Hangul fillers, the blank Braille pattern) and the
+    // combining grapheme joiner are dropped too, so a name made of them gets the fallback.
+    for (const blank of [0x3164, 0x115f, 0x1160, 0xffa0, 0x2800, 0x34f]) {
+      expect(cleanName(ch(blank))).toBe("Student");
+      expect(cleanName(ch(blank, blank, blank))).toBe("Student");
+      expect(cleanName("Jane" + ch(blank) + " Doe " + ch(blank))).toBe("Jane Doe");
+    }
+    expect(cleanName(ch(0x2800, 0x2800) + " " + ch(0x3164))).toBe("Student");
+    // A Braille pattern with dots is a symbol people can see, so it stays.
+    expect(cleanName(ch(0x2801))).toBe(ch(0x2801));
     // The zero-width joiner stays inside an emoji built from several (a person at a laptop).
     expect(cleanName("Sam " + ch(0x1f469, 0x200d, 0x1f4bb))).toBe("Sam " + ch(0x1f469, 0x200d, 0x1f4bb));
     // No email ever survives: an "@" word in a longer name is dropped.
@@ -245,7 +255,10 @@ describe("F8 classes: one lectures window per class", () => {
     const first = await open(t);
     vi.setSystemTime(T0 + 2 * HOUR);
     await end(t);
+    // Run later than End day, so an overwrite would show as a different endedAt.
+    vi.setSystemTime(T0 + 5 * HOUR);
     await t.mutation(internal.lectures.close, { lecture: first._id });
+    await t.mutation(internal.lectures.close, { lecture: first._id, scheduled: true });
     expect((await lecture(t, first._id))?.endedAt).toBe(T0 + 2 * HOUR);
 
     // On an open class it sets the 12-hour end, even when it runs late.
@@ -266,6 +279,63 @@ describe("F8 classes: one lectures window per class", () => {
     await t.mutation(internal.lectures.close, { lecture: third._id });
     expect((await lecture(t, third._id))?.endedAt).toBe(T0 + 21 * HOUR);
     expect(await win(t)).toEqual({ lecture: null, start: T0 + 21 * HOUR, startsAt: null, graceMin: 0 });
+  });
+
+  it("F8 the scheduled close of a class End day already ended leaves its endedAt alone", async () => {
+    const t = setup();
+    const first = await open(t);
+    vi.advanceTimersByTime(2 * HOUR);
+    await end(t);
+    vi.advanceTimersByTime(LECTURE_MS);
+    await t.finishInProgressScheduledFunctions();
+    expect((await lecture(t, first._id))?.endedAt).toBe(T0 + 2 * HOUR);
+    expect(await win(t)).toEqual({ lecture: null, start: T0 + 2 * HOUR, startsAt: null, graceMin: 0 });
+  });
+
+  it("F8 a class opened the evening before, with the next morning's start saved, stays open until 12 h after that start", async () => {
+    const t = setup();
+    // 21:00: the professor saves tomorrow's 9:15 start, which opens the class.
+    const first = await open(t);
+    const startsAt = T0 + 12 * HOUR + 15 * MIN;
+    await t.run((ctx) => ctx.db.patch("lectures", first._id, { startsAt, graceMin: 5 }));
+
+    // 8:55: the morning's first scan joins the same class.
+    vi.advanceTimersByTime(11 * HOUR + 55 * MIN);
+    expect((await open(t))._id).toBe(first._id);
+    await t.run((ctx) => ctx.db.insert("checkins", checkinRow("test|student1")));
+
+    // 9:00, 12 h after the class opened: the close job runs and the class stays open.
+    vi.advanceTimersByTime(5 * MIN);
+    await t.finishInProgressScheduledFunctions();
+    expect((await lecture(t, first._id))?.endedAt).toBeUndefined();
+    expect(await win(t)).toEqual({ lecture: first._id, start: T0, startsAt, graceMin: 5 });
+    expect(await isIn(t, "test|student1")).toBe(true);
+
+    // It closes itself 12 h after the saved start.
+    vi.advanceTimersByTime(startsAt + LECTURE_MS - Date.now() - MIN);
+    await t.finishInProgressScheduledFunctions();
+    expect((await lecture(t, first._id))?.endedAt).toBeUndefined();
+    vi.advanceTimersByTime(MIN);
+    await t.finishInProgressScheduledFunctions();
+    expect((await lecture(t, first._id))?.endedAt).toBe(startsAt + LECTURE_MS);
+    expect(await isIn(t, "test|student1")).toBe(false);
+  });
+
+  it("F8 ensureLecture keeps a class with a saved start open until 12 h after that start, then ends it there and opens a new one", async () => {
+    const t = setup();
+    const first = await open(t);
+    const startsAt = T0 + 10 * HOUR;
+    await t.run((ctx) => ctx.db.patch("lectures", first._id, { startsAt }));
+    vi.setSystemTime(T0 + 13 * HOUR);
+    expect((await open(t))._id).toBe(first._id);
+    vi.setSystemTime(startsAt + LECTURE_MS + HOUR);
+    const second = await open(t);
+    expect(second._id).not.toBe(first._id);
+    expect((await lecture(t, first._id))?.endedAt).toBe(startsAt + LECTURE_MS);
+    // A saved start earlier than the class opened doesn't end it before 12 h.
+    await t.run((ctx) => ctx.db.patch("lectures", second._id, { startsAt: second.startedAt - 2 * HOUR }));
+    vi.setSystemTime(second.startedAt + LECTURE_MS - MIN);
+    expect((await open(t))._id).toBe(second._id);
   });
 
   it("F8 checkedIn counts only check-ins inside the current window (uses .gte('_creationTime', start))", async () => {
@@ -334,6 +404,23 @@ describe("F8 classes: one lectures window per class", () => {
     const first = await open(t);
     await t.mutation(internal.live.groups.lock, { channel: CH, force: true, lecture: first._id });
     expect(await t.query(api.live.groups.status, { channel: CH })).toMatchObject({ locked: true });
+  });
+
+  it("F8 a lock that runs before its time queues itself again with the same lecture", async () => {
+    const t = setup();
+    const first = await open(t);
+    // Class starts in 10 minutes, so teams lock in 15.
+    await t.run((ctx) => ctx.db.insert("classStarts", { channel: CH, startsAt: T0 + 10 * MIN, graceMin: 0 }));
+    await t.run((ctx) => ctx.scheduler.runAfter(0, internal.live.groups.lock, { channel: CH, lecture: first._id }));
+    vi.advanceTimersByTime(5 * MIN);
+    await t.finishInProgressScheduledFunctions();
+    expect(await t.query(api.live.groups.status, { channel: CH })).toMatchObject({ locked: false });
+    const queued = await t.run(async (ctx) =>
+      (await ctx.db.system.query("_scheduled_functions").take(20))
+        .filter((j) => j.name.includes("groups") && j.state.kind === "pending")
+        .map((j) => j.args[0]),
+    );
+    expect(queued).toEqual([{ channel: CH, lecture: first._id }]);
   });
 });
 

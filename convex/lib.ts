@@ -64,7 +64,8 @@ export function metersBetween(aLat: number, aLng: number, bLat: number, bLng: nu
 
 // ---------- Classes (the `lectures` table) ----------
 // A class runs from the moment ensureLecture opens it until End day (endLecture) or 12 hours
-// later (convex/lectures.ts). No other table stores its class: a row belongs to the class whose
+// after it opened or after its saved start time, whichever is later (lectureClosesAt,
+// convex/lectures.ts). No other table stores its class: a row belongs to the class whose
 // window holds its _creationTime, so a read for this class adds .gte("_creationTime", start) after
 // the index's equality fields, for example
 //   .withIndex("by_channel_and_user", (q) => q.eq("channel", ch).eq("user", u).gte("_creationTime", start))
@@ -72,8 +73,16 @@ export function metersBetween(aLat: number, aLng: number, bLat: number, bLng: nu
 // A student has one checkins, groups or lost row per class, so read those with .first(), never
 // .unique(): from the second class on there are two, and .unique() throws.
 
-// A class nobody ended closes this long after it opened.
+// A class nobody ended closes this long after it opened (or after its saved start time).
 export const LECTURE_MS = 12 * 60 * 60_000;
+
+// When a class nobody ends closes itself: 12 hours after it opened, or 12 hours after its saved
+// start time when that is later. A class opened the evening before (the professor saves the next
+// morning's start, or rehearses the deck) then stays open through the morning's class instead of
+// closing in the middle of it.
+export function lectureClosesAt(lecture: Doc<"lectures">) {
+  return Math.max(lecture.startedAt, lecture.startsAt ?? lecture.startedAt) + LECTURE_MS;
+}
 
 export type LectureWindow = {
   lecture: Id<"lectures"> | null; // the open class; null between classes and before the first one
@@ -121,17 +130,19 @@ export async function lectureWindow(ctx: Ctx, channel: string): Promise<LectureW
 // The open class on a channel, opening one when none is open. Mutations only. Call it from the
 // professor's actions that start class activity (a deck press, a pass scan, a saved start time,
 // a quiz), never from a student's: students can't start a class. A new class gets a job that
-// closes it 12 hours later. A class still open 12 hours after it opened (its close job never
-// ran) ends at startedAt + 12 h, and a new one opens.
+// closes it 12 hours later (the job waits longer when a saved start time moves lectureClosesAt).
+// A class still open past lectureClosesAt (its close job never ran) ends there, and a new one
+// opens.
 export async function ensureLecture(ctx: MutationCtx, channel: string): Promise<Doc<"lectures">> {
   const now = Date.now();
   const last = await newestLecture(ctx, channel);
   if (last && last.endedAt === undefined) {
-    if (now < last.startedAt + LECTURE_MS) return last;
-    await ctx.db.patch("lectures", last._id, { endedAt: last.startedAt + LECTURE_MS });
+    const closesAt = lectureClosesAt(last);
+    if (now < closesAt) return last;
+    await ctx.db.patch("lectures", last._id, { endedAt: closesAt });
   }
   const id = await ctx.db.insert("lectures", { channel, startedAt: now });
-  await ctx.scheduler.runAt(now + LECTURE_MS, internal.lectures.close, { lecture: id });
+  await ctx.scheduler.runAt(now + LECTURE_MS, internal.lectures.close, { lecture: id, scheduled: true });
   const lecture = await ctx.db.get("lectures", id);
   if (!lecture) throw new Error("ensureLecture: the class it just opened is missing.");
   return lecture;
@@ -163,10 +174,14 @@ export async function checkedIn(ctx: Ctx, channel: string, user: string): Promis
 const NAME_MAX = 60;
 // Dropped from names: control characters (C0, DEL, C1) and the invisible characters that could
 // hide a name or flip the text after it: the soft hyphen, zero-width space, direction marks, bidi
-// embeddings, overrides and isolates, the word joiner and the byte-order mark. The zero-width
-// joiner (U+200D) stays, because emoji made of several emoji (a family, a person at a laptop)
-// are joined with it.
-const HIDDEN = /[\p{Cc}\u00AD\u061C\u180E\u200B\u200E\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/gu;
+// embeddings, overrides and isolates, the word joiner and the byte-order mark. Also the
+// characters Unicode counts as letters or symbols that draw nothing (the Hangul fillers U+115F,
+// U+1160, U+3164 and U+FFA0, and the blank Braille pattern U+2800, the usual tricks for a blank
+// name) and the combining grapheme joiner. The zero-width joiner (U+200D) stays, because emoji
+// made of several emoji (a family, a person at a laptop) are joined with it, and so do tag
+// characters, which spell out flags such as Scotland's. U+034F, U+115F and U+1160 sit outside the
+// brackets because they join the character before them, which lint flags inside a class.
+const HIDDEN = /\u034F|\u115F|\u1160|[\p{Cc}\u00AD\u061C\u180E\u200B\u200E\u200F\u202A-\u202E\u2060-\u206F\u2800\u3164\uFEFF\uFFA0]/gu;
 // What's left has to hold at least one letter, digit, punctuation mark or symbol, so a name never
 // shows as a blank on the projector.
 const VISIBLE = /[\p{L}\p{N}\p{P}\p{S}]/u;
