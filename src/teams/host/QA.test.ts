@@ -6,7 +6,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import QA from "./QA";
+import QA, { grouped } from "./QA";
 
 const state = vi.hoisted(() => ({ items: undefined as unknown, asked: [] as string[] }));
 vi.mock("convex/react", () => ({
@@ -85,10 +85,22 @@ describe("#/host Questions", () => {
     expect(buttons(question(html, "What does O(n) mean?"))).toEqual(["Keep", "Type answer", "Dismiss", "Delete"]);
     const second = question(html, "Is this on the exam?");
     expect(second).toContain("<strong>Your answer:</strong> Yes, questions 1 to 3.");
-    expect(buttons(second)).toEqual(["Keep", "Edit answer", "Share the answer", "Dismiss", "Delete"]);
+    expect(buttons(second)).toEqual(["Keep", "Edit answer", "Share with the student who asked", "Dismiss", "Delete"]);
     const third = question(html, "Where are the slides posted?");
     expect(third).toContain(">Shared with students<");
     expect(buttons(third)).toEqual(["Edit answer", "Stop sharing", "Dismiss", "Delete"]);
+  });
+
+  it("UC-check-1 a shared private answer says only the student who asked sees it, on the row and in the Shared card", () => {
+    state.items = [item({ private: true, answer: "Office hours Tuesday.", shared: true, status: "keep" })];
+    const html = tab();
+    const row = question(html, "What does O(n) mean?");
+    expect(row).toContain(">Shared with the student who asked<");
+    expect(row).not.toContain(">Shared with students<");
+    expect(buttons(row)).toEqual(["Edit answer", "Stop sharing", "Dismiss", "Delete"]);
+    const card = html.slice(html.indexOf("<h2>Shared with students</h2>"));
+    expect(card).toContain("Office hours Tuesday.");
+    expect(card).toContain(">Only the student who asked<");
   });
 
   it("F30.4 the Shared with students card lists each shared answer under its question", () => {
@@ -119,5 +131,21 @@ describe("#/host Questions", () => {
     expect(html).toContain("No questions yet.");
     expect(html).toContain("Students ask from the Live slides page on their phones.");
     expect(html).toContain("No answers shared yet.");
+  });
+
+  it("UC-check-2 grouping puts private questions under their own heading after the topics, never under 'No topic yet'", () => {
+    const rows = [
+      item({ _id: "a", text: "New one" }),
+      item({ _id: "b", text: "Secret", private: true }),
+      item({ _id: "c", text: "Vowel?", topic: "Vowels", cluster: "What a vowel is" }),
+      item({ _id: "d", text: "Gone", status: "dismissed", private: true }),
+    ] as never[];
+    const out = grouped(rows).map((t) => [t.topic, t.groups.flatMap((g) => g.list.map((q) => q.text))]);
+    expect(out).toEqual([
+      ["No topic yet", ["New one"]],
+      ["Vowels", ["Vowel?"]],
+      ["Private (not sent to the AI)", ["Secret"]],
+      ["Dismissed", ["Gone"]],
+    ]);
   });
 });

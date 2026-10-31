@@ -2,7 +2,7 @@
 // student their team. #/live/leaderboard shows it big for the projector. The professor picks the
 // team size on #/host (Points), so neither has a professor button.
 import { useEffect } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { CHANNEL } from "../../blocks/deck";
@@ -11,13 +11,16 @@ import { Card, Status } from "../../blocks/ui";
 import "./leaderboard.css";
 
 // "You're on Green." Also puts a student who checked in before their team was dealt onto one.
+// join waits for Convex to confirm the sign-in: right after a sign-in the tab has the user while
+// Convex still sends the old token, and join would fail with "Sign in first.".
 export function GroupBadge() {
   const { user } = useGoogleUser();
+  const { isAuthenticated } = useConvexAuth();
   const team = useQuery(api.live.groups.mine, { channel: CHANNEL });
   const join = useMutation(api.live.groups.join);
   useEffect(() => {
-    if (user && team === null) join({ channel: CHANNEL }).catch((e: unknown) => console.error("Couldn't put this student on a team:", e));
-  }, [user, team, join]);
+    if (user && isAuthenticated && team === null) join({ channel: CHANNEL }).catch((e: unknown) => console.error("Couldn't put this student on a team:", e));
+  }, [user, isAuthenticated, team, join]);
   if (!team) return null;
   return <p className={"group-badge group--" + team.color}>You’re on {team.label}</p>;
 }

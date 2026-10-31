@@ -62,7 +62,7 @@ describe("UC-convex-1 the answer to a private question reaches its author", () =
 });
 
 describe("UC-convex-2 organize never sends a private question to Gemini", () => {
-  it("UC-convex-2 private rows are left out of the request and get no topic; only private rows -> nothing goes out", async () => {
+  it("UC-convex-2 private rows are left out of the request and get no topic; only private rows -> nothing goes out and the error says why", async () => {
     const t = setup();
     const [s1, s2] = await room(t, 2);
     await post(s1, "What is a vowel?");
@@ -92,7 +92,15 @@ describe("UC-convex-2 organize never sends a private question to Gemini", () => 
     const [a] = await room(t2, 1);
     await post(a, "Private only", { private: true });
     fetchMock.mockClear();
-    await expect((await professor(t2)).action(api.live.questions.organize, { channel: CH })).rejects.toThrow("No questions to group yet.");
+    await expect((await professor(t2)).action(api.live.questions.organize, { channel: CH })).rejects.toThrow(
+      "Private questions aren't sent to the AI, so there's nothing to group yet.",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // A class with no questions at all still says there is nothing to group.
+    const t3 = setup();
+    await room(t3, 1);
+    await expect((await professor(t3)).action(api.live.questions.organize, { channel: CH })).rejects.toThrow("No questions to group yet.");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

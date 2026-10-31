@@ -377,8 +377,10 @@ export const organize = action({
   returns: v.number(),
   handler: async (ctx, { channel }): Promise<number> => {
     const all: HostRow[] = await ctx.runQuery(api.live.questions.forHost, { channel }); // professors and admins only
-    const rows = all.filter((r) => r.status !== "dismissed" && !r.private);
-    if (rows.length === 0) throw new ConvexError("No questions to group yet.");
+    const open = all.filter((r) => r.status !== "dismissed");
+    const rows = open.filter((r) => !r.private);
+    if (rows.length === 0)
+      throw new ConvexError(open.length ? "Private questions aren't sent to the AI, so there's nothing to group yet." : "No questions to group yet.");
     const reply = await gemini({
       model: "fast",
       json: true,

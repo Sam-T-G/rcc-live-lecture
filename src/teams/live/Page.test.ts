@@ -33,6 +33,8 @@ vi.mock("convex/react", () => ({
     calls.mutations.push({ name: getFunctionName(ref), args });
     return true;
   },
+  // GroupBadge (Leaderboard.tsx) waits for this before it calls live.groups.join.
+  useConvexAuth: () => ({ isLoading: false, isAuthenticated: auth.user !== null }),
 }));
 vi.mock("../../blocks/auth", () => ({ useGoogleUser: () => auth, SignedInAs: () => "[signed in as]" }));
 // The deck's live slide is results["deck:current"]. With deck.steps set, it is instead each of
