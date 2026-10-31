@@ -62,16 +62,19 @@ function LockNote() {
   return <p className="muted">Teams are still forming. They lock at {t}.</p>;
 }
 
+// big: the projector version (#/live/leaderboard, inside <Projector>, which gives the title). The
+// room sees it, so it has no professor buttons and lists every team instead of a fold nobody can
+// open from the seats.
 export function Leaderboard({ big }: { big?: boolean }) {
   const board = useQuery(api.live.groups.leaderboard, { channel: CHANNEL });
   const me = useQuery(api.live.groups.mine, { channel: CHANNEL });
   const cls = "board" + (big ? " board--big" : "");
-  const top = board?.teams.slice(0, 3) ?? [];
-  const rest = board?.teams.slice(3) ?? [];
+  const top = board?.teams.slice(0, big ? undefined : 3) ?? [];
+  const rest = big ? [] : (board?.teams.slice(3) ?? []);
   const mineBelow = rest.find((g) => g.team === me?.team);
-  return (
-    <Card title="Team leaderboard">
-      <TeamSize />
+  const body = (
+    <>
+      {!big && <TeamSize />}
       <LockNote />
       {board === undefined ? (
         <Status kind="loading">Loading the scores…</Status>
@@ -96,6 +99,7 @@ export function Leaderboard({ big }: { big?: boolean }) {
           </p>
         </>
       )}
-    </Card>
+    </>
   );
+  return big ? body : <Card title="Team leaderboard">{body}</Card>;
 }

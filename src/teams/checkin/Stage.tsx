@@ -40,7 +40,7 @@ export default function Stage() {
     <div className="stage" onPointerUp={() => setTimeout(refocus, 0)}>
       <iframe ref={frame} className="stage__deck" src={deck.toString()} title="Slides" onLoad={refocus} allow="fullscreen" />
       {shown ? (
-        <aside className="stage__card">
+        <aside className="stage__card" data-theme="light">
           <button className="stage__hide" onClick={() => setShown(false)} aria-label="Hide">×</button>
           <QR value={pageUrl("checkin/student")} size={150} />
           <p className="stage__count"><b>{count ?? "…"}</b> checked in</p>
@@ -68,7 +68,7 @@ export default function Stage() {
           )}
         </aside>
       ) : (
-        <button className="stage__show" onClick={() => setShown(true)}>Check-in</button>
+        <button className="stage__show" data-theme="light" onClick={() => setShown(true)}>Check-in</button>
       )}
     </div>
   );

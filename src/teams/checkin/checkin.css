@@ -16,12 +16,13 @@ button.quiet { background: transparent; color: var(--accent); box-shadow: inset 
 .late__grace { width: 4em; }
 @keyframes late-in { from { transform: translateY(24px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .late__item { animation: none; } }
-/* Kiosk (#/checkin/kiosk): iPad in landscape at the door, read from about 1 m */
-.kiosk { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; padding: 24px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+/* Kiosk (#/checkin/kiosk): the door iPad, read from about 1 m. Two columns in landscape, one in
+   portrait (820 x 1180), so the camera takes the full width there. */
+.kiosk { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; padding: 24px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; align-content: start; }
 .kiosk__left { position: relative; }
 .kiosk__video { width: 100%; border-radius: 16px; background: #000; transform: scaleX(-1); display: block; }
 .kiosk__video--off { aspect-ratio: 4 / 3; }
-.kiosk__start { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); font-size: 2rem; padding: 20px 40px; min-height: 72px; width: max-content; max-width: calc(100% - 32px); }
+.kiosk__start { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); white-space: nowrap; font-size: min(2rem, 7vw); padding: 20px 40px; min-height: 72px; width: max-content; max-width: calc(100% - 32px); }
 .kiosk__result { min-height: 200px; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; justify-content: center; border: 4px solid var(--line); }
 .kiosk__result--ok { border-color: #137333; background: rgba(19, 115, 51, 0.12); }
 .kiosk__result--again { border-color: var(--muted); }
@@ -37,7 +38,7 @@ button.quiet { background: transparent; color: var(--accent); box-shadow: inset 
 .kiosk__names li { padding: 6px 0; border-bottom: 1px solid var(--line); }
 .kiosk__stop { margin-top: 16px; }
 @media (prefers-color-scheme: dark) { .kiosk__result--ok .kiosk__label, .kiosk__result--ok .kiosk__name { color: #81c995; } .kiosk__result--ok { border-color: #81c995; } }
-@media (max-width: 720px) { .kiosk { grid-template-columns: 1fr; } }
+@media (max-width: 720px), (orientation: portrait) { .kiosk { grid-template-columns: 1fr; } }
 .ask__q { display: flex; flex-direction: column; gap: 6px; font-weight: 700; margin: 12px 0; }
 .ask__q input { font-size: 1.2rem; }
 .ask__choice { align-items: center; margin: 6px 0; }
@@ -62,19 +63,26 @@ button.quiet { background: transparent; color: var(--accent); box-shadow: inset 
 body.stage-body { margin: 0; overflow: hidden; }
 .stage { position: fixed; inset: 0; background: #000; }
 .stage__deck { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.stage__card { position: absolute; right: 16px; bottom: 16px; width: 230px; padding: 14px; border-radius: 14px; background: rgb(255 255 255 / 0.96); color: #111; box-shadow: 0 8px 28px rgb(0 0 0 / 0.3); font-size: 15px; display: flex; flex-direction: column; align-items: center; text-align: center; }
-.stage__card .qr { margin: 0; }
-.stage__hide { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; min-height: 0; padding: 0; border-radius: 50%; background: transparent; color: #555; box-shadow: none; font-size: 20px; line-height: 1; }
-.stage__count { margin: 8px 0 0; font-size: 16px; }
-.stage__count b { font-size: 34px; font-variant-numeric: tabular-nums; margin-right: 6px; }
-.stage__hint { margin: 0; color: #555; font-size: 14px; }
-.stage__poll { width: 100%; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; text-align: left; }
-.stage__q { margin: 0 0 6px; font-weight: 700; }
-.stage__answered { margin: 0; }
-.stage__answered b { font-size: 28px; margin-right: 6px; }
-.stage__bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.stage__bar { position: relative; display: flex; justify-content: space-between; gap: 6px; padding: 4px 8px; border-radius: 6px; background: #eee; overflow: hidden; }
+/* The card is read from the back of A-210 on a 1920 x 1080 projector, so every size is a stage
+   size (--stage-u and --proj-* in tokens.css), and Stage.tsx themes it light like the deck under it. */
+.stage__card { position: absolute; right: calc(24 * var(--stage-u)); bottom: calc(24 * var(--stage-u)); box-sizing: border-box; width: calc(440 * var(--stage-u)); max-height: calc(100% - 48 * var(--stage-u)); overflow: hidden; padding: calc(64 * var(--stage-u)) calc(24 * var(--stage-u)) calc(24 * var(--stage-u)); border-radius: calc(24 * var(--stage-u)); background: var(--surface); color: var(--text); box-shadow: var(--rcc-elevation-2); font-size: var(--proj-ledger); line-height: 1.2; display: flex; flex-direction: column; align-items: center; text-align: center; }
+/* <QR> writes its px width inline; the card's width wins, so phones can scan it from the seats.
+   It gives up some room while a quiz is on the card. */
+.stage__card .qr { width: 100% !important; margin: 0; }
+.stage__card:has(.stage__poll) .qr { width: 60% !important; }
+.stage__card .qr svg { display: block; width: 100%; height: auto; }
+.stage__hide { position: absolute; top: calc(8 * var(--stage-u)); right: calc(8 * var(--stage-u)); width: calc(56 * var(--stage-u)); height: calc(56 * var(--stage-u)); min-height: 0; padding: 0; border-radius: 50%; background: transparent; color: var(--muted); box-shadow: none; font-size: var(--proj-small); line-height: 1; }
+.stage__count { margin: calc(8 * var(--stage-u)) 0 0; font-size: var(--proj-small); }
+.stage__count b { font-size: var(--proj-head); line-height: 1; font-variant-numeric: tabular-nums; margin-right: calc(12 * var(--stage-u)); }
+.stage__hint { margin: 0; color: var(--muted); font-size: var(--proj-ledger); }
+.stage__poll { width: 100%; margin-top: calc(16 * var(--stage-u)); padding-top: calc(16 * var(--stage-u)); border-top: max(1px, calc(2 * var(--stage-u))) solid var(--line); text-align: left; }
+.stage__q { margin: 0 0 calc(8 * var(--stage-u)); font-weight: 700; font-size: var(--proj-small); overflow-wrap: anywhere; }
+.stage__answered { margin: 0; font-size: var(--proj-small); }
+.stage__answered b { font-size: var(--proj-head); line-height: 1; font-variant-numeric: tabular-nums; margin-right: calc(12 * var(--stage-u)); }
+.stage__bars { list-style: none; margin: 0; padding: 0; display: grid; gap: calc(8 * var(--stage-u)); }
+.stage__bar { position: relative; display: flex; justify-content: space-between; gap: calc(12 * var(--stage-u)); padding: calc(8 * var(--stage-u)) calc(16 * var(--stage-u)); border-radius: calc(12 * var(--stage-u)); background: var(--fill); overflow: hidden; font-size: var(--proj-ledger); }
 .stage__bar > span:not(.stage__fill), .stage__bar b { position: relative; }
-.stage__fill { position: absolute; inset: 0 auto 0 0; background: #c6dafc; }
-.stage__bar--right .stage__fill { background: #a8dab5; }
-.stage__show { position: absolute; right: 16px; bottom: 16px; min-height: 0; padding: 8px 14px; opacity: 0.85; }
+.stage__fill { position: absolute; inset: 0 auto 0 0; background: var(--line); }
+.stage__bar--right { font-weight: 700; }
+.stage__bar--right .stage__fill { background: color-mix(in srgb, var(--accent) 35%, var(--surface)); }
+.stage__show { position: absolute; right: calc(24 * var(--stage-u)); bottom: calc(24 * var(--stage-u)); min-height: 0; padding: calc(12 * var(--stage-u)) calc(24 * var(--stage-u)); font-size: var(--proj-ledger); opacity: 0.85; }

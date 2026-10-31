@@ -6,6 +6,7 @@ import { api } from "../../../convex/_generated/api";
 import { useRoute } from "../../blocks/router";
 import { CHANNEL, useDeckSlide } from "../../blocks/deck";
 import { Card, Screen, Status } from "../../blocks/ui";
+import { Projector } from "../../blocks/kit";
 import Questions from "./Questions";
 import { QuizCard } from "../checkin/Quiz";
 import PastQuestions from "./PastQuestions";
@@ -30,9 +31,9 @@ export default function LivePage() {
   const [, part] = useRoute(); // #/live/leaderboard: the big board for the projector
   if (part === "leaderboard")
     return (
-      <Screen title="Leaderboard" wide>
+      <Projector title="Team leaderboard">
         <Leaderboard big />
-      </Screen>
+      </Projector>
     );
   return (
     <Screen title="Live slides" wide>
@@ -63,7 +64,7 @@ export default function LivePage() {
             </>
           )}
         </Card>
-        <div>
+        <div className="live__side">
           <QuizCard />
           <Leaderboard />
           <PastQuestions />
