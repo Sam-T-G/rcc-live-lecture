@@ -29,10 +29,16 @@ struct DecodingTests {
         #expect(live.slide.lines == ["A line"])
     }
 
-    @Test("F36 deck:current null decodes to no slide")
+    @Test("F36 deck:current null decodes to no slide, as the type DeckStore subscribes with")
     func nullIsNoSlide() throws {
-        let none = try JSONDecoder().decode(LiveSlide?.self, from: json("null"))
+        // deck:current is null before the first slide of a class and after End day. DeckStore
+        // subscribes with CurrentAnswer, so a change to a non-optional type fails here.
+        let none: LiveSlide? = try JSONDecoder().decode(DeckStore.CurrentAnswer.self, from: json("null"))
         #expect(none == nil)
+        let slide: LiveSlide? = try JSONDecoder().decode(
+            DeckStore.CurrentAnswer.self,
+            from: json(#"{"index":1,"beat":0,"count":6,"title":"Slide 2","lines":[],"at":1}"#))
+        #expect(slide?.slide.index == 1)
     }
 
     @Test("ios-9 lateFeed rows decode; a lateMin no Int can hold throws")

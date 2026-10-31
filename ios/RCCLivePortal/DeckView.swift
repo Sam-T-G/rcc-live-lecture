@@ -72,6 +72,49 @@ struct Follow: Equatable {
         guard let live, !following, let left = liveWhenLeft else { return false }
         return live != left
     }
+
+    /// The line over the buttons while the student reads an earlier slide and the deck has
+    /// moved on, or nil. DeckView shows exactly this text.
+    func notice(live: Int?) -> String? {
+        guard let live, showNotice(live: live) else { return nil }
+        return Words.professorOn(slide: live + 1)
+    }
+}
+
+/// What the deck screen shows, picked from the store. DeckView switches on it, so ScreenTests
+/// checks the screen's choice and its words.
+struct DeckScreen: Equatable {
+    enum Main: Equatable {
+        /// The spinner and "Loading the slides…".
+        case loading
+        /// Words in the middle of the screen, and no slide.
+        case message(String)
+        /// The slides, on the live one or one the student paged back to.
+        case deck(LiveSlide)
+    }
+
+    /// The bar over the slides once they have loaded and then stopped coming in.
+    let bar: Problem?
+    let main: Main
+
+    init(bar: Problem?, main: Main) {
+        self.bar = bar
+        self.main = main
+    }
+
+    init(live: LiveSlide?, load: LoadState) {
+        bar = load.loaded ? load.problem : nil
+        if let live {
+            main = .deck(live)
+        } else if load.loaded {
+            main = .message(Words.waiting)
+        } else if let problem = load.problem {
+            // ios-5: before the first answer, failures say so in words instead of a bare spinner.
+            main = .message(Words.line(for: problem))
+        } else {
+            main = .loading
+        }
+    }
 }
 
 struct DeckView: View {
@@ -83,17 +126,17 @@ struct DeckView: View {
     @State private var pendingStart: Int?
 
     var body: some View {
+        let screen = DeckScreen(live: store.live, load: store.load)
         VStack(spacing: 0) {
-            if store.load.loaded, let problem = store.load.problem {
+            if let problem = screen.bar {
                 NoticeBar(problem: problem)
             }
-            if let live = store.live {
+            switch screen.main {
+            case .deck(let live):
                 deck(live: live)
-            } else if store.load.loaded {
-                CenterMessage(text: Words.waiting)
-            } else if let problem = store.load.problem {
-                CenterMessage(text: Words.line(for: problem))
-            } else {
+            case .message(let text):
+                CenterMessage(text: text)
+            case .loading:
                 Spacer()
                 VStack(spacing: 16) {
                     ProgressView()
@@ -122,7 +165,8 @@ struct DeckView: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.load.problem)
     }
 
-    private var showNotice: Bool { follow.showNotice(live: store.live?.slide.index) }
+    private var notice: String? { follow.notice(live: store.live?.slide.index) }
+    private var showNotice: Bool { notice != nil }
 
     @ViewBuilder
     private func deck(live: LiveSlide) -> some View {
@@ -157,8 +201,8 @@ struct DeckView: View {
         .tabViewStyle(.page(indexDisplayMode: .never))
 
         VStack(spacing: 0) {
-            if showNotice {
-                Text(Words.professorOn(slide: live.slide.index + 1))
+            if let notice {
+                Text(notice)
                     .font(.subheadline.weight(.semibold))
                     .padding(.top, 10)
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
@@ -197,8 +241,8 @@ struct DeckView: View {
         }
         .background(.bar)
         .onChange(of: showNotice) { _, shown in
-            if shown {
-                AccessibilityNotification.Announcement(Words.professorOn(slide: live.slide.index + 1)).post()
+            if shown, let notice {
+                AccessibilityNotification.Announcement(notice).post()
             }
         }
     }

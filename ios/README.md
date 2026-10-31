@@ -11,13 +11,21 @@ It uses [ConvexMobile](https://github.com/get-convex/convex-swift) 0.8.2, pinned
 You need Xcode, xcodegen (`brew install xcodegen`) and a Mac with Apple Silicon. ConvexMobile's simulator library has arm64 code only, so `project.yml` sets `EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64`. Without that line, a build for "Any iOS Simulator Device" (`generic/platform=iOS Simulator`) fails to link x86_64, and an Intel Mac can't build for the simulator at all.
 
 ```sh
-cd ios
-xcodegen generate     # makes RCCLivePortal.xcodeproj from project.yml; git ignores it, build/ and DerivedData/
+ios/scripts/test.sh                      # from the repo root; runs on the simulator "iPhone 17"
+SIM='iPhone 17 Pro' ios/scripts/test.sh  # another simulator, by name or udid
+```
+
+`scripts/test.sh` runs `xcodegen generate` (it makes RCCLivePortal.xcodeproj from project.yml; git ignores it, build/ and DerivedData/), builds for testing into `ios/build/DD`, installs the app on the simulator and starts it there with the tests loaded and `-convexURL http://127.0.0.1:9`, a closed port. It prints any failed test and the summary line, exits 0 only when every test passed, and keeps the log in `ios/build/test.log`. If your Xcode has no iPhone 17, use a name from `xcrun simctl list devices available`.
+
+Use the script on Xcode 27 beta. There, `xcodebuild test` waits about 12 minutes and then fails with "The test runner hung before establishing connection." after repeated "DTServiceHubClient failed to bless service hub" lines, because the app it starts is never resumed. On a release Xcode without that bug, this works too:
+
+```sh
+cd ios && xcodegen generate
 xcodebuild test -project RCCLivePortal.xcodeproj -scheme RCCLivePortal \
   -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
-RCCLivePortalTests checks the follow rule, number decoding, the late banner and the words. The tests run inside the app, which opens no connection while they run, so they need no backend. `npm test` doesn't build Swift, so run them before you push a change to `ios/` or to what `deck:current`, `deck:slides` or `lateFeed` return. If your Xcode has no iPhone 17, use a name from `xcrun simctl list devices available`.
+RCCLivePortalTests checks the follow rule, which screen and words the app picks, number decoding, the retry wait, the late banner and its words. The tests run inside the app, which makes no DeckStore and opens no connection while they run (a test fails if it does), so they need no backend. `npm test` and CI don't build Swift, so run them before you push a change to `ios/` or to what `deck:current`, `deck:slides` or `lateFeed` return.
 
 ## Run against your dev backend
 

@@ -57,6 +57,11 @@ struct LiveSlide: Decodable, Equatable {
     let slide: Slide
     let count: Int
 
+    init(slide: Slide, count: Int) {
+        self.slide = slide
+        self.count = count
+    }
+
     private enum CodingKeys: String, CodingKey { case count }
 
     init(from decoder: Decoder) throws {
@@ -78,7 +83,8 @@ enum Problem: Equatable {
 struct LoadState: Equatable {
     /// True once `deck:current` has answered at least once.
     private(set) var loaded = false
-    /// `deck:current` failures since its last answer. Each failure is retried after 3 seconds.
+    /// `deck:current` failures since its last answer. Each failure is retried after 3 seconds,
+    /// or as soon as the connection comes back (Resubscriber).
     private(set) var failuresInARow = 0
     /// True once the connection has been down for 4 seconds.
     var offline = false
@@ -100,11 +106,68 @@ struct LoadState: Equatable {
     }
 }
 
+/// The three subscriptions the app keeps open.
+enum Feed: Hashable {
+    case current, slides, lateFeed
+}
+
+/// Subscribes a failed feed again: after `delay`, or at once when the connection comes back,
+/// whichever is first. A server error or an answer the app can't decode ends a ConvexMobile
+/// subscription, and so does a connection that drops before the first answer (InternalError
+/// "channel closed"). Every feed waits the same 3 seconds. deck:slides and lateFeed used to wait
+/// 10 (F36), so a phone that opened while joining Wi-Fi couldn't page back, and lost late
+/// arrivals, for 6 seconds after the live slide showed.
+@MainActor
+final class Resubscriber {
+    nonisolated static let defaultDelay: Duration = .seconds(3)
+
+    private let delay: Duration
+    private var pending: [Feed: (wait: Task<Void, Never>, run: @MainActor () -> Void)] = [:]
+
+    init(delay: Duration = Resubscriber.defaultDelay) {
+        self.delay = delay
+    }
+
+    /// The feeds waiting to subscribe again.
+    var waiting: Set<Feed> { Set(pending.keys) }
+
+    /// `feed` ended: run `run` after the delay, or sooner on a reconnect. A second call for the
+    /// same feed replaces the first.
+    func later(_ feed: Feed, _ run: @escaping @MainActor () -> Void) {
+        pending[feed]?.wait.cancel()
+        let delay = self.delay
+        let wait = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: delay)
+            if !Task.isCancelled { self?.fire(feed) }
+        }
+        pending[feed] = (wait, run)
+    }
+
+    /// The connection is back: every waiting feed subscribes again now.
+    func connected() {
+        for feed in Array(pending.keys) { fire(feed) }
+    }
+
+    private func fire(_ feed: Feed) {
+        guard let p = pending.removeValue(forKey: feed) else { return }
+        p.wait.cancel()
+        p.run()
+    }
+}
+
 /// Reads the deck from Convex. Read only: this app never calls a mutation, so nothing a
 /// student does on their phone reaches the professor's deck.
 @MainActor
 @Observable
 final class DeckStore {
+    /// What `deck:current` answers: null before the first slide of a class and after End day.
+    /// subscribeCurrent decodes with this type, and DecodingTests decodes "null" through it.
+    typealias CurrentAnswer = LiveSlide?
+
+    /// How many stores this process has made. The app makes none while RCCLivePortalTests run
+    /// (ScreenTests checks it), so a test run opens no connection.
+    private(set) static var made = 0
+
     /// nil when the channel has no slide yet, and before the first answer.
     private(set) var live: LiveSlide?
     private(set) var shown: [Slide] = []
@@ -118,14 +181,16 @@ final class DeckStore {
     @ObservationIgnored private var currentSub: AnyCancellable?
     @ObservationIgnored private var slidesSub: AnyCancellable?
     @ObservationIgnored private var offlineTimer: Task<Void, Never>?
+    @ObservationIgnored private let retries = Resubscriber()
 
     init(config: Config) {
+        Self.made += 1
         self.config = config
         self.client = ConvexClient(deploymentUrl: config.deploymentURL)
         subscribeCurrent()
         subscribeSlides()
+        subscribeLate()
         watchConnection()
-        late.start(client: client, channel: config.channel)
     }
 
     /// Pages a student can swipe through: every slide shown so far up to the live one, with
@@ -140,16 +205,15 @@ final class DeckStore {
 
     private func subscribeCurrent() {
         currentSub = client
-            .subscribe(to: "deck:current", with: ["channel": config.channel], yielding: LiveSlide?.self)
+            .subscribe(to: "deck:current", with: ["channel": config.channel], yielding: CurrentAnswer.self)
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { [weak self] _ in
-                    // A server error, or an answer the app can't decode, ends the subscription.
-                    // Count it and try again shortly.
+                    // The subscription ended (see Resubscriber). Count it and subscribe again.
                     MainActor.assumeIsolated {
                         guard let self else { return }
                         self.load.failed()
-                        self.retry(after: 3) { $0.subscribeCurrent() }
+                        self.retries.later(.current) { [weak self] in self?.subscribeCurrent() }
                     }
                 },
                 receiveValue: { [weak self] value in
@@ -171,18 +235,19 @@ final class DeckStore {
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { [weak self] _ in
-                    // The live slide still shows without this list; paging back waits for the retry.
-                    MainActor.assumeIsolated { self?.retry(after: 10) { $0.subscribeSlides() } }
+                    // The live slide still shows without this list; paging back waits for it.
+                    MainActor.assumeIsolated {
+                        self?.retries.later(.slides) { [weak self] in self?.subscribeSlides() }
+                    }
                 },
                 receiveValue: { [weak self] value in
                     MainActor.assumeIsolated { self?.shown = value }
                 })
     }
 
-    private func retry(after seconds: Double, _ body: @escaping @MainActor (DeckStore) -> Void) {
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(seconds))
-            if let self { body(self) }
+    private func subscribeLate() {
+        late.start(client: client, channel: config.channel) { [weak self] in
+            self?.retries.later(.lateFeed) { [weak self] in self?.subscribeLate() }
         }
     }
 
@@ -208,6 +273,9 @@ final class DeckStore {
                         self.offlineTimer?.cancel()
                         self.offlineTimer = nil
                         self.load.offline = false
+                        // A feed that failed while the phone was still joining Wi-Fi
+                        // subscribes again now instead of after its wait.
+                        self.retries.connected()
                     case .connecting:
                         // Retries report "connecting" again every few seconds; keep the
                         // timer from the first one so the notice still shows.

@@ -114,27 +114,20 @@ final class LateBanner {
         self.hold = hold
     }
 
-    /// Subscribes to lateFeed on `channel`, the deck's channel.
-    func start(client: ConvexClient, channel: String) {
+    /// Subscribes to lateFeed on `channel`, the deck's channel. `ended` runs when the
+    /// subscription ends; DeckStore subscribes again from there, with the same 3-second wait
+    /// as the slides (Resubscriber).
+    func start(client: ConvexClient, channel: String, ended: @escaping @MainActor () -> Void) {
         sub = client
             .subscribe(to: "checkin/attendance:lateFeed", with: ["channel": channel], yielding: [LateArrival].self)
             .receive(on: DispatchQueue.main)
             .sink(
-                receiveCompletion: { [weak self] _ in
-                    // A server error ends the subscription. The slides don't need it, so the
-                    // next try waits 10 seconds.
-                    MainActor.assumeIsolated { self?.restart(client: client, channel: channel) }
+                receiveCompletion: { _ in
+                    MainActor.assumeIsolated { ended() }
                 },
                 receiveValue: { [weak self] feed in
                     MainActor.assumeIsolated { self?.take(feed) }
                 })
-    }
-
-    private func restart(client: ConvexClient, channel: String) {
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(10))
-            self?.start(client: client, channel: channel)
-        }
     }
 
     /// One answer from lateFeed: each new arrival shows for 8 seconds, and VoiceOver reads
