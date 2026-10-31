@@ -37,7 +37,7 @@ git remote get-url origin >/dev/null 2>&1 && git ls-remote --exit-code origin HE
 
 echo
 if [ "$bad" = 0 ]; then
-  echo "Ready. Last check by hand: npm run dev, open http://localhost:5173/#/lab, sign in with Google."
+  echo "Ready. Last check by hand: npm run dev, open http://localhost:5173/#/lab, and sign in with the test form (Google refuses localhost for now; the test form needs your backend's host in DEV_HOSTS in convex/auth.config.ts and convex/checkin/prof.ts)."
 else
   echo "Fix the FIX lines above, then run scripts/doctor.sh again."
 fi

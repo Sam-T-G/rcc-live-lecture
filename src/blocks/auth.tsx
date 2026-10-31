@@ -23,7 +23,9 @@
 // The sign-in is kept in localStorage, so every tab of this site has the same one: signing in or
 // out in one tab does the same in the others, and Convex always gets the sign-in the tab shows.
 // When the server refuses the sign-in (its token ran out, or the backend doesn't accept that kind),
-// it's dropped and the sign-in shows again. A lost connection never drops it.
+// it's dropped and the sign-in shows again under "The server didn’t accept that sign-in." A lost
+// connection never drops it. A sign-in's hour (or 12 hours, typed) runs from when this page got
+// the token, so a phone whose clock is wrong keeps it as long as the server does.
 import {
   createContext,
   useCallback,
@@ -79,6 +81,16 @@ function decode(token: string): Stored | null {
   return { token, exp: p.exp * 1000, name: text(p.name), email: text(p.email), picture: text(p.picture) };
 }
 
+// A token this page just got (Google's callback or the typed form), timed by this device's clock:
+// it ends as long after now as the token lasts (exp - iat). exp and iat are by the issuer's clock,
+// so on a phone whose clock is an hour fast, comparing exp with Date.now() would drop a fresh
+// Google sign-in at once. The server still judges the token by its own clock (DropRefused).
+function received(token: string): Stored | null {
+  const s = decode(token);
+  const iat = claims(token)?.iat;
+  return s && typeof iat === "number" ? { ...s, exp: Date.now() + (s.exp - iat * 1000) } : s;
+}
+
 // Whether Google issued this token (the typed sign-in has its own issuer, src/blocks/devLogin.ts).
 function isGoogle(token: string) {
   return GOOGLE_ISSUERS.includes(text(claims(token)?.iss));
@@ -104,12 +116,14 @@ function savedToken(): string | null {
 
 // The saved sign-in, or null when there is none, it can't be read, it ends within a minute, or it
 // is a typed sign-in in a live build (the live site signs in with Google, and prod refuses typed
-// tokens). Read from the token itself, so a name saved garbled by an older version reads right.
+// tokens). The name and email are read from the token itself, so a name saved garbled by an older
+// version reads right; the end is the saved one, timed by this device's clock (received).
 function load(): Stored | null {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || "null") as Partial<Stored> | null;
     if (typeof saved?.token !== "string") return null;
-    const s = decode(saved.token) ?? (saved as Stored);
+    const d = decode(saved.token);
+    const s = d ? { ...d, exp: typeof saved.exp === "number" ? saved.exp : d.exp } : (saved as Stored);
     if (!import.meta.env.DEV && !isGoogle(s.token)) return null;
     return s.exp - MIN > Date.now() ? s : null;
   } catch {
@@ -152,11 +166,14 @@ function onDoorIPad() {
 // endsAt: when a Google sign-in ends, from 5 minutes before its token runs out (null otherwise; the
 // sign-in ends a minute before the token does), for SignInEnding (src/teams/checkin/prof.tsx) to say
 // so with Google's button.
+// refused: the server refused the last sign-in, so it was dropped (DropRefused). SignInButton says
+// so until the next sign-in or sign-out.
 type AuthState = {
   user: Stored | null;
   ready: boolean;
   failed: boolean;
   endsAt: number | null;
+  refused: boolean;
   signOut: () => void;
   renderButton: (el: HTMLElement) => void;
   signInWithToken: (token: string) => void;
@@ -179,10 +196,15 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
     const s = load();
     return ending(s) ? s!.token : null;
   });
+  // Whether the server refused the last sign-in (AuthState.refused).
+  const [refused, setRefused] = useState(false);
   // The person Convex was last told about. When the signed-in person changes (a sign-in, or another
   // account in another tab), Convex is told "loading" for one render first (switching), so it drops
   // the old sign-in and checks the new one from the start; DropRefused then knows the server's
-  // answer is about this sign-in.
+  // answer is about this sign-in. Pages get the new person only in the next render, the one where
+  // Convex hears signed in: Convex's provider then calls client.setAuth, which holds back every
+  // call until the server has the token, before the pages' effects run. A page that got the person
+  // during the switching render would send its first calls signed out ("Sign in first.").
   const me = user ? personOf(user.token) : null;
   const [told, setTold] = useState(me);
   useEffect(() => setTold(me), [me]);
@@ -197,6 +219,16 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
   }, [token]);
   const fetchAccessToken = useCallback(async () => tokenRef.current, []);
 
+  // Signs in with a token made somewhere other than Google (the typed test sign-in). Google's
+  // callback signs in the same way.
+  const signInWithToken = useCallback((t: string) => {
+    const s = received(t);
+    if (!s) return;
+    save(s);
+    setRefused(false);
+    setUser(s);
+  }, []);
+
   const wantGoogle = useCallback(() => setGsi((s) => (s === "off" ? "loading" : s)), []);
   useEffect(() => {
     if (gsi !== "loading") return;
@@ -207,12 +239,7 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
           gsiReady = true;
           window.google.accounts.id.initialize({
             client_id: GOOGLE_CLIENT_ID,
-            callback: (r: { credential: string }) => {
-              const s = decode(r.credential);
-              if (!s) return;
-              save(s);
-              setUser(s);
-            },
+            callback: (r: { credential: string }) => signInWithToken(r.credential),
             auto_select: true,
             itp_support: true,
           });
@@ -225,7 +252,7 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
     return () => {
       live = false;
     };
-  }, [gsi]);
+  }, [gsi, signInWithToken]);
   useEffect(() => {
     if (user && isGoogle(user.token)) wantGoogle();
   }, [user, wantGoogle]);
@@ -235,6 +262,7 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
   useEffect(() => {
     const sync = () => {
       const next = load();
+      if (next) setRefused(false);
       setUser((u) => (u?.token === next?.token ? u : next));
     };
     const onStorage = (e: StorageEvent) => {
@@ -282,6 +310,7 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
   const signOut = useCallback(() => {
     localStorage.removeItem(KEY);
     window.google?.accounts.id.disableAutoSelect();
+    setRefused(false);
     setUser(null);
   }, []);
 
@@ -294,25 +323,20 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
     [gsi, wantGoogle],
   );
 
-  // Signs in with a token made somewhere other than Google (the typed test sign-in).
-  const signInWithToken = useCallback((t: string) => {
-    const s = decode(t);
-    if (!s) return;
-    save(s);
-    setUser(s);
-  }, []);
-
   // DropRefused: the server refused this token.
   const drop = useCallback((t: string) => {
     if (savedToken() === t) localStorage.removeItem(KEY);
+    if (tokenRef.current === t) setRefused(true);
     setUser((u) => (u?.token === t ? null : u));
   }, []);
 
   const ready = gsi === "ready" || gsi === "failed";
   const failed = gsi === "failed";
+  // During the switching render pages still see no one (see `told` above).
+  const shown = switching ? null : user;
   const value = useMemo(
-    () => ({ user, ready, failed, endsAt, signOut, renderButton, signInWithToken, switching, fetchAccessToken }),
-    [user, ready, failed, endsAt, signOut, renderButton, signInWithToken, switching, fetchAccessToken],
+    () => ({ user: shown, ready, failed, endsAt, refused, signOut, renderButton, signInWithToken, switching, fetchAccessToken }),
+    [shown, ready, failed, endsAt, refused, signOut, renderButton, signInWithToken, switching, fetchAccessToken],
   );
 
   return (
@@ -326,10 +350,11 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
 }
 
 // What Convex's provider calls to learn about the sign-in. A module-level hook, so its identity
-// never changes.
+// never changes. a.user is null during the switching render, so Convex hears signed in in the same
+// render that hands pages the sign-in.
 function useAuthForConvex() {
   const a = useContext(AuthContext)!;
-  return { isLoading: a.switching, isAuthenticated: !!a.user && !a.switching, fetchAccessToken: a.fetchAccessToken };
+  return { isLoading: a.switching, isAuthenticated: !!a.user, fetchAccessToken: a.fetchAccessToken };
 }
 
 // Drops the sign-in when the server refuses its token, so the sign-in shows again: a token that ran
@@ -365,10 +390,19 @@ export function GoogleButton() {
 }
 
 // Staff screens: Google's button, with the typed test sign-in under it in `npm run dev` builds.
-// A live build leaves TestSignIn, and with it src/blocks/devLogin.ts, out of the bundle.
+// A live build leaves TestSignIn, and with it src/blocks/devLogin.ts, out of the bundle. Above
+// them, when the server refused the last sign-in, a line that says so (and in dev builds, where
+// typed sign-ins work).
 export function SignInButton() {
+  const { refused } = useGoogleUser();
   return (
     <div>
+      {refused && (
+        <Status kind="error">
+          The server didn’t accept that sign-in.
+          {import.meta.env.DEV && " Test sign-ins work only on the dev backends in DEV_HOSTS in convex/auth.config.ts and convex/checkin/prof.ts."}
+        </Status>
+      )}
       <GoogleButton />
       {import.meta.env.DEV && <TestSignIn />}
     </div>

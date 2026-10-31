@@ -2,6 +2,7 @@
 // Home (#/): a link to every page, grouped by who uses it, each with a line that says what the page
 // does (blocks-frontend-12, rt-19). Every link is a quiet button on its own line, so it's 48px tall
 // to tap on a phone (docs/design.md, Student phone).
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -33,10 +34,25 @@ const ROUTES = [
   "ui",
 ];
 
+// The parts the team pages route, read from their source: each `case "<part>":` in
+// src/teams/checkin/Page.tsx and each `part === "<part>"` in src/teams/live/Page.tsx. A new part
+// with no line on Home fails the test below (APP-risk-3).
+const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+const checkinParts = [...source("../teams/checkin/Page.tsx").matchAll(/case "([^"]+)":/g)].map((m) => m[1]);
+const liveParts = [...source("../teams/live/Page.tsx").matchAll(/part === "([^"]+)"/g)].map((m) => m[1]);
+
 describe("Home", () => {
   it("blocks-frontend-12 links every route, #/portal, the teacher scanner, the quiz, the projector and the team board included", () => {
     expect(links.map((l) => l.to)).toEqual(ROUTES);
     for (const name of Object.keys(pages).filter(Boolean)) expect(links.some((l) => l.to.split("/")[0] === name)).toBe(true);
+  });
+
+  it("APP-risk-3 links every part the check-in and live pages route (join is student by another name)", () => {
+    // So a page that stops routing with `case` or `part ===` fails here instead of finding nothing.
+    expect(checkinParts).toEqual(expect.arrayContaining(["student", "join", "teacher", "kiosk", "quiz", "stage"]));
+    expect(liveParts).toEqual(["leaderboard"]);
+    const routed = [...checkinParts.filter((p) => p !== "join").map((p) => `checkin/${p}`), ...liveParts.map((p) => `live/${p}`)];
+    for (const route of routed) expect(links.map((l) => l.to), `Home has no line for #/${route}`).toContain(route);
   });
 
   it("blocks-frontend-12 groups them for students, professors, the projector and door, and people building the app", () => {

@@ -102,6 +102,7 @@ type Shared = {
   signInWithToken: (token: string) => void;
   signOut: () => void;
   ready: boolean;
+  refused: boolean;
 };
 
 let Auth: typeof import("./auth");
@@ -113,6 +114,8 @@ let drawn: unknown[];
 let shared: Shared;
 let bridge: Bridge; // what AuthProvider told Convex in the last render
 let heard: boolean[]; // isLoading as AuthProvider told it to Convex, one entry per render
+// Per render: the sign-in pages got (useGoogleUser().user) and whether Convex heard signed in.
+let views: { user: string | null; convexHeardSignedIn: boolean }[];
 let providerSlots: unknown[];
 let watcherSlots: unknown[];
 
@@ -156,6 +159,7 @@ beforeEach(async () => {
   });
   convex.held = null; // Convex's provider starts out loading
   heard = [];
+  views = [];
   providerSlots = [];
   watcherSlots = [];
   vi.resetModules(); // auth.tsx loads Google's script once per page
@@ -203,6 +207,7 @@ function render() {
   const provider = find(tree, (e) => typeof e.props?.useAuth === "function")!;
   bridge = (provider.props.useAuth as () => Bridge)();
   heard.push(bridge.isLoading);
+  views.push({ user: shared.user?.token ?? null, convexHeardSignedIn: bridge.isAuthenticated });
   convexView(bridge);
   const watcher = find(tree, named("DropRefused"));
   hooks.slots = watcherSlots;
@@ -459,5 +464,115 @@ describe("blocks-frontend-16 the typed test sign-in on an http address", () => {
     const el = typedForm().view();
     expect(errorIn(el)).toBe("Sign-in needs https. Open the live site or localhost.");
     expect(find(el, (e) => e.type === "input")).toBeUndefined();
+  });
+});
+
+// ConvexProviderWithAuth (convex/dist/esm/react/ConvexAuthState.js) calls client.setAuth, which
+// holds back every call until the server has the token, only in a render where it hears signed
+// in, and in an effect that runs before the page's own effects. A page that got the sign-in one
+// render earlier sent its first call signed out: #/checkin/student's pass.refresh got "Sign in
+// first." and signed the student straight back out.
+describe("APP-spec-1 pages get a new sign-in only in the render that hands it to Convex", () => {
+  const early = () => views.filter((v) => v.user && !v.convexHeardSignedIn);
+
+  it("APP-spec-1 a sign-in on the page, with Convex already connected signed out", async () => {
+    await settle();
+    await answer(false); // Convex connected signed out (#/portal before "Check in")
+    views = [];
+    const ana = typed("ana@example.edu");
+    shared.signInWithToken(ana);
+    await settle();
+    expect(early()).toEqual([]);
+    expect(signedIn()).toBe(ana);
+    expect(await convexAsks()).toBe(ana);
+  });
+
+  it("APP-spec-1 'Not you? Sign out', then a sign-in as someone else", async () => {
+    saveSignIn(typed("ana@example.edu"));
+    await settle();
+    await answer(true);
+    shared.signOut();
+    await settle();
+    views = [];
+    const ben = typed("ben@example.edu");
+    shared.signInWithToken(ben);
+    await settle();
+    expect(early()).toEqual([]);
+    expect(signedIn()).toBe(ben);
+  });
+
+  it("APP-spec-1 a sign-in made in another tab", async () => {
+    await settle();
+    await answer(false);
+    views = [];
+    const ana = typed("ana@example.edu");
+    otherTab(ana);
+    await settle();
+    expect(early()).toEqual([]);
+    expect(signedIn()).toBe(ana);
+    expect(store.has(KEY)).toBe(true);
+  });
+});
+
+describe("APP-spec-2 a Google sign-in lasts its hour from when this page got the token, whatever the phone's clock says", () => {
+  it("APP-spec-2 a phone 61 minutes fast keeps the sign-in, after a reload too, until a minute before the hour ends", async () => {
+    await settle();
+    shared.renderButton({} as HTMLElement);
+    await settle();
+    const iat = Math.floor((T0 - 61 * MIN) / 1000); // Google's clock is 61 minutes behind the phone's
+    const token = `${b64url({ alg: "RS256" })}.${b64url({ iss: GOOGLE, sub: "1234", email: "ana@example.edu", name: "Ana", iat, exp: iat + 3600 })}.sig`;
+    googleCallback!({ credential: token });
+    await settle();
+    expect(signedIn()).toBe(token);
+    expect(store.has(KEY)).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(30 * MIN);
+    await settle();
+    expect(signedIn()).toBe(token);
+    // A reload reads the saved sign-in with the same end.
+    vi.resetModules();
+    Auth = await import("./auth");
+    providerSlots = [];
+    watcherSlots = [];
+    await settle();
+    expect(signedIn()).toBe(token);
+
+    await vi.advanceTimersByTimeAsync(28 * MIN);
+    await settle();
+    expect(signedIn()).toBe(token);
+    await vi.advanceTimersByTimeAsync(2 * MIN);
+    await settle();
+    expect(signedIn()).toBeNull();
+  });
+});
+
+describe("APP-risk-2 a sign-in the server refuses says so on the sign-in form", () => {
+  const said = (refused: boolean) => {
+    hooks.slots = [];
+    hooks.at = 0;
+    hooks.context = { refused };
+    const status = find(Auth.SignInButton(), named("Status"));
+    return status ? [status.props.children].flat(3).filter((x) => typeof x === "string").join(" ") : null;
+  };
+
+  it("APP-risk-2 refused stays on until the next sign-in, and the form shows it", async () => {
+    await settle();
+    expect(shared.refused).toBe(false);
+    shared.signInWithToken(typed("ana@example.edu"));
+    await settle();
+    await answer(false);
+    expect(signedIn()).toBeNull();
+    expect(shared.refused).toBe(true);
+
+    shared.signInWithToken(typed("ben@example.edu"));
+    await settle();
+    expect(shared.refused).toBe(false);
+
+    expect(said(false)).toBeNull();
+    expect(said(true)).toContain("The server didn’t accept that sign-in.");
+    // `npm run dev` builds also say where typed sign-ins work; live builds don't.
+    expect(said(true)).toContain("DEV_HOSTS");
+    vi.stubEnv("DEV", false);
+    expect(said(true)).not.toContain("DEV_HOSTS");
   });
 });
