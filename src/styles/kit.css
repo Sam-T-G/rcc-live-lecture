@@ -1,0 +1,285 @@
+/* Styles for the parts in src/blocks/kit.tsx. Tokens only (src/styles/tokens.css),
+   no raw colors. docs/design.md shows each part, and #/ui shows every state.
+   This is the "kit" layer: it beats the base layer (src/index.css), and any
+   team stylesheet beats it. */
+@layer kit {
+  /* ------------------------------------------------------- <Button> */
+  /* Busy: the words keep their place (and stay readable to a screen reader),
+     so the button never changes width, and a spinner in the button's own word
+     color sits on top. */
+  .btn__label { display: inline-flex; align-items: center; gap: var(--rcc-space-2); }
+  .btn[aria-busy="true"] { opacity: 1; cursor: progress; }
+  .btn[aria-busy="true"] .btn__label { opacity: 0; }
+  .btn__spinner {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 1.25em;
+    height: 1.25em;
+    border: 2px solid currentColor;
+    border-inline-end-color: transparent;
+    border-radius: 50%;
+    animation: rcc-spin 1s linear infinite;
+  }
+
+  /* -------------------------------------------------------- <Field> */
+  /* Label, hint, error, then the field: the error stays above the phone's
+     keyboard, and a screen reader hears it before the field. */
+  .field { margin: 0 0 var(--rcc-space-4); }
+  .field__label { margin-bottom: var(--rcc-space-2); }
+  .field__hint,
+  .field__error { margin: 0 0 var(--rcc-space-2); font-size: var(--fs-small); line-height: var(--lh-small); }
+  .field__hint { color: var(--muted); }
+  .field__error { color: var(--error); font-weight: var(--rcc-weight-strong); }
+  .field select { display: block; width: 100%; }
+  /* In a row of controls, the row's gap does the spacing. */
+  .row > :is(.field, .seg-field) { margin-bottom: 0; }
+
+  /* --------------------------------------------------------- <Tabs> */
+  .tabs__list {
+    display: flex;
+    gap: var(--rcc-space-1);
+    margin: 0 0 var(--rcc-space-4);
+    border-bottom: var(--rcc-hairline) solid var(--line);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs__tab {
+    position: relative;
+    flex: none;
+    min-height: var(--rcc-target-min);
+    padding: var(--rcc-space-2) var(--rcc-space-4);
+    border-radius: var(--rcc-radius-sm) var(--rcc-radius-sm) 0 0;
+    background-color: transparent;
+    color: var(--muted);
+  }
+  /* The chosen tab: green words and a 3px bar under them, drawn on a
+     pseudo-element so the tab's own box never moves. */
+  .tabs__tab[aria-selected="true"] { color: var(--accent); }
+  .tabs__tab[aria-selected="true"]::after {
+    content: "";
+    position: absolute;
+    inset: auto var(--rcc-space-2) 0;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+    background: var(--accent);
+  }
+  /* Tabs don't change shape when pressed: they sit on a line. */
+  .tabs__tab:is(:active, [data-force="active"]):not(:disabled) { border-radius: var(--rcc-radius-sm) var(--rcc-radius-sm) 0 0; }
+  .tabs__tab:is(:focus-visible, [data-force="focus"]) { outline-offset: -3px; }
+  .tabs__panel:focus-visible { outline-offset: var(--rcc-space-1); }
+
+  /* ----------------------------------------------------- <Segmented> */
+  /* Real radio buttons, hidden but focusable, so arrow keys and screen readers
+     work with no script. The chosen option changes fill, ring and words
+     together: a tinted fill alone is too faint to see (GDG §2.5). */
+  .seg {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--rcc-space-1);
+    max-width: 100%;
+    padding: var(--rcc-space-1);
+    border-radius: var(--rcc-radius-full);
+    box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong);
+  }
+  .seg__option {
+    position: relative;
+    display: block;
+    min-height: 0;
+    margin: 0;
+  }
+  .seg__input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    pointer-events: none;
+  }
+  .seg__label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--tap);
+    min-width: var(--tap);
+    padding: var(--rcc-space-2) var(--rcc-space-5);
+    border-radius: var(--rcc-radius-full);
+    font-size: var(--fs-label);
+    line-height: var(--lh-label);
+    font-weight: var(--rcc-weight-strong);
+    color: var(--text);
+    cursor: pointer;
+    transition: background-color var(--rcc-dur-fast-effects) var(--rcc-ease-standard);
+  }
+  @media (hover: hover) {
+    .seg__option:hover .seg__label { background-color: color-mix(in srgb, currentColor var(--rcc-state-hover), transparent); }
+  }
+  .seg__input:checked + .seg__label {
+    background-color: var(--accent-soft);
+    color: var(--accent-soft-text);
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+  .seg__input:focus-visible + .seg__label,
+  .seg__label[data-force="focus"] { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .seg-field:disabled .seg__label { opacity: 0.5; cursor: not-allowed; }
+  /* Full width: each option takes an equal share (phones). */
+  .seg--block { display: flex; }
+  .seg--block .seg__option { flex: 1 1 0; }
+
+  /* -------------------------------------------------------- <Badge> */
+  /* Square corners: a badge is never pressed (GDG §4.3: round means press).
+     The 1px edge marks it out where its fill alone is too faint. */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.154em;  /* 28 at 13px; it grows with --fs-badge on the projector */
+    padding: 0 0.615em;   /* 8 at 13px */
+    border-radius: var(--rcc-radius-xs);
+    box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong);
+    font-size: var(--fs-badge);
+    line-height: 1.231; /* 16 on 13 */
+    letter-spacing: var(--rcc-track-label-md);
+    font-weight: var(--rcc-weight-strong);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .badge--neutral { background: var(--fill); color: var(--text); }
+  .badge--accent { background: var(--accent-soft); color: var(--accent-soft-text); }
+  .badge--live { background: var(--live); color: var(--live-text); }
+  .badge--warn { background: var(--warn); color: var(--warn-text); }
+  .badge--error { background: var(--error-soft); color: var(--error-soft-text); }
+
+  /* ------------------------------------------------------- <Banner> */
+  /* A status box: a tinted fill plus a 1px edge that carries the boundary. */
+  .banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--rcc-space-3) var(--rcc-space-4);
+    margin: 0 0 var(--rcc-space-4);
+    padding: var(--rcc-space-3) var(--rcc-space-4);
+    border-radius: var(--radius);
+    box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong);
+  }
+  .banner__body { flex: 1 1 14rem; min-width: 0; }
+  .banner__title { margin: 0; font-weight: var(--rcc-weight-strong); }
+  .banner__text > :last-child { margin-bottom: 0; }
+  .banner__action { flex: none; display: flex; flex-wrap: wrap; gap: var(--rcc-space-2); }
+  .banner--info { background: var(--fill); color: var(--text); }
+  .banner--success { background: var(--accent-soft); color: var(--accent-soft-text); }
+  .banner--warn { background: var(--warn); color: var(--warn-text); }
+  .banner--error { background: var(--error-soft); color: var(--error-soft-text); }
+  /* Inside a banner, quiet words and links take the banner's own ink, which
+     is measured against its fill. */
+  .banner :is(.muted, a) { color: inherit; }
+  .banner :is(.btn--secondary, .btn--quiet) { color: inherit; }
+  .banner .btn--secondary { box-shadow: inset 0 0 0 var(--rcc-hairline) currentColor; }
+  /* <BannerStack>: banners pinned to the bottom of the screen, above the
+     iPhone home bar. Taps pass through the gaps. */
+  .banner-stack {
+    position: fixed;
+    inset: auto var(--rcc-space-4) calc(var(--rcc-space-4) + env(safe-area-inset-bottom, 0px));
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--rcc-space-2);
+    pointer-events: none;
+  }
+  .banner-stack > * {
+    width: min(100%, 40rem);
+    margin: 0;
+    pointer-events: auto;
+    box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong), var(--rcc-elevation-2);
+  }
+
+  /* --------------------------------------------------------- <Stat> */
+  .stat { display: flex; flex-direction: column; gap: var(--rcc-space-1); min-width: 0; }
+  .stat__value {
+    font-size: var(--fs-stat);
+    line-height: 1.25;
+    letter-spacing: var(--rcc-track-headline-lg);
+    font-weight: var(--rcc-weight-strong);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  .stat__label { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--muted); }
+  .stat--accent .stat__value { color: var(--accent); }
+
+  /* --------------------------------------------------- <EmptyState> */
+  .empty { padding: var(--rcc-space-8) var(--rcc-space-4); text-align: center; }
+  .empty__title { margin: 0 0 var(--rcc-space-2); font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: var(--rcc-weight-strong); }
+  .empty__text { margin: 0 auto var(--rcc-space-4); max-width: 34ch; color: var(--muted); }
+  .empty__action { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--rcc-space-2); }
+
+  /* ----------------------------------------------------- <Skeleton> */
+  /* Grey blocks where the content will go, so nothing jumps when it lands.
+     They hold still: no shimmer or pulse (GDG motion.md §5.6). */
+  .skeleton { display: grid; gap: var(--rcc-space-3); margin: 0 0 var(--rcc-space-4); }
+  .skeleton__line,
+  .skeleton__block { display: block; border-radius: var(--rcc-radius-xs); background: var(--fill); }
+  .skeleton__line { height: 1em; }
+  .skeleton__line:nth-child(3n + 2) { width: 92%; }
+  .skeleton__line:nth-child(3n + 3) { width: 64%; }
+  .skeleton__block { width: 100%; border-radius: var(--rcc-radius-sm); }
+
+  /* ------------------------------------------------- <ConfirmButton> */
+  .confirm {
+    display: flex;
+    flex-direction: column;
+    gap: var(--rcc-space-3);
+    padding: var(--rcc-space-4);
+    border-radius: var(--radius);
+    background: var(--fill);
+    box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong);
+  }
+  .confirm__question { margin: 0; font-weight: var(--rcc-weight-strong); }
+  .confirm__actions { display: flex; flex-wrap: wrap; gap: var(--rcc-space-2); }
+
+  /* ------------------------------------------------------ <Projector> */
+  /* The 1920 x 1080 stage for the room's screen. Every size below is a stage
+     size from presentation.md §13.3, scaled to the window by --stage-u. */
+  .projector {
+    --fs-h1: var(--proj-head);
+    --lh-h1: 1.1;
+    --fs-h2: var(--proj-body);
+    --lh-h2: 1.2;
+    --fs-h3: var(--proj-body);
+    --lh-h3: 1.2;
+    --fs-body: var(--proj-body);
+    --lh-body: 1.3;
+    --fs-small: var(--proj-small);
+    --lh-small: 1.3;
+    --fs-label: var(--proj-small);
+    --lh-label: 1.2;
+    --fs-ledger: var(--proj-ledger);
+    --lh-ledger: 1.2;
+    --fs-badge: var(--proj-ledger);
+    --fs-stat: var(--proj-head);
+    --fs-big: var(--proj-digits);
+    display: flex;
+    flex-direction: column;
+    gap: calc(32 * var(--stage-u));
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: var(--proj-margin);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+  .projector > * { margin: 0; }
+  .projector .big__label { font-size: var(--proj-small); }
+  /* Rows read from the back of the room: stage-sized space and a 2px rule. */
+  .projector .list > li {
+    padding-block: calc(24 * var(--stage-u));
+    border-bottom-width: max(var(--rcc-hairline), calc(2 * var(--stage-u)));
+  }
+
+  /* ----------------------------------------------- forced colors */
+  /* Windows High Contrast drops fills and box-shadows: give the edges and the
+     chosen states a real line. */
+  @media (forced-colors: active) {
+    .badge, .banner, .seg, .confirm { border: 1px solid CanvasText; }
+    .seg__input:checked + .seg__label { outline: 2px solid Highlight; outline-offset: -2px; }
+    .tabs__tab[aria-selected="true"]::after { background: Highlight; forced-color-adjust: none; }
+  }
+}

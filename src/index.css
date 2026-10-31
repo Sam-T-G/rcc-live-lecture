@@ -1,61 +1,375 @@
-/* Shared look. Colors are tokens; change them here, not in a page. */
-:root {
-  --bg: #f7faf8;
-  --surface: #ffffff;
-  --text: #17201b;
-  --muted: #56635b;
-  --line: #d8e2dc;
-  --accent: #137333;
-  --accent-text: #ffffff;
-  --error: #b3261e;
-  --radius: 14px;
-  color-scheme: light;
-  font-family: "Google Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #101512;
-    --surface: #18201b;
-    --text: #e6eee9;
-    --muted: #a1b0a7;
-    --line: #2c3831;
-    --accent: #81c995;
-    --accent-text: #0b1f12;
-    --error: #f2b8b5;
-    color-scheme: dark;
+/* Shared look for every page.
+   Colors, sizes and timing are tokens in src/styles/tokens.css: change them
+   there, not in a page. The kit's parts (src/blocks/kit.tsx) are styled in
+   src/styles/kit.css. #/ui shows everything in light and dark, and
+   docs/design.md says what to use where.
+   This file styles bare elements and the parts in src/blocks/ui.tsx (Screen,
+   Card, Big, Status, Todo). It sits in the "base" cascade layer, so a rule in
+   a team stylesheet (unlayered) beats it whatever its selector. */
+@import "./styles/tokens.css";
+@import "./styles/kit.css";
+
+@layer base {
+  /* ------------------------------------------------------------ page */
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--rcc-font-text);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    letter-spacing: var(--rcc-track-body-lg);
+    font-weight: var(--rcc-weight-body);
+    font-optical-sizing: auto;                        /* display drawing for headings, text drawing for body */
+    font-variation-settings: "GRAD" var(--rcc-grad);  /* thinner strokes on dark (GDG §3.2) */
+    font-synthesis: weight;
+    /* Google Sans turns a few typed strings into the Google logo (GDG
+       foundations §2.8). Students type names and questions, so ligatures stay
+       off everywhere. */
+    font-variant-ligatures: none;
+    /* A long email or code breaks instead of pushing the page sideways at 320px. */
+    overflow-wrap: anywhere;
+  }
+  /* A themed scope (#/ui, the projector) paints its own ground. */
+  [data-theme] {
+    background-color: var(--bg);
+    color: var(--text);
+    font-variation-settings: "GRAD" var(--rcc-grad);
+  }
+  [hidden] { display: none !important; }
+  img, video, iframe, canvas { max-width: 100%; }
+  img { height: auto; }
+
+  /* --------------------------------------------------------- type */
+  h1, h2, h3, h4, .text-h1, .text-h2, .text-h3 {
+    font-family: var(--rcc-font-text);
+    font-weight: var(--rcc-weight-strong);
+    text-wrap: balance;
+  }
+  h1, h2, h3, h4 { margin: 0 0 var(--rcc-space-3); }
+  h1, .text-h1 { font-size: var(--fs-h1); line-height: var(--lh-h1); letter-spacing: var(--tr-h1); }
+  h1 { margin-bottom: var(--rcc-space-4); }
+  h2, .text-h2 { font-size: var(--fs-h2); line-height: var(--lh-h2); letter-spacing: var(--tr-h2); }
+  h3, .text-h3 { font-size: var(--fs-h3); line-height: var(--lh-h3); letter-spacing: 0; }
+  h4 { font-size: var(--fs-body); line-height: var(--lh-body); }
+  .text-small, small { font-size: var(--fs-small); line-height: var(--lh-small); }
+  .text-label { font-size: var(--fs-label); line-height: var(--lh-label); font-weight: var(--rcc-weight-strong); letter-spacing: var(--rcc-track-label-lg); }
+  p, ul, ol, dl, figure, blockquote { margin: 0 0 var(--rcc-space-4); }
+  ul, ol { padding-inline-start: var(--rcc-space-6); }
+  strong, b { font-weight: var(--rcc-weight-strong); }
+  hr { border: 0; border-top: var(--rcc-hairline) solid var(--line); margin: var(--rcc-space-6) 0; }
+  code, kbd, samp, pre { font-family: var(--rcc-font-code); font-variant-ligatures: none; }
+  :not(pre) > code { font-size: 0.9375em; background: var(--code-bg); color: var(--code-text); padding: 0.1em 0.35em; border-radius: var(--rcc-radius-xs); }
+  pre { overflow-x: auto; background: var(--code-bg); color: var(--code-text); padding: var(--rcc-space-4); border-radius: var(--rcc-radius-sm); }
+
+  /* ------------------------------------------------------------ links */
+  /* Underlined: green beside body words is under 3:1, so color alone can't mark a link. */
+  a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    text-decoration-thickness: from-font;
+  }
+
+  /* ------------------------------------------------------------ focus */
+  /* An outline rather than GDG's box-shadow ring, so a team rule that sets
+     box-shadow on a button can't hide it. 3px, 2px clear of the control,
+     3:1 or more on every ground (contrast.ts). [data-force] is for #/ui only. */
+  :focus-visible,
+  [data-force="focus"] {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------------------------------------------------------- controls */
+  button, input, select, textarea { font: inherit; letter-spacing: inherit; color: inherit; margin: 0; }
+
+  /* A bare <button> is the main (primary) button. One class makes the others:
+     .btn--secondary (outlined), .btn--quiet (words only), .btn--danger (red,
+     for what can't be undone), .btn--small (laptop pages only), .btn--block
+     (full width). The same classes work on an <a class="btn">. The kit's
+     <Button> adds a busy state. */
+  button,
+  .btn {
+    --state: 0%;
+    min-height: var(--rcc-target-min);
+    padding: var(--rcc-space-2) var(--rcc-space-6);
+    border: 0;
+    border-radius: var(--rcc-radius-full);
+    background-color: var(--accent);
+    background-image: linear-gradient(color-mix(in srgb, currentColor var(--state), transparent) 0 0);
+    color: var(--accent-text);
+    font-size: var(--fs-label);
+    line-height: var(--lh-label);
+    letter-spacing: var(--rcc-track-label-lg);
+    font-weight: var(--rcc-weight-strong);
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      border-radius var(--rcc-dur-fast-spatial) var(--rcc-ease-spatial),
+      background-color var(--rcc-dur-fast-effects) var(--rcc-ease-standard);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--rcc-space-2);
+    position: relative;
+    text-align: center;
+    text-decoration: none;
+  }
+  .btn--secondary {
+    background-color: transparent;
+    color: var(--text);
+    box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong);
+  }
+  .btn--quiet {
+    background-color: transparent;
+    color: var(--accent);
+    padding-inline: var(--rcc-space-3);
+  }
+  .btn--danger {
+    background-color: var(--error);
+    color: var(--error-text);
+  }
+  .btn--small {
+    min-height: var(--rcc-control-sm);
+    padding-block: var(--rcc-space-1);
+    padding-inline: var(--rcc-space-4);
+    font-size: var(--fs-small);
+  }
+  .btn--block { width: 100%; }
+  /* State layer: the button's own word color at 8% (hover) or 10% (pressed). */
+  @media (hover: hover) {
+    :is(button, .btn):hover:not(:disabled, [aria-disabled="true"]) { --state: var(--rcc-state-hover); }
+  }
+  :is(button, .btn)[data-force="hover"] { --state: var(--rcc-state-hover); }
+  :is(button, .btn):is(:active, [data-force="active"]):not(:disabled, [aria-disabled="true"]) {
+    --state: var(--rcc-state-pressed);
+    border-radius: var(--rcc-radius-sm); /* press feedback is a shape change (GDG §7.2) */
+  }
+  /* 50% rather than GDG's 38%, so a locked quiz answer stays readable on a phone. */
+  :is(button, .btn):is(:disabled, [aria-disabled="true"]) { opacity: 0.5; cursor: not-allowed; }
+
+  /* ----------------------------------------------------------- fields */
+  label {
+    display: block;
+    margin-bottom: var(--rcc-space-3);
+    font-size: var(--fs-label);
+    line-height: var(--lh-label);
+    font-weight: var(--rcc-weight-strong);
+  }
+  legend {
+    padding: 0;
+    margin-bottom: var(--rcc-space-2);
+    font-size: var(--fs-label);
+    line-height: var(--lh-label);
+    font-weight: var(--rcc-weight-strong);
+  }
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"]),
+  select,
+  textarea {
+    min-height: var(--rcc-target-min);
+    padding: var(--rcc-space-2) var(--rcc-space-3);
+    /* 16px or more, or iOS Safari zooms the page when the field gets focus. */
+    font-size: max(1rem, var(--fs-body));
+    line-height: var(--lh-small);
+    font-weight: var(--rcc-weight-body);
+    letter-spacing: normal;
+    color: var(--text);
+    background-color: var(--surface);
+    border: var(--rcc-hairline) solid var(--line-strong);
+    border-radius: var(--rcc-radius-sm);
+  }
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"]),
+  textarea { display: block; width: 100%; }
+  /* A select keeps its own width in a row of buttons and fills a label it sits in. */
+  select { max-width: 100%; }
+  label > select { display: block; width: 100%; }
+  label > :is(input:not([type="checkbox"], [type="radio"]), select, textarea) { margin-top: var(--rcc-space-2); }
+  textarea { min-height: 6rem; resize: vertical; }
+  ::placeholder { color: var(--muted); opacity: 1; }
+  :is(input, select, textarea)[aria-invalid="true"] { border-color: var(--error); }
+  :is(input, select, textarea):disabled { opacity: 0.5; cursor: not-allowed; }
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex: none;
+    accent-color: var(--accent);
+  }
+  /* A label around a checkbox or radio is the tap target: 48px tall. */
+  label:has(> input[type="checkbox"], > input[type="radio"]) {
+    display: flex;
+    align-items: center;
+    gap: var(--rcc-space-3);
+    min-height: var(--rcc-target-min);
+    margin-bottom: 0;
+    cursor: pointer;
+  }
+  fieldset { border: 0; margin: 0 0 var(--rcc-space-4); padding: 0; min-inline-size: 0; }
+  summary { padding-block: var(--rcc-space-3); cursor: pointer; }
+
+  /* ------------------------------------------------- lists and tables */
+  /* .list: one row per item with a divider, no bullets. */
+  .list { list-style: none; margin: 0 0 var(--rcc-space-4); padding: 0; }
+  .list > li { padding-block: var(--rcc-space-3); border-bottom: var(--rcc-hairline) solid var(--line); }
+  .list > li:last-child { border-bottom: 0; }
+  /* Rules between rows only, a tinted head, numbers in fixed-width figures.
+     Wrap a wide table in .table-scroll so it scrolls on its own on a phone. */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-small);
+    line-height: var(--lh-small);
+    font-variant-numeric: tabular-nums lining-nums;
+    overflow-wrap: normal;
+  }
+  th, td { text-align: start; padding: var(--rcc-space-2); border-bottom: var(--rcc-hairline) solid var(--line); }
+  thead th { background: var(--fill); font-weight: var(--rcc-weight-strong); }
+  .table-scroll { overflow-x: auto; }
+
+  /* ---------------------------------------------------- small helpers */
+  .muted { color: var(--muted); }
+  .error { color: var(--error); }
+  .row { display: flex; flex-wrap: wrap; gap: var(--rcc-space-3); align-items: center; }
+  .stack { display: flex; flex-direction: column; gap: var(--rcc-space-3); }
+  .stack > * { margin: 0; }
+  /* The ledger line: dates, rooms, counters. Tokens, never a sentence (GDG §9.7). */
+  .ledger {
+    font-family: var(--rcc-font-code);
+    font-size: var(--fs-ledger);
+    line-height: var(--lh-ledger);
+    letter-spacing: var(--rcc-track-ledger);
+    font-weight: var(--rcc-weight-strong);
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--muted);
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* --------------------------------- the parts in src/blocks/ui.tsx */
+  /* <Screen>: the narrow page is for phones; wide is for laptops and big
+     screens. Content stays 688px (1248px wide) at every size; the margin
+     grows. Safe-area insets keep words clear of an iPhone's corners once
+     index.html's viewport meta has viewport-fit=cover (until then they're 0). */
+  .page {
+    max-width: calc(43rem + 2 * var(--rcc-page-margin));
+    margin: 0 auto;
+    padding-block: var(--rcc-space-6) calc(var(--rcc-space-16) + env(safe-area-inset-bottom, 0px));
+    padding-inline: max(var(--rcc-page-margin), env(safe-area-inset-left, 0px)) max(var(--rcc-page-margin), env(safe-area-inset-right, 0px));
+  }
+  .page--wide { max-width: calc(78rem + 2 * var(--rcc-page-margin)); }
+
+  /* <Card> */
+  .panel {
+    margin-block: var(--rcc-space-4);
+    padding: var(--card-pad);
+    background: var(--surface);
+    border: var(--rcc-hairline) solid var(--line);
+    border-radius: var(--radius);
+  }
+  .panel > :first-child { margin-top: 0; }
+  .panel > :last-child { margin-bottom: 0; }
+
+  /* <Todo> */
+  .todo { border-style: dashed; }
+  .todo__team {
+    margin: 0 0 var(--rcc-space-1);
+    font-family: var(--rcc-font-code);
+    font-size: var(--fs-ledger);
+    letter-spacing: var(--rcc-track-ledger);
+    font-weight: var(--rcc-weight-strong);
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  /* <Big>: one number, read from across a room. */
+  .big { display: flex; flex-direction: column; align-items: flex-start; }
+  .big__value {
+    font-size: var(--fs-big);
+    line-height: 1;
+    font-weight: var(--rcc-weight-strong);
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--accent);
+  }
+  .big__label { color: var(--muted); font-size: var(--fs-body); }
+
+  /* <Status>: waiting on the server, nothing yet, or failed. */
+  .status { margin: 0; padding-block: var(--rcc-space-3); color: var(--muted); }
+  /* The spinner shows only when the wait passes 0.4 s, so a quick load
+     doesn't flash it. */
+  .status--loading { display: flex; align-items: center; gap: var(--rcc-space-2); }
+  .status--loading::before {
+    content: "";
+    flex: none;
+    width: 1em;
+    height: 1em;
+    border: 2px solid currentColor;
+    border-inline-end-color: transparent;
+    border-radius: 50%;
+    opacity: 0;
+    animation: rcc-spin 1s linear infinite, rcc-show 1ms 400ms forwards;
+  }
+  /* An error is a box: a tinted fill and a 1px edge (the fill alone is under
+     3:1). The inline space is a transparent border, so a team rule that sets
+     `padding: 8px 0` on .status (host.css) can't push the words to the edge,
+     which is also why the visible edge is an outline. */
+  .status--error {
+    margin-block: var(--rcc-space-2);
+    padding-block: var(--rcc-space-2);
+    border: 0 solid transparent;
+    border-inline-width: var(--rcc-space-3);
+    border-radius: var(--rcc-radius-sm);
+    outline: var(--rcc-hairline) solid var(--line-strong);
+    outline-offset: calc(-1 * var(--rcc-hairline));
+    background: var(--error-soft);
+    color: var(--error-soft-text);
+  }
+
+  /* <QR> */
+  .qr { margin: 0; max-width: 100%; }
+  .qr svg { width: 100%; height: auto; display: block; border-radius: var(--rcc-radius-sm); }
+  .qr figcaption { color: var(--muted); margin-top: var(--rcc-space-2); text-align: center; }
+
+  /* The lab's slide preview and vision panel. */
+  .slide h3 { margin: var(--rcc-space-1) 0 var(--rcc-space-2); }
+  .vision { position: relative; }
+  .vision video, .vision img { display: block; width: 100%; height: auto; border-radius: var(--rcc-radius-sm); }
+  .vision canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  @keyframes rcc-spin { to { transform: rotate(1turn); } }
+  @keyframes rcc-show { to { opacity: 1; } }
+
+  /* ---------------------------------------------- reduced motion */
+  /* Every animation and transition in the app ends at once, team stylesheets
+     included: an !important in a layer beats every unlayered rule. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* ----------------------------------------------- forced colors */
+  /* Windows High Contrast drops fills and box-shadows, so buttons get a real edge. */
+  @media (forced-colors: active) {
+    button, .btn { border: 1px solid ButtonText; }
   }
 }
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.45; }
-.page { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
-h1 { font-size: 2rem; margin: 0 0 8px; }
-h2 { font-size: 1.2rem; margin: 0 0 12px; }
-.muted { color: var(--muted); }
-.error { color: var(--error); }
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin: 16px 0; }
-button { font: inherit; font-weight: 600; background: var(--accent); color: var(--accent-text); border: 0; border-radius: 999px; padding: 10px 18px; min-height: 44px; cursor: pointer; }
-button:disabled { opacity: 0.6; cursor: default; }
-label { display: block; margin-bottom: 12px; color: var(--muted); }
-input { display: block; width: 100%; margin-top: 4px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-a { color: var(--accent); }
-.qr { margin: 0; max-width: 100%; }
-.qr svg { width: 100%; height: auto; display: block; border-radius: 8px; }
-.qr figcaption { color: var(--muted); margin-top: 6px; text-align: center; }
-.slide h3 { margin: 4px 0 8px; }
-
-/* Shared screen parts (src/blocks/ui.tsx) */
-.page--wide { max-width: 1280px; }
-.todo { border-style: dashed; }
-.todo__team { margin: 0 0 4px; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
-.big { display: flex; flex-direction: column; align-items: flex-start; }
-.big__value { font-size: clamp(4rem, 14vw, 10rem); line-height: 1; font-weight: 600; letter-spacing: -0.03em; color: var(--accent); font-variant-numeric: tabular-nums; }
-.big__label { color: var(--muted); font-size: 1.1rem; }
-.status { padding: 12px 0; color: var(--muted); }
-.status--error { color: var(--error); }
-.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; max-width: 100%; }
-label select { display: block; width: 100%; margin-top: 4px; }
-.vision { position: relative; }
-.vision video, .vision img { display: block; width: 100%; height: auto; border-radius: 10px; }
-.vision canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.vision [hidden] { display: none; }

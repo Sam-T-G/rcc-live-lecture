@@ -1,0 +1,340 @@
+/* =============================================================================
+   RCC Live Lecture: design tokens.
+
+   Copied from the GDG on Campus RCC design system: github.com/Sam-T-G/rcc-gdg,
+   docs/04-brand/design-system/tokens.css (v1.0 of 2026-08-31, read 2026-10-31).
+   Its contrast audit is foundations.md §2.5; the projector sizes come from
+   presentation.md §13.3. Every value is GDG's unless a comment says the app
+   chose it. Never edit rcc-gdg from here: copy a changed value over, then run
+   `npm test`.
+
+   Pages use the short names at the bottom of each block (--bg, --text,
+   --accent, --fs-body, ...). src/styles/contrast.ts lists the text and
+   background pairs those names make, and src/styles/contrast.test.ts measures
+   every one in light and dark. docs/design.md says which name goes where, and
+   #/ui shows all of them.
+
+   Left out on purpose: --rcc-fill-green and --rcc-fill-yellow (the licensed
+   bright fills: under --rcc-on-surface words they fail contrast in dark),
+   blue (GDG keeps it for links to other documents, and this app has none),
+   the Step, and the narrative and expressive motion tiers (decks only).
+   ============================================================================= */
+
+/* Cascade layers: tokens, then base elements (src/index.css), then the kit
+   (src/styles/kit.css). Team stylesheets are unlayered, so a team rule beats
+   all three whatever its selector. */
+@layer tokens, base, kit;
+
+@layer tokens {
+  :root {
+    /* ---------------------------------------------------------------- type */
+    --rcc-font-text: "Google Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --rcc-font-code: "Google Sans Code", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --rcc-weight-body: 400;
+    --rcc-weight-strong: 500;
+    --rcc-weight-loud: 700;
+
+    /* Fluid roles grow from a 360px to a 1440px window; fixed roles never move. */
+    --rcc-size-display-sm: clamp(1.75rem, 1.5rem + 1.111vw, 2.5rem);       /* 28 to 40 */
+    --rcc-size-headline-lg: clamp(1.5rem, 1.3333rem + 0.741vw, 2rem);      /* 24 to 32 */
+    --rcc-size-headline-sm: clamp(1.25rem, 1.1667rem + 0.370vw, 1.5rem);   /* 20 to 24 */
+    --rcc-size-title-lg: 1.125rem;   /* 18 */
+    --rcc-size-body-lg: 1.0625rem;   /* 17 */
+    --rcc-size-body-md: 0.9375rem;   /* 15 */
+    --rcc-size-label-lg: 0.9375rem;  /* 15 */
+    --rcc-size-label-md: 0.8125rem;  /* 13 */
+    --rcc-size-code-sm: 0.8125rem;   /* 13 */
+
+    /* Tracking flips sign around 20px: negative above, positive below. */
+    --rcc-track-display-sm: -0.015em;
+    --rcc-track-headline-lg: -0.01em;
+    --rcc-track-headline-sm: -0.005em;
+    --rcc-track-body-lg: 0.005em;
+    --rcc-track-label-lg: 0.01em;
+    --rcc-track-label-md: 0.015em;
+    --rcc-track-ledger: 0.08em;
+
+    /* --------------------------------------------------------------- space */
+    /* --rcc-space-N is N x 4px. */
+    --rcc-space-0-5: 0.125rem; /*  2 */
+    --rcc-space-1: 0.25rem;    /*  4 */
+    --rcc-space-2: 0.5rem;     /*  8 */
+    --rcc-space-3: 0.75rem;    /* 12 */
+    --rcc-space-4: 1rem;       /* 16 */
+    --rcc-space-5: 1.25rem;    /* 20 */
+    --rcc-space-6: 1.5rem;     /* 24 */
+    --rcc-space-8: 2rem;       /* 32 */
+    --rcc-space-10: 2.5rem;    /* 40 */
+    --rcc-space-12: 3rem;      /* 48 */
+    --rcc-space-16: 4rem;      /* 64 */
+
+    /* Page margin and card padding step up at 600px and 1024px (below). */
+    --rcc-page-margin: var(--rcc-space-4);
+    --card-pad: var(--rcc-space-4);
+
+    /* Hit areas. GDG's floor is 48px; --tap (44px) is the app's floor for
+       anything tapped on a phone, and --rcc-control-sm is for laptop pages only. */
+    --rcc-target-min: 3rem;    /* 48 */
+    --rcc-control-sm: 2.25rem; /* 36 */
+    --tap: 2.75rem;            /* 44 (app) */
+
+    /* --------------------------------------------------------------- shape */
+    --rcc-radius-xs: 0.25rem;  /*  4: badges, inline code */
+    --rcc-radius-sm: 0.5rem;   /*  8: inputs, pressed buttons */
+    --rcc-radius-md: 0.75rem;  /* 12: a card in a grid */
+    --rcc-radius-lg: 1rem;     /* 16: page cards, banners */
+    --rcc-radius-xl: 1.5rem;   /* 24: page-level panels */
+    --rcc-radius-full: 9999px; /* only things you can press */
+    --rcc-hairline: 1px;
+    --radius: var(--rcc-radius-lg);
+
+    /* -------------------------------------------------------------- motion */
+    /* Spatial (position, size, radius) may overshoot; effects (opacity,
+       color) never do. Reduced motion zeroes the spatial track (below). */
+    --rcc-dur-fast-effects: 90ms;
+    --rcc-dur-default-effects: 140ms;
+    --rcc-dur-fast-spatial: 200ms;
+    --rcc-dur-default-spatial: 320ms;
+    --rcc-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --rcc-ease-spatial: cubic-bezier(0.34, 1.28, 0.64, 1);
+    --rcc-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+    /* State layers: the content's own color at these strengths. GDG writes
+       0.08 and 0.10; color-mix() needs percentages. */
+    --rcc-state-hover: 8%;
+    --rcc-state-pressed: 10%;
+
+    /* ---------------------------------------------- the app's type roles */
+    /* Which GDG role each one uses is the app's choice. Line heights are plain
+       ratios (GDG's px line height over its px size), so a bigger font inside
+       an element gets a line that fits it instead of inheriting a fixed 28px. */
+    --fs-h1: var(--rcc-size-display-sm);    /* page title, 28 to 40 */
+    --lh-h1: 1.12;
+    --tr-h1: var(--rcc-track-display-sm);
+    --fs-h2: var(--rcc-size-headline-sm);   /* card title, 20 to 24 */
+    --lh-h2: 1.3;
+    --tr-h2: var(--rcc-track-headline-sm);
+    --fs-h3: var(--rcc-size-title-lg);      /* a section inside a card, 18 */
+    --lh-h3: 1.333;                         /* 24 on 18 */
+    --fs-body: var(--rcc-size-body-lg);     /* 17 */
+    --lh-body: 1.647;                       /* 28 on 17 */
+    --fs-small: var(--rcc-size-body-md);    /* hints, times, table cells, 15 */
+    --lh-small: 1.6;                        /* 24 on 15 */
+    --fs-label: var(--rcc-size-label-lg);   /* buttons and labels, 15 */
+    --lh-label: 1.333;                      /* 20 on 15 */
+    --fs-ledger: var(--rcc-size-code-sm);   /* the ledger line, 13 */
+    --lh-ledger: 1.538;                     /* 20 on 13 */
+    --fs-badge: var(--rcc-size-label-md);   /* a Badge, 13 */
+    --fs-stat: var(--rcc-size-headline-lg); /* a Stat number, 24 to 32 */
+    --fs-big: clamp(4rem, 14vw, 10rem);     /* the Big number, 64 to 160 (app) */
+
+    /* Projector: presentation.md's 1920 x 1080 stage. One stage pixel is
+       --stage-u, so a 1280 x 720 window shows the same layout at 2/3 size.
+       At 1920 x 1080: heading 92, body 48, small 40, ledger 32, digits 240,
+       margin 96 (GDG's floors are 72, 40 and 32). max() keeps a phone at the
+       phone sizes. */
+    --stage-u: min(100vw / 1920, 100vh / 1080);
+    --proj-head: max(var(--rcc-size-display-sm), calc(92 * var(--stage-u)));
+    --proj-body: max(var(--rcc-size-body-lg), calc(48 * var(--stage-u)));
+    --proj-small: max(var(--rcc-size-body-md), calc(40 * var(--stage-u)));
+    --proj-ledger: max(var(--rcc-size-code-sm), calc(32 * var(--stage-u)));
+    --proj-digits: max(4rem, calc(240 * var(--stage-u)));
+    --proj-margin: max(var(--rcc-space-4), calc(96 * var(--stage-u)));
+  }
+
+  /* ---------------------------------------------------------- light colors */
+  /* Light is the default, and the projector's theme (decks run light in
+     A-210). [data-theme] on any element themes that element and what's in it. */
+  :root,
+  [data-theme="light"] {
+    color-scheme: light;
+
+    --rcc-surface: #f7faf8;
+    --rcc-surface-container-lowest: #ffffff;
+    --rcc-surface-container-low: #eef6ef;
+    --rcc-surface-container: #e8f0e9;
+    --rcc-surface-container-high: #e3eae3;
+    --rcc-surface-container-highest: #dde5de;
+    --rcc-on-surface: #1e201e;
+    --rcc-on-surface-variant: #575a58;
+    --rcc-outline: #727873;          /* edges that carry meaning, 3:1 or more */
+    --rcc-outline-variant: #ccd4cd;  /* dividers only, 1.44:1 by design */
+
+    --rcc-primary: #00732d;          /* Green 500 derived: the lead */
+    --rcc-on-primary: #ffffff;
+    --rcc-primary-container: #cff1d3;
+    --rcc-on-primary-container: #003a13;
+
+    --rcc-error: #c5150f;            /* Red 500 derived: failure and destruction only */
+    --rcc-on-error: #ffffff;
+    --rcc-error-container: #ffeae6;
+    --rcc-on-error-container: #6f0604;
+
+    --rcc-highlight: #e09f2e;        /* Yellow 600 derived: a fill under dark words, never a mark */
+    --rcc-on-highlight: #392300;
+    --rcc-highlight-container: #ffe5c0;
+    --rcc-on-highlight-container: #4f3400;
+
+    --rcc-code-surface: #eef6ef;
+    --rcc-code-on-surface: #2f312f;
+    --rcc-focus-ring: #00732d;
+
+    --rcc-grad: 0;
+    --rcc-elevation-ink: 30 32 30;
+    --rcc-elevation-key: 0.3;
+    --rcc-elevation-ambient: 0.15;
+
+    /* Cards: white on the tinted page (GDG §2.6). */
+    --surface: var(--rcc-surface-container-lowest);
+  }
+
+  /* ----------------------------------------------------------- dark colors */
+  /* By the system setting, unless the page chose light. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+
+      --rcc-surface: #121412;
+      --rcc-surface-container-lowest: #0b0f0b;
+      --rcc-surface-container-low: #171c18;
+      --rcc-surface-container: #1b211c;
+      --rcc-surface-container-high: #262b27;
+      --rcc-surface-container-highest: #313731;
+      --rcc-on-surface: #e6e9e6;
+      --rcc-on-surface-variant: #b9bcba;
+      --rcc-outline: #919791;
+      --rcc-outline-variant: #424943;
+
+      --rcc-primary: #96d6a0;
+      --rcc-on-primary: #003410;
+      --rcc-primary-container: #00531e;
+      --rcc-on-primary-container: #c6eccb;
+
+      --rcc-error: #ffb3a8;
+      --rcc-on-error: #660604;
+      --rcc-error-container: #910906;
+      --rcc-on-error-container: #ffdbd4;
+
+      --rcc-highlight: #e7ae58;
+      --rcc-on-highlight: #392300;
+      --rcc-highlight-container: #624000;
+      --rcc-on-highlight-container: #fcdeb5;
+
+      --rcc-code-surface: #1b211c;
+      --rcc-code-on-surface: #dadedb;
+      --rcc-focus-ring: #96d6a0;
+
+      --rcc-grad: -25;
+      --rcc-elevation-ink: 0 0 0;
+      --rcc-elevation-key: 0.44;
+      --rcc-elevation-ambient: 0.24;
+
+      /* Cards step one tone up from the page in dark (GDG §4.4), not down. */
+      --surface: var(--rcc-surface-container);
+    }
+  }
+
+  /* By choice: the same values as the block above. contrast.test.ts fails if
+     the two blocks ever differ. */
+  [data-theme="dark"] {
+    color-scheme: dark;
+
+    --rcc-surface: #121412;
+    --rcc-surface-container-lowest: #0b0f0b;
+    --rcc-surface-container-low: #171c18;
+    --rcc-surface-container: #1b211c;
+    --rcc-surface-container-high: #262b27;
+    --rcc-surface-container-highest: #313731;
+    --rcc-on-surface: #e6e9e6;
+    --rcc-on-surface-variant: #b9bcba;
+    --rcc-outline: #919791;
+    --rcc-outline-variant: #424943;
+
+    --rcc-primary: #96d6a0;
+    --rcc-on-primary: #003410;
+    --rcc-primary-container: #00531e;
+    --rcc-on-primary-container: #c6eccb;
+
+    --rcc-error: #ffb3a8;
+    --rcc-on-error: #660604;
+    --rcc-error-container: #910906;
+    --rcc-on-error-container: #ffdbd4;
+
+    --rcc-highlight: #e7ae58;
+    --rcc-on-highlight: #392300;
+    --rcc-highlight-container: #624000;
+    --rcc-on-highlight-container: #fcdeb5;
+
+    --rcc-code-surface: #1b211c;
+    --rcc-code-on-surface: #dadedb;
+    --rcc-focus-ring: #96d6a0;
+
+    --rcc-grad: -25;
+    --rcc-elevation-ink: 0 0 0;
+    --rcc-elevation-key: 0.44;
+    --rcc-elevation-ambient: 0.24;
+
+    --surface: var(--rcc-surface-container);
+  }
+
+  /* ---------------------------------------------- the app's color names */
+  /* Declared on every theme scope, so a [data-theme] element works them out
+     from its own colors. The names index.css had before (--bg, --surface,
+     --text, --muted, --line, --accent, --accent-text, --error, --radius) keep
+     working, so every page picked up these colors without an edit. */
+  :root,
+  [data-theme] {
+    --bg: var(--rcc-surface);                         /* the page */
+    --fill: var(--rcc-surface-container-high);        /* table heads, neutral badges, skeletons */
+    --text: var(--rcc-on-surface);
+    --muted: var(--rcc-on-surface-variant);           /* hints, times, labels under numbers */
+    --line: var(--rcc-outline-variant);               /* dividers; never a control's only edge */
+    --line-strong: var(--rcc-outline);                /* field and outline-button edges */
+    --accent: var(--rcc-primary);                     /* links, the main button, big numbers */
+    --accent-text: var(--rcc-on-primary);             /* words on an --accent fill */
+    --accent-soft: var(--rcc-primary-container);      /* a chosen option, a success banner */
+    --accent-soft-text: var(--rcc-on-primary-container);
+    --error: var(--rcc-error);                        /* error words, the danger button */
+    --error-text: var(--rcc-on-error);                /* words on an --error fill */
+    --error-soft: var(--rcc-error-container);         /* an error banner */
+    --error-soft-text: var(--rcc-on-error-container);
+    --live: var(--rcc-highlight);                     /* the Live badge */
+    --live-text: var(--rcc-on-highlight);
+    --warn: var(--rcc-highlight-container);           /* a warning banner */
+    --warn-text: var(--rcc-on-highlight-container);
+    --code-bg: var(--rcc-code-surface);
+    --code-text: var(--rcc-code-on-surface);
+    --focus: var(--rcc-focus-ring);
+
+    /* Elevation: tone first, then a hairline, then a shadow. Level 0 is a
+       zero-alpha shadow so it can animate to level 1. */
+    --rcc-elevation-0: 0 0 0 0 rgb(var(--rcc-elevation-ink) / 0), 0 0 0 0 rgb(var(--rcc-elevation-ink) / 0);
+    --rcc-elevation-1: 0 1px 2px 0 rgb(var(--rcc-elevation-ink) / var(--rcc-elevation-key)), 0 1px 3px 1px rgb(var(--rcc-elevation-ink) / var(--rcc-elevation-ambient));
+    --rcc-elevation-2: 0 1px 2px 0 rgb(var(--rcc-elevation-ink) / var(--rcc-elevation-key)), 0 2px 6px 2px rgb(var(--rcc-elevation-ink) / var(--rcc-elevation-ambient));
+  }
+
+  /* ------------------------------------------------------ breakpoints */
+  /* 600 and 1024, GDG's tiers. */
+  @media (min-width: 600px) {
+    :root {
+      --rcc-page-margin: var(--rcc-space-8);
+      --card-pad: var(--rcc-space-6);
+    }
+  }
+  @media (min-width: 1024px) {
+    :root {
+      --rcc-page-margin: var(--rcc-space-12);
+    }
+  }
+
+  /* ---------------------------------------------------- reduced motion */
+  /* Movement stops; color and opacity changes stay. src/index.css also cuts
+     every animation and transition to 1ms, team stylesheets included. */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --rcc-dur-fast-spatial: 0ms;
+      --rcc-dur-default-spatial: 0ms;
+    }
+  }
+}
