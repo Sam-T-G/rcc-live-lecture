@@ -32,7 +32,7 @@ vi.mock("../../blocks/ui", async (importOriginal) => {
   };
 });
 
-const team = (n: number) => ({ team: n, color: "green", label: `Team ${n}`, members: 3, correct: 6 - n, rank: n, ec: 0 });
+const team = (n: number) => ({ team: n, color: "green", label: `Team ${n}`, members: 3, correct: 6 - n, changes: 0, points: 6 - n, perStudent: (6 - n) / 3, rank: n, ec: 0 });
 // The deck on slide `index + 1` of 10, with slides 1 to `index + 1` shown this class.
 function deckOn(index: number) {
   results["deck:current"] = { index, beat: 0, count: 10, title: `Slide ${index + 1}`, lines: ["A line"], at: 0 };
@@ -127,8 +127,10 @@ describe("#/live/leaderboard, the room's board", () => {
     expect(html).toContain("Plus 3 more teams.");
   });
 
-  it("the phone card still gives the professor the team-size buttons", () => {
-    expect(renderToStaticMarkup(createElement(Leaderboard))).toContain("Teams of 3");
+  it("rt-2 the phone card has no team-size buttons, even for a professor: they're on #/host Points", () => {
+    const html = renderToStaticMarkup(createElement(Leaderboard));
+    expect(html).not.toContain("Teams of 3");
+    expect(html).not.toContain("Teams of 4");
   });
 });
 

@@ -398,8 +398,9 @@ describe("F8 classes: one lectures window per class", () => {
   it("F8 a lock that runs before its time queues itself again with the same lecture", async () => {
     const t = setup();
     const first = await open(t);
-    // Class starts in 10 minutes, so teams lock in 15.
-    await t.run((ctx) => ctx.db.insert("classStarts", { channel: CH, startsAt: T0 + 10 * MIN, graceMin: 0 }));
+    // Class starts in 10 minutes, so teams lock in 15. An open class keeps its own start time
+    // (lectureWindow reads classStarts only before the first class).
+    await t.run((ctx) => ctx.db.patch("lectures", first._id, { startsAt: T0 + 10 * MIN, graceMin: 0 }));
     await t.run((ctx) => ctx.scheduler.runAfter(0, internal.live.groups.lock, { channel: CH, lecture: first._id }));
     vi.advanceTimersByTime(5 * MIN);
     await t.finishInProgressScheduledFunctions();

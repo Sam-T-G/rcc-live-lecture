@@ -1,0 +1,14 @@
+/* Team leaderboard rows (Leaderboard.tsx). live.css draws the rows; these rules place what a row
+   holds: the place beside two lines, the team and its extra credit on the first, and right
+   answers, points per student and students on the second. */
+
+/* The phone card (.board--card), at every width: three columns every row shares (live.css makes
+   each row a subgrid), so the extra credit lines up from row to row. The `ol` makes these rules
+   outrank live.css's `.board:not(.board--big)` ones, which still place a fourth column. */
+ol.board.board--card { grid-template-columns: 2.2em minmax(0, 1fr) auto; }
+ol.board.board--card .board__rank { grid-row: 1 / span 2; }
+ol.board.board--card .board__ec { grid-column: 3; grid-row: 1; }
+ol.board.board--card .board__members { grid-column: 2 / -1; grid-row: 2; }
+
+/* The projector: the same three columns in every row. */
+.board--big .board__row { grid-template-columns: 2.2em minmax(0, 1fr) auto; }

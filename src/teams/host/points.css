@@ -1,0 +1,41 @@
+/* #/host Points (Boards.tsx). Its own classes only: host.css styles the bare buttons under
+   .host-root, and every button here is the kit's Button, which keeps its own look. */
+
+/* Teams, Point changes and End of class on the left, Students on the right from 1000px; one
+   column below that. Cards keep host.css's 16px bottom margin, so the rows need no gap. */
+.points { display: grid; column-gap: var(--rcc-space-4); align-items: start; }
+@media (min-width: 1000px) {
+  .points { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+}
+.points__side { min-width: 0; }
+
+/* Team size and when the teams lock, on one line when they fit. */
+.points-size { margin-bottom: var(--rcc-space-3); }
+.points-size__lock { margin: 0; }
+
+/* One team: its chip and place, then its numbers; +1 and -1 at the end. */
+.points-teams { list-style: none; margin: 0; padding: 0; }
+.points-team {
+  display: flex;
+  align-items: center;
+  gap: var(--rcc-space-3);
+  padding-block: var(--rcc-space-3);
+  border-bottom: var(--rcc-hairline) solid var(--line);
+}
+.points-team:last-child { border-bottom: 0; }
+.points-team__main { flex: 1; min-width: 0; }
+.points-team__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rcc-space-2); margin: 0; }
+.points-team__line { margin: var(--rcc-space-1) 0 0; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--muted); }
+.points-act { display: flex; gap: var(--rcc-space-2); justify-content: flex-end; white-space: nowrap; }
+
+/* The team filter over the student list: the chosen one is filled. */
+.points-filter { display: flex; flex-wrap: wrap; gap: var(--rcc-space-2); margin-bottom: var(--rcc-space-3); }
+.points-filter .btn[aria-pressed="true"] { background-color: var(--accent-soft); color: var(--accent-soft-text); }
+.points-table td { vertical-align: middle; }
+
+/* Point changes: the change, who and why, then Undo. */
+.points-log__row { display: flex; align-items: center; gap: var(--rcc-space-3); }
+.points-log__delta { min-width: 2.5em; font-weight: var(--rcc-weight-strong); font-variant-numeric: tabular-nums; }
+.points-log__what { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--rcc-space-2); }
+.points-log__name { font-weight: var(--rcc-weight-strong); }
+.points-log__why { flex-basis: 100%; font-size: var(--fs-small); line-height: var(--lh-small); }
