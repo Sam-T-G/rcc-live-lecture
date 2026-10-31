@@ -1,0 +1,26 @@
+/* #/host Questions (QA.tsx). Tokens: src/styles/tokens.css. The "Group by topic with AI" switch
+   (.host-switch) and .host-grid are in host.css. */
+.qa-list { list-style: none; margin: 0; padding: 0; }
+.qa-q { padding-block: var(--rcc-space-4); border-top: var(--rcc-hairline) solid var(--line); }
+.qa-list > .qa-q:first-child { border-top: 0; }
+.qa-q__text { margin: 0; font-weight: var(--rcc-weight-strong); white-space: pre-wrap; }
+/* A dismissed question stays readable: its words go grey, and its "Dismissed" badge says why. */
+.qa-q--dismissed .qa-q__text { color: var(--muted); font-weight: var(--rcc-weight-body); }
+.qa-q__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rcc-space-2) var(--rcc-space-3); margin: var(--rcc-space-2) 0 0; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--muted); }
+/* The professor's answer, under the question, marked by a green rule (as students see it). */
+.qa-q__answer { margin: var(--rcc-space-3) 0 0; padding-inline-start: var(--rcc-space-3); border-inline-start: 3px solid var(--accent); white-space: pre-wrap; }
+.qa-q__editor { margin-top: var(--rcc-space-3); }
+.qa-q__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rcc-space-1) var(--rcc-space-2); margin-top: var(--rcc-space-2); }
+/* The first button's words line up with the question above: a small quiet button has 16px inside its edge. */
+.qa-q__actions > .btn:first-child { margin-inline-start: calc(-1 * var(--rcc-space-4)); }
+/* Delete's question, in place: the kit's confirm box look, on one line. */
+.qa-q__confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--rcc-space-2); padding: var(--rcc-space-2) var(--rcc-space-3); border-radius: var(--rcc-radius-sm); background: var(--fill); box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong); }
+.qa-q__ask { font-weight: var(--rcc-weight-strong); }
+
+.qa-topic { margin-top: var(--rcc-space-6); }
+.qa-topic > h3 { display: flex; align-items: center; gap: var(--rcc-space-2); }
+.qa-cluster { margin-top: var(--rcc-space-2); padding-inline-start: var(--rcc-space-4); border-inline-start: 2px solid var(--line); }
+.qa-cluster__label { margin: var(--rcc-space-2) 0 0; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--muted); }
+
+.qa-shared__q { margin: 0; font-weight: var(--rcc-weight-strong); white-space: pre-wrap; }
+.qa-shared__a { margin: var(--rcc-space-1) 0 0; white-space: pre-wrap; }

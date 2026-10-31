@@ -1,93 +1,215 @@
-// Student questions, organized for the professor. The professor decides what to keep, answers
-// by typing, and approves what the room sees. The AI only sorts; it shares nothing.
-import { useState } from "react";
+// #/host Questions: every question students posted on #/live in this class, private ones too,
+// newest first, with each one's slide, upvotes and name ("Anonymous" when they hid it). The
+// professor keeps or dismisses a question (that only sorts this list), types an answer and shares
+// it under the question on every phone, or deletes the question from every phone. "Group by topic
+// with AI" sends Gemini only the question texts, never names, and sorts the list into topics. The
+// server's rules are in convex/live/questions.ts.
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
-import { Card, Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
+import { Badge, Button, EmptyState, Field } from "../../blocks/kit";
+import { Card, Status } from "../../blocks/ui";
 import { errorText } from "./Team";
+import "./qa.css";
 
-type Item = NonNullable<ReturnType<typeof useQuery<typeof api.host.qa.list>>>[number];
+type Item = FunctionReturnType<typeof api.live.questions.forHost>[number];
+
+const ANSWER_MAX = 1000;
+const upvotes = (n: number) => `${n} ${n === 1 ? "upvote" : "upvotes"}`;
 
 function Question({ q }: { q: Item }) {
-  const setStatus = useMutation(api.host.qa.setStatus);
-  const answer = useMutation(api.host.qa.answer);
-  const share = useMutation(api.host.qa.share);
+  const setStatus = useMutation(api.live.questions.setStatus);
+  const saveAnswer = useMutation(api.live.questions.answer);
+  const share = useMutation(api.live.questions.share);
+  const remove = useMutation(api.live.questions.remove);
   const [typing, setTyping] = useState(false);
-  const [text, setText] = useState(q.answer ?? "");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(""); // the button whose request is running
   const [error, setError] = useState("");
-  const id: Id<"studentQuestions"> = q._id;
-  const run = (job: Promise<unknown>) => job.then(() => setError(""), (e) => setError(errorText(e)));
+
+  // Runs one request; its error shows under this question. True when it worked.
+  async function run(button: string, job: () => Promise<unknown>) {
+    setBusy(button);
+    setError("");
+    try {
+      await job();
+      return true;
+    } catch (e) {
+      setError(errorText(e));
+      return false;
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function edit() {
+    setText(q.answer ?? "");
+    setTyping(true);
+  }
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    if (await run("save", () => saveAnswer({ question: q._id, text }))) setTyping(false);
+  }
+  const mark = (button: string, status: Item["status"]) => void run(button, () => setStatus({ question: q._id, status }));
+  const dismissed = q.status === "dismissed";
 
   return (
-    <div className={"host-q" + (q.status === "dismissed" ? " host-q--dim" : "")}>
-      <strong>{q.text}</strong>
-      <div className="host-q__meta">
-        <span className="host-pill">{q.visibility === "private" ? "Private" : "Public"}</span>
-        <span className="host-pill">Slide {q.index + 1}</span>
-        <span className="muted">{q.name}</span>
-        {q.status === "keep" && <span className="host-pill">Kept</span>}
-        {q.shared && <span className="host-pill">Shared with students</span>}
-      </div>
-      {q.answer && !typing && <p className="muted">Answer: {q.answer}</p>}
-      {typing && (
-        <div>
-          <textarea className="host-answer" rows={3} value={text} onChange={(e) => setText(e.target.value)} aria-label="Your answer" />
-          <div className="row">
-            <button className="host-small host-main" onClick={() => void run(answer({ id, text }).then(() => setTyping(false)))}>Save answer</button>
-            <button className="host-small host-quiet" onClick={() => setTyping(false)}>Cancel</button>
-          </div>
-        </div>
+    <li className={dismissed ? "qa-q qa-q--dismissed" : "qa-q"}>
+      <p className="qa-q__text">{q.text}</p>
+      <p className="qa-q__meta">
+        <Badge>Slide {q.index + 1}</Badge>
+        {q.private && <Badge tone="warn">Private</Badge>}
+        {q.status === "keep" && <Badge>Kept</Badge>}
+        {dismissed && <Badge>Dismissed</Badge>}
+        {q.shared && <Badge tone="accent">Shared with students</Badge>}
+        <span>{upvotes(q.votes)}</span>
+        <span>{q.name ?? "Anonymous"}</span>
+      </p>
+      {q.answer !== null && !typing && (
+        <p className="qa-q__answer">
+          <strong>Your answer:</strong> {q.answer}
+        </p>
       )}
-      <div className="host-q__actions">
-        {q.status === "dismissed" ? (
-          <button className="host-small host-quiet" onClick={() => void run(setStatus({ id, status: "new" }))}>Bring back</button>
+      {typing && (
+        <form className="qa-q__editor" onSubmit={save}>
+          <Field label="Your answer" hint="Students see it only after you share it.">
+            {(f) => <textarea {...f} rows={3} maxLength={ANSWER_MAX} value={text} onChange={(e) => setText(e.target.value)} />}
+          </Field>
+          <div className="row">
+            <Button type="submit" small busy={busy === "save"}>
+              Save answer
+            </Button>
+            <Button variant="secondary" small disabled={busy === "save"} onClick={() => setTyping(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+      <div className="qa-q__actions">
+        {dismissed ? (
+          <Button variant="quiet" small busy={busy === "back"} onClick={() => mark("back", "new")}>
+            Bring back
+          </Button>
         ) : (
           <>
-            {q.status !== "keep" && <button className="host-small host-quiet" onClick={() => void run(setStatus({ id, status: "keep" }))}>Keep</button>}
-            <button className="host-small host-quiet" onClick={() => setTyping(true)}>{q.answer ? "Edit answer" : "Type answer"}</button>
-            <button className="host-small host-quiet" disabled title="Voice answers are coming" onClick={() => undefined}>Record answer</button>
-            {q.visibility === "public" && (
-              <button className="host-small host-quiet" onClick={() => void run(share({ id, shared: !q.shared }))}>{q.shared ? "Stop sharing" : "Share with students"}</button>
+            {q.status !== "keep" && (
+              <Button variant="quiet" small busy={busy === "keep"} onClick={() => mark("keep", "keep")}>
+                Keep
+              </Button>
             )}
-            <button className="host-small host-quiet" onClick={() => void run(setStatus({ id, status: "dismissed" }))}>Dismiss</button>
+            {!typing && (
+              <Button variant="quiet" small onClick={edit}>
+                {q.answer === null ? "Type answer" : "Edit answer"}
+              </Button>
+            )}
+            {q.answer !== null && (
+              <Button variant="quiet" small busy={busy === "share"} onClick={() => void run("share", () => share({ question: q._id, shared: !q.shared }))}>
+                {q.shared ? "Stop sharing" : "Share the answer"}
+              </Button>
+            )}
+            <Button variant="quiet" small busy={busy === "dismiss"} onClick={() => mark("dismiss", "dismissed")}>
+              Dismiss
+            </Button>
           </>
         )}
+        <DeleteQuestion busy={busy === "delete"} onDelete={() => run("delete", () => remove({ question: q._id }))} />
       </div>
       {error && <Status kind="error">{error}</Status>}
-    </div>
+    </li>
   );
 }
 
-// Topic, then groups of the same question, biggest first.
-function grouped(items: Item[]) {
+// Delete asks first, in place, because it takes the question off every phone and can't be
+// undone. Cancel or Escape goes back. When the delete fails, the question stays open with the
+// error under it, so the professor can try again.
+function DeleteQuestion({ busy, onDelete }: { busy: boolean; onDelete: () => Promise<boolean> }) {
+  const [asking, setAsking] = useState(false);
+  const opener = useRef<HTMLButtonElement>(null);
+  const cancel = useRef<HTMLButtonElement>(null);
+  const pressed = useRef(false); // focus moves only after a press, never on the first render
+
+  useEffect(() => {
+    if (pressed.current) (asking ? cancel : opener).current?.focus();
+  }, [asking]);
+
+  function show(next: boolean) {
+    pressed.current = true;
+    setAsking(next);
+  }
+
+  if (!asking)
+    return (
+      <Button ref={opener} variant="quiet" small onClick={() => show(true)}>
+        Delete
+      </Button>
+    );
+  return (
+    <span
+      className="qa-q__confirm"
+      role="group"
+      aria-label="Delete this question"
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && !busy) show(false);
+      }}
+    >
+      <span className="qa-q__ask">Delete this question from every phone?</span>
+      <Button variant="danger" small busy={busy} onClick={() => void onDelete()}>
+        Delete
+      </Button>
+      <Button ref={cancel} variant="secondary" small disabled={busy} onClick={() => show(false)}>
+        Cancel
+      </Button>
+    </span>
+  );
+}
+
+// Topics, biggest first, each with its groups of questions that ask the same thing, biggest
+// first. Questions posted since the last grouping come first, under "No topic yet"; dismissed
+// ones come last. `key` is for React only.
+type Group = { key: string; label: string; list: Item[] };
+type Topic = { key: string; topic: string; count: number; groups: Group[] };
+const NO_TOPIC = "No topic yet";
+
+function grouped(items: Item[]): Topic[] {
   const topics = new Map<string, Map<string, Item[]>>();
   for (const q of items) {
-    const topic = q.topic ?? "Not sorted yet";
-    const clusters = topics.get(topic) ?? new Map<string, Item[]>();
-    const key = q.cluster ?? q.text;
-    clusters.set(key, [...(clusters.get(key) ?? []), q]);
-    topics.set(topic, clusters);
+    if (q.status === "dismissed") continue;
+    const topic = q.topic ?? NO_TOPIC;
+    const groups = topics.get(topic) ?? new Map<string, Item[]>();
+    const label = q.cluster ?? q.text;
+    groups.set(label, [...(groups.get(label) ?? []), q]);
+    topics.set(topic, groups);
   }
-  const size = (c: Map<string, Item[]>) => [...c.values()].reduce((n, l) => n + l.length, 0);
-  return [...topics.entries()]
-    .sort((a, b) => size(b[1]) - size(a[1]))
-    .map(([topic, clusters]) => ({ topic, count: size(clusters), clusters: [...clusters.entries()].sort((a, b) => b[1].length - a[1].length) }));
+  const size = (g: Map<string, Item[]>) => [...g.values()].reduce((n, l) => n + l.length, 0);
+  const rank = (topic: string, g: Map<string, Item[]>) => (topic === NO_TOPIC ? Infinity : size(g));
+  const out: Topic[] = [...topics.entries()]
+    .sort((a, b) => rank(b[0], b[1]) - rank(a[0], a[1]))
+    .map(([topic, groups]) => ({
+      key: `topic:${topic}`,
+      topic,
+      count: size(groups),
+      groups: [...groups.entries()].sort((a, b) => b[1].length - a[1].length).map(([label, list]) => ({ key: label, label, list })),
+    }));
+  const dismissed = items.filter((q) => q.status === "dismissed");
+  if (dismissed.length)
+    out.push({ key: "dismissed", topic: "Dismissed", count: dismissed.length, groups: dismissed.map((q) => ({ key: q._id, label: q.text, list: [q] })) });
+  return out;
 }
 
 export default function QA() {
-  const items = useQuery(api.host.qa.list, { channel: CHANNEL });
-  const organize = useAction(api.host.ai.organize);
+  const items = useQuery(api.live.questions.forHost, { channel: CHANNEL });
+  const organize = useAction(api.live.questions.organize);
   const [sorted, setSorted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function toggle(on: boolean) {
     setSorted(on);
+    setError("");
     if (!on) return;
     setBusy(true);
-    setError("");
     try {
       await organize({ channel: CHANNEL });
     } catch (e) {
@@ -107,45 +229,59 @@ export default function QA() {
             <span className="host-switch__track" />
             Group by topic with AI
           </label>
-          {busy && <span className="muted">Sorting...</span>}
+          {busy && <span className="muted">Grouping…</span>}
         </div>
         {error && <Status kind="error">{error}</Status>}
-        {items === undefined && <Status kind="loading">Loading...</Status>}
-        {items?.length === 0 && <Status kind="empty">No questions yet.</Status>}
-        {items && !sorted && items.map((q) => <Question key={q._id} q={q} />)}
-        {items && sorted &&
+        {items === undefined ? (
+          <Status kind="loading">Loading questions…</Status>
+        ) : items.length === 0 ? (
+          <EmptyState title="No questions yet.">Students ask from the Live slides page on their phones.</EmptyState>
+        ) : !sorted ? (
+          <ul className="qa-list">
+            {items.map((q) => (
+              <Question key={q._id} q={q} />
+            ))}
+          </ul>
+        ) : (
           grouped(items).map((t) => (
-            <div key={t.topic} className="host-topic">
-              <h3>{t.topic} <span className="host-pill">{t.count}</span></h3>
-              {t.clusters.map(([label, list]) => (
-                <div key={label} className="host-cluster">
-                  <p className="host-cluster__label">{list.length > 1 ? `${label} · asked ${list.length} times` : label}</p>
-                  {list.map((q) => <Question key={q._id} q={q} />)}
+            <section key={t.key} className="qa-topic">
+              <h3>
+                {t.topic} <Badge>{t.count}</Badge>
+              </h3>
+              {t.groups.map((g) => (
+                <div key={g.key} className="qa-cluster">
+                  {g.list.length > 1 && <p className="qa-cluster__label">{`${g.label} · asked ${g.list.length} times`}</p>}
+                  <ul className="qa-list">
+                    {g.list.map((q) => (
+                      <Question key={q._id} q={q} />
+                    ))}
+                  </ul>
                 </div>
               ))}
-            </div>
-          ))}
+            </section>
+          ))
+        )}
       </Card>
-      <div>
-        <Card title="Shared with students">
-          <Shared />
-        </Card>
-        <Card title="Voice answers and textbook">
-          <p className="muted host-soon">Voice answers, recordings, and textbook matches come later. The AI will never share anything you haven't approved.</p>
-        </Card>
-      </div>
+      <Card title="Shared with students">
+        <Shared items={items} />
+      </Card>
     </div>
   );
 }
 
-function Shared() {
-  const items = useQuery(api.host.qa.list, { channel: CHANNEL });
-  const shared = items?.filter((q) => q.shared) ?? [];
-  if (items === undefined) return <Status kind="loading">Loading...</Status>;
-  if (shared.length === 0) return <Status kind="empty">Nothing shared yet.</Status>;
+// The answers students can see now, under their questions.
+function Shared({ items }: { items: Item[] | undefined }) {
+  if (items === undefined) return <Status kind="loading">Loading…</Status>;
+  const shared = items.filter((q) => q.shared);
+  if (shared.length === 0) return <Status kind="empty">No answers shared yet.</Status>;
   return (
-    <ul>
-      {shared.map((q) => <li key={q._id}>{q.text}{q.answer ? ` - ${q.answer}` : ""}</li>)}
+    <ul className="list">
+      {shared.map((q) => (
+        <li key={q._id}>
+          <p className="qa-shared__q">{q.text}</p>
+          <p className="qa-shared__a">{q.answer}</p>
+        </li>
+      ))}
     </ul>
   );
 }
