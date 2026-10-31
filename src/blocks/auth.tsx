@@ -167,7 +167,7 @@ function onDoorIPad() {
 // sign-in ends a minute before the token does), for SignInEnding (src/teams/checkin/prof.tsx) to say
 // so with Google's button.
 // refused: the server refused the last sign-in, so it was dropped (DropRefused). SignInButton says
-// so until the next sign-in or sign-out.
+// so until the next sign-in, or until someone signed in signs out.
 type AuthState = {
   user: Stored | null;
   ready: boolean;
@@ -307,10 +307,13 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
   }, [user, gsi]);
   const endsAt = user && endingToken === user.token ? user.exp - DROP : null;
 
+  // Signing out of a sign-in clears `refused`. With nobody signed in it stays: a page whose call
+  // came back "Sign in first." after DropRefused dropped the sign-in (#/checkin/student's queued
+  // pass.refresh) signs out, and the form must still say why.
   const signOut = useCallback(() => {
     localStorage.removeItem(KEY);
     window.google?.accounts.id.disableAutoSelect();
-    setRefused(false);
+    if (tokenRef.current !== null) setRefused(false);
     setUser(null);
   }, []);
 
@@ -323,10 +326,14 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
     [gsi, wantGoogle],
   );
 
-  // DropRefused: the server refused this token.
+  // DropRefused: the server refused this token. tokenRef goes null at once, so a signOut() before
+  // the next render already sees nobody signed in.
   const drop = useCallback((t: string) => {
     if (savedToken() === t) localStorage.removeItem(KEY);
-    if (tokenRef.current === t) setRefused(true);
+    if (tokenRef.current === t) {
+      tokenRef.current = null;
+      setRefused(true);
+    }
     setUser((u) => (u?.token === t ? null : u));
   }, []);
 

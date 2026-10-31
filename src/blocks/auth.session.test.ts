@@ -576,3 +576,44 @@ describe("APP-risk-2 a sign-in the server refuses says so on the sign-in form", 
     expect(said(true)).not.toContain("DEV_HOSTS");
   });
 });
+
+// #/checkin/student: the refused token's queued pass.refresh comes back "Sign in first." after the
+// sign-in was dropped, and the page then calls signOut() (Student.tsx). That must not hide the line.
+describe("APP-check-1 a sign-out after the refused sign-in was dropped keeps the line", () => {
+  it("APP-check-1 signOut() with nobody signed in keeps refused; with someone signed in it clears it", async () => {
+    await settle();
+    shared.signInWithToken(typed("ana@example.edu"));
+    await settle();
+    await answer(false);
+    expect(signedIn()).toBeNull();
+    expect(shared.refused).toBe(true);
+
+    shared.signOut(); // the page's late "Sign in first." answer
+    await settle();
+    expect(signedIn()).toBeNull();
+    expect(shared.refused).toBe(true);
+
+    // The next sign-in clears it, and "Not you? Sign out" from there leaves it off.
+    shared.signInWithToken(typed("ben@example.edu"));
+    await settle();
+    await answer(true);
+    expect(shared.refused).toBe(false);
+    shared.signOut();
+    await settle();
+    expect(signedIn()).toBeNull();
+    expect(shared.refused).toBe(false);
+  });
+
+  it("APP-check-1 signOut() right after the drop, before the page re-renders, keeps refused", async () => {
+    await settle();
+    shared.signInWithToken(typed("ana@example.edu"));
+    await settle();
+    convex.held = false; // the server refuses; DropRefused drops the sign-in in this render's effects
+    render();
+    expect(store.has(KEY)).toBe(false);
+    shared.signOut();
+    await settle();
+    expect(signedIn()).toBeNull();
+    expect(shared.refused).toBe(true);
+  });
+});
