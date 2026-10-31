@@ -1,97 +1,166 @@
-// /#/lab: one panel per building block, so anyone can see each one work before building on it.
-import { lazy, Suspense, useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+// #/lab: one panel for each building block (sign-in, live sync, QR code, location, the deck
+// bridge, AI and vision), to check on a real phone or laptop that each one works before a page
+// builds on it. Anyone can open it; Home links it. Ping and Ask the AI work only for professors
+// and admins, because the server lets only them call lab.ping and lab.aiPing (convex/lab.ts says
+// why), so everyone else sees a line saying so in those two panels. Each panel that reads from
+// the server has its own ErrorBoundary, so a block that breaks leaves the other panels up.
+import { lazy, Suspense, useState, type ReactNode } from "react";
+import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { SignInButton, useGoogleUser } from "../blocks/auth";
-import { QR } from "../blocks/qr";
-import { useLocation } from "../blocks/location";
 import { useDeckSlide } from "../blocks/deck";
+import { Button } from "../blocks/kit";
+import { useLocation } from "../blocks/location";
+import { QR } from "../blocks/qr";
 import { pageUrl } from "../blocks/router";
-// Loaded only when the lab opens, so phones on other pages never download the vision library.
+import { Card, ErrorBoundary, Screen, Status } from "../blocks/ui";
+import { useStaff } from "../teams/checkin/prof";
+import { why } from "../teams/checkin/util";
+// The vision panel loads only when the lab opens. LabVision.tsx is the one file that imports the
+// vision block (src/blocks/vision.ts, which brings in MediaPipe, about 160 KB), and pages that only
+// need the camera import src/blocks/camera.ts instead, so phones on other pages never download
+// MediaPipe. src/blocks/camera.test.ts fails if a static import ever brings it back.
 const Vision = lazy(() => import("./LabVision"));
 
 export default function Lab() {
   return (
-    <main className="page">
-      <h1>Lab</h1>
-      <p className="muted">Each panel tests one building block.</p>
-      <SignIn />
-      <Sync />
+    <Screen title="Lab">
+      <ErrorBoundary label="The sign-in panel">
+        <SignIn />
+      </ErrorBoundary>
+      <ErrorBoundary label="The live sync panel">
+        <Sync />
+      </ErrorBoundary>
       <Qr />
       <Location />
-      <Deck />
-      <Ai />
-      <Suspense fallback={<p className="muted">Loading vision…</p>}><Vision /></Suspense>
-    </main>
+      <ErrorBoundary label="The deck panel">
+        <Deck />
+      </ErrorBoundary>
+      <ErrorBoundary label="The AI panel">
+        <Ai />
+      </ErrorBoundary>
+      <ErrorBoundary label="The vision panel">
+        <Suspense fallback={<Status kind="loading">Loading vision…</Status>}>
+          <Vision />
+        </Suspense>
+      </ErrorBoundary>
+    </Screen>
   );
 }
 
+// What lab.whoami's role is called on the page. No role is a student.
+const ROLE_WORDS = { admin: "an admin", professor: "a professor", scanner: "a scanner" } as const;
+
 function SignIn() {
   const { user, signOut } = useGoogleUser();
-  const who = useQuery(api.lab.whoami);
+  // Waits for Convex to take the sign-in first (as useStaff does), so the line never says the
+  // server refused a sign-in for a moment before the real answer comes.
+  const { isLoading } = useConvexAuth();
+  const who = useQuery(api.lab.whoami, isLoading ? "skip" : {});
   return (
-    <section className="panel">
-      <h2>Google sign-in</h2>
+    <Card title="Sign in">
       {user ? (
         <>
           <p>
             Signed in as <b>{user.name || user.email}</b>.{" "}
-            {who === undefined ? "Checking with the server…" : who ? (who.isHost ? "The server says you're a host." : "The server says you're a student.") : "The server didn't accept the sign-in."}
+            {who === undefined
+              ? "Checking with the server…"
+              : who
+                ? `The server says you're ${who.role ? ROLE_WORDS[who.role] : "a student"}.`
+                : "The server didn't accept the sign-in."}
           </p>
-          <button onClick={signOut}>Sign out</button>
+          <Button variant="secondary" onClick={signOut}>
+            Sign out
+          </Button>
         </>
       ) : (
         <SignInButton />
       )}
-    </section>
+    </Card>
   );
 }
 
-function Sync() {
-  const count = useQuery(api.lab.pings);
+// Ping and Ask the AI: `children` (the button) for professors and admins, and `line` for
+// everyone else, plus which account to sign in with when signed out. The server checks again
+// on every call (convex/lab.ts).
+function ProfOnly({ line, children }: { line: string; children: ReactNode }) {
+  const me = useStaff();
+  if (me === undefined) return <Status kind="loading">Checking who is signed in…</Status>;
+  if (me && (me.role === "professor" || me.role === "admin")) return <>{children}</>;
+  return <p>{me === null ? `${line} Sign in with the Google account your admin added.` : line}</p>;
+}
+
+// "9:30:05 PM": to the second, so pings a few seconds apart show different times.
+const toTheSecond = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
+
+// Live sync: the newest ping's time (lab.lastPing). Every open #/lab shows the new time when a
+// professor or admin presses Ping, even after 500 pings, where lab.pings (a count that stops at
+// 500) would stay the same.
+export function Sync() {
+  const last = useQuery(api.lab.lastPing);
   const ping = useMutation(api.lab.ping);
-  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function press() {
+    setBusy(true);
+    setError("");
+    try {
+      await ping();
+    } catch (e) {
+      setError(why(e));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <section className="panel">
-      <h2>Live sync</h2>
-      <p>
-        Pings so far: <b>{count ?? "…"}</b>. Open this page on two devices and press on one.
-      </p>
-      <button onClick={() => ping().then(() => setErr(""), (e) => setErr(String(e.data ?? e.message)))}>Ping</button>
-      {err && <p className="error">{err}</p>}
-    </section>
+    <Card title="Live sync">
+      {last === undefined ? (
+        <Status kind="loading">Loading the last ping…</Status>
+      ) : last === null ? (
+        <Status kind="empty">No pings yet.</Status>
+      ) : (
+        <p>
+          Last ping at <b>{toTheSecond(last)}</b>.
+        </p>
+      )}
+      <ProfOnly line="Only professors and admins can press Ping, since each press saves a row on the server.">
+        <p>Open #/lab on two devices and press Ping on one. The time changes on both.</p>
+        <Button busy={busy} onClick={press}>
+          Ping
+        </Button>
+      </ProfOnly>
+      {error && <Status kind="error">{error}</Status>}
+    </Card>
   );
 }
 
 function Qr() {
   const [value, setValue] = useState(pageUrl("lab"));
   return (
-    <section className="panel">
-      <h2>QR code</h2>
+    <Card title="QR code">
       <label>
         Encodes
         <input value={value} onChange={(e) => setValue(e.target.value)} />
       </label>
       <QR value={value} size={240} />
-    </section>
+    </Card>
   );
 }
 
 function Location() {
   const { fix, error, busy, request } = useLocation();
   return (
-    <section className="panel">
-      <h2>Location</h2>
-      <button disabled={busy} onClick={() => request().catch(() => {})}>
-        {busy ? "Finding you…" : "Share my location"}
-      </button>
+    <Card title="Location">
+      <Button busy={busy} onClick={() => request().catch(() => {})}>
+        Share my location
+      </Button>
       {fix && (
         <p>
           {fix.lat.toFixed(5)}, {fix.lng.toFixed(5)} · within about {Math.round(fix.accuracyM)} m
         </p>
       )}
-      {error && <p className="error">{error}</p>}
-    </section>
+      {error && <Status kind="error">{error}</Status>}
+    </Card>
   );
 }
 
@@ -99,16 +168,17 @@ function Deck() {
   const [channel, setChannel] = useState("test");
   const slide = useDeckSlide(channel || null);
   return (
-    <section className="panel">
-      <h2>Deck bridge</h2>
+    <Card title="Deck bridge">
       <label>
         Channel
         <input value={channel} onChange={(e) => setChannel(e.target.value.trim())} />
       </label>
-      {slide === undefined ? (
-        <p className="muted">Loading…</p>
+      {!channel ? (
+        <Status kind="empty">Type a channel.</Status>
+      ) : slide === undefined ? (
+        <Status kind="loading">Loading…</Status>
       ) : slide === null ? (
-        <p className="muted">No deck has sent this channel anything yet.</p>
+        <Status kind="empty">No deck has sent this channel anything yet.</Status>
       ) : (
         <div className="slide">
           <p className="muted">
@@ -122,27 +192,40 @@ function Deck() {
           </ul>
         </div>
       )}
-    </section>
+    </Card>
   );
 }
 
-function Ai() {
+export function Ai() {
   const run = useAction(api.lab.aiPing);
-  const [out, setOut] = useState("");
   const [busy, setBusy] = useState(false);
+  const [answer, setAnswer] = useState("");
+  const [error, setError] = useState("");
+  async function ask() {
+    setBusy(true);
+    setAnswer("");
+    setError("");
+    try {
+      setAnswer(await run());
+    } catch (e) {
+      setError(why(e));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <section className="panel">
-      <h2>AI (Gemini)</h2>
-      <button
-        disabled={busy}
-        onClick={() => {
-          setBusy(true);
-          run().then(setOut, (e) => setOut("Error: " + String(e.data ?? e.message))).finally(() => setBusy(false));
-        }}
-      >
-        {busy ? "Asking…" : "Ask the AI"}
-      </button>
-      {out && <p>{out}</p>}
-    </section>
+    <Card title="AI (Gemini)">
+      <ProfOnly line="Only professors and admins can ask the AI, since each question uses the app's Gemini key.">
+        <Button busy={busy} onClick={ask}>
+          Ask the AI
+        </Button>
+      </ProfOnly>
+      {answer && (
+        <p>
+          Gemini answered: <b>{answer}</b>
+        </p>
+      )}
+      {error && <Status kind="error">{error}</Status>}
+    </Card>
   );
 }

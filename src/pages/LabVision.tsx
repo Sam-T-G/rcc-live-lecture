@@ -1,5 +1,7 @@
 // Lab panel for the vision block: pick a model, then run it on a sample picture or the camera.
+// What failed (the model, the picture, the camera) shows as a Status error.
 import { useCallback, useRef, useState } from "react";
+import { Status } from "../blocks/ui";
 import { VISION, drawSeen, loadVision, useCamera, useVisionLoop, type Runner, type Seen, type VisionKind } from "../blocks/vision";
 
 const BASE = "https://storage.googleapis.com/mediapipe-tasks/";
@@ -17,7 +19,8 @@ function say(s: Seen) {
 
 export default function Vision() {
   const [kind, setKind] = useState<VisionKind>("gestures");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(""); // loading the model, then how long it took
+  const [error, setError] = useState(""); // the model didn't load, or didn't run on the sample picture
   const [seen, setSeen] = useState("");
   const [runner, setRunner] = useState<Runner | null>(null);
   const cam = useCamera();
@@ -35,6 +38,7 @@ export default function Vision() {
 
   async function load(mode: "VIDEO" | "IMAGE") {
     setStatus("Loading the model…");
+    setError("");
     const t = performance.now();
     const r = await loadVision(kind, mode);
     setStatus(`Loaded in ${Math.round(performance.now() - t)} ms.`);
@@ -42,10 +46,10 @@ export default function Vision() {
   }
   async function camera() {
     if (cam.on) { cam.stop(); return; }
-    try { setRunner(await load("VIDEO")); await cam.start(); } catch { setStatus("The model didn't load. Check the connection."); }
+    try { setRunner(await load("VIDEO")); await cam.start(); } catch { setStatus(""); setError("The model didn't load. Check the connection."); }
   }
   async function picture(label: string) {
-    setSample(label); setSeen("");
+    setSample(label); setSeen(""); setError("");
     const mine = ++pick.current; // a newer pick replaces this one; its result and errors are dropped
     if (!label) return;
     try {
@@ -58,7 +62,9 @@ export default function Vision() {
       const s = r.run(el);
       setSeen(say(s));
       if (canvas.current) drawSeen(canvas.current, kind, s, el.naturalWidth, el.naturalHeight);
-    } catch { if (mine === pick.current) setStatus("That didn't run. Check the connection."); }
+    } catch {
+      if (mine === pick.current) { setStatus(""); setError("The model didn't run on the sample picture. Check the connection."); }
+    }
   }
 
   return (
@@ -66,7 +72,7 @@ export default function Vision() {
       <h2>Vision (on the device)</h2>
       <label>
         Model
-        <select value={kind} onChange={(e) => { cam.stop(); setRunner(null); setSeen(""); setSample(""); setKind(e.target.value as VisionKind); }}>
+        <select value={kind} onChange={(e) => { cam.stop(); setRunner(null); setSeen(""); setSample(""); setStatus(""); setError(""); setKind(e.target.value as VisionKind); }}>
           {(Object.keys(VISION) as VisionKind[]).map((k) => <option key={k} value={k}>{k}: {VISION[k].what}</option>)}
         </select>
       </label>
@@ -78,7 +84,8 @@ export default function Vision() {
         </select>
       </p>
       {status && <p className="muted">{status}</p>}
-      {cam.error && <p className="error">{cam.error}</p>}
+      {error && <Status kind="error">{error}</Status>}
+      {cam.error && <Status kind="error">{cam.error}</Status>}
       <div className="vision">
         <video ref={cam.video} playsInline muted hidden={!cam.on} />
         <img ref={img} alt={sample ? "Sample: " + sample : ""} hidden={cam.on || !sample} />
