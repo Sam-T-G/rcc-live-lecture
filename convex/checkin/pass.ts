@@ -33,8 +33,8 @@ const CURRENT_MS = 60_000; // the current code scans until it's this old
 const PREVIOUS_MS = 40_000; // the code before it scans until this long after it was replaced
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no look-alikes, so a teacher can type one
 
-const NOT_A_PASS = "That code isn't a pass. Ask them to open their pass again.";
-const OLD = "That code is old. Ask them to open their pass again.";
+export const NOT_A_PASS = "That code isn't a pass. Ask them to open their pass again.";
+export const OLD = "That code is old. Ask them to open their pass again.";
 
 // Whether the signed-in person can open the professor pages: a professor or admin on the staff
 // list (checkin/prof.ts).

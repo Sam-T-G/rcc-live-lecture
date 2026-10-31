@@ -96,6 +96,8 @@ vi.mock("./qrRead", () => ({ makeQrReader: () => reader }));
 vi.mock("./prof", () => ({ DoorGate: () => null }));
 
 const { KioskScanner } = await import("./Kiosk");
+// The two refusals the server words for the teacher scanner ("Ask them to ..."); the kiosk rewords them.
+const { NOT_A_PASS, OLD } = await import("../../../convex/checkin/pass");
 
 type El = ReactElement<Record<string, unknown> & { children?: ReactNode }>;
 const TOKEN = "0123456789abcdef".repeat(4); // the paired iPad's device token
@@ -227,7 +229,7 @@ describe("SCAN the door kiosk: what the line sees", () => {
   });
 
   it("F12.2 a pass the server refuses shows its reason in role=alert, outside the status line, and the reason clears after 3 s", async () => {
-    scan.mockRejectedValueOnce(new ConvexError("That code is old or wrong. Ask them to open their pass again."));
+    scan.mockRejectedValueOnce(new ConvexError(OLD));
     reader.mockResolvedValue("RCC-ZZZ999");
     cam.on = true;
     cam.video.current = { readyState: 4 };
@@ -236,13 +238,47 @@ describe("SCAN the door kiosk: what the line sees", () => {
     await settle();
     let el = render();
     expect(scan).toHaveBeenCalledWith({ channel: "gdg", code: "RCC-ZZZ999", device: TOKEN });
-    expect(html(el)).toContain('<p class="kiosk__error" role="alert">That code is old or wrong. Ask them to open their pass again.</p>');
+    expect(html(el)).toContain('<p class="kiosk__error" role="alert">That code is old. Open your pass again and hold it up.</p>');
     expect(statusLine(el)).not.toContain("That code");
 
     vi.advanceTimersByTime(3000);
     el = render();
-    expect(html(el)).not.toContain("That code is old or wrong.");
+    expect(html(el)).not.toContain("That code is old.");
     expect(statusLine(el)).toContain("Hold your pass up to the camera");
+  });
+
+  it("SCAN-check-1 a pass held up to the camera that the server refuses ('Ask them to ...', worded for the teacher scanner) tells the student to show their pass again", async () => {
+    const alert = (el: El) => /<p class="kiosk__error" role="alert">(.*?)<\/p>/.exec(html(el))?.[1].replace(/&#x27;/g, "'");
+
+    reader.mockResolvedValue("RCC-ZZZ999");
+    cam.on = true;
+    cam.video.current = { readyState: 4 };
+    scan.mockRejectedValueOnce(new ConvexError(NOT_A_PASS));
+    render();
+    await vi.advanceTimersByTimeAsync(250);
+    await settle();
+    expect(alert(render())).toBe("That code isn't a pass. Open your pass again and hold it up.");
+    expect(words(render())).not.toContain("Ask them");
+  });
+
+  it("SCAN-risk-1 a code typed into 'Code on your pass' that the server refuses gets a line the student can act on, with no 'Ask them'", async () => {
+    const alert = (el: El) => /<p class="kiosk__error" role="alert">(.*?)<\/p>/.exec(html(el))?.[1].replace(/&#x27;/g, "'");
+    const typed = async (error: string) => {
+      scan.mockRejectedValueOnce(new ConvexError(error));
+      const el = render();
+      (input(el).props.ref as { current: unknown }).current = { blur: () => {} };
+      type(el, "abc234");
+      await submit(render());
+      return alert(render());
+    };
+    expect(await typed(NOT_A_PASS)).toBe("That code isn't a pass. Check the code on your pass and type it again.");
+    vi.advanceTimersByTime(3000);
+    expect(await typed(OLD)).toBe("That code is old. Type the code your pass shows now.");
+    vi.advanceTimersByTime(3000);
+
+    // Any other refusal shows as the server words it.
+    expect(await typed("No code.")).toBe("No code.");
+    expect(words(render())).not.toContain("Ask them");
   });
 
   it("rt-24 a student types the code on their pass: it checks them in with this iPad's device token, shows 'Checked in' and their name for 3 s, and empties the field", async () => {

@@ -30,6 +30,20 @@ export default function Kiosk() {
 
 type Result = { kind: "ok" | "again" | "error"; text: string };
 
+// The server words two refusals for the teacher scanner ("Ask them to open their pass again.",
+// convex/checkin/pass.ts NOT_A_PASS and OLD). At the door the student reads them, so they get a
+// step they can take: show the pass again, or type the code it shows now. Matched on the first
+// sentence; any other refusal shows as the server words it.
+function forStudent(text: string, typedIn: boolean) {
+  if (text.startsWith("That code isn't a pass.")) {
+    return typedIn ? "That code isn't a pass. Check the code on your pass and type it again." : "That code isn't a pass. Open your pass again and hold it up.";
+  }
+  if (text.startsWith("That code is old.")) {
+    return typedIn ? "That code is old. Type the code your pass shows now." : "That code is old. Open your pass again and hold it up.";
+  }
+  return text;
+}
+
 // The front camera's id once the browser shows labels (after the first allow); before
 // that, useCamera falls back to facingMode "user", which is also the front camera.
 async function frontCamera() {
@@ -138,7 +152,7 @@ export function KioskScanner({ device }: { device: string | undefined }) {
       const r = await scan({ channel: CHANNEL, code, device });
       setResult({ kind: r.already ? "again" : "ok", text: r.name });
     } catch (e) {
-      setResult({ kind: "error", text: why(e) });
+      setResult({ kind: "error", text: forStudent(why(e), typedIn) });
     }
   }
   const sendRef = useRef(send);
