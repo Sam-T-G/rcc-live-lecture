@@ -5,6 +5,10 @@ button.quiet { background: transparent; color: var(--accent); box-shadow: inset 
 .pass > * { max-width: 100%; }
 .pass__name { font-size: 1.5rem; font-weight: 700; margin: 12px 0 0; }
 .pass__code { font-size: 2rem; letter-spacing: 0.2em; font-family: ui-monospace, monospace; margin: 8px 0; }
+/* The QR's square. "Getting a new code…" takes its place at the same size, and an old code's
+   letters keep their line, so nothing under them moves while a new code loads. */
+.pass__qr { box-sizing: border-box; width: 280px; aspect-ratio: 1; display: grid; place-items: center; }
+.pass__code--old { visibility: hidden; }
 .scanner { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 48px; align-items: start; }
 .scanner__video { width: 100%; border-radius: 12px; background: #000; transform: scaleX(-1); }
 .scanner__video--off { aspect-ratio: 16 / 9; }

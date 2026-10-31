@@ -1,52 +1,51 @@
-// The late banner: when someone checks in late, every screen showing this gets a banner
-// with their first name for 8 seconds. Check-in owns it; Live slides drops it on #/live
-// with one line: <LateBanner />. Arrivals already there when the page opens don't replay.
+// The late banner: when someone checks in late, every screen showing it gets a line with their
+// first name and how many minutes late they are, for 8 seconds. Each student can turn it off for
+// themselves with the checkbox on their pass (HideLate in Student.tsx).
+// Where it renders, as <LateBanner /> with no props: #/checkin/student (the pass and the
+// checked-in screen), #/live, #/live/leaderboard, #/portal and #/checkin/stage. The iOS app shows
+// the same lines from its own copy (ios/RCCLivePortal/LateBanner.swift).
+// It remembers the newest arrival time in the first list it gets and shows only later arrivals
+// (late.ts), so an arrival from before the page opened never shows, even when it comes back into
+// the list of 5 because someone ticked or unticked the opt-out.
 import { useEffect, useRef, useState } from "react";
 import "./checkin.css";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { CHANNEL } from "../../blocks/deck";
+import { lateLine, newArrivals, type Late, type Seen } from "./late";
 
-type Late = { id: string; first: string; lateMin: number };
-
-const LINES = [
-  (n: string, m: number) => `🐢 ${n} just walked in, ${m} min late.`,
-  (n: string, m: number) => `🚨 Late alert: ${n}, ${m} min after start.`,
-  (n: string, m: number) => `⏰ ${n} is here. Class started ${m} min ago.`,
-  (n: string, m: number) => `🥐 ${n} stopped for breakfast. ${m} min late.`,
-  (n: string, m: number) => `👀 Everyone say hi to ${n}, ${m} min late.`,
-];
-
-function line(l: Late) {
-  // Same person always gets the same line, so two screens show the same words.
-  let h = 0;
-  for (const c of l.id) h = (h * 31 + c.charCodeAt(0)) | 0;
-  return LINES[Math.abs(h) % LINES.length](l.first, l.lateMin);
-}
+const SHOW_MS = 8_000;
 
 export default function LateBanner() {
   const feed = useQuery(api.checkin.attendance.lateFeed, { channel: CHANNEL });
-  const seen = useRef<Set<string> | null>(null);
+  const seen = useRef<Seen | null>(null);
+  const timers = useRef<number[]>([]);
   const [showing, setShowing] = useState<Late[]>([]);
 
   useEffect(() => {
     if (!feed) return;
-    if (!seen.current) {
-      seen.current = new Set(feed.map((f) => f.id));
-      return;
-    }
-    const fresh = feed.filter((f) => !seen.current!.has(f.id));
+    const { fresh, seen: next } = newArrivals(feed, seen.current);
+    seen.current = next;
     if (fresh.length === 0) return;
-    fresh.forEach((f) => seen.current!.add(f.id));
+    const ids = new Set(fresh.map((f) => f.id));
     setShowing((s) => [...fresh, ...s]);
-    const ids = new Set<string>(fresh.map((f) => f.id));
-    setTimeout(() => setShowing((s) => s.filter((x) => !ids.has(x.id))), 8000);
+    timers.current.push(window.setTimeout(() => setShowing((s) => s.filter((x) => !ids.has(x.id))), SHOW_MS));
   }, [feed]);
+
+  // A page that drops the banner stops its timers too.
+  useEffect(() => {
+    const list = timers.current;
+    return () => list.forEach((id) => clearTimeout(id));
+  }, []);
 
   if (showing.length === 0) return null;
   return (
     <div className="late" role="status" aria-live="polite">
-      {showing.map((l) => <p key={l.id} className="late__item">{line(l)}</p>)}
+      {showing.map((l) => (
+        <p key={l.id} className="late__item">
+          {lateLine(l)}
+        </p>
+      ))}
     </div>
   );
 }

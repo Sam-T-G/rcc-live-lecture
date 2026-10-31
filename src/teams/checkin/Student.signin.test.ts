@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Student } from "./Student";
 
 vi.mock("convex/react", () => ({ useQuery: () => undefined, useMutation: () => async () => null }));
-vi.mock("../../blocks/auth", () => ({ StudentSignIn: () => "[sign-in]", useGoogleUser: () => ({ user: null }) }));
+vi.mock("../../blocks/auth", () => ({ StudentSignIn: () => "[sign-in]", SignedInAs: () => null, useGoogleUser: () => ({ user: null }) }));
 
 describe("Student signed out", () => {
   it("ROLES-UI-risk-5 says to sign in, not to type a name and email, above the sign-in", () => {
