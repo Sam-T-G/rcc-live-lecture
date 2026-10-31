@@ -1,7 +1,7 @@
 // checkin/prof: the professor key, the kiosk key, and every host-only function's gate.
 import { describe, expect, it, vi } from "vitest";
 import { api } from "../_generated/api";
-import { authMatrix, HOST_ONLY, KIOSK_KEY, passCode, PROF_KEY, profEnv, SCANNER, typed } from "../test.helpers";
+import { authMatrix, type Caller, HOST_ONLY, KIOSK_KEY, passCode, PROF_KEY, profEnv, SCANNER, typed } from "../test.helpers";
 import * as prof from "./prof";
 
 const CH = "gdg";
@@ -60,96 +60,107 @@ describe("D11 the kiosk key", () => {
   });
 
   it("D11 authMatrix: checkin.pass.scan and canScan take the kiosk key", async () => {
-    expect(
-      await authMatrix(async (as, key, t) => {
-        const code = await passCode(typed(t, "Sample student 1", "student1@example.edu"));
-        await as.mutation(api.checkin.pass.scan, { key, channel: CH, code });
-      }),
-    ).toEqual(SCANNER);
-    expect(
-      await authMatrix(async (as, key) => {
-        if (!(await as.query(api.checkin.pass.canScan, { key }))) throw new Error("canScan said no");
-      }),
-    ).toEqual(SCANNER);
+    await authMatrix(SCANNER, async (as, key, t) => {
+      const code = await passCode(typed(t, "Sample student 1", "student1@example.edu"));
+      await as.mutation(api.checkin.pass.scan, { key, channel: CH, code });
+    });
+    await authMatrix(SCANNER, async (as, key) => {
+      if (!(await as.query(api.checkin.pass.canScan, { key }))) throw new Error("canScan said no");
+    });
   });
 
   it("D11 authMatrix: amHost refuses the kiosk key", async () => {
-    expect(
-      await authMatrix(async (as, key) => {
-        if (!(await as.query(api.checkin.pass.amHost, { key }))) throw new Error("amHost said no");
-      }),
-    ).toEqual(HOST_ONLY);
+    await authMatrix(HOST_ONLY, async (as, key) => {
+      if (!(await as.query(api.checkin.pass.amHost, { key }))) throw new Error("amHost said no");
+    });
   });
 });
 
 // Every host-only function: refused signed out with no key, with a wrong key, as a typed sign-in
 // whose email is on HOST_EMAILS, and with the kiosk key; allowed with PROFESSOR_KEY and as a Google
-// host. Each row runs on its own empty backend.
+// host. Each row runs on its own empty backend, and authMatrix fails the test when a row differs.
 describe("F4.4 host-only functions", () => {
   it("F4.4 authMatrix for checkin.read.names", async () => {
-    expect(await authMatrix((as, key) => as.query(api.checkin.read.names, { key, channel: CH }))).toEqual(HOST_ONLY);
+    await authMatrix(HOST_ONLY, (as, key) => as.query(api.checkin.read.names, { key, channel: CH }));
   });
 
   it("F4.4 authMatrix for checkin.quiz.ask", async () => {
-    expect(
-      await authMatrix((as, key) =>
-        as.mutation(api.checkin.quiz.ask, { key, channel: CH, kind: "quiz", question: "Which one is a vowel?", choices: ["A", "B"], correct: 0 }),
-      ),
-    ).toEqual(HOST_ONLY);
+    await authMatrix(HOST_ONLY, (as, key) =>
+      as.mutation(api.checkin.quiz.ask, { key, channel: CH, kind: "quiz", question: "Which one is a vowel?", choices: ["A", "B"], correct: 0 }),
+    );
   });
 
   it("F4.4 authMatrix for checkin.quiz.end", async () => {
-    expect(
-      await authMatrix(async (as, key, t) => {
-        const poll = await t.mutation(api.checkin.quiz.ask, { key: PROF_KEY, channel: CH, kind: "vote", question: "Pizza or tacos?", choices: ["Pizza", "Tacos"] });
-        await as.mutation(api.checkin.quiz.end, { key, poll });
-      }),
-    ).toEqual(HOST_ONLY);
+    await authMatrix(HOST_ONLY, async (as, key, t) => {
+      const poll = await t.mutation(api.checkin.quiz.ask, { key: PROF_KEY, channel: CH, kind: "vote", question: "Pizza or tacos?", choices: ["Pizza", "Tacos"] });
+      await as.mutation(api.checkin.quiz.end, { key, poll });
+    });
   });
 
   it("F4.4 authMatrix for checkin.quiz.stats", async () => {
-    expect(
-      await authMatrix(async (as, key, t) => {
-        const poll = await t.mutation(api.checkin.quiz.ask, { key: PROF_KEY, channel: CH, kind: "quiz", question: "Which one is a vowel?", choices: ["A", "B"], correct: 0 });
-        await as.query(api.checkin.quiz.stats, { key, poll });
-      }),
-    ).toEqual(HOST_ONLY);
+    await authMatrix(HOST_ONLY, async (as, key, t) => {
+      const poll = await t.mutation(api.checkin.quiz.ask, { key: PROF_KEY, channel: CH, kind: "quiz", question: "Which one is a vowel?", choices: ["A", "B"], correct: 0 });
+      await as.query(api.checkin.quiz.stats, { key, poll });
+    });
   });
 
   it("F4.4 authMatrix for checkin.quiz.history", async () => {
-    expect(await authMatrix((as, key) => as.query(api.checkin.quiz.history, { key, channel: CH }))).toEqual(HOST_ONLY);
+    await authMatrix(HOST_ONLY, (as, key) => as.query(api.checkin.quiz.history, { key, channel: CH }));
   });
 
   it("F4.4 authMatrix for checkin.attendance.setClassStart", async () => {
-    expect(
-      await authMatrix((as, key) => as.mutation(api.checkin.attendance.setClassStart, { key, channel: CH, startsAt: Date.now(), graceMin: 5 })),
-    ).toEqual(HOST_ONLY);
+    await authMatrix(HOST_ONLY, (as, key) => as.mutation(api.checkin.attendance.setClassStart, { key, channel: CH, startsAt: Date.now(), graceMin: 5 }));
   });
 
   it("F4.4 authMatrix for checkin.attendance.sheet", async () => {
-    expect(await authMatrix((as, key) => as.query(api.checkin.attendance.sheet, { key, channel: CH }))).toEqual(HOST_ONLY);
+    await authMatrix(HOST_ONLY, (as, key) => as.query(api.checkin.attendance.sheet, { key, channel: CH }));
   });
 
   it("F4.4 authMatrix for live.groups.setSize", async () => {
-    expect(await authMatrix((as, key) => as.mutation(api.live.groups.setSize, { key, channel: CH, size: 3 }))).toEqual(HOST_ONLY);
+    await authMatrix(HOST_ONLY, (as, key) => as.mutation(api.live.groups.setSize, { key, channel: CH, size: 3 }));
   });
 
   it("F4.4 authMatrix for checkin.pass.scan (the door scanner also takes the kiosk key)", async () => {
-    expect(
-      await authMatrix(async (as, key, t) => {
-        const code = await passCode(typed(t, "Sample student 1", "student1@example.edu"));
-        await as.mutation(api.checkin.pass.scan, { key, channel: CH, code });
-      }),
-    ).toEqual(SCANNER);
+    await authMatrix(SCANNER, async (as, key, t) => {
+      const code = await passCode(typed(t, "Sample student 1", "student1@example.edu"));
+      await as.mutation(api.checkin.pass.scan, { key, channel: CH, code });
+    });
   });
 
   it("F4.4 a refused row throws the sign-in or key message", async () => {
-    const m = await authMatrix((as, key) => as.query(api.checkin.read.names, { key, channel: CH }));
+    const m = await authMatrix(HOST_ONLY, (as, key) => as.query(api.checkin.read.names, { key, channel: CH }));
     expect(m.errors).toEqual({
       signedOut: expect.stringContaining("Sign in first."),
       wrongKey: expect.stringContaining("That professor key is wrong."),
       typedHostEmail: expect.stringContaining("Only hosts can do that."),
       kioskKey: expect.stringContaining("That professor key is wrong."),
     });
+  });
+});
+
+// authMatrix compares the rows with HOST_ONLY or SCANNER itself, so a test that only awaits it
+// still fails when a function lets the wrong caller in.
+describe("F39.3 authMatrix checks its own rows", () => {
+  it("F39.3 authMatrix fails a test that asserts nothing else when a function lets every caller in", async () => {
+    // checkin.read.count is open to anyone, like a host-only function without its requireProf.
+    await expect(authMatrix(HOST_ONLY, (as) => as.query(api.checkin.read.count, { channel: CH }))).rejects.toThrow(
+      "authMatrix: rows that differ from HOST_ONLY: signedOut got through; wrongKey got through; typedHostEmail got through; kioskKey got through",
+    );
+  });
+
+  it("F39.3 authMatrix fails a row that should have finished, and says what it threw", async () => {
+    // checkin.read.names refuses the kiosk key, which SCANNER lets in.
+    await expect(authMatrix(SCANNER, (as, key) => as.query(api.checkin.read.names, { key, channel: CH }))).rejects.toThrow(
+      "authMatrix: rows that differ from SCANNER: kioskKey was refused (That professor key is wrong.)",
+    );
+  });
+
+  it("F39.3 authMatrix takes HOST_ONLY or SCANNER themselves, never a copy or a matrix of its own", async () => {
+    const names = (as: Caller, key: string | undefined) => as.query(api.checkin.read.names, { key, channel: CH });
+    await expect(authMatrix({ ...HOST_ONLY }, names)).rejects.toThrow("authMatrix takes HOST_ONLY or SCANNER");
+    await expect(authMatrix({ ...HOST_ONLY, typedHostEmail: true } as unknown as typeof HOST_ONLY, names)).rejects.toThrow(
+      "authMatrix takes HOST_ONLY or SCANNER",
+    );
+    expect(Object.isFrozen(HOST_ONLY) && Object.isFrozen(SCANNER)).toBe(true);
   });
 });

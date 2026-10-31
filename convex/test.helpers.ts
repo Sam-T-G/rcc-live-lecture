@@ -94,21 +94,33 @@ export type Row = (typeof ROWS)[number];
 export type Matrix = Record<Row, boolean>;
 
 // A host-only function: only a Google host and the professor key get through.
-export const HOST_ONLY: Matrix = { signedOut: false, wrongKey: false, typedHostEmail: false, kioskKey: false, googleHost: true, profKey: true };
-// The door scanner (checkin.pass.scan and canScan) also takes the kiosk key.
-export const SCANNER: Matrix = { ...HOST_ONLY, kioskKey: true };
+export const HOST_ONLY = Object.freeze({
+  signedOut: false,
+  wrongKey: false,
+  typedHostEmail: false,
+  kioskKey: false,
+  googleHost: true,
+  profKey: true,
+} as const satisfies Matrix);
+// The door scanner (checkin.pass.scan and canScan) also takes the kiosk key. coverage.test.ts
+// counts no other function checked against it.
+export const SCANNER = Object.freeze({ ...HOST_ONLY, kioskKey: true } as const satisfies Matrix);
 
-// Runs one call as each of the six callers above, each on its own fresh backend, and returns
-// true for a row whose call finished and false for one that threw. `call` gets the caller, the
-// key to pass (undefined means none) and that row's backend, so it can add what the call needs
-// first (with t.run, or with PROF_KEY). Write the call so it finishes for an allowed caller, then:
-//   expect(await authMatrix((as, key) => as.query(api.checkin.read.names, { key, channel: "gdg" }))).toEqual(HOST_ONLY);
+// Runs one call as each of the six callers above, each on its own fresh backend, and fails the
+// test unless exactly the rows `expected` allows finish: HOST_ONLY for a host-only function,
+// SCANNER for the door scanner. `call` gets the caller, the key to pass (undefined means none)
+// and that row's backend, so it can add what the call needs first (with t.run, or on `t` with
+// PROF_KEY). Write the call so it finishes for an allowed caller, and await authMatrix:
+//   await authMatrix(HOST_ONLY, (as, key) => as.query(api.checkin.read.names, { key, channel: "gdg" }));
 // A function that answers true or false instead of throwing (amHost, canScan) throws inside
-// `call` when it answers false. Sets PROFESSOR_KEY, HOST_EMAILS and KIOSK_KEY. When a row comes
-// out wrong, `errors` (left out of toEqual) holds what each refused row threw.
+// `call` when it answers false. Sets PROFESSOR_KEY, HOST_EMAILS and KIOSK_KEY. Returns the rows,
+// with `errors` holding what each refused row threw.
 export async function authMatrix(
+  expected: typeof HOST_ONLY | typeof SCANNER,
   call: (as: Caller, key: string | undefined, t: T) => Promise<unknown>,
 ): Promise<Matrix & { readonly errors: Partial<Record<Row, string>> }> {
+  // Only these two objects: a matrix written in a test file could let a refused caller through.
+  if (expected !== HOST_ONLY && expected !== SCANNER) throw new Error("authMatrix takes HOST_ONLY or SCANNER from test.helpers.ts first.");
   profEnv();
   kioskEnv();
   const who: Record<Row, [(t: T) => Caller, string | undefined]> = {
@@ -132,5 +144,9 @@ export async function authMatrix(
       errors[row] = e instanceof Error ? e.message : String(e);
     }
   }
+  const wrong = ROWS.filter((row) => out[row] !== expected[row]).map((row) =>
+    out[row] ? `${row} got through` : `${row} was refused (${errors[row]})`,
+  );
+  if (wrong.length) throw new Error(`authMatrix: rows that differ from ${expected === HOST_ONLY ? "HOST_ONLY" : "SCANNER"}: ${wrong.join("; ")}`);
   return Object.defineProperty(out, "errors", { value: errors, enumerable: false }) as Matrix & { readonly errors: Partial<Record<Row, string>> };
 }
