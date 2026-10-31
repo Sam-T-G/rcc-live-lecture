@@ -1,0 +1,15 @@
+/* #/host: the "Lost by slide" line at the bottom of the header card (Page.tsx LostBySlide). One
+   wrapping row of "Slide 3: 4" entries under a label; fixed-width digits, so the entries don't
+   shift when a count changes. */
+.host-lost {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--rcc-space-2) var(--rcc-space-6);
+  margin: var(--rcc-space-4) 0 0;
+  padding-top: var(--rcc-space-3);
+  border-top: var(--rcc-hairline) solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.host-lost__label { font-weight: var(--rcc-weight-strong); }
+.host-lost__slide { white-space: nowrap; }

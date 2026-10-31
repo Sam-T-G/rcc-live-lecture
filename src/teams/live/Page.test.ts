@@ -1,32 +1,54 @@
 // @vitest-environment node
-// #/live and #/live/leaderboard, rendered to HTML with made-up query results (no backend).
-import { createElement } from "react";
+// #/live and #/live/leaderboard, rendered to HTML with made-up query results (no backend). The
+// quiz, past-questions and questions cards and the late banner are stand-ins that print their
+// names, and ErrorBoundary is a <section> that carries its label, so these tests check what
+// Page.tsx decides: which card sits in which boundary, the I'm lost slot under the slide, paging,
+// and the words.
+import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import LivePage from "./Page";
+import LivePage, { LiveSlides } from "./Page";
 import { Leaderboard } from "./Leaderboard";
 
 const results: Record<string, unknown> = {};
+const auth = vi.hoisted(() => ({ user: null as null | { name: string; email: string } }));
 vi.mock("convex/react", () => ({
-  useQuery: (ref: FunctionReference<"query">) => results[getFunctionName(ref)],
+  useQuery: (ref: FunctionReference<"query">, args?: unknown) => (args === "skip" ? undefined : results[getFunctionName(ref)]),
   useMutation: () => async () => null,
 }));
-vi.mock("../../blocks/auth", () => ({ useGoogleUser: () => ({ user: null }) }));
-vi.mock("../../blocks/deck", () => ({ CHANNEL: "gdg", useDeckSlide: () => null }));
+vi.mock("../../blocks/auth", () => ({ useGoogleUser: () => auth, SignedInAs: () => "[signed in as]" }));
+vi.mock("../../blocks/deck", () => ({ CHANNEL: "gdg", useDeckSlide: () => results["deck:current"] }));
 vi.mock("../checkin/Quiz", () => ({ QuizCard: () => "[quiz card]" }));
+vi.mock("../checkin/LateBanner", () => ({ default: () => "[late banner]" }));
 vi.mock("./PastQuestions", () => ({ default: () => "[past questions]" }));
 vi.mock("./Questions", () => ({ default: () => "[questions]" }));
+vi.mock("../../blocks/ui", async (importOriginal) => {
+  const { createElement } = await import("react");
+  return {
+    ...(await importOriginal<typeof import("../../blocks/ui")>()),
+    ErrorBoundary: ({ label, children }: { label?: string; children?: ReactNode }) =>
+      createElement("section", { "data-boundary": label }, children),
+  };
+});
 
 const team = (n: number) => ({ team: n, color: "green", label: `Team ${n}`, members: 3, correct: 6 - n, rank: n, ec: 0 });
+// The deck on slide `index + 1` of 10, with slides 1 to `index + 1` shown this class.
+function deckOn(index: number) {
+  results["deck:current"] = { index, beat: 0, count: 10, title: `Slide ${index + 1}`, lines: ["A line"], at: 0 };
+  results["deck:slides"] = Array.from({ length: index + 1 }, (_, i) => ({ index: i, beat: 0, title: `Slide ${i + 1}`, lines: [], at: 0 }));
+}
+const STUDENT = { name: "Sample student 1", email: "student1@example.edu" };
 
 beforeEach(() => {
   for (const k of Object.keys(results)) delete results[k];
+  auth.user = null;
   Object.assign(results, {
     "checkin/pass:amHost": true, // a professor is signed in on the projector laptop
     "live/groups:status": { size: 3, locked: true, locksAt: null },
     "live/groups:leaderboard": { questions: 2, teams: [1, 2, 3, 4, 5].map(team) },
     "live/groups:mine": null,
+    "deck:current": null,
     "deck:slides": [],
   });
 });
@@ -34,6 +56,19 @@ beforeEach(() => {
 function open(hash: string) {
   vi.stubGlobal("location", { hash });
   return renderToStaticMarkup(createElement(LivePage));
+}
+
+// The markup inside the stand-in boundary labelled `label`, or null when the page has none.
+function boundary(html: string, label: string) {
+  const start = `<section data-boundary="${label}">`;
+  const at = html.indexOf(start);
+  if (at < 0) return null;
+  return html.slice(at + start.length, html.indexOf("</section>", at));
+}
+// The text of the page's I'm lost slot, tags dropped.
+function lostSlot(html: string) {
+  const inner = boundary(html, "The I’m lost button");
+  return inner === null ? null : inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 describe("#/live/leaderboard, the room's board", () => {
@@ -47,6 +82,10 @@ describe("#/live/leaderboard, the room's board", () => {
     const html = open("#/live/leaderboard");
     expect(html).not.toContain("Teams of 3");
     expect(html).not.toContain("Teams of 4");
+  });
+
+  it("F16 the late banner shows on the room's board, in its projector-size box", () => {
+    expect(open("#/live/leaderboard")).toContain('<div class="live-board__late">[late banner]</div>');
   });
 
   it("lists every team, since nobody can open a fold on the projector", () => {
@@ -96,6 +135,120 @@ describe("#/live/leaderboard, the room's board", () => {
 describe("#/live, the student phone", () => {
   it("stacks the side cards in a column with a gap (live.css .live__side)", () => {
     const html = open("#/live");
-    expect(html).toMatch(/<div class="live__side">\[quiz card\]/);
+    expect(html).toMatch(/<div class="live__side"><section data-boundary="The quiz">\[quiz card\]/);
+  });
+
+  it("live-frontend-22 each side card sits in its own error boundary, apart from the slide", () => {
+    deckOn(2);
+    const html = open("#/live");
+    expect(boundary(html, "The quiz")).toBe("[quiz card]");
+    expect(boundary(html, "The team leaderboard")).toContain("<h2>Team leaderboard</h2>");
+    expect(boundary(html, "Past questions")).toBe("[past questions]");
+    expect(boundary(html, "Questions")).toBe("[questions]");
+    expect(html).toContain('<div id="live-questions"><section data-boundary="Questions">');
+    // The slide is outside every card's boundary, so a card that fails leaves it up.
+    const slide = html.indexOf("<h2 class=\"slide__title\">Slide 3</h2>");
+    expect(slide).toBeGreaterThan(-1);
+    expect(slide).toBeLessThan(html.indexOf('<div class="live__side">'));
+  });
+
+  it("F16 the late banner shows on #/live", () => {
+    expect(boundary(open("#/live"), "The late banner")).toBe("[late banner]");
+  });
+
+  it("core-backend-10 'Signed in as' with its sign-out sits under the title", () => {
+    expect(open("#/live")).toContain("<h1>Live slides</h1>[signed in as]");
+  });
+
+  it("F20.1 a checked-in student sees 'I’m lost' under the slide, pressed while they're counted as lost on it", () => {
+    deckOn(2);
+    auth.user = STUDENT;
+    results["checkin/read:me"] = true;
+    results["live/read:mine"] = false;
+    let html = open("#/live");
+    expect(html).toMatch(/<button aria-pressed="false" type="button" class="btn btn--secondary btn--block lost__button">/);
+    expect(lostSlot(html)).toBe("I’m lost The professor sees how many people are lost on each slide. Your name isn’t shown.");
+
+    results["live/read:mine"] = true;
+    html = open("#/live");
+    expect(html).toMatch(/<button aria-pressed="true" type="button" class="btn btn--secondary btn--block lost__button">/);
+    expect(lostSlot(html)).toBe("✓ I’m lost You’re counted as lost on slide 3. Tap again to undo.");
+
+    // Right after a slide change, before `mine` arrives: the button shows, not pressed and not busy.
+    delete results["live/read:mine"];
+    html = open("#/live");
+    expect(html).toMatch(/<button aria-pressed="false" type="button" class="btn btn--secondary btn--block lost__button">/);
+    expect(html).not.toContain("aria-busy");
+  });
+
+  it("F21.2 a signed-in student who isn't checked in sees 'Check in to answer, ask and join a team.' and a link to #/checkin/student, and no I'm lost button", () => {
+    deckOn(2);
+    auth.user = STUDENT;
+    results["checkin/read:me"] = false;
+    const html = open("#/live");
+    expect(lostSlot(html)).toBe("Check in to answer, ask and join a team. Check in");
+    expect(boundary(html, "The I’m lost button")).toContain('<a href="#/checkin/student" class="btn btn--secondary btn--block">Check in</a>');
+    expect(html).not.toContain("lost__button");
+  });
+
+  it("F20.6 signed out: 'Sign in to tap I’m lost' instead of the button", () => {
+    deckOn(2);
+    const html = open("#/live");
+    expect(lostSlot(html)).toBe("Sign in to tap I’m lost");
+    expect(html).not.toContain("lost__button");
+  });
+
+  it("no I'm lost slot while the check-in state loads, and none before the slides start", () => {
+    deckOn(2);
+    auth.user = STUDENT; // checkin/read:me not in yet
+    expect(boundary(open("#/live"), "The I’m lost button")).toBe('<div class="lost" aria-busy="true"></div>');
+    results["deck:current"] = null;
+    expect(open("#/live")).not.toContain("The I’m lost button");
+  });
+
+  it("the words match #/portal: 'Loading the slides…', 'Waiting for the slides to start.', '← Back', 'Next →'", () => {
+    results["deck:current"] = undefined;
+    expect(open("#/live")).toContain("Loading the slides…");
+    results["deck:current"] = null;
+    expect(open("#/live")).toContain("Waiting for the slides to start.");
+    deckOn(2);
+    const html = open("#/live");
+    expect(html).toContain("← Back");
+    expect(html).toContain("Next →");
+    expect(html).not.toContain("Back to live"); // following the professor
+  });
+
+  it("live-frontend-18 a phone that paged back follows live again once the professor reaches or goes back past its slide", () => {
+    const at = (pin: number) => renderToStaticMarkup(createElement(LiveSlides, { pin }));
+    // Paged back to slide 4 while the professor is on slide 7: the phone stays on slide 4.
+    deckOn(6);
+    let html = at(3);
+    expect(html).toContain('<h2 class="slide__title">Slide 4</h2>');
+    expect(html).toContain("The professor is on slide 7 now.");
+    expect(html).toContain("Back to live");
+
+    // The professor goes back to slide 3: the phone follows live.
+    deckOn(6);
+    results["deck:current"] = { index: 2, beat: 0, count: 10, title: "Slide 3", lines: [], at: 0 };
+    html = at(3);
+    expect(html).toContain('<h2 class="slide__title">Slide 3</h2>');
+    expect(html).not.toContain("The professor is on slide");
+    expect(html).not.toContain("Back to live");
+
+    // The professor reaches slide 4: live again too.
+    results["deck:current"] = { index: 3, beat: 0, count: 10, title: "Slide 4 live", lines: [], at: 0 };
+    html = at(3);
+    expect(html).toContain('<h2 class="slide__title">Slide 4 live</h2>');
+    expect(html).not.toContain("Back to live");
+
+    // The deck stops (End day): the phone waits for the next slides.
+    results["deck:current"] = null;
+    expect(at(3)).toContain("Waiting for the slides to start.");
+  });
+
+  it("#/live/<other> shows 'No page at #/live/<other>'", () => {
+    const html = open("#/live/nope");
+    expect(html).toContain("<h1>No page at #/live/nope</h1>");
+    expect(html).toContain('<a href="#/">Go home</a>');
   });
 });

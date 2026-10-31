@@ -92,3 +92,18 @@
 /* Paging back through slides */
 .slide__nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .slide__nav button:disabled { opacity: 0.45; cursor: default; }
+.slide__live { margin: 8px 0 0; }
+
+/* I'm lost, under the slide (Page.tsx Lost). The slot keeps a button's height while the check-in
+   state loads, so the cards under it don't jump. Pressed, the button takes the chosen-option look
+   (tokens: --accent-soft-text on --accent-soft, an --accent ring). */
+.lost { display: grid; gap: var(--rcc-space-2); margin-top: var(--rcc-space-4); min-height: var(--rcc-target-min); }
+.lost__note { margin: 0; font-size: var(--fs-small); }
+.lost__button[aria-pressed="true"] { background-color: var(--accent-soft); color: var(--accent-soft-text); box-shadow: inset 0 0 0 var(--rcc-hairline) var(--accent); }
+
+/* The late banner on #/live/leaderboard, in projector sizes so the back of the room can read it
+   (docs/design.md: nothing on the projector under 32px; body words 48px). The wrapper takes no
+   space, so the projector's column gap doesn't add a row under the board. */
+.live-board__late { display: contents; }
+.live-board__late .late { left: var(--proj-margin); right: var(--proj-margin); bottom: calc(48 * var(--stage-u)); gap: calc(16 * var(--stage-u)); }
+.live-board__late .late__item { max-width: none; padding: calc(24 * var(--stage-u)) calc(40 * var(--stage-u)); border-radius: calc(24 * var(--stage-u)); font-size: var(--proj-body); line-height: 1.2; }

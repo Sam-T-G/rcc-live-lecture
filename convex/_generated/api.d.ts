@@ -29,6 +29,7 @@ import type * as lab from "../lab.js";
 import type * as lectures from "../lectures.js";
 import type * as lib from "../lib.js";
 import type * as live_groups from "../live/groups.js";
+import type * as live_lost from "../live/lost.js";
 import type * as live_past from "../live/past.js";
 import type * as live_questions from "../live/questions.js";
 import type * as live_read from "../live/read.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   lectures: typeof lectures;
   lib: typeof lib;
   "live/groups": typeof live_groups;
+  "live/lost": typeof live_lost;
   "live/past": typeof live_past;
   "live/questions": typeof live_questions;
   "live/read": typeof live_read;

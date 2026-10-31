@@ -1,49 +1,89 @@
-// Live slides team: #/live, the phone view of the slide the professor is on. Registered in
-// src/pages/index.ts already; build here.
+// Live slides team: #/live, the student's phone during class. Registered in src/pages/index.ts.
+//   #/live: the slide the professor is on, live. The student can page back through slides this
+//     class has shown without moving the projector; a phone that paged back follows live again
+//     when the professor reaches or goes back past that slide, the same rule as #/portal. Under the
+//     slide: "I'm lost" for the slide on screen (convex/live/lost.ts), or what to do first: sign in
+//     (the button jumps to the sign-in form in the Questions card) or check in (a link to
+//     #/checkin/student). Beside it: the quiz, the team leaderboard, past questions and the
+//     questions board, each in its own ErrorBoundary, so a card whose query fails shows its own
+//     error and the slide stays up.
+//   #/live/leaderboard: the team board on the projector.
+//   Both show the late banner (first names, for students who didn't opt out). Any other
+//   #/live/<part> shows "No page at #/live/<part>".
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { useRoute } from "../../blocks/router";
+import { SignedInAs, useGoogleUser } from "../../blocks/auth";
 import { CHANNEL, useDeckSlide } from "../../blocks/deck";
-import { Card, Screen, Status } from "../../blocks/ui";
-import { Projector } from "../../blocks/kit";
-import Questions from "./Questions";
+import { Button, Projector } from "../../blocks/kit";
+import { Link, useRoute } from "../../blocks/router";
+import { Card, ErrorBoundary, Screen, Status } from "../../blocks/ui";
+import LateBanner from "../checkin/LateBanner";
 import { QuizCard } from "../checkin/Quiz";
-import PastQuestions from "./PastQuestions";
 import { GroupBadge, Leaderboard } from "./Leaderboard";
+import PastQuestions from "./PastQuestions";
+import Questions from "./Questions";
 import "./live.css";
 
+// The box around the Questions card, whose sign-in form "Sign in to tap I'm lost" jumps to.
+const QUESTIONS_ID = "live-questions";
+
 export default function LivePage() {
-  const live = useDeckSlide(CHANNEL);
-  const shown = useQuery(api.deck.slides, { channel: CHANNEL });
-  // null follows the professor. A number is a slide this student paged back to; it stays put
-  // when the professor moves on, until they tap "Back to live".
-  const [pinned, setPinned] = useState<number | null>(null);
-  const earlier = pinned !== null ? shown?.find((x) => x.index === pinned) : undefined;
-  const slide = earlier ? { ...earlier, count: live?.count ?? 0 } : live;
-  const here = slide ? slide.index : null;
-  const before = shown && here !== null ? [...shown].reverse().find((x) => x.index < here) : undefined;
-  const after = shown && here !== null && pinned !== null ? shown.find((x) => x.index > here) : undefined;
-  function later() {
-    if (!after || (live && after.index >= live.index)) setPinned(null);
-    else setPinned(after.index);
-  }
-  const [, part] = useRoute(); // #/live/leaderboard: the big board for the projector
+  const [, part] = useRoute();
   if (part === "leaderboard")
     return (
       <Projector title="Team leaderboard">
-        <Leaderboard big />
+        <ErrorBoundary label="The team leaderboard">
+          <Leaderboard big />
+        </ErrorBoundary>
+        <div className="live-board__late">
+          <LateBanner />
+        </div>
       </Projector>
     );
+  if (part !== undefined)
+    return (
+      <Screen title={`No page at #/live/${part}`}>
+        <p><Link to="">Go home</Link></p>
+      </Screen>
+    );
+  return <LiveSlides />;
+}
+
+// The phone view. `pin` opens it on a slide the student paged back to, the way Page.test.ts
+// checks where a paged-back phone ends up; the page itself starts on the live slide.
+export function LiveSlides({ pin = null }: { pin?: number | null }) {
+  const live = useDeckSlide(CHANNEL);
+  const shown = useQuery(api.deck.slides, { channel: CHANNEL });
+  // null follows the professor. A number is a slide this student paged back to: the phone stays
+  // on it while the professor moves on, until the student taps "Back to live", or the professor
+  // reaches or goes back past it, or the deck stops (live is null). Set during render, React's way
+  // to adjust state when what it depends on changes, so the phone never shows the old slide first.
+  const [pinned, setPinned] = useState<number | null>(pin);
+  if (pinned !== null && (live === null || (live !== undefined && pinned >= live.index))) setPinned(null);
+  const earlier = pinned !== null ? shown?.find((x) => x.index === pinned) : undefined;
+  const looking = earlier !== undefined; // on a slide the student paged back to
+  const slide = earlier ? { ...earlier, count: live?.count ?? 0 } : live;
+  const here = slide ? slide.index : null;
+  const before = shown && here !== null ? [...shown].reverse().find((x) => x.index < here) : undefined;
+  const after = earlier && shown ? shown.find((x) => x.index > earlier.index) : undefined;
+  function next() {
+    if (!after || (live && after.index >= live.index)) setPinned(null);
+    else setPinned(after.index);
+  }
+
   return (
     <Screen title="Live slides" wide>
-      <GroupBadge />
+      <SignedInAs />
+      <ErrorBoundary label="Your team">
+        <GroupBadge />
+      </ErrorBoundary>
       <div className="live">
         <Card>
           {slide === undefined ? (
-            <Status kind="loading">Loading the slide…</Status>
+            <Status kind="loading">Loading the slides…</Status>
           ) : slide === null ? (
-            <Status kind="empty">Waiting for the professor to start the slides.</Status>
+            <Status kind="empty">Waiting for the slides to start.</Status>
           ) : (
             <>
               <h2 className="slide__title">{slide.title}</h2>
@@ -54,23 +94,106 @@ export default function LivePage() {
               </ul>
               <p className="slide__count muted">Slide {slide.index + 1} of {slide.count}</p>
               <div className="slide__nav">
-                <button type="button" disabled={!before} onClick={() => before && setPinned(before.index)}>← Earlier</button>
-                <button type="button" disabled={pinned === null} onClick={later}>Later →</button>
-                {pinned !== null && <button type="button" onClick={() => setPinned(null)}>Back to live</button>}
+                <Button variant="secondary" disabled={!before} onClick={() => before && setPinned(before.index)}>← Back</Button>
+                <Button variant="secondary" disabled={!looking} onClick={next}>Next →</Button>
+                {looking && <Button onClick={() => setPinned(null)}>Back to live</Button>}
               </div>
-              {pinned !== null && live && (
-                <p className="muted">You’re looking back. The professor is on slide {live.index + 1}.</p>
-              )}
+              {looking && live && <p className="slide__live muted">The professor is on slide {live.index + 1} now.</p>}
+              <ErrorBoundary key={slide.index} label="The I’m lost button">
+                <Lost index={slide.index} />
+              </ErrorBoundary>
             </>
           )}
         </Card>
         <div className="live__side">
-          <QuizCard />
-          <Leaderboard />
-          <PastQuestions />
-          <Questions index={here} />
+          <ErrorBoundary label="The quiz">
+            <QuizCard />
+          </ErrorBoundary>
+          <ErrorBoundary label="The team leaderboard">
+            <Leaderboard />
+          </ErrorBoundary>
+          <ErrorBoundary label="Past questions">
+            <PastQuestions />
+          </ErrorBoundary>
+          <div id={QUESTIONS_ID}>
+            <ErrorBoundary label="Questions">
+              <Questions index={here} />
+            </ErrorBoundary>
+          </div>
         </div>
       </div>
+      <ErrorBoundary label="The late banner">
+        <LateBanner />
+      </ErrorBoundary>
     </Screen>
+  );
+}
+
+// The words a ConvexError("text") carries ("Check in first."), or a plain line for anything else.
+function why(e: unknown) {
+  const data = (e as { data?: unknown } | null)?.data;
+  return typeof data === "string" ? data : "Something went wrong. Try again.";
+}
+
+// Signed out: scroll to the sign-in form in the Questions card and put the cursor in its first
+// field, so the student signs in once for I'm lost, questions and upvotes.
+function toSignIn() {
+  const box = document.getElementById(QUESTIONS_ID);
+  const field = box?.querySelector<HTMLElement>("form input");
+  (field ?? box)?.scrollIntoView({ block: "center" });
+  field?.focus({ preventScroll: true });
+}
+
+// Under the slide on screen: "I'm lost" for a checked-in student (pressed while they're counted
+// as lost on it), or what to do first. The professor's #/host shows the count for each slide.
+function Lost({ index }: { index: number }) {
+  const { user } = useGoogleUser();
+  const checkedIn = useQuery(api.checkin.read.me, user ? { channel: CHANNEL } : "skip");
+  const mine = useQuery(api.live.read.mine, user && checkedIn ? { channel: CHANNEL, index } : "skip");
+  const toggle = useMutation(api.live.lost.toggle);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!user)
+    return (
+      <div className="lost">
+        <Button variant="secondary" block onClick={toSignIn}>Sign in to tap I’m lost</Button>
+      </div>
+    );
+  if (checkedIn === undefined) return <div className="lost" aria-busy="true" />;
+  if (!checkedIn)
+    return (
+      <div className="lost">
+        <p className="lost__note">Check in to answer, ask and join a team.</p>
+        <Link to="checkin/student" className="btn btn--secondary btn--block">Check in</Link>
+      </div>
+    );
+
+  async function tap() {
+    setBusy(true);
+    setError("");
+    try {
+      await toggle({ channel: CHANNEL, index });
+    } catch (e) {
+      setError(why(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  // Busy only while a tap is on its way. Before `mine` arrives (a moment after each slide change)
+  // the button shows as not pressed and still works: the server decides on or off, and `mine`
+  // updates the button.
+  return (
+    <div className="lost">
+      <Button variant="secondary" block className="lost__button" aria-pressed={mine === true} busy={busy} onClick={() => void tap()}>
+        {mine && <span aria-hidden="true">✓ </span>}I’m lost
+      </Button>
+      <p className="lost__note muted">
+        {mine
+          ? `You’re counted as lost on slide ${index + 1}. Tap again to undo.`
+          : "The professor sees how many people are lost on each slide. Your name isn’t shown."}
+      </p>
+      {error && <Status kind="error">{error}</Status>}
+    </div>
   );
 }
