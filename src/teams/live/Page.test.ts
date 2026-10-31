@@ -21,7 +21,7 @@ vi.mock("../../blocks/auth", () => ({ useGoogleUser: () => auth, SignedInAs: () 
 vi.mock("../../blocks/deck", () => ({ CHANNEL: "gdg", useDeckSlide: () => results["deck:current"] }));
 vi.mock("../checkin/Quiz", () => ({ QuizCard: () => "[quiz card]" }));
 vi.mock("../checkin/LateBanner", () => ({ default: () => "[late banner]" }));
-vi.mock("./PastQuestions", () => ({ default: () => "[past questions]" }));
+vi.mock("./PastQuestions", () => ({ default: () => "[past quizzes and votes]" }));
 vi.mock("./Questions", () => ({ default: () => "[questions]" }));
 vi.mock("../../blocks/ui", async (importOriginal) => {
   const { createElement } = await import("react");
@@ -145,7 +145,7 @@ describe("#/live, the student phone", () => {
     const html = open("#/live");
     expect(boundary(html, "The quiz")).toBe("[quiz card]");
     expect(boundary(html, "The team leaderboard")).toContain("<h2>Team leaderboard</h2>");
-    expect(boundary(html, "Past questions")).toBe("[past questions]");
+    expect(boundary(html, "Past quizzes and votes")).toBe("[past quizzes and votes]");
     expect(boundary(html, "Questions")).toBe("[questions]");
     expect(html).toContain('<div id="live-questions"><section data-boundary="Questions">');
     // The slide is outside every card's boundary, so a card that fails leaves it up.

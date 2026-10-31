@@ -1,5 +1,5 @@
 // @vitest-environment node
-// Past quizzes on #/live (PastQuestions.tsx), rendered to HTML with made-up rows from live.past
+// Past quizzes and votes on #/live (PastQuestions.tsx), rendered to HTML with made-up rows from live.past
 // (no backend).
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -36,10 +36,10 @@ function html(rows: Row[] | undefined) {
   return renderToStaticMarkup(createElement(PastQuestions)).replace(/<!-- -->/g, "");
 }
 
-// The line under each question, top to bottom: "Question 2 · You got it wrong".
+// The line under each question, top to bottom: "Quiz 2 · You got it wrong".
 const verdicts = (page: string) => [...page.matchAll(/<span class="past__verdict muted">([^<]*)<\/span>/g)].map((m) => m[1]);
 
-describe("Past quizzes on #/live", () => {
+describe("Past quizzes and votes on #/live", () => {
   it("F23.3 live-backend-12 live-frontend-10 rt-12 a quiz with no right answer says 'You picked B', never right or wrong; the other verdicts stay", () => {
     const page = html([
       row(5, { correct: null, mine: 1 }),
@@ -49,11 +49,11 @@ describe("Past quizzes on #/live", () => {
       row(1, { correct: 0, mine: 0 }),
     ]);
     expect(verdicts(page)).toEqual([
-      "Question 5 · You picked B",
-      "Question 4 · No answer",
-      "Question 3 · Vote",
-      "Question 2 · You got it wrong",
-      "Question 1 · You got it right",
+      "Quiz 4 · You picked B",
+      "Quiz 3 · No answer",
+      "Vote 1 · You picked C",
+      "Quiz 2 · You got it wrong",
+      "Quiz 1 · You got it right",
     ]);
     // The quiz with no right answer marks no choice right; the student's pick still shows.
     const first = page.slice(page.indexOf("Question text 5"), page.indexOf("Question text 4"));
@@ -61,13 +61,18 @@ describe("Past quizzes on #/live", () => {
     expect(first).toContain("Current (your pick)");
   });
 
-  it("F23.1 F23.4 the card is titled 'Past quizzes' while it loads, when it's empty and with rows", () => {
-    for (const rows of [undefined, [], [row(1, { mine: 0 })]]) {
+  it("F23.1 F23.4 QUI-risk-1 the card says 'quizzes and votes' while it loads, when it's empty and with rows, never 'question'", () => {
+    for (const rows of [undefined, [], [row(2, { kind: "vote", correct: null, mine: null }), row(1, { mine: 0 })]]) {
       const page = html(rows);
-      expect(page.startsWith('<section class="panel"><h2>Past quizzes</h2>')).toBe(true);
-      expect(page).not.toContain("Past questions");
+      expect(page.startsWith('<section class="panel"><h2>Past quizzes and votes</h2>')).toBe(true);
+      // "Question" names a student's post on the Questions card beside this one.
+      expect(page.replace(/Question text \d/g, "")).not.toMatch(/question/i);
     }
-    expect(html(undefined)).toContain("Loading past questions…");
-    expect(html([])).toContain("No questions have ended yet.");
+    expect(html(undefined)).toContain("Loading past quizzes and votes…");
+    expect(html([])).toContain("No quiz or vote has ended yet.");
+    expect(verdicts(html([row(2, { kind: "vote", correct: null, mine: null }), row(1, { mine: 0 })]))).toEqual([
+      "Vote 1 · No answer",
+      "Quiz 1 · You got it right",
+    ]);
   });
 });

@@ -4,7 +4,7 @@
 //     when the professor reaches or goes back past that slide, the same rule as #/portal. Under the
 //     slide: "I'm lost" for the slide on screen (convex/live/lost.ts), or what to do first: sign in
 //     (the button jumps to the sign-in form in the Questions card) or check in (a link to
-//     #/checkin/student). Beside it: the quiz, the team leaderboard, past questions and the
+//     #/checkin/student). Beside it: the quiz, the team leaderboard, past quizzes and votes, and the
 //     questions board, each in its own ErrorBoundary, so a card whose query fails shows its own
 //     error and the slide stays up.
 //   #/live/leaderboard: the team board on the projector.
@@ -112,7 +112,7 @@ export function LiveSlides({ pin = null }: { pin?: number | null }) {
           <ErrorBoundary label="The team leaderboard">
             <Leaderboard />
           </ErrorBoundary>
-          <ErrorBoundary label="Past questions">
+          <ErrorBoundary label="Past quizzes and votes">
             <PastQuestions />
           </ErrorBoundary>
           <div id={QUESTIONS_ID}>
