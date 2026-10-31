@@ -39,7 +39,7 @@ export const ask = mutation({
 
 // Everything asked, newest first. Hosts only: private questions and names are in here.
 export const list = query({
-  args: { key: v.optional(v.string()), channel: v.string() },
+  args: { channel: v.string() },
   returns: v.array(forHostShape),
   handler: async (ctx, { channel }) => {
     await requireProf(ctx);
@@ -71,7 +71,7 @@ export const shared = query({
 });
 
 export const setStatus = mutation({
-  args: { key: v.optional(v.string()), id: v.id("studentQuestions"), status: statusValidator },
+  args: { id: v.id("studentQuestions"), status: statusValidator },
   returns: v.null(),
   handler: async (ctx, { id, status }) => {
     await requireProf(ctx);
@@ -82,7 +82,7 @@ export const setStatus = mutation({
 
 // Type an answer. An empty answer removes it.
 export const answer = mutation({
-  args: { key: v.optional(v.string()), id: v.id("studentQuestions"), text: v.string() },
+  args: { id: v.id("studentQuestions"), text: v.string() },
   returns: v.null(),
   handler: async (ctx, { id, text }) => {
     await requireProf(ctx);
@@ -94,7 +94,7 @@ export const answer = mutation({
 
 // The professor approves (or takes back) showing a public question to the room.
 export const share = mutation({
-  args: { key: v.optional(v.string()), id: v.id("studentQuestions"), shared: v.boolean() },
+  args: { id: v.id("studentQuestions"), shared: v.boolean() },
   returns: v.null(),
   handler: async (ctx, { id, shared }) => {
     await requireProf(ctx);

@@ -1,5 +1,8 @@
-// #/checkin/kiosk: an iPad at the classroom door, hosts only. The front camera reads the QR
-// pass on each student's phone and checks them in. Works in Safari (jsQR) and Chrome.
+// #/checkin/kiosk: an iPad at the classroom door. The front camera reads the QR pass on each
+// student's phone and checks them in. Works in Safari (jsQR) and Chrome. DoorGate (prof.tsx)
+// opens it for a paired iPad, which scans with its device token, and for anyone on the staff list
+// who signs in; anyone else gets the pairing screen. A paired iPad can only scan, so this page
+// reads no names (checkin.read.names is for professors).
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -7,7 +10,7 @@ import { Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
 import { useCamera } from "../../blocks/camera";
 import { makeQrReader } from "./qrRead";
-import { ProfGate, useProfKey } from "./prof";
+import { DoorGate } from "./prof";
 
 function why(e: unknown) {
   const x = e as { data?: unknown };
@@ -15,7 +18,7 @@ function why(e: unknown) {
 }
 
 export default function Kiosk() {
-  return <ProfGate title="Check-in kiosk"><KioskScanner /></ProfGate>;
+  return <DoorGate>{(device) => <KioskScanner device={device} />}</DoorGate>;
 }
 
 type Result = { kind: "ok" | "again" | "error"; text: string };
@@ -29,10 +32,9 @@ async function frontCamera() {
   } catch { return undefined; }
 }
 
-function KioskScanner() {
+// device: the paired iPad's token, or undefined when someone on the staff list is signed in.
+function KioskScanner({ device }: { device: string | undefined }) {
   const count = useQuery(api.checkin.read.count, { channel: CHANNEL });
-  const key = useProfKey();
-  const names = useQuery(api.checkin.read.names, { channel: CHANNEL, key });
   const scan = useMutation(api.checkin.pass.scan);
   const cam = useCamera();
   const [read] = useState(makeQrReader);
@@ -45,7 +47,7 @@ function KioskScanner() {
     if (code === last.current.code && now - last.current.at < 4000) return;
     last.current = { code, at: now };
     try {
-      const r = await scan({ channel: CHANNEL, code, key });
+      const r = await scan({ channel: CHANNEL, code, device });
       setResult(r.already ? { kind: "again", text: r.name } : { kind: "ok", text: r.name });
     } catch (e) {
       setResult({ kind: "error", text: why(e) });
@@ -95,9 +97,6 @@ function KioskScanner() {
           {result?.kind === "error" && <p className="kiosk__error">{result.text}</p>}
         </div>
         <p className="kiosk__count"><span>{count ?? "…"}</span> checked in</p>
-        <ul className="kiosk__names">
-          {(names ?? []).slice(0, 8).map((n) => <li key={n.at + n.name}>{n.name}</li>)}
-        </ul>
         {cam.on && <button className="quiet kiosk__stop" onClick={cam.stop}>Stop camera</button>}
       </div>
     </main>

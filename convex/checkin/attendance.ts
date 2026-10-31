@@ -19,7 +19,7 @@ export const classStart = query({
 
 // A host sets the start time (ms) and how many minutes of grace before "late".
 export const setClassStart = mutation({
-  args: { key: v.optional(v.string()), channel: v.string(), startsAt: v.number(), graceMin: v.number() },
+  args: { channel: v.string(), startsAt: v.number(), graceMin: v.number() },
   returns: v.null(),
   handler: async (ctx, { channel, startsAt, graceMin }) => {
     await requireProf(ctx);
@@ -33,7 +33,7 @@ export const setClassStart = mutation({
 
 // Every check-in on this channel, first in first, with email and minutes late. Hosts only.
 export const sheet = query({
-  args: { key: v.optional(v.string()), channel: v.string() },
+  args: { channel: v.string() },
   returns: v.array(v.object({ name: v.string(), email: v.string(), at: v.number(), lateMin: v.union(v.null(), v.number()) })),
   handler: async (ctx, { channel }) => {
     await requireProf(ctx);

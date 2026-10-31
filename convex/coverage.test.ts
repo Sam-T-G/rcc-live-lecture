@@ -31,9 +31,9 @@ type Fn = { ref: string; hasKey: boolean; guarded: boolean; skipped: boolean };
 type Registered = { isQuery?: boolean; isMutation?: boolean; isAction?: boolean; isInternal?: boolean; exportArgs?: () => string };
 
 // Every query, mutation and action a Convex module exports, as `api.<module>.<name>` or
-// `internal.<module>.<name>`, whether its args include `key` (host-only functions still accept
-// one until ROLES-UI removes it), whether it calls a staff check, and whether its module is in
-// SKIP_MODULES.
+// `internal.<module>.<name>`, whether its args include `key` (none may: the "ROLES-UI no
+// function takes a key arg" test below), whether it calls a staff check, and whether its module
+// is in SKIP_MODULES.
 async function convexFunctions(): Promise<Fn[]> {
   const out: Fn[] = [];
   for (const [file, load] of Object.entries(modules)) {
@@ -294,6 +294,11 @@ describe("F39 every Convex function is tested", async () => {
     const checked = new Set(matrices.map(matrixCheck));
     const hostOnly = fns.filter((f) => f.ref.startsWith("api.") && (f.guarded || f.hasKey || ANSWERS.includes(f.ref)));
     expect(hostOnly.filter((f) => !checked.has(f.ref)).map((f) => f.ref)).toEqual([]);
+  });
+
+  it("ROLES-UI no function takes a key arg, convex/host/ included: the server reads who is calling from the sign-in (DECK_BRIDGE_KEY reaches POST /deck in the request body, not as an arg)", async () => {
+    expect(fns.some((f) => f.skipped)).toBe(true); // convex/host/ is in the list
+    expect(fns.filter((f) => f.hasKey).map((f) => f.ref)).toEqual([]);
   });
 
   it("F39.3 the staff-check scan finds the host-only functions in the real modules and leaves the open ones out", () => {

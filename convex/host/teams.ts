@@ -48,7 +48,7 @@ export async function reshuffleRoom(ctx: MutationCtx, channel: string, newDay: b
 
 // Mix everyone into new teams.
 export const reshuffle = mutation({
-  args: { key: v.optional(v.string()), channel: v.string() },
+  args: { channel: v.string() },
   returns: v.null(),
   handler: async (ctx, { channel }) => {
     await requireProf(ctx);

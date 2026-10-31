@@ -6,12 +6,10 @@ import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Card, Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
-import { useProfKey } from "../checkin/prof";
 import { Team, errorText } from "./Team";
 
 export function Missing() {
-  const key = useProfKey();
-  const rows = useQuery(api.host.board.missing, { key, channel: CHANNEL });
+  const rows = useQuery(api.host.board.missing, { channel: CHANNEL });
   const feedback = useAction(api.host.ai.feedback);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -21,7 +19,7 @@ export function Missing() {
     setBusy(true);
     setError("");
     try {
-      setNote(await feedback({ key, channel: CHANNEL }));
+      setNote(await feedback({ channel: CHANNEL }));
     } catch (e) {
       setError(errorText(e));
     } finally {

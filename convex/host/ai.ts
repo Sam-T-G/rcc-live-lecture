@@ -11,7 +11,7 @@ const draftShape = v.object({ text: v.string(), choices: v.array(v.string()), co
 // Drafts one multiple-choice question about the slide the deck is on. The professor edits it
 // before opening it.
 export const draftQuestion = action({
-  args: { key: v.optional(v.string()), channel: v.string() },
+  args: { channel: v.string() },
   returns: draftShape,
   handler: async (ctx, { channel }): Promise<Draft> => {
     await ctx.runQuery(api.host.questions.forHost, { channel }); // throws unless the caller is a host
@@ -41,7 +41,7 @@ export const draftQuestion = action({
 
 // Two or three plain sentences on how the room did on the newest question.
 export const feedback = action({
-  args: { key: v.optional(v.string()), channel: v.string() },
+  args: { channel: v.string() },
   returns: v.string(),
   handler: async (ctx, { channel }): Promise<string> => {
     const q = await ctx.runQuery(api.host.questions.forHost, { channel }); // host only
@@ -63,7 +63,7 @@ export const feedback = action({
 // Only the question text goes to Gemini, with a number in place of each student. The professor
 // sees the result and decides what to keep; nothing reaches students from here.
 export const organize = action({
-  args: { key: v.optional(v.string()), channel: v.string() },
+  args: { channel: v.string() },
   returns: v.number(),
   handler: async (ctx, { channel }): Promise<number> => {
     const all = await ctx.runQuery(api.host.qa.list, { channel }); // host only

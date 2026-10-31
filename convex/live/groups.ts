@@ -142,7 +142,7 @@ export const status = query({
 // A professor or admin picks 3 or 4 students per team. Before the lock, students already on
 // a team keep it; after the lock, everyone is re-dealt to match the new size.
 export const setSize = mutation({
-  args: { key: v.optional(v.string()), channel: v.string(), size: v.number() },
+  args: { channel: v.string(), size: v.number() },
   returns: v.null(),
   handler: async (ctx, { channel, size }) => {
     await requireProf(ctx);

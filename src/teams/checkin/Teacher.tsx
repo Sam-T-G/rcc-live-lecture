@@ -1,6 +1,6 @@
-// #/checkin/teacher: the professor's laptop, behind the professor key. The camera reads students'
-// passes, the page lists who has checked in, and the professor sets when class starts and
-// downloads the attendance sheet.
+// #/checkin/teacher: the professor's laptop, for professors and admins on the staff list
+// (StaffGate). The camera reads students' passes, the page lists who has checked in, and the
+// professor sets when class starts and downloads the attendance sheet.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -8,17 +8,16 @@ import { Link } from "../../blocks/router";
 import { Big, Card, Screen, Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
 import { useCamera } from "../../blocks/camera";
-import { ProfGate, useProfKey } from "./prof";
+import { StaffGate } from "./prof";
 import { clock, why } from "./util";
 
 export function Teacher() {
-  return <ProfGate title="Teacher check-in"><Scanner /></ProfGate>;
+  return <StaffGate title="Teacher check-in"><Scanner /></StaffGate>;
 }
 
 // The host sets when class starts and the grace minutes. Check-ins after that are late.
 export function ClassStart() {
   const start = useQuery(api.checkin.attendance.classStart, { channel: CHANNEL });
-  const key = useProfKey();
   const set = useMutation(api.checkin.attendance.setClassStart);
   const [time, setTime] = useState("14:30");
   const [grace, setGrace] = useState("5");
@@ -29,7 +28,7 @@ export function ClassStart() {
     const [h, m] = time.split(":").map(Number);
     const d = new Date();
     d.setHours(h, m, 0, 0);
-    set({ channel: CHANNEL, key, startsAt: d.getTime(), graceMin: Number(grace) || 0 }).then(() => setErr("")).catch((x) => setErr(why(x)));
+    set({ channel: CHANNEL, startsAt: d.getTime(), graceMin: Number(grace) || 0 }).then(() => setErr("")).catch((x) => setErr(why(x)));
   }
 
   return (
@@ -47,8 +46,7 @@ export function ClassStart() {
 
 // The attendance sheet for the professor: name, email, time in, minutes late.
 export function Download() {
-  const key = useProfKey();
-  const sheet = useQuery(api.checkin.attendance.sheet, { channel: CHANNEL, key });
+  const sheet = useQuery(api.checkin.attendance.sheet, { channel: CHANNEL });
   if (!sheet) return null;
   function save() {
     const cell = (x: string) => `"${x.replace(/"/g, '""')}"`;
@@ -81,8 +79,7 @@ function makeDetector(): Detector | null {
 
 export function Scanner() {
   const count = useQuery(api.checkin.read.count, { channel: CHANNEL });
-  const key = useProfKey();
-  const names = useQuery(api.checkin.read.names, { channel: CHANNEL, key });
+  const names = useQuery(api.checkin.read.names, { channel: CHANNEL });
   const scan = useMutation(api.checkin.pass.scan);
   const cam = useCamera();
   const [detector] = useState(makeDetector);
@@ -96,7 +93,7 @@ export function Scanner() {
     if (code === last.current.code && now - last.current.at < 4000) return;
     last.current = { code, at: now };
     try {
-      setResult({ ok: true, ...(await scan({ channel: CHANNEL, code, key })) });
+      setResult({ ok: true, ...(await scan({ channel: CHANNEL, code })) });
     } catch (e) {
       setResult({ ok: false, text: why(e) });
     }

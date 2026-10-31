@@ -13,7 +13,6 @@ vi.mock("convex/react", () => ({
   useMutation: () => async () => null,
 }));
 vi.mock("../../blocks/auth", () => ({ useGoogleUser: () => ({ user: null }) }));
-vi.mock("../checkin/prof", () => ({ useProfKey: () => undefined }));
 vi.mock("../../blocks/deck", () => ({ CHANNEL: "gdg", useDeckSlide: () => null }));
 vi.mock("../checkin/Quiz", () => ({ QuizCard: () => "[quiz card]" }));
 vi.mock("./PastQuestions", () => ({ default: () => "[past questions]" }));

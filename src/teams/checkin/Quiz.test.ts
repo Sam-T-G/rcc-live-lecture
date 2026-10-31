@@ -18,8 +18,7 @@ vi.mock("convex/react", () => ({
   useMutation: () => async () => null,
 }));
 vi.mock("./prof", () => ({
-  ProfGate: ({ children }: { children: unknown }) => children,
-  useProfKey: () => undefined,
+  StaffGate: ({ children }: { children: unknown }) => children,
 }));
 
 describe("#/checkin/quiz, ended quiz", () => {

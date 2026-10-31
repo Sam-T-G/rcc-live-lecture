@@ -6,7 +6,7 @@ import { TEAMS, saltFor, teamOf, teamValidator } from "./teams";
 
 // Opens a question on a slide and closes any that was open. Hosts only.
 export const open = mutation({
-  args: { key: v.optional(v.string()), channel: v.string(), index: v.number(), text: v.string(), choices: v.array(v.string()), correct: v.number(), points: v.optional(v.number()) },
+  args: { channel: v.string(), index: v.number(), text: v.string(), choices: v.array(v.string()), correct: v.number(), points: v.optional(v.number()) },
   returns: v.id("quizQuestions"),
   handler: async (ctx, { channel, index, text, choices, correct, points = 10 }) => {
     await requireProf(ctx);
@@ -21,7 +21,7 @@ export const open = mutation({
 });
 
 export const close = mutation({
-  args: { key: v.optional(v.string()), questionId: v.id("quizQuestions") },
+  args: { questionId: v.id("quizQuestions") },
   returns: v.null(),
   handler: async (ctx, { questionId }) => {
     await requireProf(ctx);
@@ -43,7 +43,7 @@ export const current = query({
 
 // The professor's view of the newest question: who picked what, and how each team did.
 export const forHost = query({
-  args: { key: v.optional(v.string()), channel: v.string() },
+  args: { channel: v.string() },
   returns: v.union(
     v.object({
       _id: v.id("quizQuestions"),

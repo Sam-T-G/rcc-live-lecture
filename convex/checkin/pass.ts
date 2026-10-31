@@ -11,17 +11,17 @@ const EVERY = 20_000; // ms between codes
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no look-alikes, so a teacher can type one
 
 // Whether the signed-in person can open the professor pages: a professor or admin on the staff
-// list (checkin/prof.ts). `key` is ignored; the professor pages still send it.
+// list (checkin/prof.ts).
 export const amHost = query({
-  args: { key: v.optional(v.string()) },
+  args: {},
   returns: v.boolean(),
   handler: async (ctx) => isProf(await staffRole(ctx)),
 });
 
 // Whether this device can scan passes at the door: a paired door iPad (its device token), or
-// anyone signed in with a role (scanner, professor, admin). `key` is ignored.
+// anyone signed in with a role (scanner, professor, admin).
 export const canScan = query({
-  args: { key: v.optional(v.string()), device: v.optional(v.string()) },
+  args: { device: v.optional(v.string()) },
   returns: v.boolean(),
   handler: async (ctx, { device }) => {
     if (await pairedDevice(ctx, device)) return true;
@@ -61,9 +61,9 @@ export const refresh = mutation({
 });
 
 // The teacher or the door iPad scans (or types) a pass code. Checks the student in on this
-// channel once. A paired iPad passes its device token as `device`; `key` is ignored.
+// channel once. A paired iPad passes its device token as `device`.
 export const scan = mutation({
-  args: { key: v.optional(v.string()), device: v.optional(v.string()), channel: v.string(), code: v.string() },
+  args: { device: v.optional(v.string()), channel: v.string(), code: v.string() },
   returns: v.object({ name: v.string(), email: v.string(), already: v.boolean() }),
   handler: async (ctx, { device, channel, code }) => {
     const iPad = await requireScanner(ctx, device);

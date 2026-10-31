@@ -4,7 +4,6 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Card, Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
-import { useProfKey } from "../checkin/prof";
 import { TEAMS, Team, errorText } from "./Team";
 import type { TeamName } from "./Team";
 
@@ -23,8 +22,7 @@ export function PointsTab() {
 
 // Tap a team to show only its students. Tap it again to show everyone.
 export function TeamBoard({ team, onTeam }: { team: Pick; onTeam: (t: Pick) => void }) {
-  const key = useProfKey();
-  const teams = useQuery(api.host.board.teams, { key, channel: CHANNEL });
+  const teams = useQuery(api.host.board.teams, { channel: CHANNEL });
   const reshuffle = useMutation(api.host.teams.reshuffle);
   const endDay = useMutation(api.host.points.endDay);
   const [message, setMessage] = useState("");
@@ -32,7 +30,7 @@ export function TeamBoard({ team, onTeam }: { team: Pick; onTeam: (t: Pick) => v
   async function end() {
     if (!window.confirm("End the day? The winning team gets extra credit and everyone is mixed into new teams.")) return;
     try {
-      setMessage(await endDay({ key, channel: CHANNEL }));
+      setMessage(await endDay({ channel: CHANNEL }));
     } catch (e) {
       setMessage(errorText(e));
     }
@@ -56,7 +54,7 @@ export function TeamBoard({ team, onTeam }: { team: Pick; onTeam: (t: Pick) => v
       )}
       <div className="row">
         <button className="host-main" onClick={end}>End day</button>
-        <button className="host-quiet" onClick={() => { if (window.confirm("Mix everyone into new teams?")) void reshuffle({ key, channel: CHANNEL }); }}>Mix the teams</button>
+        <button className="host-quiet" onClick={() => { if (window.confirm("Mix everyone into new teams?")) void reshuffle({ channel: CHANNEL }); }}>Mix the teams</button>
       </div>
       {message && <Status kind="empty">{message}</Status>}
     </Card>
@@ -65,8 +63,7 @@ export function TeamBoard({ team, onTeam }: { team: Pick; onTeam: (t: Pick) => v
 
 // Every student with their points. Tap -1 or -5 to take points off; each one is kept as an event.
 export function Roster({ team, onTeam }: { team: Pick; onTeam: (t: Pick) => void }) {
-  const key = useProfKey();
-  const rows = useQuery(api.host.board.students, { key, channel: CHANNEL });
+  const rows = useQuery(api.host.board.students, { channel: CHANNEL });
   const adjust = useMutation(api.host.points.adjust);
   const ranked = rows?.map((r, i) => ({ ...r, rank: i + 1 }));
   const shown = ranked?.filter((r) => team === "all" || r.team === team);
@@ -89,7 +86,7 @@ export function Roster({ team, onTeam }: { team: Pick; onTeam: (t: Pick) => void
                 <td className="host-rank">{r.rank}</td><td>{r.name}</td><td><Team name={r.team} /></td><td>{r.today}</td><td>{r.total}</td>
                 <td className="host-act">
                   {[1, 5].map((n) => (
-                    <button key={n} className="host-small host-quiet" aria-label={`Take ${n} off ${r.name}`} onClick={() => void adjust({ key, channel: CHANNEL, user: r.user, name: r.name, delta: -n })}>-{n}</button>
+                    <button key={n} className="host-small host-quiet" aria-label={`Take ${n} off ${r.name}`} onClick={() => void adjust({ channel: CHANNEL, user: r.user, name: r.name, delta: -n })}>-{n}</button>
                   ))}
                 </td>
               </tr>

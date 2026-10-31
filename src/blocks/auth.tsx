@@ -1,7 +1,12 @@
-// Block: Google sign-in. Google Identity Services gives the browser an ID token; Convex
-// checks it (convex/auth.config.ts). Wrap the app in <AuthProvider>, put <SignInButton/>
-// where people sign in, and read the user server-side with ctx.auth.getUserIdentity().
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+// Block: sign-in. Google Identity Services gives the browser an ID token; Convex checks it
+// (convex/auth.config.ts). Wrap the app in <AuthProvider>, put <SignInButton/> where people sign
+// in, and read the user server-side with ctx.auth.getUserIdentity().
+// <SignInButton/> shows Google's button with the typed sign-in (any name and email) under it;
+// <GoogleButton/> is Google's button on its own. Show either one only to someone signed out:
+// Convex keeps using the token it has until it refreshes it, so a new sign-in on top of a live
+// one reaches the server only after a reload. Staff roles count only for a Google sign-in on
+// prod (convex/checkin/prof.ts).
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 
 export const GOOGLE_CLIENT_ID = "954308885597-kmeh8q5gajj5mh2vhnkgtgfd89e8son4.apps.googleusercontent.com";
@@ -46,7 +51,15 @@ function loadGsi() {
   return gsiPromise;
 }
 
-type AuthState = { user: Stored | null; ready: boolean; signOut: () => void; renderButton: (el: HTMLElement) => void; signInWithToken: (token: string) => void };
+// failed: Google's script didn't load (offline, or blocked), so its button can't show.
+type AuthState = {
+  user: Stored | null;
+  ready: boolean;
+  failed: boolean;
+  signOut: () => void;
+  renderButton: (el: HTMLElement) => void;
+  signInWithToken: (token: string) => void;
+};
 const AuthContext = createContext<AuthState | null>(null);
 
 export function useGoogleUser() {
@@ -58,6 +71,7 @@ export function useGoogleUser() {
 export function AuthProvider({ client, children }: { client: ConvexReactClient; children: ReactNode }) {
   const [user, setUser] = useState<Stored | null>(load);
   const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     loadGsi()
@@ -77,7 +91,10 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
         });
         setReady(true);
       })
-      .catch(() => setReady(true));
+      .catch(() => {
+        setFailed(true);
+        setReady(true);
+      });
   }, []);
 
   // ID tokens last an hour. When one runs out, drop it so the page asks again.
@@ -109,7 +126,10 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
     setUser(s);
   }, []);
 
-  const value = useMemo(() => ({ user, ready, signOut, renderButton, signInWithToken }), [user, ready, signOut, renderButton, signInWithToken]);
+  const value = useMemo(
+    () => ({ user, ready, failed, signOut, renderButton, signInWithToken }),
+    [user, ready, failed, signOut, renderButton, signInWithToken],
+  );
 
   return (
     <AuthContext.Provider value={value}>
@@ -127,10 +147,31 @@ function useConvexAuth() {
   return { isLoading: false, isAuthenticated: !!u, fetchAccessToken };
 }
 
-// Students type a name and email; no Google. (Google sign-in is still wired in
-// AuthProvider for anyone already signed in, but no button shows it.)
+// Google's "Continue with Google" button. Google's script draws it into this box once
+// AuthProvider has loaded it; the box keeps the button's height meanwhile, so nothing under it
+// jumps.
+export function GoogleButton() {
+  const { renderButton, ready, failed } = useGoogleUser();
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (box.current) renderButton(box.current);
+  }, [renderButton]);
+  return (
+    <div>
+      <div ref={box} aria-busy={!ready} style={{ minHeight: 44 }} />
+      {failed && <p className="muted">Google sign-in didn’t load. Check the connection, then reload the page.</p>}
+    </div>
+  );
+}
+
+// Everyone signs in here: Google's button, with the typed sign-in (a name and an email) under it.
 export function SignInButton() {
-  return <TestSignIn />;
+  return (
+    <div>
+      <GoogleButton />
+      <TestSignIn />
+    </div>
+  );
 }
 
 // Who this browser is signed in as, so a student who typed the wrong email or picked up a
@@ -149,7 +190,8 @@ export function SignedInAs() {
   );
 }
 
-// Typed sign-in: any name and email (convex/auth.config.ts). Never a host (convex/lib.ts).
+// Typed sign-in: any name and email (convex/auth.config.ts). Anyone can type any email, so a
+// typed sign-in holds a staff role only on a dev backend (convex/checkin/prof.ts).
 function TestSignIn() {
   const { signInWithToken } = useGoogleUser();
   const [name, setName] = useState("");
@@ -166,7 +208,7 @@ function TestSignIn() {
   }
   return (
     <form onSubmit={go} style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16, alignItems: "center" }}>
-      <strong style={{ width: "100%" }}>Sign in</strong>
+      <strong style={{ width: "100%" }}>Or type your name and email</strong>
       <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Your name" placeholder="Your name" required autoComplete="name" />
       <input value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Your email" placeholder="Your email" type="email" required autoComplete="email" />
       <button type="submit">Sign in</button>

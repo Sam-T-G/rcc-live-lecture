@@ -1,6 +1,5 @@
 // @vitest-environment node
-// #/host (Page.tsx), rendered with every Convex query still loading and the professor key gate
-// open. Each card file (AskRoom, Missing, Boards, QA) is swapped for a stand-in that prints its
+// #/host (Page.tsx), rendered with every Convex query still loading and the staff gate open. Each card file (AskRoom, Missing, Boards, QA) is swapped for a stand-in that prints its
 // name, and ErrorBoundary for a <section> that carries its label, so the test checks only what
 // Page.tsx decides: the header link, the tab buttons, and which panel each tab shows inside which
 // boundary. The cards' own headings belong to the files that own those cards.
@@ -10,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import HostPage, { Dashboard, type Tab } from "./Page";
 
 vi.mock("convex/react", () => ({ useQuery: () => undefined }));
-vi.mock("../checkin/prof", () => ({ ProfGate: ({ children }: { children: ReactNode }) => children, useProfKey: () => undefined }));
+vi.mock("../checkin/prof", () => ({ StaffGate: ({ children }: { children: ReactNode }) => children }));
 vi.mock("./AskRoom", () => ({ default: () => "[ask the room]" }));
 vi.mock("./Missing", () => ({ Missing: () => "[who is missing it]" }));
 vi.mock("./Boards", () => ({ PointsTab: () => "[points tab]" }));

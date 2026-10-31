@@ -23,8 +23,9 @@
 //
 // Every host-only function calls requireProf(ctx) first (requireAdmin(ctx) for the staff list),
 // in queries, mutations and actions alike. Keys open nothing: PROFESSOR_KEY, KIOSK_KEY and
-// HOST_EMAILS are never read here. Until the professor pages stop sending it, a host-only
-// function still accepts `key: v.optional(v.string())` and ignores it.
+// HOST_EMAILS are never read here, and no function takes a `key` arg (convex/coverage.test.ts
+// fails when one does). DECK_BRIDGE_KEY is the only key left: it lets the deck post slides to
+// POST /deck (convex/http.ts), and it opens no page.
 import { ConvexError, type Infer } from "convex/values";
 import { api } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";

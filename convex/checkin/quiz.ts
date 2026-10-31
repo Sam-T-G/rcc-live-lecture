@@ -58,7 +58,7 @@ export const mine = query({
 
 // A host asks a new question (a quiz, or a vote with no right answer). Any question still open on the channel closes first.
 export const ask = mutation({
-  args: { key: v.optional(v.string()), channel: v.string(), kind, question: v.string(), choices: v.array(v.string()), correct: v.optional(v.number()) },
+  args: { channel: v.string(), kind, question: v.string(), choices: v.array(v.string()), correct: v.optional(v.number()) },
   returns: v.id("polls"),
   handler: async (ctx, { channel, kind, question, choices, correct }) => {
     await requireProf(ctx);
@@ -77,7 +77,7 @@ export const ask = mutation({
 
 // A host ends the question. Answers stop and results show on every phone.
 export const end = mutation({
-  args: { key: v.optional(v.string()), poll: v.id("polls") },
+  args: { poll: v.id("polls") },
   returns: v.null(),
   handler: async (ctx, { poll }) => {
     await requireProf(ctx);
@@ -113,7 +113,7 @@ export const answer = mutation({
 
 // The professor's numbers for one poll, live while it's open. Hosts only.
 export const stats = query({
-  args: { key: v.optional(v.string()), poll: v.id("polls") },
+  args: { poll: v.id("polls") },
   returns: v.union(
     v.null(),
     v.object({
@@ -146,7 +146,7 @@ export const stats = query({
 
 // Every question asked on the channel, newest first, with how many got it right. Hosts only.
 export const history = query({
-  args: { key: v.optional(v.string()), channel: v.string() },
+  args: { channel: v.string() },
   returns: v.array(v.object({ id: v.id("polls"), kind, question: v.string(), answered: v.number(), rightPct: v.union(v.null(), v.number()) })),
   handler: async (ctx, { channel }) => {
     await requireProf(ctx);

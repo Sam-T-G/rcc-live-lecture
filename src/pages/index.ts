@@ -11,6 +11,8 @@ import PortalPage from "../portal/Page";
 
 // #/ui loads only when someone opens it, so phones on other pages never download the gallery.
 const UIKit = lazy(() => import("./UIKit"));
+// #/admin too: only staff open it, on a laptop.
+const Admin = lazy(() => import("./Admin"));
 
 export const pages: Record<string, ComponentType> = {
   "": Home,
@@ -20,4 +22,5 @@ export const pages: Record<string, ComponentType> = {
   host: HostPage, // #/host
   portal: PortalPage, // #/portal, #/portal?channel=<name>
   ui: () => createElement(Suspense, null, createElement(UIKit)), // #/ui (every color and kit part, light and dark), #/ui/projector
+  admin: () => createElement(Suspense, null, createElement(Admin)), // #/admin: the staff list and the door iPads
 };

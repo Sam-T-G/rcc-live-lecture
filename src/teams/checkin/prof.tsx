@@ -1,53 +1,256 @@
-// The professor key on the client. The professor types it once; this browser saves it in
-// localStorage and sends it as `key` with every host-only call, so the professor pages work
-// without Google sign-in. Nothing is saved until someone types a key.
-// <ProfGate> shows its children to a Google host or to anyone whose saved key works.
-import { useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
-import { useQuery } from "convex/react";
+// Who may use the professor pages and the door scanner, on the client. The server checks every
+// call (convex/checkin/prof.ts, convex/staff.ts); these parts only pick what a page shows. No page
+// sends a key: the server reads who is calling from their sign-in.
+//   useStaff()   the signed-in person: undefined while loading, null when signed out, else
+//                { email, role, canHoldRole } from api.staff.me (role: "admin", "professor",
+//                "scanner" or null).
+//   <StaffGate title="Live quiz">...</StaffGate>   the page, for professors and admins. Anyone
+//                else sees how to sign in, or why their sign-in doesn't open it.
+//   <DoorGate>{(device) => <Scanner device={device} />}</DoorGate>   #/checkin/kiosk. Staff who
+//                are signed in (any role) scan as themselves (device is undefined); a paired iPad
+//                scans with its device token; anyone else gets the pairing screen.
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
-import { Card, Screen, Status } from "../../blocks/ui";
+import { SignInButton, useGoogleUser } from "../../blocks/auth";
+import { Button } from "../../blocks/kit";
+import { Big, Card, Screen, Status } from "../../blocks/ui";
+import { clock, why } from "./util";
 
-const STORE = "rcc-live:prof-key";
-const listeners = new Set<() => void>();
+export type StaffMe = FunctionReturnType<typeof api.staff.me>;
+export type Role = NonNullable<StaffMe>["role"];
 
-function read(): string | undefined {
-  try { return localStorage.getItem(STORE) || undefined; } catch { return undefined; }
-}
-export function setProfKey(key: string | null) {
-  try { if (key) localStorage.setItem(STORE, key); else localStorage.removeItem(STORE); } catch { /* private mode: key lasts until reload */ }
-  listeners.forEach((l) => l());
-}
-function subscribe(l: () => void) {
-  listeners.add(l);
-  return () => listeners.delete(l);
-}
+// Professors and admins: who the professor pages open for.
+const isProfRole = (role: Role | undefined) => role === "professor" || role === "admin";
 
-// The saved key, or undefined when none is saved. Pass it as `key` to every host-only function.
-export function useProfKey(): string | undefined {
-  return useSyncExternalStore(subscribe, read);
+// The signed-in person as the server's staff checks see them. It waits for Convex to accept the
+// sign-in first, so a page never shows the signed-out screen for a moment before the real one.
+export function useStaff(): StaffMe | undefined {
+  const { isLoading } = useConvexAuth();
+  const me = useQuery(api.staff.me, isLoading ? "skip" : {});
+  return isLoading ? undefined : me;
 }
 
-export function ProfGate({ title, children }: { title: string; children: ReactNode }) {
-  const key = useProfKey();
-  const host = useQuery(api.checkin.pass.amHost, { key });
-  const [typed, setTyped] = useState("");
+// What a staff page shows to someone it doesn't open for, and how they get in. A typed sign-in
+// that can't hold a role (on prod) gets Sign out, which brings back the Google button: Convex
+// keeps using the token it has until it refreshes it, so a Google sign-in made on top of a typed
+// one wouldn't reach the server before a reload.
+export function NotStaff({ me }: { me: StaffMe }) {
+  const { signOut } = useGoogleUser();
+  if (me === null)
+    return (
+      <>
+        <p>Sign in with the Google account your admin added.</p>
+        <SignInButton />
+      </>
+    );
+  if (!me.canHoldRole)
+    return (
+      <>
+        <p>Staff sign in with Google, so the app can check that {me.email} is yours. Sign out, then sign in with Google.</p>
+        <p>
+          <Button variant="secondary" onClick={signOut}>Sign out</Button>
+        </p>
+      </>
+    );
+  return (
+    <>
+      <p>
+        {me.role === "scanner"
+          ? `${me.email} is on the staff list as a scanner, so you can scan passes at the door but can't open this page. Ask an admin to make you a professor on #/admin.`
+          : `${me.email} isn't on the staff list. Ask an admin to add you on #/admin.`}
+      </p>
+      <p>
+        <Button variant="secondary" onClick={signOut}>Sign out</Button>
+      </p>
+    </>
+  );
+}
 
-  if (host) return <>{children}</>;
-  if (host === undefined) return <Screen title={title} wide><Status kind="loading">Checking…</Status></Screen>;
-
-  function save(e: FormEvent) {
-    e.preventDefault();
-    if (typed.trim()) setProfKey(typed.trim());
-    setTyped("");
-  }
+// A professor page: its children for professors and admins, the sign-in or the reason for
+// everyone else, under the page's title.
+export function StaffGate({ title, children }: { title: string; children: ReactNode }) {
+  const me = useStaff();
+  if (me && isProfRole(me.role)) return <>{children}</>;
   return (
     <Screen title={title} wide>
-      <Card title="Professor key">
-        <form className="row" onSubmit={save}>
-          <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Professor key" aria-label="Professor key" autoCapitalize="none" autoComplete="off" />
-          <button type="submit">Open</button>
-        </form>
-        {key && <Status kind="error">That key didn’t work.</Status>}
+      {me === undefined ? <Status kind="loading">Checking who is signed in…</Status> : <NotStaff me={me} />}
+    </Screen>
+  );
+}
+
+// ---------- The door iPad ----------
+// A door iPad doesn't sign in. The first time it opens #/checkin/kiosk it makes a device token
+// (32 random bytes from crypto.getRandomValues, as 64 lower-case hex characters) and keeps it in
+// localStorage, so a reload keeps its pairing. It asks the server for a 6-digit code; a professor
+// or admin types that code on #/admin, and the iPad's status query flips to paired. The server
+// keeps only the token's SHA-256. Unpairing on #/admin stops the token at once and brings this
+// screen back.
+
+const DEVICE = "rcc-live:door-device";
+const TOKEN = /^[0-9a-f]{64}$/;
+const deviceListeners = new Set<() => void>();
+let unsaved: string | undefined; // the token when localStorage is off: it lasts until a reload
+
+// This browser's device token, or undefined before it has one.
+export function readDeviceToken(): string | undefined {
+  try {
+    const saved = localStorage.getItem(DEVICE);
+    if (saved && TOKEN.test(saved)) return saved;
+  } catch {
+    /* localStorage is off: use the one in memory */
+  }
+  return unsaved;
+}
+
+// Makes this browser's device token and saves it. Returns it.
+export function newDeviceToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const token = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  unsaved = token;
+  try {
+    localStorage.setItem(DEVICE, token);
+  } catch {
+    /* localStorage is off: kept in memory until a reload */
+  }
+  deviceListeners.forEach((l) => l());
+  return token;
+}
+
+function subscribeDevice(l: () => void) {
+  deviceListeners.add(l);
+  return () => deviceListeners.delete(l);
+}
+
+function useDeviceToken() {
+  return useSyncExternalStore(subscribeDevice, readDeviceToken, readDeviceToken);
+}
+
+export function DoorGate({ children }: { children: (device: string | undefined) => ReactNode }) {
+  const me = useStaff();
+  const token = useDeviceToken();
+  const status = useQuery(api.staff.deviceStatus, token ? { token } : "skip");
+  useEffect(() => {
+    if (!token) newDeviceToken();
+  }, [token]);
+
+  if (token && status?.status === "paired") return <>{children(token)}</>;
+  if (me?.role) return <>{children(undefined)}</>;
+  // (status can't be "paired" here; saying so lets TypeScript narrow it for PairScreen.)
+  if (me === undefined || !token || status === undefined || status.status === "paired")
+    return (
+      <Screen title="Check-in kiosk" wide>
+        <Status kind="loading">Checking this iPad…</Status>
+      </Screen>
+    );
+  return <PairScreen me={me} token={token} status={status} />;
+}
+
+type Code = { code: string; expiresAt: number };
+type Unpaired = { status: "none" } | ({ status: "waiting" } & Code);
+
+// "482913" as "482 913", easier to read across a room. #/admin ignores the space.
+const spaced = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
+
+// True once `at` has passed. Renders again at that moment.
+function usePassed(at: number | undefined) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (at === undefined) return;
+    const wait = at - Date.now();
+    if (wait <= 0) {
+      setNow(Date.now());
+      return;
+    }
+    const t = setTimeout(() => setNow(Date.now()), wait);
+    return () => clearTimeout(t);
+  }, [at]);
+  return at !== undefined && at <= now;
+}
+
+// A code that's gone from the server this long before its time ended early: the server ends the
+// oldest of its 200 open codes to make room for a new request (convex/staff.ts requestPairing).
+const ENDED_EARLY_MS = 5_000;
+
+// The pairing screen, shown from the status query (api.staff.deviceStatus). It asks for a code
+// when it opens, unless this iPad is waiting on one already (a reload shows the same code). A code
+// the server ends early is replaced at once. A code that runs its 10 minutes waits for a press on
+// "Get a new code", so a tab left open somewhere doesn't keep making codes.
+export function PairScreen({ me, token, status }: { me: StaffMe; token: string; status: Unpaired }) {
+  const request = useMutation(api.staff.requestPairing);
+  const [phase, setPhase] = useState<"asking" | "showing" | "expired" | "error">(status.status === "waiting" ? "showing" : "asking");
+  const [error, setError] = useState("");
+  const shown = useRef<Code | null>(status.status === "waiting" ? status : null);
+  const asked = useRef(false);
+
+  // The code comes back through the status query, as does "paired" (then DoorGate opens the scanner).
+  const ask = useCallback(async () => {
+    setPhase("asking");
+    setError("");
+    try {
+      await request({ token });
+    } catch (e) {
+      setError(why(e));
+      setPhase("error");
+    }
+  }, [request, token]);
+
+  useEffect(() => {
+    if (asked.current) return;
+    asked.current = true;
+    if (status.status !== "waiting") void ask();
+  }, [ask, status.status]);
+
+  useEffect(() => {
+    if (status.status === "waiting") {
+      shown.current = status;
+      setPhase("showing");
+    } else if (phase === "showing") {
+      const last = shown.current;
+      if (last && Date.now() < last.expiresAt - ENDED_EARLY_MS) void ask();
+      else setPhase("expired");
+    }
+  }, [status, phase, ask]);
+
+  const expired = usePassed(status.status === "waiting" ? status.expiresAt : undefined);
+  const live = status.status === "waiting" && !expired ? status : null;
+
+  return (
+    <Screen title="Pair this iPad" wide>
+      {live ? (
+        <>
+          <Big value={spaced(live.code)} label="pairing code" />
+          <p>A professor or admin types this code on #/admin, under Pair a door iPad. Then this iPad scans passes.</p>
+          <p className="muted">The code works until {clock(live.expiresAt)}.</p>
+        </>
+      ) : phase === "error" ? (
+        <>
+          <Status kind="error">{error}</Status>
+          <p>
+            <Button onClick={() => void ask()}>Try again</Button>
+          </p>
+        </>
+      ) : phase === "expired" || (phase === "showing" && status.status === "waiting") ? (
+        <>
+          <p>The code expired.</p>
+          <p>
+            <Button onClick={() => void ask()}>Get a new code</Button>
+          </p>
+        </>
+      ) : (
+        <Status kind="loading">Getting a code…</Status>
+      )}
+      <Card title="Or sign in">
+        {me === null ? (
+          <>
+            <p>Scanners, professors and admins can sign in here instead of pairing.</p>
+            <SignInButton />
+          </>
+        ) : (
+          <NotStaff me={me} />
+        )}
       </Card>
     </Screen>
   );

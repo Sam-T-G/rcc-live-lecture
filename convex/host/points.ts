@@ -9,7 +9,7 @@ const EXTRA_CREDIT = 1; // each student on the winning team
 
 // Take points off (or give some back). The reason is kept so a change can be undone.
 export const adjust = mutation({
-  args: { key: v.optional(v.string()), channel: v.string(), user: v.string(), name: v.string(), delta: v.number(), reason: v.optional(v.string()) },
+  args: { channel: v.string(), user: v.string(), name: v.string(), delta: v.number(), reason: v.optional(v.string()) },
   returns: v.null(),
   handler: async (ctx, { channel, user, name, delta, reason }) => {
     await requireProf(ctx);
@@ -22,7 +22,7 @@ export const adjust = mutation({
 // The team with the most points today wins; every student on it gets extra credit. Then the
 // day resets and everyone is mixed into new teams. A tie awards nothing and changes nothing.
 export const endDay = mutation({
-  args: { key: v.optional(v.string()), channel: v.string() },
+  args: { channel: v.string() },
   returns: v.string(),
   handler: async (ctx, { channel }) => {
     await requireProf(ctx);

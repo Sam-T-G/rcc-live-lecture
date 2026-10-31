@@ -5,14 +5,12 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Card, Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
-import { useProfKey } from "../checkin/prof";
 import { errorText } from "./Team";
 
 type Draft = { text: string; choices: string[]; correct: number };
 
 export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
-  const key = useProfKey();
-  const question = useQuery(api.host.questions.forHost, { key, channel: CHANNEL });
+  const question = useQuery(api.host.questions.forHost, { channel: CHANNEL });
   const draftQuestion = useAction(api.host.ai.draftQuestion);
   const open = useMutation(api.host.questions.open);
   const close = useMutation(api.host.questions.close);
@@ -32,12 +30,12 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
     }
   }
 
-  const makeDraft = () => run(async () => setDraft(await draftQuestion({ key, channel: CHANNEL })));
+  const makeDraft = () => run(async () => setDraft(await draftQuestion({ channel: CHANNEL })));
   const blank = () => setDraft({ text: "", choices: ["", "", "", ""], correct: 0 });
   const openIt = () =>
     run(async () => {
       if (!draft || slideIndex === null) return;
-      await open({ key, channel: CHANNEL, index: slideIndex, ...draft });
+      await open({ channel: CHANNEL, index: slideIndex, ...draft });
       setDraft(null);
     });
 
@@ -86,7 +84,7 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
             </div>
           ))}
           <ol type="A" className="host-choices">{question.choices.map((c, i) => <li key={i}>{c}{i === question.correct ? " (right)" : ""}</li>)}</ol>
-          {question.status === "open" && <button className="host-small" onClick={() => run(() => close({ key, questionId: question._id }).then(() => undefined))} disabled={busy}>Close question</button>}
+          {question.status === "open" && <button className="host-small" onClick={() => run(() => close({ questionId: question._id }).then(() => undefined))} disabled={busy}>Close question</button>}
         </>
       )}
       {question === null && !draft && <Status kind="empty">No question yet.</Status>}

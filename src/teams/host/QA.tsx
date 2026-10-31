@@ -6,13 +6,11 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Card, Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
-import { useProfKey } from "../checkin/prof";
 import { errorText } from "./Team";
 
 type Item = NonNullable<ReturnType<typeof useQuery<typeof api.host.qa.list>>>[number];
 
 function Question({ q }: { q: Item }) {
-  const key = useProfKey();
   const setStatus = useMutation(api.host.qa.setStatus);
   const answer = useMutation(api.host.qa.answer);
   const share = useMutation(api.host.qa.share);
@@ -37,23 +35,23 @@ function Question({ q }: { q: Item }) {
         <div>
           <textarea className="host-answer" rows={3} value={text} onChange={(e) => setText(e.target.value)} aria-label="Your answer" />
           <div className="row">
-            <button className="host-small host-main" onClick={() => void run(answer({ key, id, text }).then(() => setTyping(false)))}>Save answer</button>
+            <button className="host-small host-main" onClick={() => void run(answer({ id, text }).then(() => setTyping(false)))}>Save answer</button>
             <button className="host-small host-quiet" onClick={() => setTyping(false)}>Cancel</button>
           </div>
         </div>
       )}
       <div className="host-q__actions">
         {q.status === "dismissed" ? (
-          <button className="host-small host-quiet" onClick={() => void run(setStatus({ key, id, status: "new" }))}>Bring back</button>
+          <button className="host-small host-quiet" onClick={() => void run(setStatus({ id, status: "new" }))}>Bring back</button>
         ) : (
           <>
-            {q.status !== "keep" && <button className="host-small host-quiet" onClick={() => void run(setStatus({ key, id, status: "keep" }))}>Keep</button>}
+            {q.status !== "keep" && <button className="host-small host-quiet" onClick={() => void run(setStatus({ id, status: "keep" }))}>Keep</button>}
             <button className="host-small host-quiet" onClick={() => setTyping(true)}>{q.answer ? "Edit answer" : "Type answer"}</button>
             <button className="host-small host-quiet" disabled title="Voice answers are coming" onClick={() => undefined}>Record answer</button>
             {q.visibility === "public" && (
-              <button className="host-small host-quiet" onClick={() => void run(share({ key, id, shared: !q.shared }))}>{q.shared ? "Stop sharing" : "Share with students"}</button>
+              <button className="host-small host-quiet" onClick={() => void run(share({ id, shared: !q.shared }))}>{q.shared ? "Stop sharing" : "Share with students"}</button>
             )}
-            <button className="host-small host-quiet" onClick={() => void run(setStatus({ key, id, status: "dismissed" }))}>Dismiss</button>
+            <button className="host-small host-quiet" onClick={() => void run(setStatus({ id, status: "dismissed" }))}>Dismiss</button>
           </>
         )}
       </div>
@@ -79,8 +77,7 @@ function grouped(items: Item[]) {
 }
 
 export default function QA() {
-  const key = useProfKey();
-  const items = useQuery(api.host.qa.list, { key, channel: CHANNEL });
+  const items = useQuery(api.host.qa.list, { channel: CHANNEL });
   const organize = useAction(api.host.ai.organize);
   const [sorted, setSorted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -92,7 +89,7 @@ export default function QA() {
     setBusy(true);
     setError("");
     try {
-      await organize({ key, channel: CHANNEL });
+      await organize({ channel: CHANNEL });
     } catch (e) {
       setError(errorText(e));
       setSorted(false);
@@ -142,8 +139,7 @@ export default function QA() {
 }
 
 function Shared() {
-  const key = useProfKey();
-  const items = useQuery(api.host.qa.list, { key, channel: CHANNEL });
+  const items = useQuery(api.host.qa.list, { channel: CHANNEL });
   const shared = items?.filter((q) => q.shared) ?? [];
   if (items === undefined) return <Status kind="loading">Loading...</Status>;
   if (shared.length === 0) return <Status kind="empty">Nothing shared yet.</Status>;

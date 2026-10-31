@@ -6,7 +6,6 @@ import { api } from "../../../convex/_generated/api";
 import { CHANNEL } from "../../blocks/deck";
 import { useGoogleUser } from "../../blocks/auth";
 import { Card, Status } from "../../blocks/ui";
-import { useProfKey } from "../checkin/prof";
 
 // "You're on Green." Also puts a student who checked in earlier onto a team.
 export function GroupBadge() {
@@ -20,17 +19,16 @@ export function GroupBadge() {
   return <p className={"group-badge group--" + team.color}>You’re on {team.label}</p>;
 }
 
-// Hosts only: choose teams of 3 or 4. Everyone else sees nothing.
+// Professors and admins only: choose teams of 3 or 4. Everyone else sees nothing.
 function TeamSize() {
-  const key = useProfKey();
-  const host = useQuery(api.checkin.pass.amHost, { key });
+  const host = useQuery(api.checkin.pass.amHost, {});
   const status = useQuery(api.live.groups.status, { channel: CHANNEL });
   const set = useMutation(api.live.groups.setSize);
   if (!host || status === undefined) return null;
   return (
     <div className="qa__tabs" role="group" aria-label="Students per team">
       {[3, 4].map((n) => (
-        <button key={n} type="button" aria-pressed={status.size === n} onClick={() => void set({ key, channel: CHANNEL, size: n })}>
+        <button key={n} type="button" aria-pressed={status.size === n} onClick={() => void set({ channel: CHANNEL, size: n })}>
           Teams of {n}
         </button>
       ))}

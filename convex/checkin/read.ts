@@ -32,7 +32,7 @@ export const me = query({
 
 // Who checked in, newest first. Names are private, so professors and admins only.
 export const names = query({
-  args: { key: v.optional(v.string()), channel: v.string() },
+  args: { channel: v.string() },
   returns: v.array(v.object({ name: v.string(), at: v.number() })),
   handler: async (ctx, { channel }) => {
     await requireProf(ctx);

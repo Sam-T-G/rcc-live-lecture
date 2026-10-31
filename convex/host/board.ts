@@ -49,7 +49,7 @@ const rosterShape = v.object({
 });
 
 export const teams = query({
-  args: { key: v.optional(v.string()), channel: v.string() },
+  args: { channel: v.string() },
   returns: v.array(v.object({ team: teamValidator, students: v.number(), today: v.number(), total: v.number() })),
   handler: async (ctx, { channel }) => {
     await requireProf(ctx);
@@ -63,7 +63,7 @@ export const teams = query({
 
 // Every student, best first. The professor's roster and the leaderboard both read this.
 export const students = query({
-  args: { key: v.optional(v.string()), channel: v.string(), limit: v.optional(v.number()) },
+  args: { channel: v.string(), limit: v.optional(v.number()) },
   returns: v.array(rosterShape),
   handler: async (ctx, { channel, limit = 200 }) => {
     await requireProf(ctx);
@@ -74,7 +74,7 @@ export const students = query({
 
 // Students who got the newest question wrong, and what they picked.
 export const missing = query({
-  args: { key: v.optional(v.string()), channel: v.string() },
+  args: { channel: v.string() },
   returns: v.array(v.object({ name: v.string(), team: teamValidator, choice: v.string() })),
   handler: async (ctx, { channel }) => {
     await requireProf(ctx);

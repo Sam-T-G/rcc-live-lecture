@@ -1,12 +1,12 @@
-// Professor view team: #/host, the screen the professor glances at while teaching. Hosts
-// only. Registered in src/pages/index.ts already; build here.
+// Professor view team: #/host, the screen the professor glances at while teaching. Professors
+// and admins only (StaffGate). Registered in src/pages/index.ts already; build here.
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { CHANNEL, useDeckSlide } from "../../blocks/deck";
 import { Link } from "../../blocks/router";
 import { Big, Card, ErrorBoundary, Screen, Status } from "../../blocks/ui";
-import { ProfGate } from "../checkin/prof";
+import { StaffGate } from "../checkin/prof";
 import AskRoom from "./AskRoom";
 import { PointsTab } from "./Boards";
 import { Missing } from "./Missing";
@@ -18,9 +18,9 @@ export type Tab = (typeof TABS)[number];
 
 export default function HostPage() {
   return (
-    <ProfGate title="Professor view">
+    <StaffGate title="Professor view">
       <Dashboard />
-    </ProfGate>
+    </StaffGate>
   );
 }
 

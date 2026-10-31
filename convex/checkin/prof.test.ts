@@ -51,19 +51,28 @@ describe("F6 the demo key is gone", () => {
 });
 
 describe("ROLES no keys", () => {
-  it("ROLES no keys: prof.ts has no key checks, and PROFESSOR_KEY, KIOSK_KEY, HOST_EMAILS and the old demo key open nothing", async () => {
+  it("ROLES no keys: prof.ts has no key checks, no function takes a key arg, and PROFESSOR_KEY, KIOSK_KEY, HOST_EMAILS and the old demo key open nothing", async () => {
     expect(Object.keys(prof)).not.toContain("keyOk");
     expect(Object.keys(prof)).not.toContain("kioskKeyOk");
     vi.stubEnv("PROFESSOR_KEY", "sample-professor-key");
     vi.stubEnv("KIOSK_KEY", "sample-kiosk-key-0123");
     vi.stubEnv("HOST_EMAILS", "host@example.edu");
     const t = setup();
+    // A call that still sends `key` (an old open tab) is refused before it runs: no function takes
+    // one. convex-test says "Unexpected field `key`", a deployment "extra field `key`".
+    const withKey = <A extends object>(args: A, key: string) => ({ ...args, key }) as A;
+    const EXTRA_KEY = /(Unexpected|extra) field `key`/;
     for (const key of ["sample-professor-key", "sample-kiosk-key-0123", OLD_DEMO_KEY]) {
-      expect(await t.query(api.checkin.pass.amHost, { key })).toBe(false);
-      expect(await t.query(api.checkin.pass.canScan, { key })).toBe(false);
-      await expect(t.query(api.checkin.read.names, { key, channel: CH })).rejects.toThrow("Sign in first.");
-      await expect(t.mutation(api.checkin.pass.scan, { key, channel: CH, code: "ABC234" })).rejects.toThrow("Sign in first.");
+      await expect(t.query(api.checkin.pass.amHost, withKey({}, key))).rejects.toThrow(EXTRA_KEY);
+      await expect(t.query(api.checkin.pass.canScan, withKey({}, key))).rejects.toThrow(EXTRA_KEY);
+      await expect(t.query(api.checkin.read.names, withKey({ channel: CH }, key))).rejects.toThrow(EXTRA_KEY);
+      await expect(t.mutation(api.checkin.pass.scan, withKey({ channel: CH, code: "ABC234" }, key))).rejects.toThrow(EXTRA_KEY);
     }
+    // With those env vars set, a signed-out caller still gets nothing.
+    expect(await t.query(api.checkin.pass.amHost, {})).toBe(false);
+    expect(await t.query(api.checkin.pass.canScan, {})).toBe(false);
+    await expect(t.query(api.checkin.read.names, { channel: CH })).rejects.toThrow("Sign in first.");
+    await expect(t.mutation(api.checkin.pass.scan, { channel: CH, code: "ABC234" })).rejects.toThrow("Sign in first.");
     // A Google account on HOST_EMAILS has no role until staff:importHostEmails adds it.
     const host = google(t, "Sample host", "host@example.edu");
     expect(await host.query(api.checkin.pass.amHost, {})).toBe(false);

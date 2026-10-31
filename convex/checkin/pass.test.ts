@@ -28,6 +28,12 @@ const LETTERS = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 const OLD_DEMO_KEY = ["gdg", "demo", "1029"].join("-");
 
 const student = (t: ReturnType<typeof setup>, n: number) => typed(t, `Sample student ${n}`, `student${n}@example.edu`);
+// A call that still sends the old `key` arg. No function takes one any more, so TypeScript
+// refuses it in the code; the cast sends it anyway, the way an old open tab would. The arg
+// validator refuses it before the handler runs (convex-test says "Unexpected field `key`", a
+// deployment "extra field `key`").
+const withKey = <A extends object>(args: A, key: string) => ({ ...args, key }) as A;
+const EXTRA_KEY = /(Unexpected|extra) field `key`/;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -39,14 +45,16 @@ afterEach(() => {
 });
 
 describe("F6 the demo key is gone", () => {
-  it("F6.4 amHost with the old demo key is false and attendance.sheet with it throws", async () => {
+  it("F6.4 the old demo key opens nothing: amHost and attendance.sheet refuse a key arg, even with PROFESSOR_KEY set to it, and signed out amHost is false and sheet throws", async () => {
     const t = setup();
     await checkIn(t, student(t, 1));
-    expect(await t.query(api.checkin.pass.amHost, { key: OLD_DEMO_KEY })).toBe(false);
-    await expect(t.query(api.checkin.attendance.sheet, { key: OLD_DEMO_KEY, channel: CH })).rejects.toThrow("Sign in first.");
-    vi.stubEnv("PROFESSOR_KEY", OLD_DEMO_KEY);
-    expect(await t.query(api.checkin.pass.amHost, { key: OLD_DEMO_KEY })).toBe(false);
-    await expect(t.query(api.checkin.attendance.sheet, { key: OLD_DEMO_KEY, channel: CH })).rejects.toThrow("Sign in first.");
+    for (const professorKey of [undefined, OLD_DEMO_KEY]) {
+      vi.stubEnv("PROFESSOR_KEY", professorKey);
+      await expect(t.query(api.checkin.pass.amHost, withKey({}, OLD_DEMO_KEY))).rejects.toThrow(EXTRA_KEY);
+      await expect(t.query(api.checkin.attendance.sheet, withKey({ channel: CH }, OLD_DEMO_KEY))).rejects.toThrow(EXTRA_KEY);
+      expect(await t.query(api.checkin.pass.amHost, {})).toBe(false);
+      await expect(t.query(api.checkin.attendance.sheet, { channel: CH })).rejects.toThrow("Sign in first.");
+    }
   });
 
   it("ROLES amHost is true for a professor and an admin, and false for a scanner, a student, a typed sign-in with the admin's email on prod and signed out", async () => {

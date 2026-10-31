@@ -1,0 +1,11 @@
+/* #/admin (src/pages/Admin.tsx), a laptop page: two columns from 1024px wide, one below.
+   Tokens only (src/styles/tokens.css); the cards, table, list and buttons are the shared ones. */
+.admin { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 var(--rcc-space-6); align-items: start; }
+@media (min-width: 1024px) { .admin { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
+/* Emails and names break anywhere, so a long one never pushes the table or a row sideways. */
+.admin__email { overflow-wrap: anywhere; }
+.admin__locked { display: inline-flex; align-items: center; gap: var(--rcc-space-2); }
+.admin__device { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--rcc-space-3); }
+.admin__device > div { flex: 1 1 16rem; min-width: 0; }
+.admin__device p { margin: 0; }
+.admin__label { font-weight: var(--rcc-weight-strong); }

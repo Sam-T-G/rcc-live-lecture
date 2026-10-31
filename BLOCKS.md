@@ -2,29 +2,49 @@
 
 Everything the product needs that isn't the product. Each block is tested on the lab page (`#/lab`). Use these; don't rebuild them.
 
-## Google sign-in
+## Sign-in and staff roles
 
 **Browser:** the app is already wrapped in `<AuthProvider>` (`src/main.tsx`).
 
 ```tsx
-import { SignInButton, useGoogleUser } from "../blocks/auth";
+import { SignInButton, SignedInAs, useGoogleUser } from "../blocks/auth";
 
 const { user, signOut } = useGoogleUser(); // user: { name, email, picture } or null
-return user ? <p>Hi {user.name}</p> : <SignInButton />;
+return user ? <SignedInAs /> : <SignInButton />; // Google's button, with the typed form under it
 ```
+
+`<SignedInAs />` is "Signed in as Jane Doe (jane@example.edu)" with a "Not you? Sign out" button. `<GoogleButton />` is Google's button on its own. Show either button only to someone signed out: Convex keeps the token it has until it refreshes it, so a sign-in on top of a live one reaches the server only after a reload.
 
 **Server:**
 
 ```ts
-import { requireUser, requireHost } from "../lib";
+import { requireUser } from "../lib";
+import { requireAdmin, requireProf, requireScanner, staffRole } from "../checkin/prof"; // from convex/<team>/
 
-const me = await requireUser(ctx);   // throws if not signed in
-me.tokenIdentifier                   // the user key to store
-me.name, me.email                    // from Google
-await requireHost(ctx);              // throws unless the email is in HOST_EMAILS
+const me = await requireUser(ctx);     // throws "Sign in first." when signed out
+me.tokenIdentifier                     // the user key to store
+me.name, me.email                      // from Google or the typed form
+await requireProf(ctx);                // a professor or admin, or it throws; returns { email, role }
+await requireAdmin(ctx);               // an admin
+await requireScanner(ctx, device);     // a paired door iPad's device token, or anyone with a role
+await staffRole(ctx);                  // "admin" | "professor" | "scanner" | null
 ```
 
-Tokens last an hour; when one runs out the page shows the button again. Convex calls fail with "Sign in with Google first." until then.
+Every host-only function starts with `requireProf(ctx)` (`requireHost` in `convex/lib.ts` is the same check) and takes no key. Roles are one per email in the `staff` table, changed on #/admin; the `ADMIN_EMAILS` env var lists permanent admins, who can't be changed or removed there. A role counts only for a Google sign-in with a verified email, or, on a dev backend, for a typed sign-in with an `@test.local` email that `staff:devGrant` gave one. `convex/staff.ts` lists the functions #/admin and the door iPad call, and who may call each.
+
+**Staff pages** (`src/teams/checkin/prof.tsx`):
+
+```tsx
+import { DoorGate, StaffGate, useStaff } from "../checkin/prof";
+
+<StaffGate title="Live quiz"><ProfessorBoard /></StaffGate>       // professors and admins; anyone else sees the sign-in, or why theirs can't open the page
+const me = useStaff();                                           // undefined loading, null signed out, else { email, role, canHoldRole }
+<DoorGate>{(device) => <Scanner device={device} />}</DoorGate>   // #/checkin/kiosk: staff, a paired iPad, or the pairing screen
+```
+
+**Testing as staff on a dev backend:** sign in with the typed form as an `@test.local` email, then `npx convex run staff:devGrant '{"email":"prof1@test.local","role":"professor"}'`. The role lasts 2 hours, and `staff:devRevoke` ends every one at once; devGrant refuses on any backend not in `DEV_HOSTS` (prod included) and refuses any other email. To test the door iPad, open #/checkin/kiosk signed out and type its code on #/admin.
+
+Google's tokens last an hour and a typed sign-in 12 hours; when one runs out the page shows the sign-in again. Convex calls fail with "Sign in first." until then.
 
 ## Live data (Convex)
 
