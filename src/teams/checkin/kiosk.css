@@ -1,0 +1,12 @@
+/* Door kiosk (#/checkin/kiosk, Kiosk.tsx), on top of the .kiosk rules in checkin.css (the page's
+   columns, the camera box, Start check-in, the result box). This sheet has the rest: the box that
+   keeps Start check-in centered on the camera whatever error shows under it, the space around the
+   count, and the "Code on your pass" form. */
+.kiosk__cam { position: relative; }
+.kiosk__awake { margin: var(--rcc-space-3) 0 0; }
+.kiosk__total { margin-top: var(--rcc-space-6); }
+/* The field and Check in on one line, their bottoms lined up. */
+.kiosk__type { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--rcc-space-3); margin-top: var(--rcc-space-6); }
+.kiosk__type .field { margin: 0; }
+/* The code as the pass shows it: capitals, in the code face. */
+.kiosk__type input { font-family: var(--rcc-font-code); text-transform: uppercase; letter-spacing: 0.1em; }
