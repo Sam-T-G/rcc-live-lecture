@@ -10,7 +10,7 @@
 //   list (anyone, signed out too)  this class's questions. Another student's private question is
 //       left out; the author sees their own with private: true. name is null when anonymous.
 //       answer is the professor's typed answer once it's shared, else null (the author's too). A
-//       private question's shared answer goes only to its author, since nobody else gets the row.
+//       private question's answer is always null: it can't be shared (Sam's decision D12 e).
 //   forHost (professors and admins)  every question in this class, private ones too, with the
 //       professor's sorting, the AI's topics and the answer; name is null when anonymous.
 // `user` (the poster's tokenIdentifier, which holds a typed sign-in's email) is stored for "mine",
@@ -30,7 +30,8 @@
 //       lib.cleanName(the name on the student's check-in in this class, the one the professor saw
 //       at the scan), so signing in again under another name doesn't change it; the sign-in's name
 //       only when that row has none. Never an email. private: only the author and the professor
-//       see it, and nobody can upvote it.
+//       see it on screen, nobody can upvote it, and its answer can't be shared. Its text still
+//       goes to Gemini, with no name, when the professor groups questions by topic (organize).
 //   api.live.questions.vote      { question } -> null                                       checked in
 //       Upvote; a second tap takes it back. "You can't upvote your own.", "You can't upvote a
 //       private question.", "Check in first."
@@ -46,12 +47,13 @@
 //       Trimmed, 1000 characters at most. Saving keeps the question and never shares the
 //       answer; an empty answer removes it and stops sharing it.
 //   api.live.questions.share     { question, shared } -> null                               professor
-//       shared: true shows the answer under the question on every phone, or for a private
-//       question on its author's phone only ("Type an answer first."). false stops showing it.
+//       shared: true shows the answer under the question on every phone ("Type an answer
+//       first."; a private question: "That question is private.", Sam's decision D12 e). false
+//       stops showing it.
 //   api.live.questions.organize  { channel } -> how many questions got a topic              professor
-//       "Group by topic with AI": sends Gemini this class's questions that aren't dismissed or
-//       private, as numbered texts only (never names), and saves each one's topic and
-//       same-question group. A private question never leaves the server and gets no topic.
+//       "Group by topic with AI": sends Gemini this class's questions that aren't dismissed,
+//       private ones too (Sam's decision D12 f), as numbered texts only (never names), and
+//       saves each one's topic and same-question group.
 // A missing question in setStatus, answer or share: "That question is gone."
 // Internal: applyTopics, which organize runs to save the AI's topics.
 import { ConvexError, v, type Infer } from "convex/values";
@@ -150,8 +152,9 @@ export const list = query({
         mine: r.user === me,
         voted: voted.has(r._id),
         private: r.private === true,
-        // Only the author gets a private row (the filter above), so its shared answer reaches only them.
-        answer: r.shared === true && r.answer ? r.answer : null,
+        // A private question's answer is never shared (share refuses it); this also covers a row
+        // an older build marked shared.
+        answer: r.shared === true && !r.private && r.answer ? r.answer : null,
       }))
       .sort((a, b) => b.votes - a.votes || b.at - a.at);
   },
@@ -327,8 +330,8 @@ export const answer = mutation({
   },
 });
 
-// Show (or stop showing) the professor's answer under the question on every phone. For a private
-// question that is only its author's phone, because list gives the row to nobody else.
+// Show (or stop showing) the professor's answer under the question on every phone. A private
+// question's answer can't be shared (Sam's decision D12 e).
 export const share = mutation({
   args: { question: v.id("questions"), shared: v.boolean() },
   returns: v.null(),
@@ -338,6 +341,7 @@ export const share = mutation({
       await ctx.db.patch("questions", question, { shared: undefined });
       return null;
     }
+    if (row.private) throw new ConvexError("That question is private.");
     if (!row.answer) throw new ConvexError("Type an answer first.");
     await ctx.db.patch("questions", question, { shared: true });
     return null;
@@ -367,20 +371,18 @@ const SORT_PROMPT =
   "Topics are 1 to 4 plain words. Group labels say the shared question in under 10 words. Every question number appears exactly once. " +
   'Reply as JSON: {"items": [{"n": number, "topic": string, "cluster": string}]}.';
 
-// "Group by topic with AI": sorts this class's questions that aren't dismissed or private into
-// topics, and inside a topic into groups that ask the same thing. Private questions stay out
-// because the student was told only the professor sees them. Gemini gets only the question texts, each
-// with a number in place of the student, never a name. The professor sees the topics on #/host;
-// nothing reaches students from here. Returns how many questions got a topic.
+// "Group by topic with AI": sorts this class's questions that aren't dismissed into topics, and
+// inside a topic into groups that ask the same thing. Private questions go too (Sam's decision
+// D12 f); the box on #/live says so. Gemini gets only the question texts, each with a number in
+// place of the student, never a name. The professor sees the topics on #/host; nothing reaches
+// students from here. Returns how many questions got a topic.
 export const organize = action({
   args: { channel: v.string() },
   returns: v.number(),
   handler: async (ctx, { channel }): Promise<number> => {
     const all: HostRow[] = await ctx.runQuery(api.live.questions.forHost, { channel }); // professors and admins only
-    const open = all.filter((r) => r.status !== "dismissed");
-    const rows = open.filter((r) => !r.private);
-    if (rows.length === 0)
-      throw new ConvexError(open.length ? "Private questions aren't sent to the AI, so there's nothing to group yet." : "No questions to group yet.");
+    const rows = all.filter((r) => r.status !== "dismissed");
+    if (rows.length === 0) throw new ConvexError("No questions to group yet.");
     const reply = await gemini({
       model: "fast",
       json: true,

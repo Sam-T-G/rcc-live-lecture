@@ -671,7 +671,7 @@ describe("F29 End day", () => {
     const t = setup();
     await openClass(t);
     await arrive(t, 1, 3);
-    expect(await admin(t).mutation(api.live.groups.endDay, { channel: CH })).toBe("Class ended. No quiz ended, so there is no extra credit to save.");
+    expect(await admin(t).mutation(api.live.groups.endDay, { channel: CH })).toBe("Class ended. No quiz with a right answer has ended, so there is no extra credit to save.");
     expect(await saved(t)).toEqual([]);
     expect(await classNow(t)).toBeNull();
     // Points changed but every team ended at 0 or below: the rows are saved with no extra credit.

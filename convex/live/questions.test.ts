@@ -300,7 +300,7 @@ describe("F30 the professor's Questions tab on #/host", () => {
     await expect(forHost(t)).rejects.toThrow("Sign in first.");
   });
 
-  it("F30.5 a private question is left out of another student's list (with and without index) and a signed-out list; the author sees it with private: true; upvoting it is refused; its shared answer reaches the author only (questions.private.test.ts)", async () => {
+  it("F30.5 a private question is left out of another student's list (with and without index) and a signed-out list; the author sees it with private: true; upvoting it is refused; sharing it throws 'That question is private.'", async () => {
     const t = setup();
     const [author, other] = await room(t, 2);
     await post(author, "I don't get slide 4 at all", { anonymous: false, private: true });
@@ -317,9 +317,11 @@ describe("F30 the professor's Questions tab on #/host", () => {
     await expect(other.mutation(api.live.questions.vote, { question: secret._id })).rejects.toThrow("You can't upvote a private question.");
     expect(await voteRows(t, secret._id)).toBe(0);
     await p.mutation(api.live.questions.answer, { question: secret._id, text: "Slide 4 is the hash route diagram." });
-    expect((await list(author)).find((q) => q.private)!.answer).toBeNull(); // saved, not shared yet
-    await p.mutation(api.live.questions.share, { question: secret._id, shared: true });
-    expect((await list(author)).find((q) => q.private)!.answer).toBe("Slide 4 is the hash route diagram.");
+    expect((await list(author)).find((q) => q.private)!.answer).toBeNull(); // saved, not shared
+    // Sam's decision D12 (e): a private question's answer can't be shared, not even with its author.
+    await expect(p.mutation(api.live.questions.share, { question: secret._id, shared: true })).rejects.toThrow("That question is private.");
+    expect((await forHost(p)).find((q) => q.private)).toMatchObject({ answer: "Slide 4 is the hash route diagram.", shared: false });
+    expect((await list(author)).find((q) => q.private)!.answer).toBeNull();
     for (const reader of [other, t, p]) expect((await list(reader)).map((q) => q.text)).toEqual(["Can you zoom in?"]);
   });
 
@@ -411,7 +413,7 @@ describe("F30 the professor's Questions tab on #/host", () => {
 });
 
 describe("F30.2 Group by topic with AI (organize, fetch stubbed)", () => {
-  it("F30.2 dismissed rows aren't sent (private ones: questions.private.test.ts); the body has only the numbered texts, no names; topics land on the right ids", async () => {
+  it("F30.2 dismissed rows aren't sent (private ones are: questions.private.test.ts); the body has only the numbered texts, no names; topics land on the right ids", async () => {
     const t = setup();
     const [s1, s2, s3] = await room(t, 3);
     await post(s1, "What is a vowel?", { anonymous: false });

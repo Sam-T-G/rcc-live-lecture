@@ -258,7 +258,7 @@ describe("F8 the next class on the same channel starts clean", () => {
 
     // End class on #/checkin/teacher (the same live.groups.endDay). Class 2 had no quiz.
     await until(t, C2 + HOUR);
-    expect(await one.prof.mutation(api.live.groups.endDay, { channel: CH })).toBe("Class ended. No quiz ended, so there is no extra credit to save.");
+    expect(await one.prof.mutation(api.live.groups.endDay, { channel: CH })).toBe("Class ended. No quiz with a right answer has ended, so there is no extra credit to save.");
     // The Thursday after, the door scans student 1 before the deck sends anything: the scan opens
     // class 3, and the deck's first press joins it.
     await until(t, C2 + WEEK - 5 * MIN);

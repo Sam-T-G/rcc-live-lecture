@@ -8,9 +8,22 @@
 // or once a class closed itself) every count is 0. A student has one row per slide in each class,
 // so a student lost on slide 3 in two classes has two rows: `mine` reads with .first(), never
 // .unique(). Anyone can read the counts, signed out too; no read returns who tapped.
-import { query } from "../_generated/server";
+//
+// The counts include only students who have a check-in in this class: a student whose check-in
+// the professor removed (checkin.attendance.removeCheckin) drops out of them, the way they drop
+// off their team (live/groups.ts). Their rows stay, so a scan again brings their taps back.
+import { query, type QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { lectureWindow } from "../lib";
+
+// Everyone with a check-in in this class (one class's check-ins, the size of the room).
+async function checkedInUsers(ctx: QueryCtx, channel: string, start: number) {
+  const rows = await ctx.db
+    .query("checkins")
+    .withIndex("by_channel", (q) => q.eq("channel", channel).gte("_creationTime", start))
+    .collect();
+  return new Set(rows.map((r) => r.user));
+}
 
 // How many people are lost on one slide in this class.
 export const lostCount = query({
@@ -18,12 +31,13 @@ export const lostCount = query({
   returns: v.number(),
   handler: async (ctx, { channel, index }) => {
     const { start } = await lectureWindow(ctx, channel);
-    // At most one row per checked-in student for this slide in this class.
+    // At most one row per student for this slide in this class.
     const rows = await ctx.db
       .query("lost")
       .withIndex("by_channel_and_index", (q) => q.eq("channel", channel).eq("index", index).gte("_creationTime", start))
       .collect();
-    return rows.length;
+    const here = await checkedInUsers(ctx, channel, start);
+    return rows.filter((r) => here.has(r.user)).length;
   },
 });
 
@@ -34,13 +48,14 @@ export const lostBySlide = query({
   returns: v.array(v.object({ index: v.number(), count: v.number() })),
   handler: async (ctx, { channel }) => {
     const { start } = await lectureWindow(ctx, channel);
-    // This class's taps only: at most one row per checked-in student per slide.
+    // This class's taps only: at most one row per student per slide.
     const rows = await ctx.db
       .query("lost")
       .withIndex("by_channel", (q) => q.eq("channel", channel).gte("_creationTime", start))
       .collect();
+    const here = await checkedInUsers(ctx, channel, start);
     const by = new Map<number, number>();
-    for (const r of rows) by.set(r.index, (by.get(r.index) ?? 0) + 1);
+    for (const r of rows) if (here.has(r.user)) by.set(r.index, (by.get(r.index) ?? 0) + 1);
     return [...by].map(([index, count]) => ({ index, count })).sort((a, b) => a.index - b.index);
   },
 });

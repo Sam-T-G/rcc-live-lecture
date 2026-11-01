@@ -70,10 +70,12 @@ describe("#/live Questions card", () => {
     expect(html).not.toContain("Be the first");
   });
 
-  it("F30.5 the form has an 'Only the professor can see it' box, and your own private question shows a 'Private' tag", () => {
+  it("F30.5 the form has an 'Only the professor sees it' box, and your own private question shows a 'Private' tag", () => {
     state.rows = [row({ mine: true, private: true, text: "Slide 4 lost me" }), row({ _id: "q2", text: "Can you zoom in?" })];
     const html = card(3);
-    expect(html).toMatch(/<label><input type="checkbox"\/>Only the professor can see it<\/label>/);
+    expect(html).toMatch(/<label><input type="checkbox"\/>Only the professor sees it<\/label>/);
+    // The AI note shows only once the box is ticked (Questions.ask.test.ts).
+    expect(html).not.toContain("AI tool");
     expect(html.match(/>Private</g)).toHaveLength(1);
     const own = html.slice(html.indexOf("Slide 4 lost me"), html.indexOf("Can you zoom in?"));
     expect(own).not.toBe("");

@@ -110,7 +110,8 @@ const ARGS: Record<string, (ids: Ids) => Record<string, unknown>[]> = {
 
 // The class: the start saved at 17:00 with 5 minutes' grace, the deck on slide 1, Ben, Cleo and
 // Dee checked in at 17:01, Ana at 17:12 (12 minutes late). Ana posts anonymously, Ben by name,
-// Cleo by name and only for the professor, who answers Cleo and shares it with her. A quiz ends
+// Cleo by name and only for the professor, who types an answer to Cleo (a private question's
+// answer can't be shared: Sam's decision D12 e, so the share is refused). A quiz ends
 // with answers from Ana and Ben, and Dee taps I'm lost.
 async function classWithThree(t: T) {
   const prof = await professor(t);
@@ -130,7 +131,7 @@ async function classWithThree(t: T) {
   await cleo.mutation(api.live.questions.ask, { channel: CH, index: 0, text: CLEO_TEXT, anonymous: false, private: true });
   const secret = (await prof.query(api.live.questions.forHost, { channel: CH })).find((q) => q.private)!;
   await prof.mutation(api.live.questions.answer, { question: secret._id, text: CLEO_ANSWER });
-  await prof.mutation(api.live.questions.share, { question: secret._id, shared: true });
+  await expect(prof.mutation(api.live.questions.share, { question: secret._id, shared: true })).rejects.toThrow("That question is private.");
   const poll = await prof.mutation(api.checkin.quiz.ask, { channel: CH, kind: "quiz", question: "Which one?", choices: ["This", "That"], correct: 0 });
   await ana.mutation(api.checkin.quiz.answer, { poll, choice: 0 });
   await ben.mutation(api.checkin.quiz.answer, { poll, choice: 1 });
@@ -202,9 +203,9 @@ describe("F43.2 privacy: what a signed-out caller and another student can read",
       [BEN_TEXT, BEN.name],
       [ANA_TEXT, null],
     ].sort());
-    // Cleo sees her own private question and the answer shared with her.
+    // Cleo sees her own private question, and no answer: it can't be shared.
     const asCleo = await cleo.query(api.live.questions.list, { channel: CH });
-    expect(asCleo.find((q) => q.text === CLEO_TEXT)).toMatchObject({ private: true, answer: CLEO_ANSWER });
+    expect(asCleo.find((q) => q.text === CLEO_TEXT)).toMatchObject({ private: true, answer: null });
     // The signed-out read of the same list has no private row.
     expect((await t.query(api.live.questions.list, { channel: CH })).some((q) => q.private)).toBe(false);
     // Dee's own pass has her own name and email, and nobody else's.

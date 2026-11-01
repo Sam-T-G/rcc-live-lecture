@@ -81,7 +81,18 @@ describe("the team leaderboard", () => {
     results["live/groups:status"] = { size: 4, locked: false, locksAt: null };
     const html = card();
     expect(html).toContain("Teams lock 5 minutes after the first check-in.");
-    expect(html).toContain("After 3 quizzes. Teams rank by points per student: 1st place gets 5 extra credit, 2nd gets 3, 3rd gets 1.");
+    expect(html).toContain("After 3 quizzes with a right answer. Teams rank by points per student: 1st place gets 5 extra credit, 2nd gets 3, 3rd gets 1.");
+  });
+
+  it("sweep1-live-4 the count names what it counts: quizzes with a right answer", () => {
+    results["live/groups:leaderboard"] = { questions: 1, teams: [team(0, "Red", { ec: 5 })] };
+    expect(card()).toContain("After 1 quiz with a right answer.");
+    // A quiz asked with no right answer ended: questions is still 0.
+    results["live/groups:leaderboard"] = { questions: 0, teams: [team(0, "Red", { correct: 0, points: 0, perStudent: 0, ec: 0 })] };
+    for (const html of [card(), big()]) {
+      expect(html).toContain("No quiz with a right answer has ended yet.");
+      expect(html).not.toContain("No quiz has ended yet.");
+    }
   });
 
   it("F29.3 with no teams in this class it says so instead of an empty board", () => {

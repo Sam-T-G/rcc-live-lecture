@@ -1,6 +1,7 @@
-// live/questions, private questions and names (fixes UC-convex-1, UC-convex-2, UC-spec-1):
-// the professor's shared answer to a private question reaches its author and nobody else, organize
-// never sends a private question to Gemini, and a by-name post shows the name the student checked
+// live/questions, private questions and names. Private questions follow Sam's decision D12 (e) and
+// (f) (sweep1-live-2): the professor's answer to a private question can't be shared, not even with
+// its author ("That question is private."), and "Group by topic with AI" sends private question
+// texts to Gemini too, never names. UC-spec-1: a by-name post shows the name the student checked
 // in with, not the name on a later sign-in.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../_generated/api";
@@ -40,8 +41,8 @@ async function post(s: Caller, text: string, o: { anonymous?: boolean; private?:
 const list = (c: Pick<T, "query">, index?: number) => c.query(api.live.questions.list, { channel: CH, index });
 const forHost = (c: Pick<T, "query">) => c.query(api.live.questions.forHost, { channel: CH });
 
-describe("UC-convex-1 the answer to a private question reaches its author", () => {
-  it("UC-convex-1 sharing a private question's answer shows it to the author only; Stop sharing hides it again", async () => {
+describe("D12 (e) a private question's answer can't be shared", () => {
+  it("sharing it throws 'That question is private.'; the professor keeps the answer; no phone gets it, the author's included", async () => {
     const t = setup();
     const [author, other] = await room(t, 2);
     await post(author, "I don't get slide 4 at all", { anonymous: false, private: true });
@@ -49,53 +50,66 @@ describe("UC-convex-1 the answer to a private question reaches its author", () =
     const p = await professor(t);
     const secret = (await forHost(p)).find((q) => q.private)!;
     await p.mutation(api.live.questions.answer, { question: secret._id, text: "Come by office hours on Tuesday." });
-    await p.mutation(api.live.questions.share, { question: secret._id, shared: true });
-    expect((await forHost(p)).find((q) => q._id === secret._id)).toMatchObject({ shared: true });
+    await expect(p.mutation(api.live.questions.share, { question: secret._id, shared: true })).rejects.toThrow("That question is private.");
+    expect((await forHost(p)).find((q) => q._id === secret._id)).toMatchObject({ answer: "Come by office hours on Tuesday.", shared: false });
     for (const index of [undefined, 3])
-      expect((await list(author, index)).find((q) => q._id === secret._id)).toMatchObject({ private: true, answer: "Come by office hours on Tuesday." });
-    // Everyone else still sees only the public question, with no answer.
+      expect((await list(author, index)).find((q) => q._id === secret._id)).toMatchObject({ private: true, answer: null });
     for (const reader of [other, t, p])
       for (const index of [undefined, 3]) expect((await list(reader, index)).map((q) => [q.text, q.answer])).toEqual([["Can you zoom in?", null]]);
+    // Stop sharing still works on it (it does nothing).
     await p.mutation(api.live.questions.share, { question: secret._id, shared: false });
+  });
+
+  it("a private row marked shared before this rule (an older build) still shows its answer to nobody", async () => {
+    const t = setup();
+    const [author] = await room(t, 1);
+    await post(author, "Old private one", { private: true });
+    const p = await professor(t);
+    const secret = (await forHost(p)).find((q) => q.private)!;
+    await t.run((ctx) => ctx.db.patch("questions", secret._id, { answer: "Old answer", shared: true }));
     expect((await list(author)).find((q) => q._id === secret._id)!.answer).toBeNull();
   });
 });
 
-describe("UC-convex-2 organize never sends a private question to Gemini", () => {
-  it("UC-convex-2 private rows are left out of the request and get no topic; only private rows -> nothing goes out and the error says why", async () => {
+describe("D12 (f) organize sends private question texts too, never names", () => {
+  it("a private question's text goes to Gemini with the rest, numbered, with no name, and gets a topic", async () => {
     const t = setup();
     const [s1, s2] = await room(t, 2);
-    await post(s1, "What is a vowel?");
-    await post(s2, "I'm failing this class and need to talk", { private: true });
+    await post(s1, "What is a vowel?", { anonymous: false });
+    await post(s2, "I'm failing this class and need to talk", { anonymous: false, private: true });
     const p = await professor(t);
     vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
     vi.stubEnv("GEMINI_MODEL_FAST", "test-fast");
+    const items = [
+      { n: 0, topic: "Grades", cluster: "Needs to talk" },
+      { n: 1, topic: "Vowels", cluster: "What a vowel is" },
+    ];
     const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
       async () =>
-        new Response(
-          JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ items: [{ n: 0, topic: "Vowels", cluster: "What a vowel is" }] }) }] } }] }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
+        new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ items }) }] } }] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
     );
     vi.stubGlobal("fetch", fetchMock);
-    expect(await p.action(api.live.questions.organize, { channel: CH })).toBe(1);
+    expect(await p.action(api.live.questions.organize, { channel: CH })).toBe(2);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const body = String(fetchMock.mock.calls[0][1]?.body);
-    expect(body).toContain("What is a vowel?");
-    expect(body).not.toContain("failing");
+    expect(body).toContain("0. I'm failing this class and need to talk");
+    expect(body).toContain("1. What is a vowel?");
+    for (const leak of ["Sample student", "@example.edu"]) expect(body).not.toContain(leak);
     const rows = await forHost(p);
-    expect(rows.find((q) => q.private)).toMatchObject({ topic: null, cluster: null });
+    expect(rows.find((q) => q.private)).toMatchObject({ topic: "Grades", cluster: "Needs to talk" });
     expect(rows.find((q) => !q.private)).toMatchObject({ topic: "Vowels" });
 
-    // A class with only a private question: nothing to group, and nothing goes to Gemini.
+    // A class with only a private question still groups it.
     const t2 = setup();
     const [a] = await room(t2, 1);
     await post(a, "Private only", { private: true });
     fetchMock.mockClear();
-    await expect((await professor(t2)).action(api.live.questions.organize, { channel: CH })).rejects.toThrow(
-      "Private questions aren't sent to the AI, so there's nothing to group yet.",
-    );
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await (await professor(t2)).action(api.live.questions.organize, { channel: CH })).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fetchMock.mockClear();
 
     // A class with no questions at all still says there is nothing to group.
     const t3 = setup();

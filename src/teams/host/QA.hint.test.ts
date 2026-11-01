@@ -1,9 +1,9 @@
 // @vitest-environment node
 // The hint under "Your answer" in #/host Questions (QA.tsx) says what Save does for this question:
 // an answer that's already shared reaches every phone as soon as it's saved (convex/live/questions.ts
-// answer() keeps shared), a private question's shared answer reaches only the student who asked it
-// (list() in convex/live/questions.ts gives a private row to its author alone), and any other answer
-// stays with the professor until they share it. Rendered to HTML with the editor open.
+// answer() keeps shared), a private question's answer stays with the professor because it can't be
+// shared (Sam's decision D12 e; share() refuses it), and any other answer stays with the professor
+// until they share it. Rendered to HTML with the editor open.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -44,18 +44,13 @@ describe("#/host Questions answer hint", () => {
     expect(html).not.toContain("only after you share it");
   });
 
-  it("a private question not shared yet: only the professor sees the answer, and sharing reaches only the student who asked", () => {
-    const html = editor({ private: true });
-    expect(html).toContain("Only you see this answer until you share it. Then only the student who asked sees it.");
-    expect(html).not.toContain("only after you share it");
-    expect(html).not.toContain("so only you see this answer");
-  });
-
-  it("a private question already shared: saving reaches the student who asked, not every student", () => {
-    const html = editor({ private: true, shared: true });
-    expect(html).toContain("The student who asked sees your changes as soon as you save.");
-    expect(html).not.toContain("Students see your changes");
-    expect(html).toContain(">Shared with the student who asked<");
-    expect(html).not.toContain(">Shared with students<");
+  it("D12 e a private question: only the professor sees the answer, and it can't be shared", () => {
+    for (const shared of [false, true]) {
+      const html = editor({ private: true, shared });
+      expect(html).toContain("Only you see this answer. A private question’s answer can’t be shared.");
+      expect(html).not.toContain("only after you share it");
+      expect(html).not.toContain("Students see your changes");
+      expect(html).not.toContain(">Shared with");
+    }
   });
 });

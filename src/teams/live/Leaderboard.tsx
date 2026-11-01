@@ -116,7 +116,9 @@ export function Leaderboard({ big }: { big?: boolean }) {
             </details>
           )}
           <p className="muted">
-            {board.questions === 0 ? "No quiz has ended yet." : `After ${plural(board.questions, "quiz", "quizzes")}.`} Teams rank by points per
+            {board.questions === 0
+              ? "No quiz with a right answer has ended yet."
+              : `After ${plural(board.questions, "quiz", "quizzes")} with a right answer.`} Teams rank by points per
             student: 1st place gets 5 extra credit, 2nd gets 3, 3rd gets 1.
           </p>
         </>

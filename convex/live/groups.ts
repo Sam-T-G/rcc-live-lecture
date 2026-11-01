@@ -47,8 +47,9 @@
 //       checked in and either no start time is saved or its lock time has passed (the teams
 //       then lock 5 minutes after the first check-in).
 //   api.live.groups.leaderboard  { channel } -> { questions, teams }
-//       questions: quizzes ended in this class. teams, best first: [{ team, color, label,
-//       members, correct, changes, points, perStudent, rank, ec }]. correct: right answers;
+//       questions: quizzes with a right answer ended in this class (a vote, or a quiz asked
+//       with no right answer, isn't counted: it can't score). teams, best first: [{ team,
+//       color, label, members, correct, changes, points, perStudent, rank, ec }]. correct: right answers;
 //       changes: the professor's changes; points = correct + changes; perStudent = points /
 //       members; rank 1 is first, shared by teams whose perStudent is the same to one
 //       decimal; ec is the extra credit that place earns (it can be a fraction, like 4 / 3 for
@@ -306,18 +307,33 @@ async function splitChanges(
 }
 
 // Give a student a team in this class if they don't have one, and return it. The caller has just
-// checked them in (checkin.pass.scan).
+// checked them in (checkin.pass.scan, on every scan).
+//
+// A student who already has a team keeps it, with one exception after the lock: when nobody else
+// checked in is on their team. That happens when the professor removed their check-in before the
+// lock (the lock re-dealt everyone else and left their row behind) or before a new size re-dealt
+// the class, and then they were scanned again. They then join the smallest team, the way a late
+// arrival does, so they never make a team of 1 (Sam's decision D12 l). When every team already has
+// 5 they stay where they are, so a second scan of a student who opened a new team never moves them.
 export async function ensureGroup(ctx: MutationCtx, channel: string, user: string): Promise<number> {
   const win = await lectureWindow(ctx, channel);
   const groups = await classGroups(ctx, channel, win.start);
   const had = groups.get(user);
-  if (had) return had.team;
   const set = await classSettings(ctx, channel, win.start);
-  const here = new Set((await classCheckins(ctx, channel, win.start)).map((c) => c.user));
-  const teamOf = new Map([...groups].map(([u, g]) => [u, g.team]));
   const locked = !!set.row?.lockedAt;
+  if (had && !locked) return had.team;
+  const here = new Set((await classCheckins(ctx, channel, win.start)).map((c) => c.user));
+  const teamOf = new Map([...groups].filter(([u]) => u !== user).map(([u, g]) => [u, g.team]));
+  const count = memberCounts(teamOf, here);
+  if (had) {
+    if (count.has(had.team)) return had.team; // someone else checked in is on their team
+    const team = pickTeam(count, true, set.size, -1);
+    if (team === -1) return had.team; // every team has 5: pickTeam would open a new team
+    await ctx.db.patch("groups", had._id, { team });
+    return team;
+  }
   const next = locked ? await nextTeam(ctx, channel, win.start, groups) : 0;
-  const team = pickTeam(memberCounts(teamOf, here), locked, set.size, next);
+  const team = pickTeam(count, locked, set.size, next);
   await ctx.db.insert("groups", { channel, user, team });
   await queueLock(ctx, channel, win, set);
   return team;
@@ -578,7 +594,7 @@ export async function scoreDay(ctx: Ctx, channel: string): Promise<ClassScores> 
 export const leaderboard = query({
   args: { channel: v.string() },
   returns: v.object({
-    questions: v.number(), // quizzes ended in this class
+    questions: v.number(), // quizzes with a right answer ended in this class
     teams: v.array(teamScore),
   }),
   handler: async (ctx, { channel }) => {
@@ -705,6 +721,9 @@ export const pointLog = query({
       .take(200);
     const checkins = new Map((await classCheckins(ctx, channel, win.start)).map((c) => [c.user, c]));
     const groups = await classGroups(ctx, channel, win.start);
+    // Newest first by `at`: a re-deal (splitChanges) writes a team's earlier changes again as new
+    // rows that keep their old `at`, so _creationTime alone would put them above later changes.
+    rows.sort((a, b) => b.at - a.at || b._creationTime - a._creationTime);
     return rows.map((r) => {
       const who = r.user === undefined ? undefined : checkins.get(r.user);
       const team = r.team ?? (who ? groups.get(who.user)?.team : undefined);
@@ -720,7 +739,7 @@ const names = (labels: string[]) => (labels.length < 2 ? labels.join("") : `${la
 
 // The line End day shows the professor.
 function endLine(s: ClassScores, credited: number) {
-  if (s.quizzes === 0 && s.changes === 0) return "Class ended. No quiz ended, so there is no extra credit to save.";
+  if (s.quizzes === 0 && s.changes === 0) return "Class ended. No quiz with a right answer has ended, so there is no extra credit to save.";
   const playing = s.teams.filter((g) => g.members > 0);
   if (playing.length === 0) return "Class ended. No team has students, so there is no extra credit to save.";
   if (credited === 0) return "Class ended. No team scored a point, so nobody gets extra credit.";

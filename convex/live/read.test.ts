@@ -14,6 +14,9 @@ describe("F20 the I'm lost counts", () => {
     const t = setup();
     await t.run(async (ctx) => {
       const now = Date.now();
+      // The counts include only students checked in to this class (sweep1-live-5).
+      for (const [n, channel] of [[1, CH], [2, CH], [3, "another-channel"]] as const)
+        await ctx.db.insert("checkins", { channel, user: user(n), name: `Sample student ${n}`, at: now });
       await ctx.db.insert("lost", { channel: CH, index: 2, user: user(1), at: now });
       await ctx.db.insert("lost", { channel: CH, index: 2, user: user(2), at: now });
       await ctx.db.insert("lost", { channel: CH, index: 0, user: user(1), at: now });
@@ -121,6 +124,38 @@ describe("F20 the counts #/host shows", () => {
       { index: 4, count: 2 },
       { index: 5, count: 1 },
     ]);
+  });
+});
+
+describe("sweep1-live-5 taps from a check-in the professor removed don't count", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    profEnv();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("student 1 taps slides 2 to 4, the professor removes their check-in: lostCount and lostBySlide drop those taps, student 2's stay", async () => {
+    const t = setup();
+    await openClass(t);
+    await showSlides(t, 4);
+    const [a, b] = await room(t, 2);
+    for (const i of [2, 3, 4]) await toggle(a, i);
+    await toggle(b, 3);
+    expect(await bySlide(t)).toEqual([
+      { index: 2, count: 1 },
+      { index: 3, count: 2 },
+      { index: 4, count: 1 },
+    ]);
+    const prof = await professor(t);
+    const rows = await prof.query(api.checkin.read.names, { channel: CH });
+    const one = rows.find((r) => r.name === "Sample student 1")!;
+    await prof.mutation(api.checkin.attendance.removeCheckin, { checkin: one.id });
+    expect(await lostCount(t, 3)).toBe(1);
+    expect(await lostCount(t, 2)).toBe(0);
+    expect(await bySlide(t)).toEqual([{ index: 3, count: 1 }]);
   });
 });
 

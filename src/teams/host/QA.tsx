@@ -1,10 +1,11 @@
 // #/host Questions: every question students posted on #/live in this class, private ones too,
 // newest first, with each one's slide, upvotes and name ("Anonymous" when they hid it). The
 // professor keeps or dismisses a question (that only sorts this list), types an answer and shares
-// it under the question on every phone (a private question's answer only on the phone of the
-// student who asked), or deletes the question from every phone. "Group by topic with AI" sends
-// Gemini only the texts of questions that aren't private, never names, and sorts the list into
-// topics. The server's rules are in convex/live/questions.ts.
+// it under the question on every phone, or deletes the question from every phone. A private
+// question's answer can't be shared (Sam's decision D12 e), so its row has no share button.
+// "Group by topic with AI" sends Gemini the texts of questions that aren't dismissed, private ones
+// too (D12 f), never names, and sorts the list into topics. The server's rules are in
+// convex/live/questions.ts.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -22,13 +23,9 @@ const upvotes = (n: number) => `${n} ${n === 1 ? "upvote" : "upvotes"}`;
 
 // What Save does for this question's answer. Saving never changes sharing (answer() in
 // convex/live/questions.ts), so an answer that's already shared reaches its readers as soon as
-// it's saved. A shared answer reaches every phone, except a private question's: list() gives a
-// private row only to the student who asked it, so its shared answer reaches only that phone.
+// it's saved. A private question's answer can't be shared, so only the professor sees it.
 function answerHint(q: Item) {
-  if (q.private)
-    return q.shared
-      ? "The student who asked sees your changes as soon as you save."
-      : "Only you see this answer until you share it. Then only the student who asked sees it.";
+  if (q.private) return "Only you see this answer. A private question’s answer can’t be shared.";
   if (q.shared) return "Students see your changes as soon as you save.";
   return "Students see it only after you share it.";
 }
@@ -70,6 +67,8 @@ export function Question({ q, open = false }: { q: Item; open?: boolean }) {
   }
   const mark = (button: string, status: Item["status"]) => void run(button, () => setStatus({ question: q._id, status }));
   const dismissed = q.status === "dismissed";
+  // A private row an older build marked shared counts as not shared: list() never shows its answer.
+  const shared = q.shared && !q.private;
 
   return (
     <li className={dismissed ? "qa-q qa-q--dismissed" : "qa-q"}>
@@ -79,7 +78,7 @@ export function Question({ q, open = false }: { q: Item; open?: boolean }) {
         {q.private && <Badge tone="warn">Private</Badge>}
         {q.status === "keep" && <Badge>Kept</Badge>}
         {dismissed && <Badge>Dismissed</Badge>}
-        {q.shared && <Badge tone="accent">{q.private ? "Shared with the student who asked" : "Shared with students"}</Badge>}
+        {shared && <Badge tone="accent">Shared with students</Badge>}
         <span>{upvotes(q.votes)}</span>
         <span>{q.name ?? "Anonymous"}</span>
       </p>
@@ -120,9 +119,9 @@ export function Question({ q, open = false }: { q: Item; open?: boolean }) {
                 {q.answer === null ? "Type answer" : "Edit answer"}
               </Button>
             )}
-            {q.answer !== null && (
-              <Button variant="quiet" small busy={busy === "share"} onClick={() => void run("share", () => share({ question: q._id, shared: !q.shared }))}>
-                {q.shared ? "Stop sharing" : q.private ? "Share with the student who asked" : "Share the answer"}
+            {q.answer !== null && !q.private && (
+              <Button variant="quiet" small busy={busy === "share"} onClick={() => void run("share", () => share({ question: q._id, shared: !shared }))}>
+                {shared ? "Stop sharing" : "Share the answer"}
               </Button>
             )}
             <Button variant="quiet" small busy={busy === "dismiss"} onClick={() => mark("dismiss", "dismissed")}>
@@ -183,8 +182,8 @@ function DeleteQuestion({ busy, onDelete }: { busy: boolean; onDelete: () => Pro
 
 // Topics, biggest first, each with its groups of questions that ask the same thing, biggest
 // first. Questions posted since the last grouping come first, under "No topic yet". Private
-// questions come after the topics under their own heading, because organize never sends them to
-// the AI, so they never get a topic. Dismissed ones come last. `key` is for React only.
+// questions sit in their topics with the rest (organize sends them too, Sam's decision D12 f).
+// Dismissed ones come last. `key` is for React only.
 type Group = { key: string; label: string; list: Item[] };
 type Topic = { key: string; topic: string; count: number; groups: Group[] };
 const NO_TOPIC = "No topic yet";
@@ -192,7 +191,7 @@ const NO_TOPIC = "No topic yet";
 export function grouped(items: Item[]): Topic[] {
   const topics = new Map<string, Map<string, Item[]>>();
   for (const q of items) {
-    if (q.status === "dismissed" || q.private) continue;
+    if (q.status === "dismissed") continue;
     const topic = q.topic ?? NO_TOPIC;
     const groups = topics.get(topic) ?? new Map<string, Item[]>();
     const label = q.cluster ?? q.text;
@@ -209,9 +208,6 @@ export function grouped(items: Item[]): Topic[] {
       count: size(groups),
       groups: [...groups.entries()].sort((a, b) => b[1].length - a[1].length).map(([label, list]) => ({ key: label, label, list })),
     }));
-  const hidden = items.filter((q) => q.private && q.status !== "dismissed");
-  if (hidden.length)
-    out.push({ key: "private", topic: "Private (not sent to the AI)", count: hidden.length, groups: hidden.map((q) => ({ key: q._id, label: q.text, list: [q] })) });
   const dismissed = items.filter((q) => q.status === "dismissed");
   if (dismissed.length)
     out.push({ key: "dismissed", topic: "Dismissed", count: dismissed.length, groups: dismissed.map((q) => ({ key: q._id, label: q.text, list: [q] })) });
@@ -289,18 +285,17 @@ export default function QA() {
   );
 }
 
-// The answers students can see now, under their questions. A private question's answer reaches
-// only the student who asked it, and says so.
+// The answers students can see now, under their questions. A private question's answer is never
+// shared, so a private row an older build marked shared is left out.
 function Shared({ items }: { items: Item[] | undefined }) {
   if (items === undefined) return <Status kind="loading">Loading…</Status>;
-  const shared = items.filter((q) => q.shared);
+  const shared = items.filter((q) => q.shared && !q.private);
   if (shared.length === 0) return <Status kind="empty">No answers shared yet.</Status>;
   return (
     <ul className="list">
       {shared.map((q) => (
         <li key={q._id}>
           <p className="qa-shared__q">{q.text}</p>
-          {q.private && <Badge tone="warn">Only the student who asked</Badge>}
           <p className="qa-shared__a">{q.answer}</p>
         </li>
       ))}

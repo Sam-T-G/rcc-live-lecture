@@ -102,8 +102,10 @@ export default function Questions({ index }: { index: number | null | undefined 
           </label>
           <label>
             <input type="checkbox" checked={onlyProfessor} onChange={(e) => setOnlyProfessor(e.target.checked)} />
-            Only the professor can see it
+            Only the professor sees it
           </label>
+          {/* Sam's decision D12 (f): "Group by topic with AI" sends private texts too, never names. */}
+          {onlyProfessor && <p className="muted">The professor’s AI tool can read the words to sort questions by topic. It never gets your name.</p>}
           <div className="live-ask__foot">
             <span className="live-ask__count">
               {text.length}/{MAX_LENGTH}

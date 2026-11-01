@@ -1,28 +1,45 @@
 # Team: Live slides
 
-The PM keeps this current; the agent reads it before every change. Copied from the team's Google Doc (the doc is the source during the meeting; paste the sheet here when it changes).
+The agent reads this before every change. Where it disagrees with the Status section of AGENTS.md, AGENTS.md wins. Sam's decisions (D6, D12 and the rest) are the source; the 10-29 Google Doc no longer is.
 
-**The product, in one line (the whole room's):** When students check in and follow the slides on their phones, the professor sees who's here and who's lost. (Starting point; the room can rewrite it.)
+**Goal:** a student in the room follows the professor's slides on their phone and takes part: they say when they're lost, ask and upvote questions, and play on a small team for extra credit.
 
-| | |
-|---|---|
-| For | [one real person, from the doc] |
-| Problem | [what goes wrong for them today] |
-| Must do | A student in the room sees the slide the professor is on, on their phone, and can tap "I'm lost" on it. (starting point; the team may change it) |
-| Not doing | [what we cut] |
-| On screen | [the exact words, from the designer] |
-| What it sees | Sign-in, and the slide text the deck sends (headings and visible lines, never notes). Keeps one row per lost tap: who and which slide. Questions: the text, the slide, and the sign-in name only if the student didn't choose anonymous; the account key is kept to stop self-upvotes and allow delete, and is never sent to any screen. One row per upvote. Groups: a small team (3 or 4 students, named by color) per checked-in student, no names shown; the board shows only totals. |
-| Tests | 1. [real-input check] 2. [ ] 3. [ ] |
-| Next ask | [the top Waiting row in the doc's queue] |
+## Must do
+
+- #/live shows the slide the professor is on, live. The student can page back through slides this class has shown without moving the projector, and the phone follows live again once the professor reaches that slide.
+- "I'm lost" on the slide on screen, for checked-in students. A second tap takes it back. The professor sees how many are lost on the slide on screen and on every slide (#/host).
+- Questions beside the slide: anonymous by default, by name if the student unticks it, or private ("Only the professor sees it"). Checked-in students upvote other people's public questions. Sorted by upvotes, then newest. The professor sorts, answers, shares an answer under a public question, deletes, and groups questions by topic with AI on #/host Questions.
+- Teams: each student joins a team when their pass is scanned. Teams lock 5 minutes after the class start or the first check-in, whichever is later, and the lock re-deals everyone into teams of 3 or 4 (the professor picks 3 or 4; fewer than 6 students stay on one team). After the lock a newcomer joins the smallest team, up to 5, and a new team opens only when every team has 5, so nobody is on a team of 1 (D12 l).
+- The board ranks teams by points per student (right answers on ended quizzes plus the professor's point changes, divided by members; D6). 1st place gets 5 extra credit, 2nd 3, 3rd 1; ties split the places they fill. #/live shows it on the phone and #/live/leaderboard on the projector.
+- End day (#/host Points or #/checkin/teacher) saves each student's extra credit and ends the class. The professor downloads it as a CSV.
+- Past quizzes and votes: once the professor ends one, the student sees the question, the counts, the right answer (quizzes) and their own pick.
+
+## What it sees
+
+- **Sign-in:** every row a student writes (`lost`, `questions`, `questionVotes`, `groups`, `groupPoints` for one student, `groupResults`) keeps their sign-in id (`tokenIdentifier`, which holds a typed sign-in's email). No function sends it to a screen.
+- **Slides:** the slide text the deck sends (headings and visible lines, never speaker notes).
+- **I'm lost:** one row per student per slide per class: who and which slide. Screens get counts only, and only for students checked in to this class, so a check-in the professor removes drops out of the counts.
+- **Questions:** the text, the slide, and the name from the student's check-in unless they post anonymously (anonymous hides it from the professor too). A private question shows only to its author and the professor, can't be upvoted, and its answer can't be shared, not even with its author (D12 e). The professor's typed answer (up to 1000 characters) stays with the professor until they share it; a shared answer shows under the question on every phone.
+- **AI:** "Group by topic with AI" sends Google's Gemini the text of every question in this class that isn't dismissed, private ones included (D12 f), each with a number in place of the student and never a name. The form on #/live tells a student this when they tick the private box. The topics come back to the professor only.
+- **Teams:** a team number per checked-in student, shown as a color. Phones and the projector show only team colors and totals, never names.
+- **Points:** each change the professor makes, for a team or one student, with its reason (up to 80 characters) and time. Only the professor sees the list.
+- **Extra credit:** End day saves one `groupResults` row per student on a team with their name and email from their check-in, team, rank, points, extra credit and running total. Only the professor reads them, for the CSV.
+- No camera, location or microphone.
 
 ## Where it lives
 
-- Pages: #/live (phone). Already registered; build in `src/teams/live/Page.tsx` and files next to it.
-- Server: `convex/live/`. Functions are called as `api.live.<file>.<function>`.
-- Data: Writes `lost`, `questions`, `questionVotes` (`convex/live/questions.ts`: `list`, `ask`, `vote`, `remove`), and `groups` and `groupSettings` (`convex/live/groups.ts`: `leaderboard`, `mine`, `join`, `size`, `setSize`). Reads `polls` and `pollAnswers` from Check-in's quiz to score the groups and to show students past questions (`convex/live/past.ts`: `past`, ended questions only). Keeps `convex/live/read.ts` working: `lostCount`, `lostBySlide`, `mine`. Reads `checkin/read:me` to let only checked-in people in (optional until Check-in has merged). See docs/contracts.md.
+- Pages: `src/teams/live/Page.tsx` (#/live, #/live/leaderboard), `Leaderboard.tsx`, `Questions.tsx`, `PastQuestions.tsx`. The professor's side is in `src/teams/host/` (Questions tab `QA.tsx`, Points tab `Boards.tsx`) and the teacher page `src/teams/checkin/Teacher.tsx`.
+- Server: `convex/live/`, called as `api.live.<file>.<function>`. Every function, its args, who may call it and the tables it touches are in [convex/live/README.md](../../../convex/live/README.md). In short:
+  - `lost.ts`: `toggle` (checked in).
+  - `read.ts`: `lostCount`, `lostBySlide`, `mine` (anyone). Other teams read these (docs/contracts.md).
+  - `past.ts`: `past` (anyone).
+  - `questions.ts`: `list` (anyone); `ask`, `vote` (checked in); `remove` (the author, a professor or admin); `forHost`, `setStatus`, `answer`, `share`, `organize` (professor or admin); `applyTopics` (internal).
+  - `groups.ts`: `status`, `leaderboard`, `mine` (anyone); `join` (signed in, deals only checked-in students); `setSize`, `roster`, `adjust`, `removePoints`, `pointLog`, `endDay`, `results` (professor or admin); `lock` (internal). `checkin.pass.scan` calls `ensureGroup`, and the class close calls `saveExtraCredit`.
+- Tables: writes `lost`, `questions`, `questionVotes`, `groups`, `groupSettings`, `groupPoints`, `groupResults`. Reads `checkins`, `polls` and `pollAnswers` (Check-in's quiz), `deckChannels` and `deckSlides` (the deck), and `lectures` (the class window, `lib.lectureWindow`): every read is for the current class only.
 - Channel: `CHANNEL` from `src/blocks/deck.ts` (`"gdg"`).
-- Only two teams? Also show how many are lost under the slide on the professor's laptop.
 
-## Seats
+## Tests
 
-Lead · PM · Designer · QA + Trust · Launch (names stay in the Google Doc, never in the repo)
+- Server, convex-test: `convex/live/*.test.ts` (groups, groups.redeal, groups.fixes, groups.sweep, lost, read, past, questions, questions.private), plus `convex/privacy.test.ts` for what students and signed-out readers can see.
+- Screens, rendered in Node: `src/teams/live/*.test.ts`. `Questions.ask.test.ts` checks what the form sends (anonymous by default, `private: true` once ticked).
+- The gate: `npm run build && npm run lint && npm test && npm run typecheck:convex`.
