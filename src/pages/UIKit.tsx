@@ -1,11 +1,12 @@
 // #/ui: every color token and every kit part in every state, light and dark side by side, for
 // design reviews and screenshots. The ratios are measured from what the browser draws.
 // #/ui/projector shows the projector layout at the window's size, and #/ui/projector/dark the
-// same layout dark. docs/design.md says when to use each part.
+// same layout dark. Any other part after #/ui shows "No page". docs/design.md says when to use
+// each part.
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ConvexError } from "convex/values";
-import { useRoute } from "../blocks/router";
-import { Big, Card, Status } from "../blocks/ui";
+import { Link, useRoute } from "../blocks/router";
+import { Big, Card, Screen, Status } from "../blocks/ui";
 import {
   Badge,
   Banner,
@@ -25,8 +26,16 @@ import { PAIRS, contrastRatio, parseColor, toHex, type Pair } from "../styles/co
 import "../styles/uikit.css";
 
 export default function UIKit() {
-  const [, sub, theme] = useRoute();
-  if (sub === "projector") return <ProjectorSample theme={theme === "dark" ? "dark" : "light"} />;
+  const parts = useRoute();
+  const [, sub, theme] = parts;
+  if (sub === "projector" && parts.length <= 3 && (theme === undefined || theme === "dark"))
+    return <ProjectorSample theme={theme === "dark" ? "dark" : "light"} />;
+  if (parts.length > 1)
+    return (
+      <Screen title={`No page at #/${parts.join("/")}`}>
+        <p><Link to="">Go home</Link></p>
+      </Screen>
+    );
   return (
     <main className="page page--wide">
       <h1>UI kit</h1>

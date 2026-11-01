@@ -8,7 +8,7 @@
 //   quiz: behind the professor key. The professor asks the room a quiz question or a vote (Quiz.tsx).
 //   stage: the deck full screen for the projector, with the check-in QR, the count and the open
 //     quiz on top (Stage.tsx).
-// Any other part shows "No page at #/checkin/<part>".
+// Any other part, or any part after one of these, shows "No page at #/checkin/<parts>".
 import "./checkin.css";
 import { Link, useRoute } from "../../blocks/router";
 import { Screen } from "../../blocks/ui";
@@ -19,24 +19,25 @@ import { Student } from "./Student";
 import { Teacher } from "./Teacher";
 
 export default function CheckinPage() {
-  const [, part = "student"] = useRoute();
-  switch (part) {
-    case "student":
-    case "join":
-      return <Student />;
-    case "teacher":
-      return <Teacher />;
-    case "kiosk":
-      return <Kiosk />;
-    case "quiz":
-      return <Professor />;
-    case "stage":
-      return <Stage />;
-    default:
-      return (
-        <Screen title={`No page at #/checkin/${part}`}>
-          <p><Link to="">Go home</Link></p>
-        </Screen>
-      );
-  }
+  const [, ...rest] = useRoute();
+  const [part = "student"] = rest;
+  if (rest.length <= 1)
+    switch (part) {
+      case "student":
+      case "join":
+        return <Student />;
+      case "teacher":
+        return <Teacher />;
+      case "kiosk":
+        return <Kiosk />;
+      case "quiz":
+        return <Professor />;
+      case "stage":
+        return <Stage />;
+    }
+  return (
+    <Screen title={`No page at #/checkin/${rest.join("/")}`}>
+      <p><Link to="">Go home</Link></p>
+    </Screen>
+  );
 }

@@ -16,6 +16,8 @@
 //   #/lab               every building block, one panel each
 //   #/ui                the design kit, light and dark (#/ui/projector at projector size)
 import { createElement, lazy, Suspense, type ComponentType } from "react";
+import { Link, useRoute } from "../blocks/router";
+import { Screen, Status } from "../blocks/ui";
 import Home from "./Home";
 import Lab from "./Lab";
 import CheckinPage from "../teams/checkin/Page";
@@ -28,13 +30,34 @@ const UIKit = lazy(() => import("./UIKit"));
 // #/admin too: only staff open it, on a laptop.
 const Admin = lazy(() => import("./Admin"));
 
+// What a lazy page shows while its file downloads, so a slow network never shows a blank page.
+function loading(Page: ComponentType, title: string) {
+  const fallback = createElement(Screen, { title, wide: true }, createElement(Status, { kind: "loading", children: "Loading…" }));
+  return () => createElement(Suspense, { fallback }, createElement(Page));
+}
+
+// A page that has nothing after its name: #/lab/nope and #/admin/x show "No page at #/...", the
+// same screen App shows for an unknown first part. Pages with parts of their own (checkin, live,
+// host, portal, ui) check them themselves.
+function alone(Page: ComponentType) {
+  return function Alone() {
+    const parts = useRoute();
+    if (parts.length <= 1) return createElement(Page);
+    return createElement(
+      Screen,
+      { title: `No page at #/${parts.join("/")}` },
+      createElement("p", null, createElement(Link, { to: "", children: "Go home" })),
+    );
+  };
+}
+
 export const pages: Record<string, ComponentType> = {
   "": Home,
-  lab: Lab,
+  lab: alone(Lab),
   checkin: CheckinPage, // #/checkin/student (join), teacher, kiosk, quiz, stage
   live: LivePage, // #/live, #/live/leaderboard
   host: HostPage, // #/host
   portal: PortalPage, // #/portal, #/portal?channel=<name>
-  ui: () => createElement(Suspense, null, createElement(UIKit)), // #/ui (every color and kit part, light and dark), #/ui/projector
-  admin: () => createElement(Suspense, null, createElement(Admin)), // #/admin: the staff list and the door iPads
+  ui: loading(UIKit, "UI kit"), // #/ui (every color and kit part, light and dark), #/ui/projector
+  admin: alone(loading(Admin, "Admin")), // #/admin: the staff list and the door iPads
 };

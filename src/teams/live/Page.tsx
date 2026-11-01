@@ -10,7 +10,7 @@
 //     error and the slide stays up.
 //   #/live/leaderboard: the team board on the projector.
 //   Both show the late banner (first names, for students who didn't opt out). Any other
-//   #/live/<part> shows "No page at #/live/<part>".
+//   #/live/<parts>, #/live/leaderboard/<part> included, shows "No page at #/live/<parts>".
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -30,8 +30,9 @@ import "./live.css";
 const QUESTIONS_ID = "live-questions";
 
 export default function LivePage() {
-  const [, part] = useRoute();
-  if (part === "leaderboard")
+  const [, ...rest] = useRoute();
+  const [part] = rest;
+  if (part === "leaderboard" && rest.length === 1)
     return (
       <Projector title="Team leaderboard">
         <ErrorBoundary label="The team leaderboard">
@@ -42,9 +43,9 @@ export default function LivePage() {
         </div>
       </Projector>
     );
-  if (part !== undefined)
+  if (rest.length > 0)
     return (
-      <Screen title={`No page at #/live/${part}`}>
+      <Screen title={`No page at #/live/${rest.join("/")}`}>
         <p><Link to="">Go home</Link></p>
       </Screen>
     );
