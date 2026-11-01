@@ -7,7 +7,8 @@
 //   <StaffGate title="Live quiz">...</StaffGate>   the page, for professors and admins. Anyone
 //                else sees how to sign in, or why their sign-in doesn't open it.
 //   <SignInEnding />   for the 5 minutes before a Google sign-in ends, its end time and Google's
-//                button pinned to the bottom of the page (StaffGate and #/admin show it).
+//                button pinned to the bottom of the page (StaffGate and #/admin show it; #/live
+//                and #/checkin/student show it with line={STUDENT_ENDING}).
 //   <DoorGate>{(device) => <Scanner device={device} />}</DoorGate>   #/checkin/kiosk. A paired
 //                iPad scans with its device token; a scanner who signs in scans as themselves
 //                (device is undefined). A professor or admin is never left signed in on a door
@@ -119,13 +120,16 @@ export function StaffGate({ title, children }: { title: string; children: ReactN
 // renews it with no click, but Safari and Firefox show Google's One Tap card, which needs one, so
 // for the last 5 minutes this says when the sign-in ends and shows Google's button, which works in
 // every browser. Signing in again keeps the page open; nothing shows once the new sign-in comes.
-export function SignInEnding() {
+// Student pages (#/live, #/checkin/student) pass their own `line` (STUDENT_ENDING), since the
+// page stays open for them but signs them out.
+export const STUDENT_ENDING = "Sign in with Google again before then, or this page signs you out.";
+export function SignInEnding({ line = "Sign in with Google again before then to keep this page open." }: { line?: string }) {
   const { endsAt } = useGoogleUser();
   if (endsAt == null) return null;
   return (
     <BannerStack>
       <Banner tone="warn" title={`Your sign-in ends at ${clock(endsAt)}.`} action={<GoogleButton />}>
-        Sign in with Google again before then to keep this page open.
+        {line}
       </Banner>
     </BannerStack>
   );

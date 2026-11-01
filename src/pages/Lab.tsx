@@ -45,7 +45,9 @@ export default function Lab() {
       <ErrorBoundary label="The live sync panel">
         <Sync />
       </ErrorBoundary>
-      <Qr />
+      <ErrorBoundary label="The QR panel">
+        <Qr />
+      </ErrorBoundary>
       <Location />
       <ErrorBoundary label="The deck panel">
         <Deck />
@@ -190,7 +192,7 @@ function Deck() {
       ) : slide === undefined ? (
         <Status kind="loading">Loading…</Status>
       ) : slide === null ? (
-        <Status kind="empty">No deck has sent this channel anything yet.</Status>
+        <Status kind="empty">No slide on this channel in this class yet.</Status>
       ) : (
         <div className="slide">
           <p className="muted">

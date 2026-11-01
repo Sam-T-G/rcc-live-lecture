@@ -36,17 +36,17 @@ Every host-only function starts with `requireProf(ctx)` (`requireHost` in `conve
 **Staff pages** (`src/teams/checkin/prof.tsx`):
 
 ```tsx
-import { DoorGate, SignInEnding, StaffGate, useStaff } from "../checkin/prof";
+import { DoorGate, SignInEnding, StaffGate, STUDENT_ENDING, useStaff } from "../checkin/prof";
 
 <StaffGate title="Live quiz"><ProfessorBoard /></StaffGate>       // professors and admins; anyone else sees the sign-in, or why theirs can't open the page
 const me = useStaff();                                           // undefined loading, null signed out, else { email, role, canHoldRole }
-<SignInEnding />                                                 // a Google sign-in's end time and Google's button, its last 5 minutes (StaffGate shows it)
+<SignInEnding />                                                 // a Google sign-in's end time and Google's button, its last 5 minutes (StaffGate shows it; student pages pass line={STUDENT_ENDING})
 <DoorGate>{(device) => <Scanner device={device} />}</DoorGate>   // #/checkin/kiosk: a scanner, a paired iPad (it signs out a professor or admin), or the pairing screen
 ```
 
 **Testing as staff on a dev backend:** sign in with the typed form as an `@test.local` email, then `npx convex run staff:devGrant '{"email":"prof1@test.local","role":"professor"}'`. The role lasts 2 hours, and `staff:devRevoke` ends every one at once; devGrant refuses on any backend not in `DEV_HOSTS` (prod included) and refuses any other email. To test the door iPad, open #/checkin/kiosk signed out and type its code on #/admin.
 
-Google's tokens last an hour and a typed sign-in 12 hours; a sign-in ends a minute before its token runs out, and the page shows the sign-in again. For a Google sign-in, 5 minutes before its token runs out, `AuthProvider` asks Google for a new one: Chrome signs the same account back in with no click, while Safari and Firefox show Google's One Tap card, which needs a click (never on #/checkin/kiosk). Professor pages and #/admin show `<SignInEnding />` then, so a professor in any browser can sign in again before the end and keep the page open.
+Google's tokens last an hour and a typed sign-in 12 hours; a sign-in ends a minute before its token runs out, and the page shows the sign-in again. For a Google sign-in, 5 minutes before its token runs out, `AuthProvider` asks Google for a new one: Chrome signs the same account back in with no click, while Safari and Firefox show Google's One Tap card, which needs a click (never on #/checkin/kiosk). Professor pages and #/admin show `<SignInEnding />` then, so a professor in any browser can sign in again before the end and keep the page open. #/live and #/checkin/student show it too, with `line={STUDENT_ENDING}`. When a sign-in runs out on a page, `useGoogleUser().ended` is true until the next sign-in or sign-out, and the quiz card and I'm lost say "Your sign-in ended." in place of the check-in line.
 
 ## Live data (Convex)
 
@@ -192,7 +192,7 @@ useVisionLoop(cam.video, runner, cam.on, (seen) => {
 ```
 
 - **Load it lazily.** The library is about 160 KB; import the page or component that uses it with `React.lazy` (as `src/pages/Lab.tsx` does), so phones on other pages never download it. Each model is a few MB the first time, then cached.
-- **The camera** (`useCamera`, in `src/blocks/camera.ts`) starts only from a button press. On a Mac it skips an iPhone (Continuity Camera) and uses the built-in one. Import it from `camera.ts` unless the page also runs a model, so MediaPipe stays out of that page's bundle.
+- **The camera** (`useCamera`, in `src/blocks/camera.ts`) starts only from a button press. On a Mac it skips an iPhone (Continuity Camera) and uses the built-in one. The browser names its cameras only after the page has camera permission, so the first time, when the browser's default camera is the iPhone, its camera turns on for about a second before `useCamera` switches to the built-in one. Import it from `camera.ts` unless the page also runs a model, so MediaPipe stays out of that page's bundle.
 - **Privacy:** send counts or labels to Convex, never frames or face data. Say what the camera sees in TEAM.md.
 - **A still picture:** `loadVision(kind, "IMAGE")`, then `run(img)` on a loaded `<img>`.
 - **Gemini** reads pictures too (`gemini()` with an image part, above). Use it when you need words about a picture; use MediaPipe when you need it live, many times a second.

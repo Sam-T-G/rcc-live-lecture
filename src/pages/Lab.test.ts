@@ -359,6 +359,21 @@ describe("#/lab", () => {
     expect(chunk.imports).toBe(2);
   });
 
+  it("sweep1-blocks-1 the QR panel sits inside its own ErrorBoundary, 'The QR panel', so a QR that throws leaves the other panels up", () => {
+    hooks.slots = [];
+    hooks.at = 0;
+    const boundary = elements(Lab()).find((e) => (e.props as { label?: string }).label === "The QR panel");
+    expect(boundary, "an ErrorBoundary labelled 'The QR panel'").toBeDefined();
+    expect(renderToStaticMarkup(boundary!.props.children as ReactElement)).toContain("<h2>QR code</h2>");
+  });
+
+  it("sweep1-blocks-8 a channel with no slide says so for this class: 'No slide on this channel in this class yet.', never that no deck ever sent one", () => {
+    results["deck:current"] = null; // also what deck.current returns after End class, or 12 h after the last slide
+    const html = page();
+    expect(html).toContain("No slide on this channel in this class yet.");
+    expect(html).not.toContain("No deck has sent this channel anything yet.");
+  });
+
   it("blocks-frontend-21 the vision panel shows a blocked camera and a model that didn't load as Status errors (role=alert)", async () => {
     vision.cameraError = "Camera blocked. Allow it in the browser's address bar.";
     expect(alerts(render(Vision, true))).toEqual(["Camera blocked. Allow it in the browser's address bar."]);

@@ -18,8 +18,14 @@
 // stop() also clears the picture from the <video>.
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// An iPhone or iPad camera (Continuity Camera on a Mac), by the name the browser gives it.
+const isPhone = (label: string) => /iphone|ipad|continuity/i.test(label);
+
 // On a Mac it skips an iPhone (Continuity Camera) and uses the built-in camera; pass a deviceId
-// to start() to pick another.
+// to start() to pick another. Until the page has camera permission the browser lists cameras
+// without names, so on the first start the browser opens its default camera; when that is an
+// iPhone and another camera exists, start() closes the iPhone's camera at once and opens the
+// other one, so the iPhone's camera turns on for about a second that first time.
 export function useCamera() {
   const video = useRef<HTMLVideoElement>(null);
   const [on, setOn] = useState(false);
@@ -57,33 +63,53 @@ export function useCamera() {
       const mine = ++turn.current;
       starting.current = true;
       setError(null);
-      try {
-        if (!deviceId) {
-          const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
-          deviceId = cams.find((c) => c.label && !/iphone|ipad|continuity/i.test(c.label))?.deviceId;
-          if (mine !== turn.current) return;
-        }
-        const s = await navigator.mediaDevices.getUserMedia({
-          video: deviceId ? { deviceId: { exact: deviceId }, width: 1280 } : { facingMode: "user", width: 1280 },
+      const cameras = async () => (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
+      const open = (id?: string) =>
+        navigator.mediaDevices.getUserMedia({
+          video: id ? { deviceId: { exact: id }, width: 1280 } : { facingMode: "user", width: 1280 },
           audio: false,
         });
-        if (mine !== turn.current) {
-          s.getTracks().forEach((t) => t.stop());
-          return;
+      // The camera this start opened and hasn't handed to `stream` yet, so a failure lets it go.
+      let s: MediaStream | null = null;
+      const letGo = () => {
+        s?.getTracks().forEach((t) => t.stop());
+        s = null;
+      };
+      try {
+        if (!deviceId) {
+          deviceId = (await cameras()).find((c) => c.label && !isPhone(c.label))?.deviceId;
+          if (mine !== turn.current) return;
         }
-        stream.current = s;
+        s = await open(deviceId);
+        if (mine !== turn.current) return letGo();
+        // No camera had a name before permission, so the browser picked its default. If that is
+        // an iPhone, the names are there now: switch to a camera that isn't one.
+        if (!deviceId && isPhone(s.getVideoTracks()[0]?.label ?? "")) {
+          const other = (await cameras()).find((c) => c.label && !isPhone(c.label));
+          if (mine !== turn.current) return letGo();
+          if (other) {
+            letGo();
+            s = await open(other.deviceId);
+            if (mine !== turn.current) return letGo();
+          }
+        }
+        // From here `stream` holds it, and stop() or drop() turns it off.
+        const opened: MediaStream = s;
+        s = null;
+        stream.current = opened;
         // A track that ends on its own fires "ended"; one this page stops doesn't.
-        for (const t of s.getTracks())
+        for (const t of opened.getTracks())
           t.addEventListener("ended", () => {
-            if (stream.current === s) stop();
+            if (stream.current === opened) stop();
           });
         if (video.current) {
-          video.current.srcObject = s;
+          video.current.srcObject = opened;
           await video.current.play();
         }
         if (mine !== turn.current) return; // stop() ran while the picture was starting, and turned it off
         setOn(true);
       } catch (e) {
+        letGo(); // a camera opened before listing the cameras again failed
         if (mine !== turn.current) return; // stopped or closed meanwhile: nothing is open, nothing to say
         drop(); // a camera whose picture wouldn't play
         setError(e instanceof Error && e.name === "NotAllowedError" ? "Camera blocked. Allow it in the browser's address bar." : "Couldn't start the camera.");

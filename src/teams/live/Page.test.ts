@@ -22,7 +22,8 @@ const calls = vi.hoisted(() => ({
   // The index prop of every Questions card rendered.
   questions: [] as unknown[],
 }));
-const auth = vi.hoisted(() => ({ user: null as null | { name: string; email: string } }));
+// The sign-in block's state: endsAt in a Google sign-in's last 5 minutes, ended once it ran out.
+const auth = vi.hoisted(() => ({ user: null as null | { name: string; email: string }, endsAt: null as number | null, ended: false }));
 vi.mock("convex/react", () => ({
   useQuery: (ref: FunctionReference<"query">, args?: unknown) => {
     if (args === "skip") return undefined;
@@ -36,7 +37,7 @@ vi.mock("convex/react", () => ({
   // GroupBadge (Leaderboard.tsx) waits for this before it calls live.groups.join.
   useConvexAuth: () => ({ isLoading: false, isAuthenticated: auth.user !== null }),
 }));
-vi.mock("../../blocks/auth", () => ({ useGoogleUser: () => auth, SignedInAs: () => "[signed in as]" }));
+vi.mock("../../blocks/auth", () => ({ useGoogleUser: () => auth, SignedInAs: () => "[signed in as]", GoogleButton: () => "[Google button]" }));
 // The deck's live slide is results["deck:current"]. With deck.steps set, it is instead each of
 // those slides in turn within one render: the hook moves to the next one while the page is
 // rendering, so React renders the same LiveSlides again with its state kept, the way an open page
@@ -94,6 +95,8 @@ const STUDENT = { name: "Sample student 1", email: "student1@example.edu" };
 beforeEach(() => {
   for (const k of Object.keys(results)) delete results[k];
   auth.user = null;
+  auth.endsAt = null;
+  auth.ended = false;
   deck.steps = null;
   calls.queries.length = 0;
   calls.mutations.length = 0;
@@ -300,6 +303,25 @@ describe("#/live, the student phone", () => {
     auth.user = null;
     results["checkin/read:me"] = false;
     expect(checkinBox(open("#/live"))).toBeNull();
+  });
+
+  it("sweep1-ledger-1 in a Google sign-in's last 5 minutes, #/live says when it ends with Google's button; once it ran out, I'm lost says so", () => {
+    deckOn(2);
+    auth.user = STUDENT;
+    results["checkin/read:me"] = true;
+    auth.endsAt = Date.UTC(2026, 10, 5, 22, 29);
+    const time = new Date(auth.endsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const html = open("#/live").replace(/&#x27;/g, "'");
+    expect(html).toContain(`Your sign-in ends at ${time}.`);
+    expect(html).toContain("Sign in with Google again before then, or this page signs you out.");
+    expect(html).toContain("[Google button]");
+    auth.endsAt = null;
+    expect(open("#/live")).not.toContain("Your sign-in ends at");
+
+    // The sign-in ran out: the student is signed out, and the page says why.
+    auth.user = null;
+    auth.ended = true;
+    expect(lostSlot(open("#/live"))).toBe("Your sign-in ended. Sign in again to tap I’m lost");
   });
 
   it("F20.6 signed out: 'Sign in to tap I’m lost' instead of the button", () => {

@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Professor, QuizCard } from "./Quiz";
 
 const answers: Record<string, unknown> = {};
-const who = vi.hoisted(() => ({ user: null as null | { name: string; email: string } }));
+const who = vi.hoisted(() => ({ user: null as null | { name: string; email: string }, ended: false }));
 
 vi.mock("convex/react", () => ({
   useQuery: (ref: Parameters<typeof getFunctionName>[0], args: unknown) => (typeof args === "object" ? answers[getFunctionName(ref)] : undefined),
@@ -17,7 +17,7 @@ vi.mock("convex/react", () => ({
 vi.mock("./prof", () => ({
   StaffGate: ({ children }: { children: unknown }) => children,
 }));
-vi.mock("../../blocks/auth", () => ({ useGoogleUser: () => ({ user: who.user }) }));
+vi.mock("../../blocks/auth", () => ({ useGoogleUser: () => ({ user: who.user, ended: who.ended }) }));
 
 const ended = { id: "p1", kind: "quiz", question: "What does a capacitor store?", choices: ["Charge", "Current"], open: false };
 const open = (kind: "quiz" | "vote") => ({
@@ -33,6 +33,7 @@ const open = (kind: "quiz" | "vote") => ({
 beforeEach(() => {
   for (const k of Object.keys(answers)) delete answers[k];
   who.user = null;
+  who.ended = false;
 });
 
 const page = () => renderToStaticMarkup(createElement(Professor)).replace(/<!-- -->/g, "");
@@ -96,6 +97,18 @@ describe("the quiz card on #/live never says 'question' (that word is for studen
 });
 
 describe("the quiz card before check-in (#/live)", () => {
+  it("sweep1-ledger-1 once the sign-in ran out on this page, the card says so: 'Your sign-in ended. Sign in again to answer.' and a Sign in link", () => {
+    who.ended = true;
+    Object.assign(answers, { "checkin/quiz:current": open("quiz"), "checkin/quiz:mine": null, "checkin/read:me": false });
+    let html = card().replace(/&#x27;/g, "'");
+    expect(html).toContain("<p>Your sign-in ended. Sign in again to answer.</p>");
+    expect(html).not.toContain("check in to answer");
+    expect(html).toMatch(/<a href="#\/checkin\/student"[^>]*>Sign in<\/a>/);
+    answers["checkin/quiz:current"] = open("vote");
+    html = card();
+    expect(html).toContain("<p>Your sign-in ended. Sign in again to vote.</p>");
+  });
+
   it("F21.2 checkin-frontend-19 signed out: the question and its choices, 'Sign in and check in to answer.' and a link to #/checkin/student, and no answer buttons", () => {
     Object.assign(answers, { "checkin/quiz:current": open("quiz"), "checkin/quiz:mine": null, "checkin/read:me": false });
     const html = card();

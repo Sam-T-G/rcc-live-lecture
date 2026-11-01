@@ -55,7 +55,7 @@ describe("SignedInAs", () => {
   it("shows 'Signed in as <name> (<email>)' and a 'Not you? Sign out' button", () => {
     const html = render({ name: "Jane Doe", email: "jane@example.edu" });
     expect(html).toContain("Signed in as Jane Doe (jane@example.edu)");
-    expect(html).toContain('<button type="button" class="quiet">Not you? Sign out</button>');
+    expect(html).toContain('<button type="button" class="btn btn--quiet">Not you? Sign out</button>');
   });
 
   it("shows the email once when the name is the email", () => {

@@ -106,7 +106,7 @@ export class ErrorBoundary extends Component<BoundaryProps, { failed: boolean }>
     return (
       <div className="row">
         <Status kind="error">{`${this.props.label || "This part of the page"} didn't load.`}</Status>
-        <button type="button" className="quiet" onClick={this.retry}>Try again</button>
+        <button type="button" className="btn btn--quiet" onClick={this.retry}>Try again</button>
       </div>
     );
   }

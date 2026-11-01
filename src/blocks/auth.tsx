@@ -168,12 +168,15 @@ function onDoorIPad() {
 // so with Google's button.
 // refused: the server refused the last sign-in, so it was dropped (DropRefused). SignInButton says
 // so until the next sign-in, or until someone signed in signs out.
+// ended: the sign-in on this page ran out (the timer below ended it), and nobody has signed in or
+// signed out since, so a student's page can say "Your sign-in ended." in place of "Sign in".
 type AuthState = {
   user: Stored | null;
   ready: boolean;
   failed: boolean;
   endsAt: number | null;
   refused: boolean;
+  ended: boolean;
   signOut: () => void;
   renderButton: (el: HTMLElement) => void;
   signInWithToken: (token: string) => void;
@@ -198,6 +201,8 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
   });
   // Whether the server refused the last sign-in (AuthState.refused).
   const [refused, setRefused] = useState(false);
+  // Whether the sign-in on this page ran out (AuthState.ended).
+  const [ended, setEnded] = useState(false);
   // The person Convex was last told about. When the signed-in person changes (a sign-in, or another
   // account in another tab), Convex is told "loading" for one render first (switching), so it drops
   // the old sign-in and checks the new one from the start; DropRefused then knows the server's
@@ -226,6 +231,7 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
     if (!s) return;
     save(s);
     setRefused(false);
+    setEnded(false);
     setUser(s);
   }, []);
 
@@ -262,7 +268,10 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
   useEffect(() => {
     const sync = () => {
       const next = load();
-      if (next) setRefused(false);
+      if (next) {
+        setRefused(false);
+        setEnded(false);
+      }
       setUser((u) => (u?.token === next?.token ? u : next));
     };
     const onStorage = (e: StorageEvent) => {
@@ -286,8 +295,9 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
   //   One Tap card instead, which needs a click; anyone who dismissed the card gets none for a
   //   while. If nothing comes, it asks once more 2 minutes before the token runs out. Never on the
   //   door iPad (onDoorIPad).
-  // - endsAt turns on, and professor pages and #/admin show the end time with Google's button
-  //   (SignInEnding), which works in every browser.
+  // - endsAt turns on, and professor pages, #/admin, #/live and #/checkin/student show the end
+  //   time with Google's button (SignInEnding), which works in every browser.
+  // When the sign-in ends here, `ended` turns on until the next sign-in or sign-out.
   // A typed sign-in never asks Google: that would swap the student for a Google identity, which
   // the server counts as a different person.
   useEffect(() => {
@@ -300,7 +310,9 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
     timers.push(
       setTimeout(() => {
         if (savedToken() === user.token) localStorage.removeItem(KEY);
-        setUser(load());
+        const next = load(); // another tab's newer sign-in, if it saved one
+        if (!next) setEnded(true);
+        setUser(next);
       }, Math.max(0, left - DROP)),
     );
     return () => timers.forEach(clearTimeout);
@@ -314,6 +326,7 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
     localStorage.removeItem(KEY);
     window.google?.accounts.id.disableAutoSelect();
     if (tokenRef.current !== null) setRefused(false);
+    setEnded(false);
     setUser(null);
   }, []);
 
@@ -341,9 +354,10 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
   const failed = gsi === "failed";
   // During the switching render pages still see no one (see `told` above).
   const shown = switching ? null : user;
+  const endedShown = ended && !user;
   const value = useMemo(
-    () => ({ user: shown, ready, failed, endsAt, refused, signOut, renderButton, signInWithToken, switching, fetchAccessToken }),
-    [shown, ready, failed, endsAt, refused, signOut, renderButton, signInWithToken, switching, fetchAccessToken],
+    () => ({ user: shown, ready, failed, endsAt, refused, ended: endedShown, signOut, renderButton, signInWithToken, switching, fetchAccessToken }),
+    [shown, ready, failed, endsAt, refused, endedShown, signOut, renderButton, signInWithToken, switching, fetchAccessToken],
   );
 
   return (
@@ -433,7 +447,7 @@ export function SignedInAs() {
   return (
     <p className="row muted">
       <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>Signed in as {who}</span>
-      <button type="button" className="quiet" onClick={signOut}>Not you? Sign out</button>
+      <button type="button" className="btn btn--quiet" onClick={signOut}>Not you? Sign out</button>
     </p>
   );
 }

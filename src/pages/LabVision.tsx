@@ -27,7 +27,10 @@ export default function Vision() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const img = useRef<HTMLImageElement>(null);
   const [sample, setSample] = useState("");
+  // Each goes up on a new sample pick or camera press, and both on a new model: a run whose
+  // number changed while its model loaded drops its result, its "Loaded in" line and its errors.
   const pick = useRef(0);
+  const camRun = useRef(0);
 
   const onSeen = useCallback((s: Seen) => {
     setSeen(say(s));
@@ -36,24 +39,36 @@ export default function Vision() {
   }, [kind, cam.video]);
   useVisionLoop(cam.video, runner, cam.on, onSeen);
 
-  async function load(mode: "VIDEO" | "IMAGE") {
+  // The model for `kind`, or null when `stale()` turned true while it loaded.
+  async function load(mode: "VIDEO" | "IMAGE", stale: () => boolean) {
     setStatus("Loading the model…");
     setError("");
     const t = performance.now();
     const r = await loadVision(kind, mode);
+    if (stale()) return null;
     setStatus(`Loaded in ${Math.round(performance.now() - t)} ms.`);
     return r;
   }
   async function camera() {
     if (cam.on) { cam.stop(); return; }
-    try { setRunner(await load("VIDEO")); await cam.start(); } catch { setStatus(""); setError("The model didn't load. Check the connection."); }
+    const mine = ++camRun.current;
+    const stale = () => mine !== camRun.current;
+    try {
+      const r = await load("VIDEO", stale);
+      if (!r) return;
+      setRunner(r);
+      await cam.start();
+    } catch {
+      if (!stale()) { setStatus(""); setError("The model didn't load. Check the connection."); }
+    }
   }
   async function picture(label: string) {
     setSample(label); setSeen(""); setError("");
     const mine = ++pick.current; // a newer pick replaces this one; its result and errors are dropped
     if (!label) return;
     try {
-      const r = await load("IMAGE");
+      const r = await load("IMAGE", () => mine !== pick.current);
+      if (!r) return;
       const el = img.current!;
       el.crossOrigin = "anonymous";
       el.src = SAMPLES[label];
@@ -72,7 +87,7 @@ export default function Vision() {
       <h2>Vision (on the device)</h2>
       <label>
         Model
-        <select value={kind} onChange={(e) => { cam.stop(); setRunner(null); setSeen(""); setSample(""); setStatus(""); setError(""); setKind(e.target.value as VisionKind); }}>
+        <select value={kind} onChange={(e) => { pick.current++; camRun.current++; cam.stop(); setRunner(null); setSeen(""); setSample(""); setStatus(""); setError(""); setKind(e.target.value as VisionKind); }}>
           {(Object.keys(VISION) as VisionKind[]).map((k) => <option key={k} value={k}>{k}: {VISION[k].what}</option>)}
         </select>
       </label>

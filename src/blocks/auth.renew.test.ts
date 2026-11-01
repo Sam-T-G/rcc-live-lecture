@@ -79,9 +79,11 @@ let googleCallback: ((r: { credential: string }) => void) | undefined;
 type Auth = typeof import("./auth");
 let AuthProvider: Auth["AuthProvider"];
 let user: () => { token: string } | null;
-let last: ReactElement<{ value: { endsAt: number | null } }> | undefined; // what AuthProvider last returned
+let last: ReactElement<{ value: { endsAt: number | null; ended: boolean; signOut: () => void } }> | undefined; // what AuthProvider last returned
 // When the sign-in ends, as AuthProvider's context gives it to the page (null: not ending soon).
 const endsAt = () => last!.props.value.endsAt;
+// Whether the sign-in on this page ran out and nobody has signed in since.
+const ended = () => last!.props.value.ended;
 
 beforeEach(async () => {
   vi.useFakeTimers();
@@ -240,6 +242,35 @@ describe("ROLES-UI-fixcheck-2 the page says when a Google sign-in ends", () => {
     hooks.at = 0;
     last = AuthProvider({ client: {} as ConvexReactClient, children: null }) as typeof last;
     expect(endsAt()).toBe(T0 + 2 * MIN);
+  });
+
+  it("sweep1-ledger-1 says the sign-in ended once it runs out, until someone signs in again; signing out by hand never says so", async () => {
+    signedIn(GOOGLE, T0 + 60 * MIN);
+    await settle();
+    expect(ended()).toBe(false);
+    await at(58 * MIN);
+    expect(ended()).toBe(false);
+    await at(59 * MIN);
+    expect(user()).toBeNull();
+    expect(ended()).toBe(true);
+    googleCallback!({ credential: jwt(GOOGLE, T0 + 120 * MIN) });
+    await settle();
+    expect(ended()).toBe(false);
+
+    last!.props.value.signOut();
+    await settle();
+    expect(user()).toBeNull();
+    expect(ended()).toBe(false);
+  });
+
+  it("sweep1-ledger-1 signing out after a sign-in ran out clears the line too", async () => {
+    signedIn(GOOGLE, T0 + 60 * MIN);
+    await settle();
+    await at(59 * MIN);
+    expect(ended()).toBe(true);
+    last!.props.value.signOut();
+    await settle();
+    expect(ended()).toBe(false);
   });
 
   it("never gives it for a typed sign-in", async () => {

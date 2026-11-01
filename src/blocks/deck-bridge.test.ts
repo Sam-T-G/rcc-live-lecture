@@ -6,13 +6,14 @@
 // the integrator's browser check with a local test deck.
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { frameSrc } from "../teams/checkin/stageLink";
 
 const SOURCE = readFileSync(new URL("../../public/deck-bridge.js", import.meta.url), "utf8");
 const DECK = "https://sam-t-g.github.io/rcc-gdg/decks/build-with-ai/";
 const SITE = "https://sample-dev-123.convex.site"; // the deck's data-site
 const KEY = "sample-bridge-key"; // stands in for DECK_BRIDGE_KEY
+afterEach(() => vi.restoreAllMocks());
 
 type Sent = { to: string; body: Record<string, unknown> };
 // One browser tab: its sessionStorage outlives a reload, and `sent` collects every send made in it.
@@ -22,11 +23,12 @@ const newTab = (storage = new Map<string, string>()): Tab => ({ storage, sent: [
 // How the page load came about: "navigate" (a link, a typed address, an iframe given a new src) or
 // "reload" (the browser's reload), as performance.getEntriesByType("navigation") reports it, and
 // whether the deck sits in an iframe (the stage, #/checkin/stage).
-type Load = { how?: "navigate" | "reload"; framed?: boolean };
+// `down` lists the sites whose fetch rejects, as a typo'd deployment name or a DNS failure does.
+type Load = { how?: "navigate" | "reload"; framed?: boolean; down?: Set<string> };
 
 // Loads the deck at `href` in `tab`: runs the bridge the way its script tag does. `go` moves the
 // deck and runs the bridge's next 300 ms check; `check` runs that check without moving.
-function open(tab: Tab, href: string, { how = "navigate", framed = false }: Load = {}) {
+function open(tab: Tab, href: string, { how = "navigate", framed = false, down = new Set<string>() }: Load = {}) {
   const url = new URL(href);
   const location = { href: url.href, pathname: url.pathname, search: url.search, hash: url.hash };
   const history = {
@@ -59,6 +61,7 @@ function open(tab: Tab, href: string, { how = "navigate", framed = false }: Load
     crypto: globalThis.crypto,
     fetch: (to: string, init: { body: string }) => {
       tab.sent.push({ to, body: JSON.parse(init.body) });
+      if (down.has(new URL(to).hostname.split(".")[0])) return Promise.reject(new TypeError("Failed to fetch"));
       return Promise.resolve({ ok: true, status: 200 });
     },
     setInterval: (f: () => void) => {
@@ -218,5 +221,62 @@ describe("public/deck-bridge.js", () => {
       expect(lone.location.href).toBe(`${DECK}?bridge-site=quaint-swan-637`);
     }
     expect(tab.sent).toHaveLength(1); // nothing more went to the script tag's site (prod, for a published deck)
+  });
+
+  // Lets each fetch's then/catch run before the next 300 ms check.
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  it("sweep1-core-1 when one bridge-site can't be reached, only that site gets the slide again, less and less often, and the sites that took it get nothing more", async () => {
+    const tab = newTab();
+    vi.spyOn(console, "warn").mockImplementation(() => {}); // "deck-bridge: offline" on each failed send
+    const down = new Set(["broken-site-999"]);
+    const deck = open(tab, `${DECK}?bridge=gdg.${KEY}&bridge-site=quaint-swan-637,broken-site-999`, { down });
+    const to = (name: string) => tab.sent.filter((s) => s.to === `https://${name}.convex.site/deck`);
+    deck.check();
+    await settle();
+    for (let k = 0; k < 20; k++) {
+      deck.check(); // 20 checks (6 s) with the deck parked on slide 0
+      await settle();
+    }
+    expect(to("quaint-swan-637")).toHaveLength(1);
+    // The first send, then tries 1, 2, 4 and 8 checks after each failure: 1 + 4 in 20 checks.
+    expect(to("broken-site-999")).toHaveLength(5);
+    expect(new Set(to("broken-site-999").map((s) => s.body.seq))).toEqual(new Set([to("quaint-swan-637")[0].body.seq]));
+
+    // The site comes back: its next try lands and nothing more goes to it.
+    down.clear();
+    for (let k = 0; k < 40; k++) {
+      deck.check();
+      await settle();
+    }
+    expect(to("broken-site-999")).toHaveLength(6);
+    expect(to("quaint-swan-637")).toHaveLength(1);
+
+    // A new slide goes to both once.
+    deck.go(1);
+    await settle();
+    deck.check();
+    await settle();
+    expect(tab.sent.slice(-2).map((s) => [s.to, s.body.index])).toEqual([
+      ["https://quaint-swan-637.convex.site/deck", 1],
+      ["https://broken-site-999.convex.site/deck", 1],
+    ]);
+    expect(tab.sent).toHaveLength(9); // 1 + 6 for slide 0, 2 for slide 1
+  });
+
+  it("sweep1-core-1 a failed send of an older slide isn't tried again once a newer slide has gone out", async () => {
+    const tab = newTab();
+    vi.spyOn(console, "warn").mockImplementation(() => {}); // "deck-bridge: offline" on each failed send
+    const down = new Set(["broken-site-999"]);
+    const deck = open(tab, `${DECK}?bridge=gdg.${KEY}&bridge-site=broken-site-999`, { down });
+    deck.check(); // slide 0 goes out
+    deck.go(1); // slide 1 goes out before slide 0's failure comes back
+    await settle();
+    down.clear();
+    for (let k = 0; k < 5; k++) {
+      deck.check();
+      await settle();
+    }
+    expect(tab.sent.map((s) => s.body.index)).toEqual([0, 1, 1]);
   });
 });

@@ -4,7 +4,8 @@
 //   <QuizCard />: the student's side, on #/checkin/student after check-in and on #/live. Anyone
 //     can read the open question and its choices; only a checked-in student gets answer buttons.
 //     Signed out it says "Sign in and check in to answer.", signed in "Check in to answer." (on a
-//     vote, "... to vote."), with a "Check in" link to #/checkin/student.
+//     vote, "... to vote."), with a "Check in" link to #/checkin/student. When the sign-in ran out
+//     on this page it says "Your sign-in ended. Sign in again to answer." with a "Sign in" link.
 // A button that sends something ignores presses until the server answers (usePending), so a
 // double click asks the room once and a double tap sends one answer.
 import { useRef, useState, type FormEvent } from "react";
@@ -246,7 +247,7 @@ export function QuizCard() {
   const mine = useQuery(api.checkin.quiz.mine, poll ? { poll: poll.id } : "skip");
   // Read here, not in Answer, so the check-in status stays loaded from one question to the next.
   const here = useQuery(api.checkin.read.me, { channel: CHANNEL });
-  const { user } = useGoogleUser();
+  const { user, ended } = useGoogleUser();
   if (!poll) return null;
   const vote = poll.kind === "vote";
 
@@ -261,12 +262,13 @@ export function QuizCard() {
       </Card>
     );
 
-  return <Answer key={poll.id} poll={poll} mine={mine} here={here} signedIn={!!user} />;
+  return <Answer key={poll.id} poll={poll} mine={mine} here={here} signedIn={!!user} ended={!user && !!ended} />;
 }
 
 // The open question. Keyed by poll in QuizCard, so a failed answer's error and a send still out
 // never carry over to the next question. `here` is checkin.read.me: undefined while it loads.
-function Answer({ poll, mine, here, signedIn }: { poll: Poll; mine: number | null | undefined; here: boolean | undefined; signedIn: boolean }) {
+// `ended`: the sign-in ran out on this page (AuthState.ended), so the line says so.
+function Answer({ poll, mine, here, signedIn, ended }: { poll: Poll; mine: number | null | undefined; here: boolean | undefined; signedIn: boolean; ended: boolean }) {
   const answer = useMutation(api.checkin.quiz.answer);
   const [sending, run] = usePending();
   // A failed answer, with what `mine` was when the student tapped. Its words stay up until the
@@ -289,7 +291,7 @@ function Answer({ poll, mine, here, signedIn }: { poll: Poll; mine: number | nul
     });
   }
 
-  const how = (signedIn ? "Check in to " : "Sign in and check in to ") + (vote ? "vote." : "answer.");
+  const how = (ended ? "Your sign-in ended. Sign in again to " : signedIn ? "Check in to " : "Sign in and check in to ") + (vote ? "vote." : "answer.");
   return (
     <Card title={vote ? "Vote now" : "Quiz now"}>
       <p className="quiz__q">{poll.question}</p>
@@ -307,7 +309,7 @@ function Answer({ poll, mine, here, signedIn }: { poll: Poll; mine: number | nul
       {here === false && (
         <>
           <p>{how}</p>
-          <Link to="checkin/student" className="btn btn--quiet btn--flush">Check in</Link>
+          <Link to="checkin/student" className="btn btn--quiet btn--flush">{ended ? "Sign in" : "Check in"}</Link>
         </>
       )}
       {here && locked && <p className="muted">Answer sent. Results show when the professor ends the quiz.</p>}

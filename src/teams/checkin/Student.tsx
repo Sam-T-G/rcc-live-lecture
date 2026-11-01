@@ -13,6 +13,7 @@ import { QR } from "../../blocks/qr";
 import { CHANNEL } from "../../blocks/deck";
 import { SignedInAs, StudentSignIn, useGoogleUser } from "../../blocks/auth";
 import LateBanner from "./LateBanner";
+import { SignInEnding, STUDENT_ENDING } from "./prof";
 import { QuizCard } from "./Quiz";
 import { askForCodes, codeIsOld, msUntilNewCode } from "./passTiming";
 import { why } from "./util";
@@ -26,7 +27,12 @@ export function Student() {
         <StudentSignIn />
       </Screen>
     );
-  return <StudentPass />;
+  return (
+    <>
+      <SignInEnding line={STUDENT_ENDING} />
+      <StudentPass />
+    </>
+  );
 }
 
 export function StudentPass() {

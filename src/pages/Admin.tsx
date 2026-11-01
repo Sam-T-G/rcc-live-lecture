@@ -53,27 +53,27 @@ function AdminsOnly({ me }: { me: StaffMe }) {
   );
 }
 
-function AdminView() {
+export function AdminView() {
   return (
     <Screen title="Admin" wide>
       <SignedInAs />
       <div className="admin">
         <div>
-          <ErrorBoundary label="Add someone">
+          <ErrorBoundary label="The Add someone form">
             <AddPerson />
           </ErrorBoundary>
-          <ErrorBoundary label="People">
+          <ErrorBoundary label="The staff list">
             <People />
           </ErrorBoundary>
         </div>
         <div>
-          <ErrorBoundary label="Pair a door iPad">
+          <ErrorBoundary label="The pairing form">
             <PairDevice />
           </ErrorBoundary>
-          <ErrorBoundary label="Door iPads">
+          <ErrorBoundary label="The door iPad list">
             <Devices />
           </ErrorBoundary>
-          <ErrorBoundary label="Changes">
+          <ErrorBoundary label="The list of changes">
             <Changes />
           </ErrorBoundary>
         </div>
@@ -82,19 +82,19 @@ function AdminView() {
   );
 }
 
-function ProfessorView() {
+export function ProfessorView() {
   return (
     <Screen title="Admin" wide>
       <SignedInAs />
       <p>Only admins can add people.</p>
       <div className="admin">
         <div>
-          <ErrorBoundary label="Pair a door iPad">
+          <ErrorBoundary label="The pairing form">
             <PairDevice />
           </ErrorBoundary>
         </div>
         <div>
-          <ErrorBoundary label="Door iPads">
+          <ErrorBoundary label="The door iPad list">
             <Devices />
           </ErrorBoundary>
         </div>
@@ -105,7 +105,7 @@ function ProfessorView() {
 
 // ---------- People (admins) ----------
 
-function AddPerson() {
+export function AddPerson() {
   const add = useMutation(api.staff.add);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<StaffRole>("professor");
@@ -133,7 +133,7 @@ function AddPerson() {
   return (
     <Card title="Add someone">
       <form onSubmit={submit}>
-        <Field label="Email" hint="The Google account they sign in with." error={error || undefined}>
+        <Field label="Email" hint="The Google account they sign in with.">
           {(f) => <input {...f} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" required />}
         </Field>
         <Segmented label="Role" options={ROLES} value={role} onChange={setRole} />
@@ -141,6 +141,7 @@ function AddPerson() {
           Professors open every professor page and pair door iPads. Scanners only scan passes at the door. Admins can also add, change and
           remove people here.
         </p>
+        {error && <Status kind="error">{error}</Status>}
         <Button type="submit" busy={busy}>
           Add
         </Button>

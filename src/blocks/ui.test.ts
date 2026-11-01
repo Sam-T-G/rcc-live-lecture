@@ -2,6 +2,7 @@
 // ErrorBoundary (ui.tsx). React's server renderer never calls an error boundary, and these tests
 // have no browser DOM, so they call, one at a time, what React calls when a part throws
 // (getDerivedStateFromError, then render, then componentDidCatch) and the Try again handler.
+import { readFileSync } from "node:fs";
 import { type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -26,7 +27,7 @@ describe("ErrorBoundary", () => {
   it("a part that throws shows Status error 'This part of the page didn't load.' and a 'Try again' button", () => {
     const html = renderToStaticMarkup(failed().render() as ReactElement);
     expect(html).toContain('<p class="status status--error" role="alert">This part of the page didn&#x27;t load.</p>');
-    expect(html).toContain('<button type="button" class="quiet">Try again</button>');
+    expect(html).toContain('<button type="button" class="btn btn--quiet">Try again</button>');
     expect(html).not.toContain("[the part]");
   });
 
@@ -48,6 +49,16 @@ describe("ErrorBoundary", () => {
     button.props.onClick();
     expect(boundary.state.failed).toBe(false);
     expect(boundary.render()).toBe("[the part]");
+  });
+
+  // The only rule for a bare "quiet" class is the check-in team's button.quiet in checkin.css (a
+  // 2px ring, for Quiz.tsx), which no base or kit sheet defines. The shared blocks shown on every
+  // page use the kit's quiet button instead.
+  it("sweep1-blocks-3 the shared blocks never use the check-in team's bare 'quiet' class", () => {
+    const offenders = ["ui.tsx", "auth.tsx"].filter((f) =>
+      /className=["{`][^"}`]*(?<![\w-])quiet(?![\w-])/.test(readFileSync(new URL(f, import.meta.url), "utf8")),
+    );
+    expect(offenders).toEqual([]);
   });
 });
 

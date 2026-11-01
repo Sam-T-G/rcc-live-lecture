@@ -20,6 +20,7 @@ import { Button, Projector } from "../../blocks/kit";
 import { Link, useRoute } from "../../blocks/router";
 import { Card, ErrorBoundary, Screen, Status } from "../../blocks/ui";
 import LateBanner from "../checkin/LateBanner";
+import { SignInEnding, STUDENT_ENDING } from "../checkin/prof";
 import { QuizCard } from "../checkin/Quiz";
 import { GroupBadge, Leaderboard } from "./Leaderboard";
 import PastQuestions from "./PastQuestions";
@@ -78,6 +79,7 @@ export function LiveSlides({ pin = null }: { pin?: number | null }) {
 
   return (
     <Screen title="Live slides" wide>
+      <SignInEnding line={STUDENT_ENDING} />
       <SignedInAs />
       <ErrorBoundary label="Check in">
         <CheckInFirst />
@@ -168,11 +170,12 @@ function CheckInFirst() {
 }
 
 // Under the slide on screen: "I'm lost" for a checked-in student (pressed while they're counted
-// as lost on it), or "Sign in to tap I'm lost" while signed out. A signed-in student who isn't
+// as lost on it), or "Sign in to tap I'm lost" while signed out ("Your sign-in ended." over "Sign
+// in again to tap I'm lost" when the sign-in ran out on this page). A signed-in student who isn't
 // checked in gets nothing here: CheckInFirst sits above the slide. The professor's #/host shows
 // the count for each slide.
 function Lost({ index }: { index: number }) {
-  const { user } = useGoogleUser();
+  const { user, ended } = useGoogleUser();
   const checkedIn = useQuery(api.checkin.read.me, user ? { channel: CHANNEL } : "skip");
   const mine = useQuery(api.live.read.mine, user && checkedIn ? { channel: CHANNEL, index } : "skip");
   const toggle = useMutation(api.live.lost.toggle);
@@ -182,7 +185,8 @@ function Lost({ index }: { index: number }) {
   if (!user)
     return (
       <div className="lost">
-        <Button variant="secondary" block onClick={toSignIn}>Sign in to tap I’m lost</Button>
+        {ended && <p>Your sign-in ended.</p>}
+        <Button variant="secondary" block onClick={toSignIn}>{ended ? "Sign in again to tap I’m lost" : "Sign in to tap I’m lost"}</Button>
       </div>
     );
   if (checkedIn === undefined) return <div className="lost" aria-busy="true" />;

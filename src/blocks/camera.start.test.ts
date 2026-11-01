@@ -62,6 +62,7 @@ const runCamera = (await import("./camera")).useCamera;
 // Capture and Streams); endOnItsOwn() is the browser ending it (unplugged, another app took it).
 class Track {
   readyState: "live" | "ended" = "live";
+  label = "FaceTime HD Camera";
   private onEnded = new Set<() => void>();
   addEventListener(type: string, fn: () => void) {
     if (type === "ended") this.onEnded.add(fn);
@@ -79,13 +80,15 @@ class Track {
 }
 
 let tracks: Track[]; // every track the browser handed over
-let prompts: { allow: () => Track; deny: (name: string) => void }[]; // getUserMedia calls waiting on an answer
-const getUserMedia = vi.fn(
+// getUserMedia calls waiting on an answer. allow(label) hands over the camera with that name.
+let prompts: { allow: (label?: string) => Track; deny: (name: string) => void }[];
+const getUserMedia = vi.fn<(constraints?: MediaStreamConstraints) => Promise<unknown>>(
   () =>
     new Promise((resolve, reject) => {
       prompts.push({
-        allow: () => {
+        allow: (label?: string) => {
           const t = new Track();
+          if (label) t.label = label;
           tracks.push(t);
           resolve({ getTracks: () => [t], getVideoTracks: () => [t] });
           return t;
@@ -266,6 +269,83 @@ describe("SCAN useCamera: one camera, only between start and stop", () => {
     prompts[1].allow();
     await again;
     expect(render().on).toBe(true);
+  });
+
+  // A Mac whose default camera is an iPhone (Continuity Camera). Before the page has camera
+  // permission, browsers list cameras with no names, so the first start can't tell which is the
+  // iPhone and the browser opens its default; after that the names are there.
+  function macWithIPhone({ builtIn = true } = {}) {
+    let allowed = false;
+    const named = [
+      { kind: "videoinput", label: "Sam’s iPhone Camera", deviceId: "iphone" },
+      ...(builtIn ? [{ kind: "videoinput", label: "FaceTime HD Camera", deviceId: "mac-camera" }] : []),
+    ];
+    enumerateDevices.mockImplementation(async () => (allowed ? named : named.map((d) => ({ ...d, label: "", deviceId: "" }))));
+    return {
+      allow(label: string) {
+        allowed = true;
+        return prompts.at(-1)!.allow(label);
+      },
+    };
+  }
+  const asked = () => getUserMedia.mock.calls.map((c) => (c[0]?.video as { deviceId?: { exact: string }; facingMode?: string }));
+
+  it("sweep1-blocks-5 on the first start, before the browser names its cameras, an iPhone the browser opens is swapped for the built-in camera", async () => {
+    const mac = macWithIPhone();
+    const cam = mount();
+    const p = cam.start();
+    await settle();
+    const iphone = mac.allow("Sam’s iPhone Camera"); // the browser's default camera
+    await settle();
+    expect(iphone.readyState).toBe("ended");
+    mac.allow("FaceTime HD Camera");
+    await p;
+    expect(asked()).toEqual([
+      { facingMode: "user", width: 1280 },
+      { deviceId: { exact: "mac-camera" }, width: 1280 },
+    ]);
+    expect(tracks.filter((t) => t.readyState === "live").map((t) => t.label)).toEqual(["FaceTime HD Camera"]);
+    expect(render().on).toBe(true);
+  });
+
+  it("sweep1-blocks-5 when the iPhone is the only camera, the first start keeps it", async () => {
+    const mac = macWithIPhone({ builtIn: false });
+    const cam = mount();
+    const p = cam.start();
+    await settle();
+    mac.allow("Sam’s iPhone Camera");
+    await p;
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(live()).toBe(1);
+    expect(render().on).toBe(true);
+  });
+
+  it("sweep1-blocks-5 Stop while the built-in camera is being opened in the iPhone's place leaves no live track", async () => {
+    const mac = macWithIPhone();
+    const cam = mount();
+    const p = cam.start();
+    await settle();
+    mac.allow("Sam’s iPhone Camera");
+    await settle();
+    cam.stop();
+    mac.allow("FaceTime HD Camera");
+    await p;
+    expect(live()).toBe(0);
+    expect(render().on).toBe(false);
+  });
+
+  it("sweep1-blocks-5 if listing the cameras fails after the iPhone opened, the iPhone is let go and the page says why", async () => {
+    const mac = macWithIPhone();
+    const cam = mount();
+    const p = cam.start();
+    await settle();
+    enumerateDevices.mockImplementationOnce(async () => {
+      throw new Error("listing failed");
+    });
+    mac.allow("Sam’s iPhone Camera");
+    await p;
+    expect(live()).toBe(0);
+    expect(render().error).toBe("Couldn't start the camera.");
   });
 
   it("blocks-frontend-16 on a page opened over plain http, start() says 'The camera needs https. Open the live site or localhost.' and asks for no camera", async () => {

@@ -34,6 +34,10 @@
      seq     a number that goes up with every send, so the backend can ignore a press that
              arrives after a newer one (convex/deck.ts)
    Never speaker notes (aside.notes), .notice text, or data-beat items not shown yet.
+   When a site can't be reached (no network, a typo'd deployment name), only that site gets
+   the same send again: 0.3 s later, then 0.6, 1.2 and 2.4 s and so on up to every 9.6 s, until
+   it answers or the slide changes. Sites that took the send get nothing more, so a dead site
+   never makes the others reopen a class the professor ended.
    Presenter, mirror, remote and run-sheet windows (?view=) never send. Decks load this file
    from the live site, so a change here reaches them only after Sam deploys. */
 (function () {
@@ -127,11 +131,36 @@
   }
 
   var last = '';
+  var latest = null; // the body of the last send
+  // Sites whose fetch of `latest` failed: { wait: checks until the next try, gap: checks between
+  // tries (1, 2, 4 ... 32), busy: a try is on its way }.
+  var retry = {};
+  function send(site, body) {
+    fetch(site.replace(/\/$/, '') + '/deck', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) })
+      .then(function (r) {
+        if (!r.ok) console.warn('deck-bridge:', site, r.status);
+        if (body === latest) delete retry[site];
+      })
+      .catch(function (e) {
+        if (body !== latest) return; // a newer slide has gone out since
+        var gap = retry[site] ? Math.min(retry[site].gap * 2, 32) : 1;
+        retry[site] = { wait: gap, gap: gap, busy: false };
+        console.warn('deck-bridge: offline', site, e);
+      });
+  }
   function tick() {
     var st = window.__deck && window.__deck.state();
     if (!st) return;
     var sig = st.i + ':' + st.b;
-    if (sig === last) return;
+    if (sig === last) {
+      Object.keys(retry).forEach(function (site) {
+        var r = retry[site];
+        if (r.busy || --r.wait > 0) return;
+        r.busy = true;
+        send(site, latest);
+      });
+      return;
+    }
     var body = read(st);
     if (!body) return;
     last = sig;
@@ -143,11 +172,9 @@
     body.key = key;
     body.run = run.id;
     body.seq = run.seq;
-    sites.forEach(function (site) {
-      fetch(site.replace(/\/$/, '') + '/deck', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) })
-        .then(function (r) { if (!r.ok) console.warn('deck-bridge:', site, r.status); })
-        .catch(function (e) { last = ''; console.warn('deck-bridge: offline', site, e); });
-    });
+    latest = body;
+    retry = {};
+    sites.forEach(function (site) { send(site, body); });
   }
   setInterval(tick, 300);
 })();
