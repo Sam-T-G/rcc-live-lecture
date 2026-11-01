@@ -103,19 +103,25 @@ function press(label: string) {
   expect(el.props.disabled, `${label} is disabled`).toBeFalsy();
   (el.props.onClick as () => void)();
 }
-function key(name: string) {
+type Held = { altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean };
+// A key press with nothing held pages, so its default action is blocked. With a modifier held
+// (Shift+ArrowLeft selects text, Cmd+ArrowLeft goes back in Safari) the page leaves it alone.
+function key(name: string, held: Held = {}) {
   render();
   if (!state.keydown) throw new Error("no keydown listener on the window");
-  const e = { key: name, altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, preventDefault: vi.fn() };
+  const e = { key: name, altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, ...held, preventDefault: vi.fn() };
   state.keydown(e);
-  expect(e.preventDefault).toHaveBeenCalled();
+  if (Object.values(held).some(Boolean)) expect(e.preventDefault).not.toHaveBeenCalled();
+  else expect(e.preventDefault).toHaveBeenCalled();
 }
-// A one-finger swipe on the slide, dx pixels sideways (negative is toward the left edge).
-function swipe(dx: number) {
+// A swipe on the slide that starts at (200, 300) and lifts dx pixels sideways (negative is toward
+// the left edge) and dy pixels down, with `fingers` on the glass when it starts.
+function swipe(dx: number, dy = 0, fingers = 1) {
   const main = render();
   expect(main.type).toBe("main");
-  (main.props.onTouchStart as (e: unknown) => void)({ touches: [{ clientX: 200, clientY: 300 }] });
-  (main.props.onTouchEnd as (e: unknown) => void)({ changedTouches: [{ clientX: 200 + dx, clientY: 300 }] });
+  const touches = Array.from({ length: fingers }, (_, i) => ({ clientX: 200 + i * 80, clientY: 300 }));
+  (main.props.onTouchStart as (e: unknown) => void)({ touches });
+  (main.props.onTouchEnd as (e: unknown) => void)({ changedTouches: [{ clientX: 200 + dx, clientY: 300 + dy }] });
 }
 
 beforeEach(() => {
@@ -161,6 +167,40 @@ describe("#/portal paging, pressed, typed and swiped (sweep2-live-fixcheck-1, sw
     expect(screen().title).toBe("A5");
     key("ArrowRight");
     expect(screen().title).toBe("A6");
+  });
+
+  it("ArrowLeft after the professor moves on opens the slide before the new live one", () => {
+    deckOn(5, upTo(5)); // the student follows live on slide 6
+    expect(screen().title).toBe("A6");
+    deckOn(6, upTo(6)); // the professor moves to slide 7
+    expect(screen().title).toBe("A7");
+    key("ArrowLeft");
+    expect(screen().title).toBe("A6");
+  });
+
+  it("an arrow key with Shift, Ctrl, Alt or Cmd held doesn't page and keeps its default action", () => {
+    deckOn(5, upTo(5));
+    key("ArrowLeft", { shiftKey: true });
+    expect(screen().title).toBe("A6");
+    key("ArrowLeft", { metaKey: true });
+    key("ArrowLeft", { ctrlKey: true });
+    key("ArrowLeft", { altKey: true });
+    expect(screen().title).toBe("A6");
+    press("← Back");
+    key("ArrowRight", { shiftKey: true });
+    expect(screen().title).toBe("A5");
+  });
+
+  it("a mostly up-and-down drag (scrolling a long slide) and a two-finger touch don't page", () => {
+    deckOn(5, upTo(5));
+    swipe(60, 200); // 60px sideways while scrolling 200px down
+    expect(screen().title).toBe("A6");
+    swipe(-60, -200);
+    expect(screen().title).toBe("A6");
+    swipe(120, 0, 2); // a pinch that ends 120px to the side
+    expect(screen().title).toBe("A6");
+    swipe(120); // the same move with one finger pages
+    expect(screen().title).toBe("A5");
   });
 
   it("a swipe right (finger toward the right edge) opens the slide before, a swipe left the one after, and a short one does nothing", () => {
