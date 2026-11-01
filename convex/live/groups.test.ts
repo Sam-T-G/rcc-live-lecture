@@ -452,14 +452,16 @@ describe("F28 the professor's point changes", () => {
       ["Blue", 0, 0],
     ]);
     // The lock re-deals 7 students into 2 teams: student 6 moves to Blue, and their 2 points go too.
+    // Red's 3 stays with students 1, 4 and 7 (UB-r3-check-3), and student 4 moves to Blue.
     await t.mutation(internal.live.groups.lock, { channel: CH, force: true });
     expect(await teamOf(ss[5])).toBe(1);
+    expect(await teamOf(ss[3])).toBe(1);
     const after = await board(t);
     expect(after.teams.map((g) => [g.label, g.members, g.changes, g.points])).toEqual([
-      ["Red", 4, 3, 3],
-      ["Blue", 3, 2, 2],
+      ["Blue", 3, 3, 3],
+      ["Red", 4, 2, 2],
     ]);
-    expect(after.teams.map((g) => g.ec)).toEqual([5, 3]); // 3 / 4 = 0.75 a student against 2 / 3
+    expect(after.teams.map((g) => g.ec)).toEqual([5, 3]); // 3 / 3 = 1.0 a student against 2 / 4
     const roster = await admin(t).query(api.live.groups.roster, { channel: CH });
     expect(roster.find((r) => r.name === "Sample student 6")).toMatchObject({ team: { label: "Blue" }, changes: 2, points: 2 });
   });

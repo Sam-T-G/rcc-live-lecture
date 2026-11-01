@@ -18,9 +18,9 @@
 // class (an open quiz counts for nothing, so the board can't give the answer away, and a vote
 // never counts) plus the points the professor added or took off (groupPoints). A change for a
 // team stays with that team; a change for a student counts for that student's current team, the
-// way their right answers do. When the lock or a new size re-deals into fewer teams, a change for
-// a team that goes away becomes changes for the students who were on it, split as evenly as whole
-// points allow (first checked in first), so the points follow them to their new teams. Teams rank
+// way their right answers do. When the lock or a new size re-deals a team's students, that team's
+// changes become changes for the students who were on it, spread as evenly as whole points allow
+// (first checked in first; see splitChanges), so the points follow them to their new teams. Teams rank
 // by points per student (points / members, Sam's decision D6), so a team of 3 and a team of 4 that
 // answer equally well tie. They rank on that number to one decimal, the way every screen shows it,
 // so two teams that both show "1.3 per student" tie. Extra credit: 1st place 5, 2nd 3, 3rd 1, the
@@ -105,6 +105,10 @@ const WINDOW_MS = 5 * 60_000; // teams form for this long, then lock
 const MOST = 5; // after the lock, a new team opens only when every team has this many
 const MAX_DELTA = 5; // a point change is 1 to 5 points either way
 const REASON_MAX = 80;
+// A row's _creationTime can come a little before the Date.now() of the mutation that wrote it
+// (lib.lectureStart), so status treats a lock time up to this long after an empty lock's row as
+// the one that lock found empty.
+const MARK_SLACK_MS = 1_000;
 
 const color = v.string();
 // A team as the screens show it: its number, its color (a `.group--<color>` style) and its label.
@@ -254,10 +258,15 @@ async function rebalance(ctx: MutationCtx, channel: string, start: number, size:
   }
 }
 
-// Before a re-deal into `t` teams (numbers 0 to t - 1): each change for a team numbered t or
-// higher, which the re-deal breaks up, becomes changes for that team's students checked in to this
-// class, the delta split as evenly as whole points allow (first checked in gets the extra), with
-// the same reason and time. A team with no students left keeps its change; it counts for nobody.
+// Before a re-deal into `t` teams (the i-th check-in to team i % t): every change for a team whose
+// students the re-deal changes becomes changes for the students on that team now (checked in to
+// this class), with the same reason and time, so the points stay with the students who earned
+// them, the way their right answers do. A team's changes are spread one point at a time, oldest
+// change first: a point added goes to the student who has the fewest of that team's points so far,
+// a point taken off to the one who has the most, first checked in first on a tie. So three +1s on
+// a team of 3 give each student 1, and +2 then -1 leaves 1 with one student. A team the re-deal
+// leaves with the same students keeps its changes as they are. A team with no students left keeps
+// its changes too; they count for nobody while nobody is on it.
 async function splitChanges(
   ctx: MutationCtx,
   channel: string,
@@ -266,16 +275,32 @@ async function splitChanges(
   groups: Map<string, Doc<"groups">>,
   t: number,
 ) {
+  const before = new Map<number, string[]>(); // each team's students now, first checked in first
+  const after = new Map<number, string[]>(); // the same after the re-deal
+  for (const [i, k] of checkins.entries()) {
+    const team = groups.get(k.user)?.team;
+    if (team !== undefined) before.set(team, [...(before.get(team) ?? []), k.user]);
+    after.set(i % t, [...(after.get(i % t) ?? []), k.user]);
+  }
+  const given = new Map<number, number[]>(); // each split team's points so far, per student
   for (const c of await classChanges(ctx, channel, start)) {
-    if (c.team === undefined || c.team < t) continue;
-    const members = checkins.filter((k) => groups.get(k.user)?.team === c.team);
+    if (c.team === undefined) continue;
+    const members = before.get(c.team) ?? [];
     if (members.length === 0) continue;
-    const each = Math.trunc(Math.abs(c.delta) / members.length);
-    const extra = Math.abs(c.delta) % members.length;
-    for (const [i, m] of members.entries()) {
-      const delta = Math.sign(c.delta) * (each + (i < extra ? 1 : 0));
-      if (delta !== 0) await ctx.db.insert("groupPoints", { channel, user: m.user, delta, reason: c.reason, at: c.at });
+    const stays = after.get(c.team) ?? [];
+    if (stays.length === members.length && members.every((u, j) => stays[j] === u)) continue;
+    const got = given.get(c.team) ?? members.map(() => 0);
+    given.set(c.team, got);
+    const share = members.map(() => 0);
+    const step = Math.sign(c.delta);
+    for (let n = 0; n < Math.abs(c.delta); n++) {
+      let pick = 0;
+      for (let j = 1; j < members.length; j++) if (step > 0 ? got[j] < got[pick] : got[j] > got[pick]) pick = j;
+      got[pick] += step;
+      share[pick] += step;
     }
+    for (const [j, user] of members.entries())
+      if (share[j] !== 0) await ctx.db.insert("groupPoints", { channel, user, delta: share[j], reason: c.reason, at: c.at });
     await ctx.db.delete("groupPoints", c._id);
   }
 }
@@ -321,9 +346,10 @@ export const lock = internalMutation({
       }
       if (!first) {
         // scheduled: false also tells status the lock time has passed with nobody here, so the
-        // screens stop showing it.
-        if (!set.row) await ctx.db.insert("groupSettings", { channel, size: set.size, scheduled: false });
-        else if (set.row.scheduled !== false) await ctx.db.patch("groupSettings", set.row._id, { scheduled: false });
+        // screens stop showing it. The row is written fresh, so its _creationTime says when this
+        // lock found nobody: a start saved later whose lock comes after that shows again.
+        if (set.row) await ctx.db.delete("groupSettings", set.row._id);
+        await ctx.db.insert("groupSettings", { channel, size: set.size, scheduled: false });
         return null;
       }
     }
@@ -335,8 +361,10 @@ export const lock = internalMutation({
 });
 
 // What the screens need: the team size, whether this class's teams are locked, and when they lock.
-// A lock that came due with nobody checked in marked the settings row (scheduled: false); then
-// locksAt is null until the first check-in, so no screen shows a lock time that has passed.
+// A lock that came due with nobody checked in wrote a fresh settings row (scheduled: false); then,
+// until the first check-in, locksAt is null for a lock time at or before that row was written, so
+// no screen shows a lock time that has passed. A start saved after that, whose lock comes later,
+// shows its lock time (checkin.attendance.setClassStart queued that lock).
 export const status = query({
   args: { channel: v.string() },
   returns: v.object({ size: v.number(), locked: v.boolean(), locksAt: v.union(v.null(), v.number()) }),
@@ -346,8 +374,9 @@ export const status = query({
     const locked = !!set.row?.lockedAt;
     if (locked) return { size: set.size, locked, locksAt: null };
     const first = await firstCheckin(ctx, channel, win.start);
-    const passed = !first && set.row?.scheduled === false;
-    return { size: set.size, locked, locksAt: passed ? null : lockTime(win, first) };
+    const at = lockTime(win, first);
+    const passed = !first && set.row?.scheduled === false && (at === null || at <= set.row._creationTime + MARK_SLACK_MS);
+    return { size: set.size, locked, locksAt: passed ? null : at };
   },
 });
 
