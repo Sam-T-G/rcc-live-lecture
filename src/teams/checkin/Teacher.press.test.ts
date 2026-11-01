@@ -282,9 +282,9 @@ describe("F14 This class before the first class", () => {
     expect(buttons(page(), /^Remove/)).toEqual([]);
   });
 
-  it("with a class running, Download names the file with this class's date", () => {
+  it("with a class running, Download names the file with this class's date and start time", () => {
     press(page(), "Download attendance (CSV)");
-    expect(server.saved.map((s) => s.name)).toEqual(["attendance-gdg-2026-11-05.csv"]);
+    expect(server.saved.map((s) => s.name)).toEqual(["attendance-gdg-2026-11-05-1430.csv"]);
   });
 });
 

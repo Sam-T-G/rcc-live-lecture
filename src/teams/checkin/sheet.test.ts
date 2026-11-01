@@ -50,18 +50,27 @@ describe("F14 the attendance CSV", () => {
     expect(csvCell("Ana = Lopez")).toBe('"Ana = Lopez"');
   });
 
-  it("rt-18 the file is named with the class's local date, not the UTC date", () => {
+  it("rt-18 the file is named with the class's local date and start time, not the UTC date", () => {
     // 5:30 PM PDT on Oct 30 is Oct 31 in UTC.
     const evening = pdt(10, 30, 17, 30);
     expect(new Date(evening).toISOString().slice(0, 10)).toBe("2026-10-31");
     expect(dateFile(evening)).toBe("attendance-gdg-2026-10-30.csv");
-    expect(classFile(aClass({ startsAt: evening }))).toBe("attendance-gdg-2026-10-30.csv");
-    // No saved start: the day the class opened.
-    expect(classFile(aClass({ startsAt: null, startedAt: pst(11, 12, 18, 0) }))).toBe("attendance-gdg-2026-11-12.csv");
+    expect(classFile(aClass({ startsAt: evening }))).toBe("attendance-gdg-2026-10-30-1730.csv");
+    // No saved start: the day and time the class opened.
+    expect(classFile(aClass({ startsAt: null, startedAt: pst(11, 12, 18, 0) }))).toBe("attendance-gdg-2026-11-12-1800.csv");
     // The check-ins from before the first class: the dates of their first and last check-in.
     const earlier = { lecture: "earlier" as const, startsAt: null, graceMin: 0 };
     expect(classFile(aClass({ ...earlier, startedAt: pdt(10, 29, 15, 0), endedAt: pdt(10, 30, 17, 30) }))).toBe("attendance-gdg-2026-10-29-to-2026-10-30.csv");
     expect(classFile(aClass({ ...earlier, startedAt: pdt(10, 29, 15, 0), endedAt: pdt(10, 29, 15, 40) }))).toBe("attendance-gdg-2026-10-29.csv");
+  });
+
+  it("E2E-3 back-to-back classes on one day get different files, each named with its start time", () => {
+    const first = classFile(aClass({ startsAt: pst(11, 5, 9, 5), startedAt: pst(11, 5, 9, 0) }));
+    const second = classFile(aClass({ startsAt: pst(11, 5, 10, 30), startedAt: pst(11, 5, 10, 25) }));
+    expect(first).toBe("attendance-gdg-2026-11-05-0905.csv");
+    expect(second).toBe("attendance-gdg-2026-11-05-1030.csv");
+    // 9:59 PM: the hour is 24-hour, so an evening class never reads as a morning one.
+    expect(classFile(aClass({ startsAt: pdt(10, 31, 21, 59) }))).toBe("attendance-gdg-2026-10-31-2159.csv");
   });
 });
 

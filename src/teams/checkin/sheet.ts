@@ -95,10 +95,14 @@ export function csvText(rows: SheetRow[]) {
 // When a class happened: its saved start time, else when it opened.
 export const classDay = (c: ClassRow) => c.startsAt ?? c.startedAt;
 
-// attendance-gdg-2026-11-05.csv: a class's file, named with its local date. The check-ins from
-// before the first class get the dates of their first and last check-in.
+// attendance-gdg-2026-11-05-1430.csv: a class's file, named with its local date and 24-hour start
+// time, so two classes on the same day save as two different files. The check-ins from before
+// the first class get the dates of their first and last check-in.
 export function classFile(c: ClassRow) {
-  if (c.lecture !== "earlier") return dateFile(classDay(c));
+  if (c.lecture !== "earlier") {
+    const at = classDay(c);
+    return `attendance-${CHANNEL}-${localDate(at)}-${hhmm(at).replace(":", "")}.csv`;
+  }
   const [first, last] = [localDate(c.startedAt), localDate(c.endedAt ?? c.startedAt)];
   return `attendance-${CHANNEL}-${first === last ? first : `${first}-to-${last}`}.csv`;
 }
