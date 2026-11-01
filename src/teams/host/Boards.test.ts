@@ -7,12 +7,41 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PointsTab } from "./Boards";
 
 const results: Record<string, unknown> = {};
+// What the page's controls do when pressed, and every mutation they send: [function, args].
+const { handlers, calls } = vi.hoisted(() => ({
+  handlers: {} as Record<string, (value?: unknown) => unknown>,
+  calls: [] as [string, unknown][],
+}));
 vi.mock("convex/react", () => ({
   useQuery: (ref: FunctionReference<"query">) => results[getFunctionName(ref)],
-  useMutation: () => async () => null,
+  useMutation: (ref: FunctionReference<"mutation">) => async (args: unknown) => {
+    calls.push([getFunctionName(ref), args]);
+    return "Class ended.";
+  },
   useConvex: () => ({ query: async () => [] }),
 }));
 vi.mock("../../blocks/deck", () => ({ CHANNEL: "gdg" }));
+// The real kit parts, each keeping its handler: a Button under its aria-label (or its words), a
+// Segmented under its label, a ConfirmButton under "confirm" and its confirm words.
+vi.mock("../../blocks/kit", async (importOriginal) => {
+  const kit = await importOriginal<typeof import("../../blocks/kit")>();
+  const { createElement } = await import("react");
+  return {
+    ...kit,
+    Button: (p: Parameters<typeof kit.Button>[0]) => {
+      handlers[String(p["aria-label"] ?? p.children)] = p.onClick as () => unknown;
+      return createElement(kit.Button, p);
+    },
+    Segmented: (p: Parameters<typeof kit.Segmented<string>>[0]) => {
+      handlers[String(p.label)] = p.onChange as (value?: unknown) => unknown;
+      return createElement(kit.Segmented<string>, p);
+    },
+    ConfirmButton: (p: Parameters<typeof kit.ConfirmButton>[0]) => {
+      handlers[`confirm ${String(p.confirm)}`] = p.onConfirm;
+      return createElement(kit.ConfirmButton, p);
+    },
+  };
+});
 
 const RED = { team: 0, color: "red", label: "Red" };
 const BLUE = { team: 1, color: "blue", label: "Blue" };
@@ -33,6 +62,8 @@ const student = (n: number, info: typeof RED | null, points: number, o: Record<s
 
 beforeEach(() => {
   for (const k of Object.keys(results)) delete results[k];
+  for (const k of Object.keys(handlers)) delete handlers[k];
+  calls.length = 0;
   Object.assign(results, {
     "live/groups:status": { size: 4, locked: true, locksAt: null },
     "live/groups:leaderboard": {
@@ -71,6 +102,30 @@ describe("#/host Points", () => {
     expect(html).toContain("Download extra credit (CSV)");
     expect(html).not.toContain("Mix the teams");
     expect(html).not.toMatch(/[-−]5</);
+  });
+
+  it("UB-risk-4 F28 each control sends its change: +1 and −1 per team and per student, the team size, Undo and End day", async () => {
+    tab();
+    // Presses a control the way a click would, then lets its change go out.
+    const press = async (name: string, value?: unknown) => {
+      expect(Object.keys(handlers)).toContain(name);
+      calls.length = 0;
+      await handlers[name](value);
+      await new Promise((r) => setTimeout(r, 0));
+      return calls.slice();
+    };
+    const adjust = (args: object) => [["live/groups:adjust", { channel: "gdg", ...args }]];
+    expect(await press("Give Red 1 point")).toEqual(adjust({ team: 0, delta: 1 }));
+    expect(await press("Take 1 point off Red")).toEqual(adjust({ team: 0, delta: -1 }));
+    expect(await press("Give Blue 1 point")).toEqual(adjust({ team: 1, delta: 1 }));
+    expect(await press("Take 1 point off Blue")).toEqual(adjust({ team: 1, delta: -1 }));
+    expect(await press("Give Sample student 4 1 point")).toEqual(adjust({ checkin: "checkin4", delta: 1 }));
+    expect(await press("Take 1 point off Sample student 1")).toEqual(adjust({ checkin: "checkin1", delta: -1 }));
+    expect(await press("Team size", "3")).toEqual([["live/groups:setSize", { channel: "gdg", size: 3 }]]);
+    expect(await press("Team size", "4")).toEqual([["live/groups:setSize", { channel: "gdg", size: 4 }]]);
+    expect(await press("Undo −1 for Blue")).toEqual([["live/groups:removePoints", { id: "points2" }]]);
+    expect(await press("Undo +2 for Sample student 1")).toEqual([["live/groups:removePoints", { id: "points1" }]]);
+    expect(await press("confirm End day")).toEqual([["live/groups:endDay", { channel: "gdg" }]]);
   });
 
   it("host-frontend-23 equal totals share a place and say 'tied', for teams and for students", () => {

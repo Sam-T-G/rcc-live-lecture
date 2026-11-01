@@ -20,11 +20,13 @@
 // team stays with that team; a change for a student counts for that student's current team, the
 // way their right answers do. When the lock or a new size re-deals into fewer teams, a change for
 // a team that goes away becomes changes for the students who were on it, split as evenly as whole
-// points allow (first checked in first), so the points follow them to their new teams. Teams rank by points per student (points / members, Sam's decision
-// D6), so a team of 3 and a team of 4 that answer equally well tie. Extra credit: 1st place 5,
-// 2nd 3, 3rd 1, the rest 0. Teams with the same points per student share the places they fill
-// (two tied for 1st get 4 each). A team with no students, or with 0 points or fewer, gets none,
-// and nobody gets any until a quiz ends or the professor changes points in this class.
+// points allow (first checked in first), so the points follow them to their new teams. Teams rank
+// by points per student (points / members, Sam's decision D6), so a team of 3 and a team of 4 that
+// answer equally well tie. They rank on that number to one decimal, the way every screen shows it,
+// so two teams that both show "1.3 per student" tie. Extra credit: 1st place 5, 2nd 3, 3rd 1, the
+// rest 0. Teams with the same points per student share the places they fill (two tied for 1st get
+// 4 each). A team with no students, or with 0 points or fewer, gets none, and nobody gets any
+// until a quiz ends or the professor changes points in this class.
 //
 // Classes. Every read here is for the current class (lib.lectureWindow): the groups rows, the
 // class's groupSettings row, check-ins, quizzes and point changes made since the class started.
@@ -45,9 +47,9 @@
 //       questions: quizzes ended in this class. teams, best first: [{ team, color, label,
 //       members, correct, changes, points, perStudent, rank, ec }]. correct: right answers;
 //       changes: the professor's changes; points = correct + changes; perStudent = points /
-//       members; rank 1 is first and tied teams share it; ec is the extra credit that place
-//       earns (it can be a fraction, like 4 / 3 for three teams tied for 2nd). Teams with no
-//       students come last with ec 0.
+//       members; rank 1 is first, shared by teams whose perStudent is the same to one
+//       decimal; ec is the extra credit that place earns (it can be a fraction, like 4 / 3 for
+//       three teams tied for 2nd). Teams with no students come last with ec 0.
 //   api.live.groups.mine         { channel } -> null | { team, color, label }   the signed-in student's team
 //   api.live.groups.join         { channel } -> null | { team, color, label }   checked-in students
 //       Deals every check-in in this class that has no team yet, in check-in order.
@@ -294,8 +296,9 @@ export async function ensureGroup(ctx: MutationCtx, channel: string, user: strin
 // Lock the teams once their time comes: re-deal everyone checked in so every team has 3 or 4. If
 // the class start moved later, wait again. A job queued for a class that has ended does nothing;
 // one with no lecture (queued before classes existed) acts on the open class. Nobody checked in
-// yet: the teams stay open, and the first check-in queues the lock again. `force` locks now (for
-// testing from the CLI).
+// yet (a start time and no check-in, or the class's only check-ins removed): the teams stay open
+// and the `scheduled` mark is cleared, so the next check-in queues the lock again. `force` locks
+// now (for testing from the CLI).
 export const lock = internalMutation({
   args: { channel: v.string(), force: v.optional(v.boolean()), lecture: v.optional(v.id("lectures")) },
   returns: v.null(),
@@ -307,8 +310,7 @@ export const lock = internalMutation({
     const first = await firstCheckin(ctx, channel, win.start);
     if (!force) {
       const at = lockTime(win, first);
-      if (at === null) return null;
-      if (Date.now() < at) {
+      if (at !== null && Date.now() < at) {
         await ctx.scheduler.runAfter(at - Date.now(), internal.live.groups.lock, lockArgs(channel, lecture ?? win.lecture));
         return null;
       }
@@ -420,7 +422,7 @@ const teamScore = v.object({
   changes: v.number(), // points the professor added (or took off, below 0) in this class
   points: v.number(), // correct + changes
   perStudent: v.number(), // points / members; 0 for a team with no students
-  rank: v.number(), // 1 is first; tied teams share a rank; teams with no students come after every other team
+  rank: v.number(), // 1 is first; teams with the same perStudent to one decimal share a rank; teams with no students come last
   ec: v.number(), // extra credit for that place
 });
 type TeamScore = Infer<typeof teamScore>;
@@ -438,8 +440,15 @@ export type ClassScores = {
   teams: TeamScore[]; // best first
 };
 
-// Whether two teams with students have the same points per student (exact, no rounding).
-const level = (a: TeamScore, b: TeamScore) => a.points * b.members === b.points * a.members;
+// Points per student in tenths, the figure every screen shows (perStudent.toFixed(1), halves
+// away from zero the way toFixed rounds them). Teams rank and tie on it, so a team never places
+// above another that shows the same number. 0 for a team with no students.
+export function tenths(points: number, members: number) {
+  if (!members) return 0;
+  const t = Math.round((Math.abs(points) * 10) / members);
+  return points < 0 ? -t : t;
+}
+const shown = (g: TeamScore) => tenths(g.points, g.members);
 
 // The scores for this class: one helper for leaderboard, roster and endDay, so the board, the
 // professor's list and the saved extra credit always agree.
@@ -508,12 +517,12 @@ export async function scoreDay(ctx: Ctx, channel: string): Promise<ClassScores> 
     const change = changed.get(team) ?? 0;
     return { ...describe(team), members: n, correct: right, changes: change, points: right + change, perStudent: n ? (right + change) / n : 0, rank: 0, ec: 0 };
   });
-  const playing = all.filter((g) => g.members > 0).sort((a, b) => b.points * a.members - a.points * b.members || a.team - b.team);
+  const playing = all.filter((g) => g.members > 0).sort((a, b) => shown(b) - shown(a) || a.team - b.team);
   const anything = quizzes > 0 || changes.length > 0;
   const teams: TeamScore[] = [];
   for (let i = 0; i < playing.length; ) {
     let j = i;
-    while (j + 1 < playing.length && level(playing[i], playing[j + 1])) j++;
+    while (j + 1 < playing.length && shown(playing[i]) === shown(playing[j + 1])) j++;
     const share = EC.slice(i, j + 1).reduce((sum, x) => sum + x, 0) / (j - i + 1);
     for (let k = i; k <= j; k++) teams.push({ ...playing[k], rank: i + 1, ec: anything && playing[k].points > 0 ? share : 0 });
     i = j + 1;
@@ -685,29 +694,42 @@ function endLine(s: ClassScores, credited: number) {
   return `${first} Saved extra credit for ${plural(credited, "student")}. The next class starts from 0 points.`;
 }
 
-// End day: saves each team member's extra credit for this class (one groupResults row per
-// student on a team, with the team's rank, points and extra credit, the same numbers the board
-// showed) and ends the class. Nothing is saved when no quiz ended and no points changed.
+// Saves each team member's extra credit for the open class (one groupResults row per student on
+// a team, with the team's rank, points and extra credit, the same numbers the board shows) and
+// returns how many students got some. Nothing is saved with no class open, or when no quiz ended
+// and no points changed. Call it just before the class ends.
+async function saveScores(ctx: MutationCtx, channel: string, s: ClassScores, endedAt: number) {
+  const lecture = s.win.lecture;
+  if (!lecture || (s.quizzes === 0 && s.changes === 0)) return 0;
+  const byTeam = new Map(s.teams.map((g) => [g.team, g]));
+  let credited = 0;
+  for (const [user, team] of s.teamOf) {
+    const g = byTeam.get(team);
+    if (!g || g.members === 0) continue;
+    await ctx.db.insert("groupResults", { channel, lecture, endedAt, user, team, rank: g.rank, points: g.points, ec: g.ec });
+    if (g.ec > 0) credited++;
+  }
+  return credited;
+}
+
+// The same save for a class that ends without End day, for the 12-hour close (lectures.close)
+// and lib.ensureLecture's close of a class left open past its close time to call just before
+// they set endedAt, with that endedAt. A quiz still open counts for nothing, the way the board
+// shows it. Returns how many students got extra credit.
+export async function saveExtraCredit(ctx: MutationCtx, channel: string, endedAt: number) {
+  return await saveScores(ctx, channel, await scoreDay(ctx, channel), endedAt);
+}
+
+// End day: saves each team member's extra credit for this class (saveScores) and ends the class.
 export const endDay = mutation({
   args: { channel: v.string() },
   returns: v.string(),
   handler: async (ctx, { channel }) => {
     await requireProf(ctx);
     const s = await scoreDay(ctx, channel);
-    const lecture = s.win.lecture;
-    if (!lecture) return "No class is running.";
+    if (!s.win.lecture) return "No class is running.";
     if (s.openPoll) throw new ConvexError("End the open question first.");
-    const endedAt = Date.now();
-    let credited = 0;
-    if (s.quizzes > 0 || s.changes > 0) {
-      const byTeam = new Map(s.teams.map((g) => [g.team, g]));
-      for (const [user, team] of s.teamOf) {
-        const g = byTeam.get(team);
-        if (!g || g.members === 0) continue;
-        await ctx.db.insert("groupResults", { channel, lecture, endedAt, user, team, rank: g.rank, points: g.points, ec: g.ec });
-        if (g.ec > 0) credited++;
-      }
-    }
+    const credited = await saveScores(ctx, channel, s, Date.now());
     await endLecture(ctx, channel);
     return endLine(s, credited);
   },
