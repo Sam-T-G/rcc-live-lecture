@@ -482,6 +482,35 @@ describe("F27 Who got it wrong, and the AI note, on polls", () => {
     expect(await missing(t)).toEqual({ kind: "vote", poll: vote, question: "Pizza or tacos?" });
   });
 
+  it("F27.1 a returning student is listed under this class's team, not last class's: missing's wrong list, byTeam and the AI note's team lines", async () => {
+    const fetchMock = gemini("Blue picked Venus. Explain again why Mercury is closest to the sun.");
+    const t = setup();
+    // Class 1: student 1 scans first (Red), student 2 second (Blue).
+    await openClass(t);
+    const [s1, s2] = await room(t, 2);
+    await endClass(t);
+
+    // Class 2: the order flips, so student 2 is Red and student 1 is Blue.
+    vi.setSystemTime(T0 + 2 * HOUR);
+    await openClass(t);
+    await checkIn(t, s2);
+    await checkIn(t, s1);
+    const quiz = await ask(t, "quiz", "Which planet is closest to the sun?", ["Venus", "Mercury", "Mars"], 1);
+    await s1.mutation(api.checkin.quiz.answer, { poll: quiz, choice: 0 });
+    await s2.mutation(api.checkin.quiz.answer, { poll: quiz, choice: 1 });
+
+    const m = await missing(t);
+    expect(m?.kind).toBe("quiz");
+    if (m?.kind !== "quiz") return;
+    expect(m.wrong).toEqual([{ name: "Sample student 1", team: { team: 1, color: "blue", label: "Blue" }, picked: "Venus" }]);
+    expect(m.byTeam).toEqual([
+      { team: 0, color: "red", label: "Red", answered: 1, right: 1 },
+      { team: 1, color: "blue", label: "Blue", answered: 1, right: 0 },
+    ]);
+    await admin(t).action(api.checkin.quiz.feedback, { channel: CH });
+    expect(JSON.stringify(sentBody(fetchMock))).toContain("By team: Red: 1 of 1 right; Blue: 0 of 1 right");
+  });
+
   it("F27.2 feedback request body has counts and team labels and none of the sample names; F27.3 'Ask the room a quiz question first.' and 'No answers yet.'", async () => {
     const fetchMock = gemini("Most of the room picked Venus. Explain again why Mercury is closest to the sun.");
     const t = setup();
