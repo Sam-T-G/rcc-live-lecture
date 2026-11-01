@@ -12,6 +12,7 @@ import { SignedInAs } from "../blocks/auth";
 import { Badge, Button, ConfirmButton, EmptyState, Field, Segmented, type Choice } from "../blocks/kit";
 import { Card, ErrorBoundary, Screen, Status } from "../blocks/ui";
 import { NotStaff, SignInEnding, useStaff, type StaffMe } from "../teams/checkin/prof";
+import { stillPaired, type Paired } from "./paired";
 import { why } from "../teams/checkin/util";
 import "./admin.css";
 
@@ -280,17 +281,18 @@ function PairDevice() {
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState("");
+  const [done, setDone] = useState<Paired | null>(null);
+  const devices = useQuery(api.staff.devices, {});
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     const name = label.trim().replace(/\s+/g, " ");
     setBusy(true);
     setError("");
-    setDone("");
+    setDone(null);
     try {
-      await approve({ code, label: name });
-      setDone(`${name} is paired. That iPad shows the pass scanner now.`);
+      const device = await approve({ code, label: name });
+      setDone({ device, text: `${name} is paired. That iPad shows the pass scanner now.` });
       setCode("");
       setLabel("");
     } catch (err) {
@@ -316,9 +318,9 @@ function PairDevice() {
         <Button type="submit" busy={busy}>
           Pair
         </Button>
-        {done && (
+        {done && stillPaired(done, devices) && (
           <p className="muted" role="status">
-            {done}
+            {done.text}
           </p>
         )}
       </form>
