@@ -1,6 +1,8 @@
 // @vitest-environment node
-// When the pass page asks for a new code and when it hides the one it has (passTiming.ts, used by
-// Student.tsx). window and document are plain EventTargets here.
+// The pass page's timing helpers in passTiming.ts: when to ask for a new code and when to hide the
+// one on screen. window and document are plain EventTargets here. These tests call the helpers
+// only: how Student.tsx wires them up (its effects, the timer, signing out on "Sign in first.")
+// has no test yet.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { askForCodes, codeIsOld, msUntilNewCode } from "./passTiming";
 
@@ -11,8 +13,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("checkin-frontend-10 checkin-backend-7 the pass page keeps its code new", () => {
-  it("F11.5 asks on mount, every 5 s, when the page turns visible, on focus, when the connection comes back and when the browser restores the page; not when the page hides; never after it stops", () => {
+describe("checkin-frontend-10 checkin-backend-7 the helpers the pass page uses to keep its code new", () => {
+  it("F11.5 askForCodes asks at once, every 5 s, when the page turns visible, on focus, when the connection comes back and when the browser restores the page; not when the page hides; never after it stops", () => {
     const win = new EventTarget();
     const doc = Object.assign(new EventTarget(), { visibilityState: "visible" });
     const ask = vi.fn();
@@ -43,7 +45,7 @@ describe("checkin-frontend-10 checkin-backend-7 the pass page keeps its code new
     expect(ask).toHaveBeenCalledTimes(6);
   });
 
-  it("F11.5 hides a code over 25 s old by this phone's clock, and asks again just after the code turns 20 s old", () => {
+  it("F11.5 codeIsOld is true for a code over 25 s old by this phone's clock, and msUntilNewCode waits until just after the code turns 20 s old", () => {
     const got = 1_000_000;
     expect(codeIsOld(got, got)).toBe(false);
     expect(codeIsOld(got, got + 25_000)).toBe(false);

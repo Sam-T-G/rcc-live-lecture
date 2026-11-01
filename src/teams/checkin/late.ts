@@ -29,8 +29,15 @@ export type Seen = { at: number; ids: string[] };
 // opened. The feed holds the newest 5 late arrivals, so an older one comes back into it when a
 // newer one ticks the opt-out, or when someone unticks theirs; comparing times keeps those from
 // showing again.
-export function newArrivals(feed: Late[], seen: Seen | null): { fresh: Late[]; seen: Seen } {
-  if (seen === null) return { fresh: [], seen: newest(feed, { at: -Infinity, ids: [] }) };
+// `now` is the phone's clock when the feed arrived (Date.now()). With it, the first feed also
+// marks everything scanned before that moment as seen, so an arrival from before the page opened
+// never shows, even one the first feed didn't hold: someone who had the opt-out ticked and
+// unticks it later, or students who become late when the professor saves the class start after
+// they walked in (lateFeed works lateness out when read). A phone clock that runs fast by a few
+// seconds only skips arrivals in those first seconds. Without `now`, the first feed's newest
+// arrival is the floor, which lets those cases show.
+export function newArrivals(feed: Late[], seen: Seen | null, now?: number): { fresh: Late[]; seen: Seen } {
+  if (seen === null) return { fresh: [], seen: newest(feed, { at: now ?? -Infinity, ids: [] }) };
   const fresh = feed.filter((f) => f.at > seen.at || (f.at === seen.at && !seen.ids.includes(f.id)));
   return { fresh, seen: newest(fresh, seen) };
 }
