@@ -20,8 +20,6 @@ targets:
     platform: iOS
     sources:
       - path: RCCLivePortal
-        excludes:
-          - ATS-Debug.plist
     dependencies:
       - package: ConvexMobile
     settings:
@@ -37,11 +35,9 @@ targets:
         MARKETING_VERSION: "0.1"
         CURRENT_PROJECT_VERSION: "1"
         CODE_SIGN_STYLE: Automatic
-      configs:
-        # Debug builds may reach a backend on this Mac (http://127.0.0.1:3210).
-        # Release builds get no ATS exception at all.
-        Debug:
-          INFOPLIST_FILE: RCCLivePortal/ATS-Debug.plist
+      # No ATS exception: App Transport Security doesn't cover ConvexMobile's websocket, so it
+      # can't block or allow a plain-http backend. Config.accepts does: https only in Release,
+      # http too in Debug, for a backend on this Mac (http://127.0.0.1:3210).
   # Unit tests for the follow rule, decoding, the late banner and the words. They run inside
   # the app, which opens no connection while tests run, so they need no backend.
   RCCLivePortalTests:

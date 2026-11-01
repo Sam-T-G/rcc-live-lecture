@@ -241,8 +241,9 @@ struct LateBannerView: View {
     /// The largest text size a card uses. In landscape a card at AX5 took 175 of iPhone 17's
     /// 402 pt and left the slide about 30 pt (sweep1-ios-check-1), so there it stops at AX1 and
     /// keeps to one line, shrinking the words to fit; that keeps it under a quarter of the height.
-    /// Portrait keeps every size. VoiceOver reads the full line either way.
+    /// In portrait it stops at AX3: at AX5 the card alone took 108 pt more and left the slide 263
+    /// of 874 pt (sweep2-ios-2, LayoutTests). VoiceOver reads the full line either way.
     static func largestType(verticalSize: UserInterfaceSizeClass?) -> DynamicTypeSize {
-        verticalSize == .compact ? .accessibility1 : .accessibility5
+        verticalSize == .compact ? .accessibility1 : .accessibility3
     }
 }

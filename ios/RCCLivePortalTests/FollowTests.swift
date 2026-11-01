@@ -9,6 +9,25 @@ private func deck(_ follow: inout Follow, to live: Int) {
 
 @Suite("Following the deck")
 struct FollowTests {
+    @Test("sweep2-ios-7 VoiceOver reads 'Slide N of M' when the screen moves with the deck, and nothing when it stays")
+    func announcesDeckMoves() {
+        var f = Follow()
+        for live in 0...5 { deck(&f, to: live) }
+        var before = f.selection
+        deck(&f, to: 6)  // following: the screen moves to slide 7
+        #expect(f.announcement(from: before, count: 10) == "Slide 7 of 10")
+
+        f.open(3, live: 6)  // the student pages back to slide 4
+        before = f.selection
+        deck(&f, to: 7)  // the screen stays on slide 4; the notice is read out instead
+        #expect(f.announcement(from: before, count: 10) == nil)
+        #expect(f.notice(live: 7) == "The professor is on slide 8 now.")
+
+        before = f.selection
+        f.deckMoved(live: 2, pages: Array(0...2))  // the deck goes back before slide 4: the screen follows
+        #expect(f.announcement(from: before, count: 10) == "Slide 3 of 10")
+    }
+
     @Test("ios-1 professor goes back to the student's slide: following is true and the next move follows")
     func professorLandsOnStudentsSlide() {
         var f = Follow()

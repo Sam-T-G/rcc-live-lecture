@@ -112,3 +112,58 @@ describe("iOS app colors and layout follow docs/design.md", () => {
     expect(body).toMatch(/minHeight:\s*(4[4-9]|[5-9]\d)\b/);
   });
 });
+
+// The app's words are copies of the web's, so a student reads the same line on every screen
+// (F16, F42). Each side's own tests check only its own copy, so these read both and fail when a
+// copy edit changes one side (sweep2-ios-5, sweep2-ios-8).
+describe("iOS app words match the web's", () => {
+  const lateTs = readFileSync(new URL("../teams/checkin/late.ts", import.meta.url), "utf8");
+  const pageTsx = readFileSync(new URL("../portal/Page.tsx", import.meta.url), "utf8");
+  const deck = SWIFT["DeckView.swift"] ?? "";
+  // Swift's "\(n) min late" and JS's `${n} min late`, with every slot written as {}.
+  const slots = (s: string) => s.replace(/\\\([^)]*\)/g, "{}").replace(/\$\{[^}]*\}/g, "{}");
+
+  it("the late banner's five lines are late.ts's LINES, in the same order", () => {
+    const swiftBody = /enum LateLines \{[\s\S]*?static let lines[^=]*= \[([\s\S]*?)\n {4}\]/.exec(SWIFT["LateBanner.swift"] ?? "")?.[1];
+    expect(swiftBody, "LateLines.lines not found in LateBanner.swift").toBeDefined();
+    const swift = [...swiftBody!.matchAll(/\{\s*n,\s*m\s+in\s+"((?:[^"\\]|\\.)*)"\s*\}/g)].map((m) => slots(m[1]));
+    const webBody = /const LINES = \[([\s\S]*?)\n\];/.exec(lateTs)?.[1];
+    expect(webBody, "LINES not found in late.ts").toBeDefined();
+    const web = [...webBody!.matchAll(/=>\s*`([^`]*)`/g)].map((m) => slots(m[1]));
+    expect(web).toHaveLength(5);
+    expect(swift).toEqual(web);
+  });
+
+  // Words in DeckView.swift: `static let loading = "..."` and
+  // `static func professorOn(slide: Int) -> String { "... \(slide) ..." }`.
+  const words = () => {
+    const body = /enum Words \{([\s\S]*?)\n\}/.exec(deck)?.[1] ?? "";
+    const lets = [...body.matchAll(/static let (\w+) = "((?:[^"\\]|\\.)*)"/g)].map(([, name, text]) => ({ name, text }));
+    const funcs = [...body.matchAll(/static func (\w+)\([^)]*\) -> String \{ "((?:[^"\\]|\\.)*)" \}/g)].map(([, name, text]) => ({
+      name,
+      text: slots(text),
+    }));
+    return [...lets, ...funcs];
+  };
+  // Lines only the app has: #/portal has no connection bar.
+  const APP_ONLY = ["cantLoad", "offline"];
+  // #/portal's source with each one-line JSX `{expression}` written as {}.
+  const portalText = pageTsx.replace(/\{[^{}\n]+\}/g, "{}");
+
+  it("every line in Words is on #/portal, word for word", () => {
+    const all = words();
+    expect(all.map((w) => w.name)).toEqual(
+      expect.arrayContaining(["loading", "waiting", "backToLive", "live", "professorOn", "slideOf", "back", "next"]),
+    );
+    const missing = all.filter((w) => !APP_ONLY.includes(w.name) && !portalText.includes(w.text)).map((w) => `${w.name}: ${w.text}`);
+    expect(missing).toEqual([]);
+  });
+
+  it("the arrows' VoiceOver labels are Words.back and Words.next, #/portal's button words", () => {
+    const labels = [...code(deck).matchAll(/\.accessibilityLabel\(([^)]*)\)/g)].map((m) => m[1].trim());
+    expect(labels).toEqual(expect.arrayContaining(["Words.back", "Words.next"]));
+    const all = Object.fromEntries(words().map((w) => [w.name, w.text]));
+    expect(pageTsx).toMatch(new RegExp(`>\\s*← ${all.back}\\s*</button>`));
+    expect(pageTsx).toMatch(new RegExp(`>\\s*${all.next} →\\s*</button>`));
+  });
+});

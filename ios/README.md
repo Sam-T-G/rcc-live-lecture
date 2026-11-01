@@ -25,7 +25,7 @@ xcodebuild test -project RCCLivePortal.xcodeproj -scheme RCCLivePortal \
   -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
-RCCLivePortalTests checks the follow rule, which screen and words the app picks, number decoding, the retry wait, the late banner and its words. The tests run inside the app, which makes no DeckStore and opens no connection while they run (a test fails if it does), so they need no backend. `npm test` and CI don't build Swift, so run them before you push a change to `ios/` or to what `deck:current`, `deck:slides` or `lateFeed` return.
+RCCLivePortalTests checks the follow rule, which screen and words the app picks, number decoding, the retry wait, the late banner and its words, which backend URLs the app takes, and that the slide keeps at least a third of the screen at every text size. `src/styles/ios.test.ts` (in `npm test`) checks the app's words against #/portal's and late.ts's. The tests run inside the app, which makes no DeckStore and opens no connection while they run (a test fails if it does), so they need no backend. `npm test` and CI don't build Swift, so run them before you push a change to `ios/` or to what `deck:current`, `deck:slides` or `lateFeed` return.
 
 ## Run against your dev backend
 
@@ -57,7 +57,7 @@ A late check-in on the same deployment and channel shows the banner in the app.
 
 With no arguments the app reads `https://utmost-ibis-818.convex.cloud` on channel `gdg`, the same backend and channel as the live site.
 
-Debug builds allow plain `http` to addresses on this Mac (`NSAllowsLocalNetworking` in `RCCLivePortal/ATS-Debug.plist`), for a backend at http://127.0.0.1:3210. Release builds have no exception.
+Release builds read only `https` backends; Debug builds also take plain `http`, for a backend at http://127.0.0.1:3210. `Config.accepts` in `RCCLivePortal/Config.swift` decides this, and a URL it refuses falls back to prod. App Transport Security can't: ConvexMobile's websocket isn't covered by ATS, so the app has no ATS exception and ATS wouldn't block an `http` backend without the check.
 
 ## Real iPhones
 

@@ -249,7 +249,7 @@ struct LateBannerHeightTests {
                 #expect(h <= landscape.height / 4, "\(type) in landscape, \(arrivals[0].first): \(h) pt of \(landscape.height)")
             }
         }
-        // Portrait keeps the full accessibility size (one card, can wrap).
+        // Portrait keeps the accessibility sizes up to AX3 (one card, can wrap).
         let portrait = bannerHeight([cy, ben], width: portraitWidth, typeSize: .accessibility5, verticalSize: .regular)
         let portraitLarge = bannerHeight([cy], width: portraitWidth, typeSize: .large, verticalSize: .regular)
         #expect(portrait > portraitLarge * 1.5, "portrait AX5 \(portrait) pt vs large \(portraitLarge) pt")

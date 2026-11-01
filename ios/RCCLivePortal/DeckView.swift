@@ -9,6 +9,9 @@ enum Words {
     static let offline = "No connection. Check your Wi-Fi or cell data."
     static let backToLive = "Back to live"
     static let live = "Live"
+    /// The arrows' VoiceOver labels: #/portal's "← Back" and "Next →" buttons, without the arrows.
+    static let back = "Back"
+    static let next = "Next"
 
     /// `slide` is 1-based, as the room counts.
     static func professorOn(slide: Int) -> String { "The professor is on slide \(slide) now." }
@@ -79,6 +82,14 @@ struct Follow: Equatable {
         guard let live, showNotice(live: live) else { return nil }
         return Words.professorOn(slide: live + 1)
     }
+
+    /// What VoiceOver reads after the deck moved and the screen was on slide index `before`:
+    /// "Slide N of M" when the screen moved with the deck, as #/portal's count does with
+    /// aria-live="polite" (sweep2-ios-7). nil when the screen stayed: the student is reading an
+    /// earlier slide, and the notice is read out instead.
+    func announcement(from before: Int, count: Int) -> String? {
+        selection == before ? nil : Words.slideOf(selection + 1, count: count)
+    }
 }
 
 /// What the deck screen shows, picked from the store. DeckView switches on it, so ScreenTests
@@ -121,15 +132,28 @@ struct DeckView: View {
     let store: DeckStore
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.verticalSizeClass) private var verticalSize
 
     @State private var follow = Follow()
     @State private var pendingStart: Int?
+
+    /// The largest text size for everything on the deck screen but the slide: the bar, the slide
+    /// count, the notice, Back to live and the arrows. At AX5 they took all but 57 of iPhone 17's
+    /// 402 pt in landscape and 110 of 874 in portrait, with a late card (sweep2-ios-2). Capped
+    /// here, the slide keeps at least a third of the height at every size (LayoutTests). The
+    /// slide itself keeps every size, and VoiceOver reads the full words either way.
+    static func largestType(verticalSize: UserInterfaceSizeClass?) -> DynamicTypeSize {
+        verticalSize == .compact ? .xxxLarge : .accessibility2
+    }
+
+    private var largest: DynamicTypeSize { DeckView.largestType(verticalSize: verticalSize) }
 
     var body: some View {
         let screen = DeckScreen(live: store.live, load: store.load)
         VStack(spacing: 0) {
             if let problem = screen.bar {
                 NoticeBar(problem: problem)
+                    .dynamicTypeSize(...largest)
             }
             switch screen.main {
             case .deck(let live):
@@ -155,15 +179,16 @@ struct DeckView: View {
         // Arrows and anything else that takes the tint: the web's green, never system blue.
         .tint(Palette.accent.color)
         .onAppear { pendingStart = store.config.startOnSlide }
-        .onChange(of: store.live?.slide.index, initial: true) { _, newLive in
+        .onChange(of: store.live?.slide.index, initial: true) { oldLive, newLive in
             guard let newLive else { return }
             if applyPendingStart() { return }
-            move { $0.deckMoved(live: newLive, pages: store.pages.map(\.index)) }
+            // The first slide that comes in isn't read out, as a page's first render isn't.
+            followDeck(live: newLive, pages: store.pages.map(\.index), announce: oldLive != nil && oldLive != newLive)
         }
         .onChange(of: store.pages.map(\.index)) { _, pages in
             if applyPendingStart() { return }
             guard let live = store.live?.slide.index else { return }
-            move { $0.deckMoved(live: live, pages: pages) }
+            followDeck(live: live, pages: pages, announce: true)
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: showNotice)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.load.problem)
@@ -179,7 +204,7 @@ struct DeckView: View {
         let position = pages.firstIndex(where: { $0.index == follow.selection })
 
         HStack {
-            Text(Words.slideOf(follow.selection + 1, count: max(live.count, live.slide.index + 1)))
+            Text(Words.slideOf(follow.selection + 1, count: DeckView.count(live)))
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -190,6 +215,7 @@ struct DeckView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
+        .dynamicTypeSize(...largest)
 
         TabView(selection: Binding(
             get: { follow.selection },
@@ -221,7 +247,7 @@ struct DeckView: View {
                     Image(systemName: "chevron.left")
                         .frame(minWidth: 44, minHeight: 44)
                 }
-                .accessibilityLabel("Previous slide")
+                .accessibilityLabel(Words.back)
                 .disabled(position == nil || position == 0)
 
                 Spacer()
@@ -239,15 +265,16 @@ struct DeckView: View {
                     Image(systemName: "chevron.right")
                         .frame(minWidth: 44, minHeight: 44)
                 }
-                .accessibilityLabel("Next slide")
+                .accessibilityLabel(Words.next)
                 .disabled(onLive)
             }
             .font(.title3.weight(.semibold))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
-        // The notice and Back to live wrap instead of cutting off at the large text sizes; the
-        // slide above takes what height is left (it scrolls).
+        // The notice and Back to live wrap instead of cutting off at the large text sizes, up to
+        // `largest`; the slide above takes what height is left (it scrolls).
+        .dynamicTypeSize(...largest)
         .fixedSize(horizontal: false, vertical: true)
         .background(.bar)
         .onChange(of: showNotice) { _, shown in
@@ -255,6 +282,21 @@ struct DeckView: View {
                 AccessibilityNotification.Announcement(notice).post()
             }
         }
+    }
+
+    /// The slide count the header shows: the deck's count, or more if the deck is past it.
+    static func count(_ live: LiveSlide) -> Int { max(live.count, live.slide.index + 1) }
+
+    /// The deck moved to `live` or its shown slides changed: follow it by Follow's rules, and
+    /// when the screen moved with it and `announce`, VoiceOver reads the new "Slide N of M".
+    private func followDeck(live: Int, pages: [Int], announce: Bool) {
+        let before = follow.selection
+        var after = follow
+        after.deckMoved(live: live, pages: pages)
+        move { $0.deckMoved(live: live, pages: pages) }
+        guard announce, let current = store.live,
+              let line = after.announcement(from: before, count: DeckView.count(current)) else { return }
+        AccessibilityNotification.Announcement(line).post()
     }
 
     /// Changes `follow` with the page-turn animation, or with none when Reduce Motion is on.

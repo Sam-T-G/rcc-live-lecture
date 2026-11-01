@@ -55,6 +55,9 @@ struct ScreenTests {
         #expect(Words.waiting == "Waiting for the slides to start.")
         #expect(Words.slideOf(4, count: 6) == "Slide 4 of 6")
         #expect(Words.backToLive == "Back to live")
+        // The arrows' VoiceOver labels: #/portal's "← Back" and "Next →" (sweep2-ios-8).
+        #expect(Words.back == "Back")
+        #expect(Words.next == "Next")
         #expect(Words.line(for: .offline) == "No connection. Check your Wi-Fi or cell data.")
     }
 
