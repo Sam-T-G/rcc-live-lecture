@@ -70,7 +70,7 @@ Errors thrown as `new ConvexError("text")` arrive in the browser as `e.data`; sh
 import { QR } from "../blocks/qr";
 import { pageUrl } from "../blocks/router";
 
-<QR value={pageUrl("join/ABC123/xyz")} size={360} label="Scan to check in" />
+<QR value={pageUrl("checkin/student")} size={360} label="Scan to check in" />
 ```
 
 SVG, sharp on a TV. To make a code that expires, change the value on a timer from a value the server hands out (a mutation can make a random one with `randomCode()` from `convex/lib.ts` and store when it was made).
@@ -201,18 +201,25 @@ useVisionLoop(cam.video, runner, cam.on, (seen) => {
 
 Hash URLs, so one GitHub Pages file serves every page.
 
-The team pages are registered already (`src/pages/index.ts`): `#/checkin/...` → `src/teams/checkin/Page.tsx`, `#/live` → `src/teams/live/Page.tsx`, `#/host` → `src/teams/host/Page.tsx`. A team adds its own sub-pages by reading the rest of the URL:
+The team pages are registered already (`src/pages/index.ts`): `#/checkin/...` → `src/teams/checkin/Page.tsx`, `#/live` → `src/teams/live/Page.tsx`, `#/host` → `src/teams/host/Page.tsx`. A team adds its own sub-pages by reading the part after its page name. Each sub-page has exactly one part, and a URL with more parts than a page expects shows "No page at #/...", so a typo never opens the wrong screen:
 
 ```tsx
-// src/teams/checkin/Page.tsx
-import { useRoute, go, pageUrl } from "../../blocks/router";
+// src/teams/checkin/Page.tsx (shortened)
+import { useRoute } from "../../blocks/router";
 export default function CheckinPage() {
-  const [, part, code] = useRoute(); // #/checkin/join/ABC123 → ["checkin", "join", "ABC123"]
-  if (part === "kiosk") return <Kiosk />;
-  return <Join code={code} />;
+  const [, ...rest] = useRoute();   // #/checkin/kiosk → ["checkin", "kiosk"]
+  const [part = "student"] = rest;  // #/checkin alone opens the student pass
+  if (rest.length <= 1)
+    switch (part) {
+      case "student": return <Student />;
+      case "kiosk": return <Kiosk />;
+    }
+  return <Screen title={`No page at #/checkin/${rest.join("/")}`}>…</Screen>; // #/checkin/join/ABC123 lands here
 }
-// pageUrl("checkin/join/" + code) is the full URL to put in the kiosk's QR.
+// pageUrl("checkin/student") is the full URL to put in a check-in QR (src/teams/checkin/Stage.tsx does).
 ```
+
+To hand a page a value, put it after "?" (`#/checkin/stage?deck=a`) and read it with `useHashParams().get("deck")`, never as an extra part of the path. A new sub-page gets a line in `src/pages/routes.test.ts`.
 
 ## Look
 
