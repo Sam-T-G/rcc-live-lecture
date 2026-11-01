@@ -44,10 +44,29 @@ vi.mock("react", async (orig) => {
 
 // requestPairing. The code comes back to the screen through the status query (the `status` prop).
 const request = vi.fn<(args: { token: string }) => Promise<unknown>>(async () => ({ status: "waiting", code: "111222", expiresAt: Date.now() + 600_000 }));
-vi.mock("convex/react", () => ({ useMutation: () => request, useQuery: () => undefined, useConvexAuth: () => ({ isLoading: false }) }));
+// checkin.attendance.clock: the server's time, `ahead` ms behind the iPad's own clock (the iPad
+// runs fast when it's positive). `answer` false leaves the call waiting, like a slow network, until
+// the test calls `release`.
+const skew = vi.hoisted(() => ({ ahead: 0, answer: true, release: (() => {}) as () => void }));
+const serverClock = vi.fn(() =>
+  skew.answer
+    ? Promise.resolve(Date.now() - skew.ahead)
+    : new Promise<number>((done) => {
+        skew.release = () => done(Date.now() - skew.ahead);
+      }),
+);
+vi.mock("convex/react", async () => {
+  const { getFunctionName } = await import("convex/server");
+  return {
+    useMutation: (ref: Parameters<typeof getFunctionName>[0]) => (getFunctionName(ref) === "checkin/attendance:clock" ? serverClock : request),
+    useQuery: () => undefined,
+    useConvexAuth: () => ({ isLoading: false }),
+  };
+});
 vi.mock("../../blocks/auth", () => ({ SignInButton: () => null, useGoogleUser: () => ({ user: null, signOut: () => {} }) }));
 
 const { PairScreen } = await import("./prof");
+const { clock } = await import("./util");
 type Props = Parameters<typeof PairScreen>[0];
 type El = ReactElement<{ children?: ReactNode; onClick?: () => void; value?: unknown }>;
 
@@ -83,9 +102,17 @@ const button = (el: El, label: string) => walk(el, { words: [], els: [] }).els.f
 const waiting = (code: string, expiresAt: number) => ({ status: "waiting" as const, code, expiresAt });
 const none = { status: "none" as const };
 
+// Lets the server clock's answer (a resolved promise) reach the screen's state.
+const settle = async () => {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+};
+
 beforeEach(() => {
   hooks.slots = [];
   request.mockClear();
+  serverClock.mockClear();
+  skew.ahead = 0;
+  skew.answer = true;
   vi.useFakeTimers();
   vi.setSystemTime(T0);
 });
@@ -142,12 +169,75 @@ describe("ROLES the door iPad's pairing screen", () => {
     expect(request).toHaveBeenCalledWith({ token: TOKEN });
   });
 
-  it("ROLES the screen stops showing a code once its time is up, before the server drops it", () => {
+  it("ROLES the screen stops showing a code once its time is up, before the server drops it", async () => {
+    render(waiting("482913", T0 + 600_000));
+    await settle();
     render(waiting("482913", T0 + 600_000));
     vi.setSystemTime(T0 + 600_001);
     vi.runOnlyPendingTimers();
     const el = render(waiting("482913", T0 + 600_000));
     expect(bigValue(el)).toBeUndefined();
     expect(words(el)).toContain("The code expired.");
+  });
+});
+
+// sweep2-checkin-3 / sweep2-access-2: expiresAt is the server's time, so the screen judges it by
+// the server's clock (checkin.attendance.clock), never the iPad's own.
+describe("sweep2-checkin-3 an iPad whose clock is off still shows a code the server takes", () => {
+  it("an iPad 11 minutes fast shows the server's fresh code, until the iPad's time for the server's expiry", async () => {
+    skew.ahead = 11 * 60_000;
+    vi.setSystemTime(T0 + skew.ahead); // the iPad's clock; the server's is T0
+    render(none);
+    await settle();
+    let el = render(waiting("482913", T0 + 600_000));
+    expect(serverClock).toHaveBeenCalledTimes(1);
+    expect(bigValue(el)).toBe("482 913");
+    expect(words(el)).toContain(`The code works until  ${clock(T0 + 600_000 + skew.ahead)} .`);
+    expect(words(el)).not.toContain("expired");
+    // 9 minutes on: still showing.
+    vi.advanceTimersByTime(540_000);
+    el = render(waiting("482913", T0 + 600_000));
+    expect(bigValue(el)).toBe("482 913");
+    // Past the server's expiry: gone, before the server drops it.
+    vi.advanceTimersByTime(60_001);
+    el = render(waiting("482913", T0 + 600_000));
+    expect(bigValue(el)).toBeUndefined();
+    expect(words(el)).toContain("The code expired.");
+  });
+
+  it("an iPad 3 minutes fast shows the code for its full 10 minutes", async () => {
+    skew.ahead = 3 * 60_000;
+    vi.setSystemTime(T0 + skew.ahead);
+    render(waiting("482913", T0 + 600_000));
+    await settle();
+    render(waiting("482913", T0 + 600_000));
+    vi.advanceTimersByTime(599_000);
+    const el = render(waiting("482913", T0 + 600_000));
+    expect(bigValue(el)).toBe("482 913");
+  });
+
+  it("an iPad 2 minutes slow hides the code when the server's 10 minutes are up", async () => {
+    skew.ahead = -2 * 60_000;
+    vi.setSystemTime(T0 + skew.ahead);
+    render(waiting("482913", T0 + 600_000));
+    await settle();
+    render(waiting("482913", T0 + 600_000));
+    vi.advanceTimersByTime(600_001);
+    const el = render(waiting("482913", T0 + 600_000));
+    expect(bigValue(el)).toBeUndefined();
+  });
+
+  it("until the server's clock answers, the iPad's own clock decides; the answer brings the code back", async () => {
+    skew.ahead = 11 * 60_000;
+    skew.answer = false;
+    vi.setSystemTime(T0 + skew.ahead);
+    render(waiting("482913", T0 + 600_000));
+    let el = render(waiting("482913", T0 + 600_000));
+    expect(bigValue(el)).toBeUndefined();
+    skew.release();
+    await settle();
+    render(waiting("482913", T0 + 600_000));
+    el = render(waiting("482913", T0 + 600_000));
+    expect(bigValue(el)).toBe("482 913");
   });
 });

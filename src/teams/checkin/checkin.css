@@ -1,6 +1,4 @@
 /* checkin team styles */
-.row { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
-button.quiet { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
 .pass { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .pass > * { max-width: 100%; }
 .pass__name { font-size: 1.5rem; font-weight: 700; margin: 12px 0 0; }

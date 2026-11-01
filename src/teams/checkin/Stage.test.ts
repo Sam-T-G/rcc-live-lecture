@@ -15,6 +15,11 @@ vi.mock("convex/react", () => ({
   useQuery: (ref: FunctionReference<"query">) => results[getFunctionName(ref)],
 }));
 vi.mock("./LateBanner", () => ({ default: () => "[late banner]" }));
+// The QR as a figure that prints the address it encodes.
+vi.mock("../../blocks/qr", async () => {
+  const { createElement: h } = await import("react");
+  return { QR: ({ value }: { value: string }) => h("figure", { className: "qr", "data-value": value }) };
+});
 vi.mock("../../blocks/ui", async (importOriginal) => {
   const { createElement: h } = await import("react");
   return {
@@ -203,6 +208,24 @@ describe("#/checkin/stage", () => {
     expect(html).toMatch(/<\/button><figure class="qr"[^>]*>[\s\S]*?<\/figure><div data-boundary="The check-in count"><p class="stage__count">/);
     expect(html).toContain('</p></div><p class="stage__hint">Scan to check in</p><div data-boundary="The quiz"><div class="stage__poll">');
     expect(html).toContain('<div data-boundary="The late banner">[late banner]</div>');
+  });
+
+  // sweep2-checkin-6 / sweep2-tests-3 / sweep2-ledger-8: the real QR draws only SVG paths, so the
+  // stand-in above prints the address it's given.
+  it("F38.2 the card's QR goes to the student pass page, #/checkin/student on this site", () => {
+    const html = open(`#/checkin/stage?deck=${DECK}`, "https:");
+    expect(decode(html.match(/<figure class="qr" data-value="([^"]*)"/)![1])).toBe("https://x/#/checkin/student");
+  });
+
+  it("F38.2 F38.4 the card shows the live count and, while a quiz is open, how many answered", () => {
+    const html = open(`#/checkin/stage?deck=${DECK}`);
+    expect(html).toContain('<p class="stage__count"><b>12</b> checked in</p>');
+    expect(html).toContain('<p class="stage__answered"><b>1</b> answered</p>');
+    results["checkin/read:count"] = 30;
+    results["checkin/quiz:current"] = { ...OPEN, answered: 17 };
+    const later = open(`#/checkin/stage?deck=${DECK}`);
+    expect(later).toContain('<p class="stage__count"><b>30</b> checked in</p>');
+    expect(later).toContain('<p class="stage__answered"><b>17</b> answered</p>');
   });
 
   it("F38.6 a reload in the same tab still hands the saved bridge key to the deck (?bridge=saved)", () => {

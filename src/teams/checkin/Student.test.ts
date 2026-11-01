@@ -1,10 +1,16 @@
 // @vitest-environment node
 // The pass page (Student.tsx), rendered to HTML with made-up query results (no backend). Effects
 // don't run here: Student.timing.test.ts checks when the page asks for codes and hides an old one.
-import { createElement } from "react";
+import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { HideLate, StudentPass } from "./Student";
+import { HideLate, Student, StudentPass } from "./Student";
+import LateBanner from "./LateBanner";
+import { ErrorBoundary } from "../../blocks/ui";
+
+// Stand-ins for the quiz card and the late banner, so a test sees where each one sits.
+vi.mock("./Quiz", () => ({ QuizCard: () => "[quiz card]" }));
+vi.mock("./LateBanner", () => ({ default: () => "[late banner]" }));
 
 // What each query answers, by its name ("checkin/pass:mine"); a query not listed is loading.
 const answers = vi.hoisted(() => ({ now: {} as Record<string, unknown> }));
@@ -72,5 +78,45 @@ describe("the pass and the checked-in screen", () => {
     const html = renderToStaticMarkup(createElement(StudentPass));
     expect(html).toContain("Making your pass…");
     expect(html).toContain("[signed in as, Not you? Sign out]");
+  });
+
+  it("sweep2-checkin-7 sweep2-tests-1 F10.4 F16.4 the checked-in screen has the quiz card, 'Follow the slides' to #/live and the late opt-out", () => {
+    const html = render(true);
+    expect(html).toContain("You’re checked in.");
+    expect(html).toContain("[quiz card]");
+    expect(html).toContain('<p><a href="#/live">Follow the slides</a></p>');
+    expect(html).toContain("Don’t show my first name on the class screens when I’m late");
+  });
+
+  it("sweep2-tests-1 F16.4 the pass has the late opt-out too", () => {
+    expect(render(false)).toContain("Don’t show my first name on the class screens when I’m late");
+  });
+});
+
+// sweep2-ledger-1: a scan flips checkin.read.me to true and StudentPass swaps the pass for the
+// checked-in screen. A banner inside either screen would mount again then and count the scan's
+// own late arrival as already seen, so the late student's phone would never show it. The banner
+// sits in Student(), beside StudentPass, and stays mounted through the swap.
+describe("sweep2-ledger-1 F16.1 the late banner on #/checkin/student", () => {
+  type El = ReactElement<{ children?: ReactNode; label?: string }>;
+  // The elements Student() returns, without rendering the components inside them.
+  const tree = (node: ReactNode): El[] =>
+    Array.isArray(node) ? node.flatMap(tree) : isValidElement(node) ? [node as El, ...tree((node as El).props.children)] : [];
+
+  it("is mounted once by Student(), beside StudentPass and in its own ErrorBoundary, the same whether or not the student is checked in", () => {
+    for (const here of [false, true]) {
+      answers.now = { "checkin/pass:mine": PASS, "checkin/read:me": here, "checkin/attendance:myHideLate": false };
+      const els = tree(Student());
+      const banners = els.filter((e) => e.type === LateBanner);
+      expect(banners).toHaveLength(1);
+      const boundary = els.find((e) => e.type === ErrorBoundary && tree(e.props.children).some((c) => c.type === LateBanner));
+      expect(boundary?.props.label).toBe("The late banner");
+      expect(els.some((e) => e.type === StudentPass)).toBe(true);
+    }
+  });
+
+  it("neither the pass nor the checked-in screen draws a banner of its own", () => {
+    expect(render(false)).not.toContain("[late banner]");
+    expect(render(true)).not.toContain("[late banner]");
   });
 });

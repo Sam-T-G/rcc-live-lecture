@@ -501,3 +501,15 @@ describe("SCAN the door kiosk: the camera and the screen stay on", () => {
     expect(html(el)).not.toContain("The camera stopped.");
   });
 });
+
+// sweep2-checkin-8: F12.6's first clause. A camera the browser refuses shows camera.ts's reason,
+// so a door iPad never sits on a dead Start check-in with no reason.
+describe("sweep2-checkin-8 F12.6 the kiosk's camera error", () => {
+  it("a camera the browser blocked shows its reason in role=alert", () => {
+    cam.error = "Camera blocked. Allow it in the browser's address bar.";
+    const el = render();
+    expect(html(el)).toContain('<p class="status status--error" role="alert">Camera blocked. Allow it in the browser&#x27;s address bar.</p>');
+    cam.error = null;
+    expect(html(render())).not.toContain("Camera blocked");
+  });
+});

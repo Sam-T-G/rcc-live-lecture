@@ -384,6 +384,28 @@ function usePassed(at: number | undefined) {
   return at !== undefined && at <= now;
 }
 
+const CLOCK_TRIP_MS = 5_000;
+
+// How far this screen's clock runs ahead of the server's, in ms (negative: behind), from one
+// checkin.attendance.clock call when the screen opens, the same estimate LateBanner.tsx makes.
+// 0 (the screen's own clock, as LateBanner uses) until the answer comes back, and when the call
+// fails or took over 5 s, since an answer that slow could be off by minutes.
+function useClockAhead(): number {
+  const serverClock = useMutation(api.checkin.attendance.clock);
+  const [ahead, setAhead] = useState(0);
+  useEffect(() => {
+    const sent = Date.now();
+    serverClock({}).then(
+      (server) => {
+        const back = Date.now();
+        if (typeof server === "number" && Number.isFinite(server) && back - sent <= CLOCK_TRIP_MS) setAhead((sent + back) / 2 - server);
+      },
+      () => {},
+    );
+  }, [serverClock]);
+  return ahead;
+}
+
 // The pairing screen, shown from the status query (api.staff.deviceStatus). It asks for a code
 // when it opens, unless this iPad is waiting on one already (a reload shows the same code). The
 // server ends a code only when its 10 minutes run out (approval shows "paired" instead), so a
@@ -423,7 +445,10 @@ export function PairScreen({ me, token, status }: { me: StaffMe; token: string; 
     }
   }, [status, phase]);
 
-  const expired = usePassed(status.status === "waiting" ? status.expiresAt : undefined);
+  // expiresAt is the server's time. On this iPad's clock the code ends `ahead` ms later, so an iPad
+  // whose clock runs fast still shows a code the server takes, once the server's clock answers.
+  const ahead = useClockAhead();
+  const expired = usePassed(status.status === "waiting" ? status.expiresAt + ahead : undefined);
   const live = status.status === "waiting" && !expired ? status : null;
 
   return (
@@ -432,7 +457,7 @@ export function PairScreen({ me, token, status }: { me: StaffMe; token: string; 
         <>
           <Big value={spaced(live.code)} label="pairing code" />
           <p>A professor or admin types this code on #/admin, under Pair a door iPad. Then this iPad scans passes.</p>
-          <p className="muted">The code works until {clock(live.expiresAt)}.</p>
+          <p className="muted">The code works until {clock(live.expiresAt + ahead)}.</p>
         </>
       ) : phase === "error" ? (
         <>

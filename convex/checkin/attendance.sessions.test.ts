@@ -321,3 +321,41 @@ describe("CKA-fixcheck a name typed as any email address shows as 'Someone' in t
     expect((await feed(t)).map((f) => f.first)).toEqual(["Jane"]);
   });
 });
+
+// sweep2-checkin-1: the two "Someone" guards in lateFeed that no other test reaches. The check-in
+// rows here never hold an "@", so only these guards keep the email's local part off the screen.
+describe("sweep2-checkin-1 lateFeed shows 'Someone' for a name that is the email's local part or a legacy pass holding '@'", () => {
+  it("a Google name equal to the student's email local part, in any case, shows as 'Someone'", async () => {
+    const t = setup();
+    await setStart(t, T0, 0);
+    vi.setSystemTime(T0 + 10 * MIN);
+    await checkIn(t, google(t, "jdoe1234", "jdoe1234@gmail.com"));
+    vi.setSystemTime(T0 + 11 * MIN);
+    await checkIn(t, google(t, "MLee77", "mlee77@example.edu"));
+    vi.setSystemTime(T0 + 12 * MIN);
+    await checkIn(t, google(t, "Mia Sample", "mia@example.edu"));
+    const out = await feed(t);
+    expect(out.map((f) => [f.first, f.lateMin])).toEqual([
+      ["Mia", 12],
+      ["Someone", 11],
+      ["Someone", 10],
+    ]);
+    expect(JSON.stringify(out)).not.toMatch(/jdoe|1234|mlee|77/i);
+  });
+
+  it("a legacy pass (no nameFromEmail) whose name holds '@' shows as 'Someone', though the check-in row's name has none", async () => {
+    const t = setup();
+    await setStart(t, T0, 0);
+    vi.setSystemTime(T0 + 11 * MIN);
+    await checkIn(t, typed(t, "jdoe1234@gmail.com", "jane@example.edu"));
+    // The pass row as a pass from before names were cleaned stored it: the email as the name, no flag.
+    await t.run(async (ctx) => {
+      const p = (await ctx.db.query("passes").take(1))[0];
+      await ctx.db.replace("passes", p._id, { user: p.user, name: "jdoe1234@gmail.com", email: p.email, code: p.code, prevCode: p.prevCode, at: p.at });
+    });
+    expect((await sheet(t)).map((r) => r.name)).toEqual(["jdoe1234"]);
+    const out = await feed(t);
+    expect(out.map((f) => f.first)).toEqual(["Someone"]);
+    expect(JSON.stringify(out)).not.toMatch(/jdoe|1234|@/i);
+  });
+});

@@ -364,7 +364,8 @@ export function ClassStart() {
 
   return (
     <Card title="Class start">
-      <form onSubmit={save}>
+      {/* noValidate: send() checks "Late after" and says what's wrong, in place of the browser's own bubble. */}
+      <form onSubmit={save} noValidate>
         <fieldset className="att-start" disabled={start === undefined}>
           <Field label="Class starts" hint={start && !sameDay(start.startsAt, now) ? day(start.startsAt) : undefined}>
             {(f) => (

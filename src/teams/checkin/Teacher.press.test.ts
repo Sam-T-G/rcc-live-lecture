@@ -4,7 +4,8 @@
 // component's state between renders, keyed by where the component sits in the tree (and its key),
 // the way React keys it (the same stand-in as Quiz.press.test.ts). render() calls every component
 // as a plain function down to the HTML elements; press() runs a button's onClick, then, for a
-// submit button, the form's onSubmit. Every mutation call waits until the test resolves it.
+// submit button whose form passes the browser's own checks (browserBlocks), the form's onSubmit.
+// Every mutation call waits until the test resolves it.
 // Every test runs in Pacific time on Nov 5, 2026 at 2:20 PM. People are samples (@example.edu).
 import { Fragment, createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { getFunctionName, type FunctionReference } from "convex/server";
@@ -124,11 +125,31 @@ function field(t: Tree[], label: string) {
 }
 const typeIn = (view: () => Tree[], label: string, value: string) => (field(view(), label).props.onChange as (e: unknown) => void)({ target: { value } });
 
+// The browser's own check of a form without noValidate (sweep2-checkin-2): a required input left
+// empty, or a number input outside its min and max or off its step, stops the submit and shows
+// the browser's bubble instead of the page's own line.
+function browserBlocks(form: Host) {
+  if (form.props.noValidate) return false;
+  return hosts(form.children).some(({ el }) => {
+    if (el.type !== "input") return false;
+    const value = String(el.props.value ?? "");
+    if (el.props.required && !value) return true;
+    if (el.props.type !== "number" || value === "") return false;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return true;
+    if (el.props.min !== undefined && n < Number(el.props.min)) return true;
+    if (el.props.max !== undefined && n > Number(el.props.max)) return true;
+    const step = el.props.step === undefined ? 1 : Number(el.props.step);
+    return Number.isFinite(step) && step > 0 && !Number.isInteger((n - Number(el.props.min ?? 0)) / step);
+  });
+}
+
 function press(t: Tree[], label: string | RegExp) {
   const { el, form } = button(t, label);
   if (el.props.disabled) return "disabled";
   (el.props.onClick as ((e: unknown) => void) | undefined)?.({ preventDefault: () => {} });
   if ((el.props.type ?? "submit") !== "submit" || !form) return "clicked";
+  if (browserBlocks(form)) return "browser-invalid";
   (form.props.onSubmit as (e: unknown) => void)({ preventDefault: () => {} });
   return "submitted";
 }
@@ -283,7 +304,8 @@ describe("F15 Save on the class start form", () => {
     for (const bad of ["", "61", "-1", "2.5"]) {
       hooks.slots = new Map();
       typeIn(form, "Late after (minutes)", bad);
-      press(form(), "Save");
+      // sweep2-checkin-2: the form is noValidate, so the browser never stops the submit with its own bubble.
+      expect(press(form(), "Save")).toBe("submitted");
       expect(alertText(form())).toBe("Late after has to be a whole number from 0 to 60.");
       expect(words(form())).not.toMatch(/grace/i);
     }

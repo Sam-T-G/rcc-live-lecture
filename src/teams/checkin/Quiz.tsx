@@ -14,7 +14,7 @@ import "./checkin.css";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Big, Card, Screen, Status } from "../../blocks/ui";
-import { Button, Stat } from "../../blocks/kit";
+import { Button, Segmented, Stat, type Choice } from "../../blocks/kit";
 import { Link } from "../../blocks/router";
 import { useGoogleUser } from "../../blocks/auth";
 import { CHANNEL } from "../../blocks/deck";
@@ -22,6 +22,10 @@ import { StaffGate } from "./prof";
 import { why } from "./util";
 
 const LETTERS = ["A", "B", "C", "D"];
+const KINDS: Choice<"quiz" | "vote">[] = [
+  { value: "quiz", label: "Quiz" },
+  { value: "vote", label: "Vote" },
+];
 
 // One request at a time. run(send) does nothing while the last send is still out; `pending` is
 // true until it settles, for the button's busy or disabled look. It checks a ref as well as the
@@ -134,10 +138,7 @@ function AskForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={send} className="ask" noValidate>
-      <div className="row" role="radiogroup" aria-label="Quiz or vote">
-        <button type="button" className={kind === "quiz" ? "" : "quiet"} onClick={() => setKind("quiz")} aria-pressed={kind === "quiz"}>Quiz</button>
-        <button type="button" className={kind === "vote" ? "" : "quiet"} onClick={() => setKind("vote")} aria-pressed={kind === "vote"}>Vote</button>
-      </div>
+      <Segmented label="Quiz or vote" hideLabel options={KINDS} value={kind} onChange={setKind} />
       <p className="muted">
         {kind === "quiz"
           ? "Quiz: mark the right answer if there is one. Students can't change their answer."
@@ -153,14 +154,14 @@ function AskForm({ onDone }: { onDone: () => void }) {
           <input value={c} onChange={(e) => setChoices(choices.map((x, j) => (j === i ? e.target.value : x)))} placeholder={i < 2 ? "Choice (needed)" : "Choice (optional)"} aria-label={"Choice " + LETTERS[i]} />
           {kind === "quiz" && (
             <label className="muted">
-              <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} /> Right
+              <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} aria-label={`Right answer: ${LETTERS[i]}`} /> Right
             </label>
           )}
         </div>
       ))}
       <p className="row">
         <Button type="submit" busy={sending}>{kind === "quiz" ? "Ask the room" : "Start the vote"}</Button>
-        {kind === "quiz" && correct !== null && <button type="button" className="quiet" onClick={() => setCorrect(null)}>No right answer</button>}
+        {kind === "quiz" && correct !== null && <Button variant="quiet" onClick={() => setCorrect(null)}>No right answer</Button>}
       </p>
       {err && <Status kind="error">{err}</Status>}
     </form>
@@ -299,7 +300,7 @@ function Answer({ poll, mine, here, signedIn, ended }: { poll: Poll; mine: numbe
       {here ? (
         <div className="quiz__picks">
           {poll.choices.map((c, i) => (
-            <button key={i} type="button" className={mine === i ? "quiz__pick quiz__pick--mine" : "quiz__pick quiet"} disabled={locked || sending} onClick={() => pick(i)} aria-pressed={mine === i}>
+            <button key={i} type="button" className={mine === i ? "quiz__pick quiz__pick--mine" : "quiz__pick btn--secondary"} disabled={locked || sending} onClick={() => pick(i)} aria-pressed={mine === i}>
               <b>{LETTERS[i]}</b> {c}
             </button>
           ))}

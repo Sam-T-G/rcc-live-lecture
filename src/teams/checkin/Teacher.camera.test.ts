@@ -148,3 +148,17 @@ describe("sweep1-tests-4 the teacher scanner's camera", () => {
     vi.unstubAllGlobals();
   });
 });
+
+// sweep2-checkin-8: F12.6's first clause on the laptop scanner.
+describe("sweep2-checkin-8 F12.6 the teacher scanner's camera error", () => {
+  afterEach(() => {
+    cam.error = "";
+  });
+
+  it("a camera the browser blocked shows its reason in role=alert", () => {
+    cam.error = "Camera blocked. Allow it in the browser's address bar.";
+    expect(html()).toContain('<p class="status status--error" role="alert">Camera blocked. Allow it in the browser&#x27;s address bar.</p>');
+    cam.error = "";
+    expect(html()).not.toContain("Camera blocked");
+  });
+});

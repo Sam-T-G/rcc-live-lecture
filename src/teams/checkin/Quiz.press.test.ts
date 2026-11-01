@@ -121,8 +121,15 @@ function typeIn(view: () => Tree[], label: string, value: string) {
 
 // The "Right" radio beside choice `n` (0 is A).
 function markRight(view: () => Tree[], n: number) {
-  const radios = hosts(view()).filter((h) => h.el.type === "input" && h.el.props.type === "radio");
+  const radios = hosts(view()).filter((h) => h.el.type === "input" && h.el.props.type === "radio" && h.el.props.name === "correct");
   (radios[n].el.props.onChange as () => void)();
+}
+
+// Picks Quiz or Vote on the form's <Segmented> (a radio per option).
+function chooseKind(view: () => Tree[], kind: "quiz" | "vote") {
+  const radio = hosts(view()).find((h) => h.el.type === "input" && h.el.props.className === "seg__input" && h.el.props.value === kind);
+  if (!radio) throw new Error(`no "${kind}" option in: ${words(view())}`);
+  (radio.el.props.onChange as () => void)();
 }
 
 type Press = "disabled" | "canceled" | "browser-required" | "clicked" | "submitted";
@@ -197,7 +204,7 @@ describe("#/checkin/quiz, asking", () => {
   });
 
   it("F17.1 checkin-frontend-17 a double click on 'Start the vote' starts one vote", () => {
-    (button(professor(), "Vote").el.props.onClick as () => void)();
+    chooseKind(professor, "vote");
     typeIn(professor, "Vote text", "What should we cover next?");
     typeIn(professor, "Choice A", "Capacitors");
     typeIn(professor, "Choice B", "Magnets");
@@ -235,7 +242,7 @@ describe("#/checkin/quiz, asking", () => {
   });
 
   it("sweep1-checkin-check-1 a blank vote says 'Type the vote text.' and starts nothing", () => {
-    (button(professor(), "Vote").el.props.onClick as () => void)();
+    chooseKind(professor, "vote");
     typeIn(professor, "Choice A", "Capacitors");
     typeIn(professor, "Choice B", "Magnets");
     typeIn(professor, "Vote text", "  ");
@@ -256,7 +263,7 @@ describe("sweep1-checkin-fixcheck-7 #/checkin/quiz calls a poll a quiz or a vote
     const quiz = professor();
     expect(alertText(quiz)).toBeTruthy();
     expect(words(quiz)).not.toMatch(/question/i);
-    (button(professor(), "Vote").el.props.onClick as () => void)();
+    chooseKind(professor, "vote");
     press(professor(), "Start the vote");
     const vote = professor();
     expect(alertText(vote)).toBeTruthy();

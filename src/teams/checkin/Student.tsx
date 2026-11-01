@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Link } from "../../blocks/router";
-import { Screen, Status } from "../../blocks/ui";
+import { ErrorBoundary, Screen, Status } from "../../blocks/ui";
 import { QR } from "../../blocks/qr";
 import { CHANNEL } from "../../blocks/deck";
 import { SignedInAs, StudentSignIn, useGoogleUser } from "../../blocks/auth";
@@ -27,10 +27,16 @@ export function Student() {
         <StudentSignIn />
       </Screen>
     );
+  // The late banner sits beside StudentPass, not inside its screens, so it stays mounted when a
+  // scan swaps the pass for "You're checked in.": a remount would count the scan's own late
+  // arrival as already seen, and the late student's phone would never show it.
   return (
     <>
       <SignInEnding line={STUDENT_ENDING} />
       <StudentPass />
+      <ErrorBoundary label="The late banner">
+        <LateBanner />
+      </ErrorBoundary>
     </>
   );
 }
@@ -78,7 +84,6 @@ export function StudentPass() {
         <p><Link to="live">Follow the slides</Link></p>
         <HideLate />
         <SignedInAs />
-        <LateBanner />
       </Screen>
     );
   if (!pass)
@@ -105,7 +110,6 @@ export function StudentPass() {
         <HideLate />
       </div>
       <SignedInAs />
-      <LateBanner />
     </Screen>
   );
 }

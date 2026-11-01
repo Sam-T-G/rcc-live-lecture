@@ -1,7 +1,7 @@
 // The late banner: when someone checks in late, every screen showing it gets a line with their
 // first name and how many minutes late they are, for 8 seconds. Each student can turn it off for
 // themselves with the checkbox on their pass (HideLate in Student.tsx).
-// Where it renders, as <LateBanner /> with no props: #/checkin/student (the pass and the
+// Where it renders, as <LateBanner /> with no props: #/checkin/student (beside the pass and the
 // checked-in screen), #/live, #/live/leaderboard, #/portal and #/checkin/stage. The iOS app shows
 // the same lines from its own copy (ios/RCCLivePortal/LateBanner.swift).
 // It shows only arrivals scanned after the page opened, each once, and only when the list brings

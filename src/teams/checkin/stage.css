@@ -52,7 +52,7 @@
 /* A part that didn't load (ErrorBoundary in ui.tsx): its error and its Try again button at
    projector size. In the banner's spot they sit on a white box that takes clicks. */
 .stage .row > .status--error,
-.stage .row > button:where(:not(.btn)) { font-size: var(--proj-ledger); }
+.stage .row > .btn--quiet { font-size: var(--proj-ledger); }
 .stage__late > .row {
   width: fit-content;
   padding: calc(16 * var(--stage-u)) calc(24 * var(--stage-u));

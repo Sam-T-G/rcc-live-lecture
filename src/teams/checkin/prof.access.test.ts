@@ -23,7 +23,8 @@ vi.mock("react", async (orig) => {
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isLoading: false, isAuthenticated: false }),
   useQuery: (ref: FunctionReference<"query">, args: unknown) => (args === "skip" ? undefined : results[getFunctionName(ref)]),
-  useMutation: () => requestPairing,
+  // The pairing screen also asks checkin.attendance.clock for the server's time when it opens.
+  useMutation: (ref: FunctionReference<"mutation">) => (getFunctionName(ref) === "checkin/attendance:clock" ? async () => Date.now() : requestPairing),
 }));
 vi.mock("../../blocks/auth", () => ({
   SignInButton: () => "[Google button, typed sign-in under it]",

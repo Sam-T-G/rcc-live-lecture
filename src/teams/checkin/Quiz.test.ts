@@ -193,3 +193,60 @@ describe("sweep1-tests-3 F18.5 the phone's results after the professor ends it",
     expect(bar(html, "B")).toBe("<b>B</b> Current (you)");
   });
 });
+
+describe("sweep2-checkin-5 the ask form's Quiz/Vote pick and right-answer radios", () => {
+  it("Quiz or vote is the kit's Segmented (real radios in a fieldset), never aria-pressed buttons in a radiogroup", () => {
+    answers["checkin/quiz:current"] = null;
+    const html = page();
+    expect(html).not.toContain('role="radiogroup"');
+    expect(html).not.toContain("aria-pressed");
+    expect(html).toMatch(/<fieldset class="seg-field"><legend class="sr-only">Quiz or vote<\/legend>/);
+    // Each option: [value, checked, its words].
+    const options = [...html.matchAll(/<input class="seg__input" type="radio"([^>]*)\/><span class="seg__label">([^<]*)<\/span>/g)].map((m) => [
+      m[1].match(/value="([^"]*)"/)?.[1],
+      m[1].includes('checked=""'),
+      m[2],
+    ]);
+    expect(options).toEqual([
+      ["quiz", true, "Quiz"],
+      ["vote", false, "Vote"],
+    ]);
+  });
+
+  it("each right-answer radio names its choice: 'Right answer: A' to 'Right answer: D'", () => {
+    answers["checkin/quiz:current"] = null;
+    const radios = [...page().matchAll(/<input type="radio"[^>]*>/g)].map((m) => m[0]).filter((tag) => tag.includes('name="correct"'));
+    const names = radios.map((tag) => tag.match(/aria-label="([^"]*)"/)?.[1]);
+    expect(names).toEqual(["Right answer: A", "Right answer: B", "Right answer: C", "Right answer: D"]);
+  });
+});
+
+describe("sweep2-checkin-9 F17.3 an open quiz shows answered of checked in, live", () => {
+  it("an open quiz with 3 answers and 12 checked in shows '3 of 12' over 'checked-in students answered'", () => {
+    Object.assign(answers, {
+      "checkin/quiz:current": open("quiz"),
+      "checkin/quiz:stats": { answered: 3, checkedIn: 12, counts: [2, 1, 0], correct: null, rightPct: null, medianSec: null },
+      "checkin/quiz:history": [],
+    });
+    expect(page()).toContain('<div class="big"><span class="big__value">3 of 12</span><span class="big__label">checked-in students answered</span></div>');
+  });
+});
+
+describe("sweep2-checkin-11 F17.5 'This class' gives '% right' for a quiz with a right answer only", () => {
+  it("a quiz with a right answer shows '67% right'; a vote and a quiz with no right answer show none", () => {
+    Object.assign(answers, {
+      "checkin/quiz:current": null,
+      "checkin/quiz:history": [
+        { id: "p1", kind: "quiz", question: "What does a capacitor store?", answered: 9, rightPct: 67 },
+        { id: "p2", kind: "vote", question: "What should we cover next?", answered: 4, rightPct: null },
+        { id: "p3", kind: "quiz", question: "Which law gives V = IR?", answered: 5, rightPct: null },
+      ],
+    });
+    const html = page();
+    const side = html.slice(html.indexOf("<h2>This class</h2>"));
+    expect(side).toContain('<span class="muted">quiz · 9 answered · 67% right</span>');
+    expect(side).toContain('<span class="muted">vote · 4 answered</span>');
+    expect(side).toContain('<span class="muted">quiz · 5 answered</span>');
+    expect(side.match(/% right/g)).toHaveLength(1);
+  });
+});
