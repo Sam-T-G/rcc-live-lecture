@@ -4,8 +4,9 @@
 // it; its feed and its lines are Check-in's (LateBanner.tsx). The paging rules (where ← Back,
 // Next →, the arrow keys and a swipe go, and when the phone follows live again) are tested in
 // paging.test.ts; the words a paged-back phone shows are tested here by opening <Slides> paged
-// back. A real swipe or key press and the ErrorBoundary around the banner (React's server render
-// doesn't run boundaries) need a browser: the PORTAL browser checks cover them (F35).
+// back. Page.paging.test.ts presses ← Back, Next → and Back to live, sends the arrow keys and
+// swipes through <Slides>' own handlers, and moves the deck between tabs. The ErrorBoundary
+// around the banner (React's server render doesn't run boundaries) needs a browser.
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
