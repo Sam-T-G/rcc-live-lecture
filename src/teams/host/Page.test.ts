@@ -77,12 +77,35 @@ beforeEach(() => {
 const page = () => renderToStaticMarkup(createElement(HostPage));
 const open = (first: Tab) => renderToStaticMarkup(createElement(Dashboard, { first }));
 
-// The markup inside the stand-in boundary labelled `label`, or null when the page has none.
+// The markup inside the first stand-in boundary labelled `label`, or null when the page has none.
+// Boundaries nest (the Now tab's holds one per card), so the end is the matching </section>.
 function boundary(html: string, label: string) {
   const start = `<section data-boundary="${label}">`;
   const at = html.indexOf(start);
   if (at < 0) return null;
-  return html.slice(at + start.length, html.indexOf("</section>", at));
+  const tags = /<section[ >]|<\/section>/g;
+  tags.lastIndex = at + start.length;
+  let depth = 1;
+  for (let m = tags.exec(html); m; m = tags.exec(html)) {
+    depth += m[0] === "</section>" ? -1 : 1;
+    if (depth === 0) return html.slice(at + start.length, m.index);
+  }
+  return null;
+}
+// The page's text a sighted professor sees: every element with the sr-only class dropped with
+// what's inside it, tags dropped, spaces squeezed. (aria-hidden parts stay: they're on screen.)
+const VOID = new Set(["area", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
+function visibleText(html: string) {
+  const out: string[] = [];
+  const hidden: boolean[] = [];
+  for (const m of html.matchAll(/<(\/?)([a-zA-Z0-9]+)([^>]*?)(\/?)>|([^<]+)/g)) {
+    const [, close, tag, attrs, selfClose, text] = m;
+    if (text !== undefined) {
+      if (!hidden.includes(true)) out.push(text);
+    } else if (close) hidden.pop();
+    else if (!selfClose && !VOID.has(tag.toLowerCase())) hidden.push(/class="([^"]* )?sr-only( [^"]*)?"/.test(attrs));
+  }
+  return out.join(" ").replace(/\s+/g, " ").trim();
 }
 
 const TABS: Tab[] = ["Now", "Points", "Questions"];
@@ -224,6 +247,74 @@ describe("#/host", () => {
     const html = open("Now");
     expect(html).toContain('<span class="big__value">4</span><span class="big__label">lost on this slide</span>');
     expect(html).toContain('<span class="big__value">30</span><span class="big__label">checked in</span>');
+  });
+
+  // DS-HOST-risk-2: F20.3 above reads the sr-only copy. These check the count a sighted professor
+  // sees: on a deck the lane draws, the 4 sits over slide 3's own column; and the hand-drawn lane's
+  // counts (a quiet 0 on a slide already shown, nothing on a slide not reached yet).
+  it("DS-HOST-risk-2 on a deck of 14 slides or fewer the lane shows the slide's lost count on screen, over its own column", () => {
+    results["deck:current"] = { index: 2, beat: 0, count: 12, title: "Slide 3", lines: [], at: 0 };
+    results["live/read:lostCount"] = (a: { index?: number }) => (a.index === 2 ? 4 : 9);
+    results["live/read:lostBySlide"] = [
+      { index: 0, count: 9 },
+      { index: 2, count: 4 },
+    ];
+    results["checkin/read:count"] = 30;
+    const html = open("Now");
+    expect(html).toContain('class="track__lane host-lane"');
+    // One count per slide shown so far, in its slide's column (grid column = index + 2).
+    const counts = [...html.matchAll(/<span class="(track__n[^"]*)" style="grid-row:1;grid-column:(\d+)" aria-hidden="true">(\d+)<\/span>/g)].map((m) => ({
+      slide: Number(m[2]) - 1,
+      n: Number(m[3]),
+      zero: m[1].includes("track__n--zero"),
+    }));
+    expect(counts).toEqual([
+      { slide: 1, n: 9, zero: false },
+      { slide: 2, n: 0, zero: true },
+      { slide: 3, n: 4, zero: false },
+    ]);
+    // Each count is on screen, not only in the sr-only words.
+    const seen = visibleText(html);
+    expect(seen).toMatch(/^Professor view Now Points Questions Attendance Slide 3 of 12 Slide 3 Lost by slide 9 0 4 1 2 3 4 5 6 7 8 9 10 11 12 30 checked in/);
+    // The lane carries the count, so the big number stays for screen readers only.
+    expect(seen).not.toContain("lost on this slide");
+  });
+
+  // DS-HOST-risk-1: the lane draws at most 14 slides. On a longer deck (the 10-29 deck has 22) the
+  // band shows the slide's lost count as the big number, the way it did before the lane.
+  it("DS-HOST-risk-1 on a deck of more than 14 slides the band shows 'N lost on this slide' on screen", () => {
+    results["deck:current"] = { index: 5, beat: 0, count: 22, title: "Recursion", lines: [], at: 0 };
+    results["live/read:lostCount"] = (a: { index?: number }) => (a.index === 5 ? 4 : 1);
+    results["live/read:lostBySlide"] = [
+      { index: 2, count: 1 },
+      { index: 5, count: 4 },
+    ];
+    results["checkin/read:count"] = 30;
+    let html = open("Now");
+    expect(html).toContain('class="host-lane host-lane--words"');
+    expect(visibleText(html)).toContain("Slide 6 of 22 Recursion 4 lost on this slide Lost by slide Slide 3: 1 Slide 6: 4 30 checked in");
+
+    // No taps on this slide: the band still says so, with a 0.
+    results["live/read:lostCount"] = 0;
+    results["live/read:lostBySlide"] = [{ index: 2, count: 1 }];
+    html = open("Now");
+    expect(visibleText(html)).toContain("Slide 6 of 22 Recursion 0 lost on this slide Lost by slide Slide 3: 1 30 checked in");
+
+    // Before the deck sends a slide there's no slide to count, so the big number stays off screen.
+    results["deck:current"] = null;
+    expect(visibleText(open("Now"))).not.toContain("lost on this slide");
+  });
+
+  // DS-HOST-design-3: one card failing leaves the other card and the desk's two columns in place.
+  // Each card has its own boundary inside the desk, with the Now tab's boundary still around both.
+  it("DS-HOST-design-3 Ask the room and Who got it wrong each sit in their own boundary inside the desk", () => {
+    const now = boundary(open("Now"), "The Now tab");
+    expect(now).toBe(
+      '<div class="desk host-desk">' +
+        '<section data-boundary="The Now tab">[ask the room]</section>' +
+        '<section data-boundary="The Now tab">[who is missing it]</section>' +
+        "</div>",
+    );
   });
 
   it("sweep2-host-4 the open page has an h1 'Professor view', its only h1", () => {

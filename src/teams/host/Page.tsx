@@ -5,7 +5,8 @@
 //     tapped "I'm lost" on each slide this class (live.read.lostBySlide; students tap on #/live),
 //     drawn over the deck's slides, and how many checked in. Screen readers get the same as
 //     words: the slide, how many are lost on it (live.read.lostCount), the "Lost by slide" line
-//     and the check-in count.
+//     and the check-in count. On a deck too long for the lane (over 14 slides), the slide's lost
+//     count shows on screen as "N lost on this slide".
 //   Three tabs: Now (ask the room, who is missing it), Points (teams and points) and Questions
 //     (the students' questions). All three panels stay mounted and only the open one shows, so a
 //     half-written question, the AI note and the "Group by topic" switch survive a tab switch.
@@ -107,8 +108,9 @@ export function Dashboard({ first = "Now" }: { first?: Tab }) {
               <h2>{slide.title}</h2>
             </>
           )}
-          {/* The lane draws this count over the slide's own segment; screen readers hear it here. */}
-          <div className="sr-only">
+          {/* When the lane is drawn it shows this count over the slide's own segment, so screen
+              readers hear it here. On a deck too long for the lane it shows on screen. */}
+          <div className={slide && !laneFits(slide.count) ? undefined : "sr-only"}>
             <Big value={lost ?? "-"} label="lost on this slide" />
           </div>
         </div>
@@ -124,8 +126,14 @@ export function Dashboard({ first = "Now" }: { first?: Tab }) {
         <Panel tab="Now" open={tab}>
           <ErrorBoundary key="now" label="The Now tab">
             <div className="desk host-desk">
-              <AskRoom slideIndex={slide ? slide.index : null} />
-              <Missing />
+              {/* One boundary per card, so a card that fails leaves the other one and the desk's
+                  two columns in place. The tab's boundary above still catches anything else. */}
+              <ErrorBoundary label="The Now tab">
+                <AskRoom slideIndex={slide ? slide.index : null} />
+              </ErrorBoundary>
+              <ErrorBoundary label="The Now tab">
+                <Missing />
+              </ErrorBoundary>
             </div>
           </ErrorBoundary>
         </Panel>
@@ -158,6 +166,9 @@ function Panel({ tab, open, children }: { tab: Tab; open: Tab; children: ReactNo
 // gap), so more slides than this push the lane past the 1280 window. A longer deck shows the
 // "Lost by slide" line as words instead.
 const LANE_MAX = 14;
+// Whether the lane can draw a deck of `count` slides. Dashboard asks this to decide whether the
+// slide's own lost count shows on screen (no lane) or only to screen readers (the lane shows it).
+const laneFits = (count: number) => count <= LANE_MAX;
 
 type Slide = ReturnType<typeof useDeckSlide>;
 
@@ -170,7 +181,7 @@ function LostBySlide({ slide }: { slide: Slide }) {
   const rows = useQuery(api.live.read.lostBySlide, { channel: CHANNEL });
   const slides = Math.max(slide?.count ?? 0, ...(rows ?? []).map((r) => r.index + 1));
   const at = slide ? slide.index : -1;
-  const lane = !!slide && slides <= LANE_MAX;
+  const lane = !!slide && laneFits(slides);
   const counted = lane && rows !== undefined && rows.length > 0;
   const count = (i: number) => rows?.find((r) => r.index === i)?.count ?? (i <= at ? 0 : null);
   return (

@@ -136,6 +136,9 @@ describe("#/host Ask the room", () => {
     results["checkin/quiz:stats"] = stats({ answered: 1, checkedIn: 12, medianSec: null });
     const html = card();
     expect(html).toContain("1 of 12");
+    // DS-HOST-risk-3: "1 of 12" above matches the sr-only line. The professor sees the count as
+    // the big number with "of 12 answered" right after it.
+    expect(html).toMatch(/<span class="tally__lead[^"]*"[^>]*>1<\/span><span class="tally__of"[^>]*>of 12 answered<\/span>/);
     expect(html).toContain("End the quiz");
     expect(html).not.toMatch(/question/i);
 
