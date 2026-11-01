@@ -16,7 +16,9 @@
 //     ?bridge=saved instead, so the key never shows on the projector and a reload still hands it
 //     to the deck. A new tab needs the link with the key again: a ?bridge=saved link opened in a
 //     tab that saved no key (a bookmark, a copied address bar) shows "Phones aren't getting these
-//     slides." at the top of the stage. Taking ?bridge=saved out of the link stops the slides
+//     slides." at the top of the stage. The saved key goes only to a deck on the origin of the
+//     ?deck= it came with: a ?bridge=saved link to a deck anywhere else gets no key and the same
+//     line, since the key in a deck's address reaches that site. Taking ?bridge=saved out of the link stops the slides
 //     going to the phones. When the link has more than one ?bridge=, the last key counts.
 //   bridge-site: handed to the deck too, so it sends to that Convex backend instead of the one its
 //     script tag names (prod, for the published decks). Checks on Sam's dev backend always pass
@@ -38,7 +40,7 @@ import { CHANNEL } from "../../blocks/deck";
 import { Projector } from "../../blocks/kit";
 import { ErrorBoundary } from "../../blocks/ui";
 import LateBanner from "./LateBanner";
-import { SAVED, bridgeIn, deckAddress, frameSrc, savedBridge, takeBridge } from "./stageLink";
+import { SAVED, bridgeIn, deckAddress, frameSrc, keyFor, savedBridge, takeBridge } from "./stageLink";
 
 const LETTERS = ["A", "B", "C", "D"];
 
@@ -47,7 +49,7 @@ export default function Stage() {
   const link = (params.get("deck") ?? "").trim();
   const deck = link ? deckAddress(link, location.protocol === "https:") : null;
   const inLink = bridgeIn(params);
-  const bridge = useBridge(inLink);
+  const bridge = useBridge(inLink, deck);
   const lost = inLink === SAVED && !bridge;
   const frame = useRef<HTMLIFrameElement>(null);
   const [shown, setShown] = useState(true);
@@ -106,21 +108,21 @@ export default function Stage() {
   );
 }
 
-// The bridge value for the deck: the one in the link, or this tab's saved one when the link says
-// ?bridge=saved. takeBridge() swaps a key in the address bar for "saved" once the page has it, and
-// again after every hash change, since the full link can be pasted in again.
-function useBridge(inLink: string | null) {
+// The bridge value for the deck: the one in the link, or, when the link says ?bridge=saved, this
+// tab's saved key if the deck is on the origin the key came with (keyFor). takeBridge() swaps a key
+// in the address bar for "saved" once the page has it, and again after every hash change, since
+// the full link can be pasted in again.
+function useBridge(inLink: string | null, deck: URL | null) {
   const [saved, setSaved] = useState(savedBridge);
   useEffect(() => {
     const take = () => {
-      const key = takeBridge();
-      if (key) setSaved(key);
+      if (takeBridge()) setSaved(savedBridge());
     };
     take();
     window.addEventListener("hashchange", take);
     return () => window.removeEventListener("hashchange", take);
   }, []);
-  return inLink === SAVED ? saved : inLink;
+  return inLink === SAVED ? keyFor(saved, deck) : inLink;
 }
 
 function Count() {
@@ -132,7 +134,7 @@ function Count() {
 function Poll() {
   const poll = useQuery(api.checkin.quiz.current, { channel: CHANNEL });
   if (poll === undefined) return null;
-  if (poll === null) return <p className="stage__none">No question open.</p>;
+  if (poll === null) return <p className="stage__none">No quiz or vote yet.</p>;
   const results = poll.results;
   const total = results ? results.counts.reduce((a, b) => a + b, 0) : 0;
   return (

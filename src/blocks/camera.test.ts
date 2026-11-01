@@ -58,6 +58,15 @@ describe("F44: phones stop downloading @mediapipe/tasks-vision", () => {
     expect(staticReach("src/pages/LabVision.tsx").get(VISION)).toEqual(["src/pages/LabVision.tsx", "src/blocks/vision.ts", VISION]);
   });
 
+  // sweep1-checkin-8: jsQR (130 kB) reads passes only on #/checkin/teacher and #/checkin/kiosk, in
+  // browsers without a QR BarcodeDetector, so qrRead.ts loads it with import() when it first needs it.
+  it("sweep1-checkin-8 no static import from src/main.tsx reaches jsqr; qrRead.ts loads it with import()", () => {
+    const main = staticReach("src/main.tsx");
+    expect(main.has("src/teams/checkin/qrRead.ts")).toBe(true);
+    expect(main.get("jsqr")?.join(" > ") ?? "not reached").toBe("not reached");
+    expect(readFileSync(join(ROOT, "src/teams/checkin/qrRead.ts"), "utf8")).toMatch(/await import\("jsqr"\)/);
+  });
+
   it("Start scanning (#/checkin/teacher) and Start check-in (#/checkin/kiosk) get useCamera from blocks/camera, which imports only react", () => {
     expect([...staticReach("src/blocks/camera.ts").keys()]).toEqual(["src/blocks/camera.ts", "react"]);
     for (const page of ["src/teams/checkin/Teacher.tsx", "src/teams/checkin/Kiosk.tsx"]) {

@@ -218,6 +218,15 @@ describe("F15 late from the class start plus grace minutes", () => {
     expect((await feed(t)).map((f) => f.lateMin)).toEqual([12]);
   });
 
+  it("sweep1-tests-7 a scan 20 s past start with grace 0 is 1 minute late, never 0 (0 reads as on time)", async () => {
+    const t = setup();
+    await setStart(t, 0);
+    vi.setSystemTime(T0 + 20_000);
+    await checkIn(t, student(t, 1));
+    expect((await sheet(t)).map((r) => r.lateMin)).toEqual([1]);
+    expect((await feed(t)).map((f) => f.lateMin)).toEqual([1]);
+  });
+
   it("F15.4 no start means nobody is late", async () => {
     const t = setup();
     vi.setSystemTime(T0 + 3 * 60 * MIN);
@@ -333,6 +342,40 @@ describe("removing a wrong check-in", () => {
     expect((await checkIn(t, a)).already).toBe(false);
     expect(await count(t)).toBe(2);
     expect(await a.query(api.checkin.read.me, { channel: CH })).toBe(true);
+  });
+
+  it("sweep1-checkin-3 removeCheckin also takes back that student's quiz answers in this class: answered never exceeds checked in", async () => {
+    const t = setup();
+    const [a, b] = [student(t, 1), student(t, 2)];
+    await checkIn(t, a);
+    await checkIn(t, b);
+    const ask = (question: string) =>
+      admin(t).mutation(api.checkin.quiz.ask, { channel: CH, kind: "quiz", question, choices: ["Yes", "No"], correct: 0 });
+    // One quiz the professor ends before the removal, one still open.
+    const ended = await ask("First sample question");
+    vi.advanceTimersByTime(10_000);
+    await a.mutation(api.checkin.quiz.answer, { poll: ended, choice: 0 });
+    await b.mutation(api.checkin.quiz.answer, { poll: ended, choice: 1 });
+    await admin(t).mutation(api.checkin.quiz.end, { poll: ended });
+    vi.advanceTimersByTime(10_000);
+    const open = await ask("Second sample question");
+    vi.advanceTimersByTime(10_000);
+    await a.mutation(api.checkin.quiz.answer, { poll: open, choice: 0 });
+    await b.mutation(api.checkin.quiz.answer, { poll: open, choice: 1 });
+
+    const rowB = (await names(t)).find((n) => n.name === "Sample student 2")!;
+    await admin(t).mutation(remove, { checkin: rowB.id });
+
+    for (const poll of [ended, open]) {
+      const stats = await admin(t).query(api.checkin.quiz.stats, { poll });
+      expect(stats).toMatchObject({ answered: 1, checkedIn: 1, rightPct: 100, counts: [1, 0] });
+    }
+    expect((await t.query(api.checkin.quiz.current, { channel: CH }))?.answered).toBe(1);
+    expect(await b.query(api.checkin.quiz.mine, { poll: open })).toBeNull();
+    // The ended quiz's saved counts follow too (live.past reads them).
+    expect((await t.run((ctx) => ctx.db.get("polls", ended)))?.counts).toEqual([1, 0]);
+    await admin(t).mutation(api.checkin.quiz.end, { poll: open });
+    expect((await admin(t).query(api.checkin.quiz.missing, { channel: CH }))).toMatchObject({ wrong: [] });
   });
 
   it("removeCheckin refuses a check-in from an earlier class: that class's attendance keeps it", async () => {

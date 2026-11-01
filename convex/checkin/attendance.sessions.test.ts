@@ -165,6 +165,33 @@ describe("CKA-convex-1 / CKA-risk-3 a start for a later class never lands on the
   });
 });
 
+describe("sweep1-ledger-2 an early student never forces End class on their own class", () => {
+  // Class is at 5 PM. With no start saved, Ana types her pass code on the door iPad at 4:10 PM,
+  // which opens the class. At 4:45 PM the professor saves 5:00 PM.
+  const FIVE = at(2026, 11, 5, 17, 0);
+
+  it("the refusal stands without sameClass; with sameClass the start saves on the open class and Ana stays checked in", async () => {
+    const t = setup();
+    vi.setSystemTime(FIVE - 50 * MIN);
+    const ana = student(t, "Ana");
+    await checkIn(t, ana);
+    vi.setSystemTime(FIVE - 15 * MIN);
+    await expect(setStart(t, FIVE)).rejects.toThrow("This class is still open. Press End class, then save the next start.");
+    await admin(t).mutation(api.checkin.attendance.setClassStart, { channel: CH, startsAt: FIVE, graceMin: 5, sameClass: true });
+    const list = await lectures(t);
+    expect(list).toEqual([expect.objectContaining({ open: true, startsAt: FIVE, count: 1 })]);
+    expect(await ana.query(api.checkin.read.me, { channel: CH })).toBe(true);
+    expect((await sheet(t)).map((r) => [r.name, r.lateMin])).toEqual([["Ana Sample", null]]);
+  });
+
+  it("sameClass is professors' only, like every setClassStart", async () => {
+    const t = setup();
+    await expect(student(t, "Ana").mutation(api.checkin.attendance.setClassStart, { channel: CH, startsAt: T0, graceMin: 5, sameClass: true })).rejects.toThrow(
+      "Only professors can do that.",
+    );
+  });
+});
+
 describe("CKA-convex-2 saving the start queues no lock once this class's teams lock", () => {
   const lockJobs = (t: T) =>
     t.run(async (ctx) => (await ctx.db.system.query("_scheduled_functions").take(100)).filter((j) => j.name.includes("live/groups") && j.state.kind === "pending").length);

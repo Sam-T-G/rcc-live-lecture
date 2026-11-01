@@ -251,6 +251,25 @@ describe("SCAN the door kiosk: what the line sees", () => {
     expect(statusLine(el)).toContain("Hold your pass up to the camera");
   });
 
+  it("sweep1-tests-4 F12.3 a pass held up to the camera is sent once per 4 s, though the camera reads it 4 times a second", async () => {
+    reader.mockResolvedValue("RCC-ABC234");
+    cam.on = true;
+    cam.video.current = { readyState: 4 };
+    render();
+    for (let i = 0; i < 15; i++) {
+      await vi.advanceTimersByTimeAsync(250); // 15 frames: 3.75 s
+      await settle();
+    }
+    expect(reader.mock.calls.length).toBeGreaterThanOrEqual(15);
+    expect(scan).toHaveBeenCalledTimes(1);
+    for (let i = 0; i < 2; i++) {
+      await vi.advanceTimersByTimeAsync(250); // past 4 s since the first send
+      await settle();
+    }
+    expect(scan).toHaveBeenCalledTimes(2);
+    expect(scan).toHaveBeenLastCalledWith({ channel: "gdg", code: "RCC-ABC234", device: TOKEN });
+  });
+
   it("SCAN-check-1 a pass held up to the camera that the server refuses ('Ask them to ...', worded for the teacher scanner) tells the student to show their pass again", async () => {
     const alert = (el: El) => /<p class="kiosk__error" role="alert">(.*?)<\/p>/.exec(html(el))?.[1].replace(/&#x27;/g, "'");
 

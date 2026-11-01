@@ -149,3 +149,47 @@ describe("the quiz card before check-in (#/live)", () => {
     expect(html).not.toContain("Check in to");
   });
 });
+
+describe("sweep1-tests-3 F18.5 the phone's results after the professor ends it", () => {
+  const results = (kind: "quiz" | "vote", correct: number | null) => ({
+    "checkin/quiz:current": { ...ended, kind, results: { counts: [3, 1], correct } },
+    "checkin/read:me": true,
+  });
+  const bar = (html: string, letter: string) => html.match(new RegExp(`<b>${letter}</b>[^<]*`))?.[0];
+
+  it("a right pick reads 'You got it right.', with '(you)' and '✓ right answer' on its bar", () => {
+    Object.assign(answers, results("quiz", 0), { "checkin/quiz:mine": 0 });
+    const html = card();
+    expect(html).toContain("You got it right.");
+    expect(html).not.toContain("Not this time.");
+    expect(bar(html, "A")).toBe("<b>A</b> Charge ✓ right answer (you)");
+    expect(bar(html, "B")).toBe("<b>B</b> Current");
+  });
+
+  it("a wrong pick reads 'Not this time.', with '(you)' on the pick and '✓ right answer' on the right bar", () => {
+    Object.assign(answers, results("quiz", 0), { "checkin/quiz:mine": 1 });
+    const html = card();
+    expect(html).toContain("Not this time.");
+    expect(html).not.toContain("You got it right.");
+    expect(bar(html, "A")).toBe("<b>A</b> Charge ✓ right answer");
+    expect(bar(html, "B")).toBe("<b>B</b> Current (you)");
+  });
+
+  it("no answer shows no verdict and no '(you)'", () => {
+    Object.assign(answers, results("quiz", 0), { "checkin/quiz:mine": null });
+    const html = card();
+    expect(html).not.toContain("You got it right.");
+    expect(html).not.toContain("Not this time.");
+    expect(html).not.toContain("(you)");
+    expect(bar(html, "A")).toBe("<b>A</b> Charge ✓ right answer");
+  });
+
+  it("an ended vote shows no verdict and no right answer, only '(you)' on the pick", () => {
+    Object.assign(answers, results("vote", null), { "checkin/quiz:mine": 1 });
+    const html = card();
+    expect(html).not.toContain("You got it right.");
+    expect(html).not.toContain("Not this time.");
+    expect(html).not.toContain("right answer");
+    expect(bar(html, "B")).toBe("<b>B</b> Current (you)");
+  });
+});

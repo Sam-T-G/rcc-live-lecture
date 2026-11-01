@@ -120,8 +120,9 @@ describe("ROLES DoorGate and the pairing screen on #/checkin/kiosk", () => {
     expect(words(html)).toContain("A professor or admin types this code on #/admin, under Pair a door iPad.");
     expect(words(html)).toContain("The code works until");
     expect(html).not.toContain("[scanner");
-    // A scanner can sign in instead of pairing (prof.access.test.ts: professors and admins can't).
-    expect(html).toContain("[Google button, typed sign-in under it]");
+    // No Google button at the door: scanners sign in on their own phone (prof.access.test.ts,
+    // sweep1-checkin-1).
+    expect(html).not.toContain("[Google button");
     expect(asked).toContainEqual(["staff:deviceStatus", { token: TOKEN }]);
   });
 

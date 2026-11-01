@@ -1,6 +1,6 @@
-// #/checkin/student (also #/checkin/join): the student signs in (a typed name and email; StudentSignIn says why not Google yet), and
-// the phone shows their QR pass until the professor or the door kiosk scans it. Both screens say
-// who is signed in, with "Not you? Sign out". The pass asks for a new code every 5 s, whenever
+// #/checkin/student (also #/checkin/join): the student signs in with Google (StudentSignIn; the
+// typed test form only in `npm run dev` builds), and the phone shows their QR pass until the
+// professor or the door kiosk scans it. Both screens say who is signed in, with "Not you? Sign out". The pass asks for a new code every 5 s, whenever
 // the phone comes back to the page, and as the code turns 20 s old (passTiming.ts); a code over
 // 25 s old on screen means those asks stopped getting through, so it shows "Getting a new code…"
 // in place of a QR the door would refuse.

@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DoorGate, StaffGate } from "./prof";
 
 const results: Record<string, unknown> = {};
-const signedIn: { user: { token: string; email: string } | null; endsAt: number | null } = { user: null, endsAt: null };
+const signedIn: { user: { token: string; email: string; exp?: number } | null; endsAt: number | null } = { user: null, endsAt: null };
 const effects = vi.hoisted(() => ({ run: false }));
 const signOut = vi.fn();
 vi.mock("react", async (orig) => {
@@ -106,14 +106,54 @@ describe("ROLES-UI-fixcheck-2 a professor page says when the sign-in ends", () =
 });
 
 describe("ROLES the door iPad opens the scanner only for a paired iPad or a scanner sign-in", () => {
-  it("ROLES signed out, the pairing screen offers sign-in to scanners only", () => {
+  // sweep1-checkin-1 / sweep1-access-1: Google keeps its own sign-in in Safari after the app's
+  // Sign out, so a Google button at the door lets anyone in line pick a staff account that once
+  // signed in on the iPad from Google's account list, with no password.
+  it("sweep1-checkin-1 signed out, the pairing screen shows no Google button: scanners sign in on their own phone, and nobody signs in to Google on the iPad", () => {
     store.set(DEVICE, TOKEN);
     results["staff:me"] = null;
     results["staff:deviceStatus"] = { status: "waiting", code: "482913", expiresAt: Date.now() + 9 * 60_000 };
     const html = words(kiosk());
-    expect(html).toContain("Scanners can sign in here instead of pairing.");
+    expect(html).not.toContain("[Google button");
+    expect(html).toContain("On your own phone, sign in on #/admin, then open #/checkin/kiosk there.");
+    expect(html).toContain("Nobody signs in to Google on this iPad.");
     expect(html).not.toMatch(/professors and admins can sign in here/i);
-    expect(html).toContain("[Google button, typed sign-in under it]");
+  });
+
+  it("sweep1-checkin-2 the pairing screen says a scanner's sign-in ends within the hour, and a paired iPad scans all class", () => {
+    store.set(DEVICE, TOKEN);
+    results["staff:me"] = null;
+    results["staff:deviceStatus"] = { status: "waiting", code: "482913", expiresAt: Date.now() + 9 * 60_000 };
+    expect(words(kiosk())).toContain("A scanner's sign-in ends in under an hour. A paired iPad scans for the whole class.");
+  });
+
+  it("sweep1-checkin-1 a professor signed in on the unpaired iPad is told to sign out of Google in Safari too", () => {
+    store.set(DEVICE, TOKEN);
+    signIn({ iss: "https://accounts.google.com", email: "prof@example.edu", email_verified: true });
+    results["staff:me"] = staff("prof@example.edu", "professor");
+    results["staff:deviceStatus"] = { status: "waiting", code: "482913", expiresAt: Date.now() + 9 * 60_000 };
+    const html = words(kiosk());
+    expect(html).toContain("Then sign out of Google in Safari too");
+    expect(html).not.toContain("[Google button");
+  });
+
+  it("sweep1-checkin-2 a scanner signed in at the door sees when their sign-in ends; a paired iPad shows no end time", () => {
+    vi.stubEnv("TZ", "America/Los_Angeles");
+    store.set(DEVICE, TOKEN);
+    signIn({ iss: "https://accounts.google.com", email: "door@example.edu", email_verified: true });
+    // Signed in at 8:40 AM: the token runs out at 9:40, and the sign-in ends a minute before.
+    signedIn.user!.exp = Date.UTC(2026, 10, 5, 17, 40);
+    results["staff:me"] = staff("door@example.edu", "scanner");
+    results["staff:deviceStatus"] = { status: "none" };
+    let html = words(kiosk());
+    expect(html).toContain("[scanner, device none]");
+    expect(html).toMatch(/Your sign-in ends at 9:39\sAM\. After that, sign in again on #\/admin\./);
+
+    results["staff:me"] = staff("someone@example.edu", null);
+    results["staff:deviceStatus"] = { status: "paired", label: "A-210 door" };
+    html = words(kiosk());
+    expect(html).toContain(`[scanner, device ${TOKEN}]`);
+    expect(html).not.toContain("sign-in ends");
   });
 
   for (const role of ["professor", "admin"] as const) {

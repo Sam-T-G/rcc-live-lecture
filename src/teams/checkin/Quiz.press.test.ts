@@ -308,9 +308,9 @@ describe("the quiz card, answering", () => {
 
   it("checkin-frontend-17 a failed answer's error goes away when the professor asks the next question", async () => {
     press(card(), "A Charge");
-    sent("checkin/quiz:answer")[0].reject(new ConvexError("Time’s up. The professor ended this question."));
+    sent("checkin/quiz:answer")[0].reject(new ConvexError("Time’s up. The professor ended this quiz."));
     await settle();
-    expect(alertText(card())).toBe("Time’s up. The professor ended this question.");
+    expect(alertText(card())).toBe("Time’s up. The professor ended this quiz.");
     server.results["checkin/quiz:current"] = open("p2");
     expect(alertText(card())).toBeUndefined();
     expect(rejections).toEqual([]);

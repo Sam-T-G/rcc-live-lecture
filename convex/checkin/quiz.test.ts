@@ -119,7 +119,7 @@ describe("F17 the professor asks, ends and sees the numbers", () => {
     const fixed = await ask(t, "quiz", "Which one is a number?", ["7", "Q"], 0);
     expect(await pollCount(t)).toBe(4);
     expect(await current(t)).toMatchObject({ id: fixed, open: true });
-    expect(await said(s.mutation(api.checkin.quiz.answer, { poll: second, choice: 0 }))).toBe("The professor ended this question.");
+    expect(await said(s.mutation(api.checkin.quiz.answer, { poll: second, choice: 0 }))).toBe("The professor ended this quiz.");
     expect((await t.query(api.live.past.past, { channel: CH })).map((p) => p.id)).toEqual([second, again, first]);
     await s.mutation(api.checkin.quiz.answer, { poll: fixed, choice: 0 });
   });
@@ -197,7 +197,7 @@ describe("F17 the professor asks, ends and sees the numbers", () => {
 });
 
 describe("F18 students answer", () => {
-  it("F18 student rules unchanged: quiz locks, vote changes until ended, 'Check in first.', 'The professor ended this question.'", async () => {
+  it("F18 student rules unchanged: quiz locks, vote changes until ended, 'Check in first.', 'The professor ended this quiz.' or '... this vote.'", async () => {
     const t = setup();
     // A student from the last class who hasn't checked in to this one.
     await openClass(t);
@@ -215,7 +215,7 @@ describe("F18 students answer", () => {
     expect(await said(gone.mutation(api.checkin.quiz.answer, { poll: quiz, choice: 1 }))).toBe("Check in first.");
     expect(await said(t.mutation(api.checkin.quiz.answer, { poll: quiz, choice: 1 }))).toBe("Sign in first.");
     await end(t, quiz);
-    expect(await said(s.mutation(api.checkin.quiz.answer, { poll: quiz, choice: 1 }))).toBe("The professor ended this question.");
+    expect(await said(s.mutation(api.checkin.quiz.answer, { poll: quiz, choice: 1 }))).toBe("The professor ended this quiz.");
 
     vi.setSystemTime(T0 + 2 * HOUR + MIN);
     const vote = await ask(t, "vote", "Pick a color", ["Red", "Blue", "Yellow", "Green"]);
@@ -223,7 +223,7 @@ describe("F18 students answer", () => {
     await s.mutation(api.checkin.quiz.answer, { poll: vote, choice: 3 });
     expect(await s.query(api.checkin.quiz.mine, { poll: vote })).toBe(3);
     await end(t, vote);
-    expect(await said(s.mutation(api.checkin.quiz.answer, { poll: vote, choice: 0 }))).toBe("The professor ended this question.");
+    expect(await said(s.mutation(api.checkin.quiz.answer, { poll: vote, choice: 0 }))).toBe("The professor ended this vote.");
     expect((await current(t))!.results).toEqual({ counts: [0, 0, 0, 1], correct: null });
   });
 
@@ -262,7 +262,7 @@ describe("F18 students answer", () => {
     expect(await said(t.mutation(api.checkin.quiz.answer, { poll, choice: 1 }))).toBe("Sign in first.");
     for (const choice of [-1, 4, 1.5]) expect(await said(s.mutation(api.checkin.quiz.answer, { poll, choice }))).toBe("Pick one of the choices.");
     await end(t, poll);
-    expect(await said(s.mutation(api.checkin.quiz.answer, { poll, choice: 1 }))).toBe("The professor ended this question.");
+    expect(await said(s.mutation(api.checkin.quiz.answer, { poll, choice: 1 }))).toBe("The professor ended this quiz.");
     expect(await s.query(api.checkin.quiz.mine, { poll })).toBeNull();
   });
 
@@ -284,7 +284,7 @@ describe("F18 students answer", () => {
 });
 
 describe("F8 each class has its own questions", () => {
-  it("F8 a poll from the last class is not current, answering it throws 'That question is gone.', history shows only this class; a student checked in to both classes answers the class-2 poll (two checkins rows, no unique() error)", async () => {
+  it("F8 a poll from the last class is not current, answering it throws 'That quiz or vote is gone.', history shows only this class; a student checked in to both classes answers the class-2 poll (two checkins rows, no unique() error)", async () => {
     const t = setup();
     await openClass(t);
     const [s] = await room(t, 1);
@@ -294,7 +294,7 @@ describe("F8 each class has its own questions", () => {
 
     // Between classes nothing is current, and last class's open poll can't be answered.
     expect(await current(t)).toBeNull();
-    expect(await said(s.mutation(api.checkin.quiz.answer, { poll: old, choice: 1 }))).toBe("That question is gone.");
+    expect(await said(s.mutation(api.checkin.quiz.answer, { poll: old, choice: 1 }))).toBe("That quiz or vote is gone.");
     expect(await history(t)).toEqual([]);
     expect(await missing(t)).toBeNull();
 
@@ -306,7 +306,7 @@ describe("F8 each class has its own questions", () => {
     const fresh = await ask(t, "quiz", "What is 3 + 3?", ["6", "7"], 0);
     expect(await current(t)).toMatchObject({ id: fresh, open: true });
     await s.mutation(api.checkin.quiz.answer, { poll: fresh, choice: 0 });
-    expect(await said(s.mutation(api.checkin.quiz.answer, { poll: old, choice: 1 }))).toBe("That question is gone.");
+    expect(await said(s.mutation(api.checkin.quiz.answer, { poll: old, choice: 1 }))).toBe("That quiz or vote is gone.");
     expect((await history(t)).map((h) => h.id)).toEqual([fresh]);
     expect(await stats(t, fresh)).toMatchObject({ answered: 1, checkedIn: 1 });
   });

@@ -34,7 +34,7 @@ import {
   timeOrDay,
   type ClassRow,
 } from "./sheet";
-import { clock, scanError, scanOpensAt, why } from "./util";
+import { STILL_OPEN, clock, scanError, scanOpensAt, why } from "./util";
 
 const MIN = 60_000;
 
@@ -78,7 +78,7 @@ export function Scanner() {
             <PastClasses />
           </ErrorBoundary>
           <p>
-            <Link to="checkin/quiz">Ask a question or start a vote</Link>
+            <Link to="checkin/quiz">Start a quiz or a vote</Link>
           </p>
         </div>
       </div>
@@ -163,7 +163,7 @@ type Result = ({ ok: true; name: string; email: string; already: boolean } | { o
 
 // The camera and the typed code. A pass the camera reads, or a code typed in, checks that
 // student in to this class.
-function ScanPasses() {
+export function ScanPasses() {
   const scan = useMutation(api.checkin.pass.scan);
   const cam = useCamera();
   const [read] = useState(makeQrReader);
@@ -297,6 +297,7 @@ function LastScan({ result }: { result: Result }) {
 export function ClassStart() {
   const start = useQuery(api.checkin.attendance.classStart, { channel: CHANNEL });
   const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
+  const sheet = useQuery(api.checkin.attendance.sheet, { channel: CHANNEL });
   const set = useMutation(api.checkin.attendance.setClassStart);
   // What the professor typed; null shows the saved (or the last class's) value.
   const [time, setTime] = useState<string | null>(null);
@@ -305,6 +306,9 @@ export function ClassStart() {
   const [busy, setBusy] = useState(false);
   // The same time a day earlier, offered when the time typed is more than 12 hours away.
   const [offer, setOffer] = useState<number | null>(null);
+  // The start the server refused because this class is still open (STILL_OPEN), offered again
+  // with sameClass under "Save anyway".
+  const [anyway, setAnyway] = useState<number | null>(null);
 
   const lastClass = classes?.find((c) => !c.open && c.startsAt !== null);
   const base = start ?? (lastClass && lastClass.startsAt !== null ? { startsAt: lastClass.startsAt, graceMin: lastClass.graceMin } : null);
@@ -312,8 +316,9 @@ export function ClassStart() {
   const shownGrace = grace ?? String(base?.graceMin ?? 5);
   const now = Date.now();
 
-  async function send(startsAt: number) {
+  async function send(startsAt: number, sameClass?: true) {
     setOffer(null);
+    setAnyway(null);
     const graceMin = Number(shownGrace);
     if (!shownGrace.trim() || !Number.isInteger(graceMin) || graceMin < 0 || graceMin > 60) {
       setErr("Late after has to be a whole number from 0 to 60.");
@@ -322,11 +327,12 @@ export function ClassStart() {
     setBusy(true);
     setErr("");
     try {
-      await set({ channel: CHANNEL, startsAt, graceMin });
+      await set(sameClass ? { channel: CHANNEL, startsAt, graceMin, sameClass } : { channel: CHANNEL, startsAt, graceMin });
       setTime(null);
       setGrace(null);
     } catch (x) {
       setErr(why(x));
+      if (why(x) === STILL_OPEN && !sameClass) setAnyway(startsAt);
     } finally {
       setBusy(false);
     }
@@ -365,6 +371,8 @@ export function ClassStart() {
                 onChange={(e) => {
                   setTime(e.target.value);
                   setOffer(null);
+                  setAnyway(null);
+                  setErr("");
                 }}
               />
             )}
@@ -382,7 +390,14 @@ export function ClassStart() {
           {start ? `Late after ${timeOrDay(start.startsAt + start.graceMin * MIN, now)}` : "No start time yet, so nobody is late."}
         </p>
       )}
-      {err && <Status kind="error">{err}</Status>}
+      {err && <Status kind="error">{anyway !== null ? stillOpen(anyway, sheet?.[0]) : err}</Status>}
+      {anyway !== null && (
+        <p className="row">
+          <Button variant="secondary" small busy={busy} onClick={() => void send(anyway, true)}>
+            Save anyway
+          </Button>
+        </p>
+      )}
       {offer !== null && (
         <p className="row">
           <Button variant="secondary" small busy={busy} onClick={() => void send(offer)}>
@@ -392,6 +407,15 @@ export function ClassStart() {
       )}
     </Card>
   );
+}
+
+// setClassStart refuses a start more than 45 minutes after the open class's first check-in, as the
+// next class's start. That check-in can be a student who came early to this class (scans have no
+// early limit while no start is saved), so this names them and when they came: Save anyway keeps
+// the class open and saves the start; End class is for a start that really is the next class's.
+function stillOpen(startsAt: number, first: { name: string; at: number } | undefined) {
+  if (!first) return STILL_OPEN;
+  return `This class is still open. Its first check-in, ${first.name} at ${clock(first.at)}, is more than 45 minutes before ${clock(startsAt)}. If ${first.name} is in this class, press Save anyway. If ${clock(startsAt)} is the next class's start, press End class, then save it.`;
 }
 
 // This class's attendance as a CSV, and how many were late.
@@ -418,7 +442,8 @@ export function Download() {
 }
 
 // Who checked in to this class, newest first. Remove takes a wrong check-in off, and that
-// student's phone shows the pass again. The check-ins from before the first class get no Remove.
+// student's phone shows the pass again; their quiz and vote answers in this class go too
+// (attendance.removeCheckin). The check-ins from before the first class get no Remove.
 function Names() {
   const names = useQuery(api.checkin.read.names, { channel: CHANNEL });
   const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
@@ -436,7 +461,7 @@ function Names() {
           {canRemove && (
             <span className="att-row__action">
               <ConfirmButton
-                question={`Remove ${n.name} from this class? Their phone shows their pass again.`}
+                question={`Remove ${n.name} from this class? Their phone shows their pass again, and their quiz and vote answers in this class are removed.`}
                 confirm="Remove"
                 onConfirm={() => remove({ checkin: n.id })}
               >

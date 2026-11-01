@@ -22,16 +22,18 @@
 //
 // Who calls what:
 //   classStart({ channel })               anyone: this class's start time and grace, or null
-//   setClassStart({ channel, startsAt, graceMin })   professors and admins: opens the class when
-//                                         none is open, saves its start, and queues the team lock;
-//                                         refuses the next class's start while this one is open
+//   setClassStart({ channel, startsAt, graceMin, sameClass? })   professors and admins: opens the
+//                                         class when none is open, saves its start, and queues the
+//                                         team lock; refuses the next class's start while this one
+//                                         is open, unless sameClass says it is this class's
 //   sheet({ channel, lecture? })          professors and admins: one class's check-ins with email
 //                                         and minutes late; this class by default, "earlier" for
 //                                         the check-ins from before the first class
 //   lectures({ channel })                 professors and admins: the classes with check-ins and the
 //                                         one running now, newest first, then "earlier"
 //   removeCheckin({ checkin })            professors and admins: removes a wrong check-in from
-//                                         this class, so the student can be scanned again
+//                                         this class and that student's quiz and vote answers
+//                                         in it, so the student can be scanned again
 //   lateFeed({ channel })                 anyone: the late banner's newest 5 late arrivals in this
 //                                         class, first names only
 //   myHideLate() / setHideLate({ hide })  the signed-in student's own switch for the late banner
@@ -43,6 +45,7 @@ import { ConvexError, v, type Infer } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import { EARLY_MS, cleanName, ensureLecture, lectureStart, lectureWindow, requireUser } from "../lib";
 import { requireProf } from "./prof";
+import { tally } from "./quiz";
 
 const MIN = 60_000;
 // A start time has to be within this long of now, so a time picked for the wrong day is refused.
@@ -58,6 +61,11 @@ const TEAM_LOCK_MS = 5 * MIN;
 const MAX_CLASSES = 50;
 const MAX_LECTURE_ROWS = 200;
 const COUNT_BUDGET = 8_000;
+// setClassStart's refusal of the next class's start. src/teams/checkin/util.ts keeps a copy, to
+// offer Save anyway when it comes back (util.test.ts checks they match).
+export const STILL_OPEN = "This class is still open. Press End class, then save the next start.";
+// removeCheckin: how many of this class's polls it looks through for the student's answers.
+const MAX_CLASS_POLLS = 200;
 // lateFeed: how many of the newest late check-ins it looks through for 5 that show.
 const FEED_ROWS = 100;
 
@@ -158,18 +166,21 @@ export const classStart = query({
 // locked already, it queues the team lock for 5 minutes after the start: a start moved earlier
 // locks the teams earlier (live.groups.lock checks the time itself, so a lock queued for the old
 // start does nothing extra).
+// `sameClass: true` saves it anyway: the professor's "Save anyway" on #/checkin/teacher, for a
+// student who came more than 45 minutes early to this class (a scan opens a class with no start,
+// and scans have no early limit until a start is saved), so ending the class isn't the only way
+// through.
 export const setClassStart = mutation({
-  args: { channel: v.string(), startsAt: v.number(), graceMin: v.number() },
+  args: { channel: v.string(), startsAt: v.number(), graceMin: v.number(), sameClass: v.optional(v.boolean()) },
   returns: v.null(),
-  handler: async (ctx, { channel, startsAt, graceMin }) => {
+  handler: async (ctx, { channel, startsAt, graceMin, sameClass }) => {
     await requireProf(ctx);
     if (!Number.isFinite(startsAt) || Math.abs(startsAt - Date.now()) > START_RANGE_MS) throw new ConvexError("Pick a time within 12 hours of now.");
     if (!Number.isInteger(graceMin)) throw new ConvexError("Grace has to be a whole number of minutes.");
     if (graceMin < 0 || graceMin > 60) throw new ConvexError("Grace has to be 0 to 60 minutes.");
     const lecture = await ensureLecture(ctx, channel);
     const first = await checkinsIn(ctx, channel, classSpan(lecture)).first();
-    if (first && startsAt > first.at + EARLY_MS)
-      throw new ConvexError("This class is still open. Press End class, then save the next start.");
+    if (first && startsAt > first.at + EARLY_MS && sameClass !== true) throw new ConvexError(STILL_OPEN);
     // The first start saved for this class also records when, so deck slides pressed after it
     // keep counting when the start moves later (lib.slidesFrom).
     const firstSave = lecture.startsAt === undefined ? { startSavedAt: Date.now() } : {};
@@ -291,8 +302,10 @@ export const lectures = query({
 
 // A professor or admin removes a wrong check-in from this class (a student scanned twice under two
 // names, or someone who isn't in the room). The student's phone shows the pass again and they can
-// be scanned again. A check-in from an earlier class stays: it is that class's record. Pressing
-// Remove twice is fine: a check-in that is gone already changes nothing.
+// be scanned again. Their quiz and vote answers in this class go too (only checked-in students can
+// answer), so "answered" never counts more students than "checked in", and an ended poll's saved
+// counts are worked out again without them. A check-in from an earlier class stays: it is that
+// class's record. Pressing Remove twice is fine: a check-in that is gone already changes nothing.
 export const removeCheckin = mutation({
   args: { checkin: v.id("checkins") },
   returns: v.null(),
@@ -304,6 +317,19 @@ export const removeCheckin = mutation({
     if (row._creationTime < span.start || (span.end !== null && row._creationTime >= span.end))
       throw new ConvexError("That check-in is from an earlier class.");
     await ctx.db.delete("checkins", checkin);
+    const polls = await ctx.db
+      .query("polls")
+      .withIndex("by_channel", (q) => q.eq("channel", row.channel).gte("_creationTime", span.start))
+      .take(MAX_CLASS_POLLS);
+    for (const p of polls) {
+      const answer = await ctx.db
+        .query("pollAnswers")
+        .withIndex("by_poll_and_user", (q) => q.eq("poll", p._id).eq("user", row.user))
+        .first();
+      if (!answer) continue;
+      await ctx.db.delete("pollAnswers", answer._id);
+      if (p.counts !== undefined) await ctx.db.patch("polls", p._id, { counts: (await tally(ctx, p._id, p.choices.length)).counts });
+    }
     return null;
   },
 });

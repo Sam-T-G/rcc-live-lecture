@@ -176,13 +176,13 @@ describe("#/checkin/stage", () => {
     expect(bars().map(words).join(" ")).not.toContain("right answer");
   });
 
-  it("F38.2 'No question open.' when the channel has no quiz or vote yet", () => {
+  it("F38.2 'No quiz or vote yet.' when the channel has no quiz or vote yet", () => {
     results["checkin/quiz:current"] = null;
-    expect(words(renderToStaticMarkup(createElement(Stage)))).toContain("No question open.");
+    expect(words(renderToStaticMarkup(createElement(Stage)))).toContain("No quiz or vote yet.");
     results["checkin/quiz:current"] = undefined;
-    expect(words(renderToStaticMarkup(createElement(Stage)))).not.toContain("No question open.");
+    expect(words(renderToStaticMarkup(createElement(Stage)))).not.toContain("No quiz or vote yet.");
     results["checkin/quiz:current"] = OPEN;
-    expect(words(renderToStaticMarkup(createElement(Stage)))).not.toContain("No question open.");
+    expect(words(renderToStaticMarkup(createElement(Stage)))).not.toContain("No quiz or vote yet.");
   });
 
   it("F38.3 the deck can't go full screen inside the page, so its F key can't cover the card", () => {
@@ -214,6 +214,34 @@ describe("#/checkin/stage", () => {
     const src = frame(open(`#/checkin/stage?bridge=saved&bridge-site=quaint-swan-637&deck=${DECK}`));
     expect(src?.searchParams.get("bridge")).toBe("gdg.k1");
     expect(src?.searchParams.get("bridge-site")).toBe("quaint-swan-637");
+  });
+
+  it("sweep1-checkin-4 the saved key goes only to a deck on the origin it came with; any other deck gets none and the stage says the phones aren't getting the slides", () => {
+    const LINE = "Phones aren't getting these slides. Open this page from the full link again.";
+    vi.stubGlobal("sessionStorage", stubStorage());
+    stubHistory();
+    at(`#/checkin/stage?bridge=gdg.k1&deck=${DECK}`);
+    expect(takeBridge()).toBe("gdg.k1");
+
+    // Same origin, another deck on it: the key goes.
+    let html = open("#/checkin/stage?bridge=saved&deck=https://deck.example.com/week10/");
+    expect(frame(html)?.searchParams.get("bridge")).toBe("gdg.k1");
+    expect(words(html)).not.toContain(LINE);
+
+    // Another host, the same host over http, or another port: no key.
+    for (const other of ["https://other.example.net/d/", "http://deck.example.com/d/", "https://deck.example.com:8443/d/", "https://evil.deck.example.com/d/"]) {
+      html = open(`#/checkin/stage?bridge=saved&deck=${other}`);
+      expect(frame(html)?.searchParams.has("bridge"), other).toBe(false);
+      expect(words(html), other).toContain(LINE);
+    }
+  });
+
+  it("sweep1-checkin-4 a key saved from a link with no deck goes to no deck", () => {
+    vi.stubGlobal("sessionStorage", stubStorage());
+    stubHistory();
+    at("#/checkin/stage?bridge=gdg.k1");
+    expect(takeBridge()).toBe("gdg.k1");
+    expect(frame(open(`#/checkin/stage?bridge=saved&deck=${DECK}`))?.searchParams.has("bridge")).toBe(false);
   });
 
   it("F38.6 a new tab with ?bridge=saved has no key, so it hands the deck none (never the word 'saved')", () => {
@@ -262,7 +290,7 @@ describe("the stage's link (stageLink.ts)", () => {
     at(`#/checkin/stage?bridge=gdg.k1&bridge-site=quaint-swan-637&deck=${DECK}`, "/rcc-live-lecture/");
 
     expect(takeBridge()).toBe("gdg.k1");
-    expect(store.values()).toEqual(["gdg.k1"]);
+    expect(store.values()).toEqual([JSON.stringify({ key: "gdg.k1", origin: "https://deck.example.com" })]);
     expect(replace).toHaveBeenCalledTimes(1);
     expect(replace).toHaveBeenCalledWith(
       { from: "app" },
@@ -279,7 +307,7 @@ describe("the stage's link (stageLink.ts)", () => {
     at(`#/checkin/stage?deck=${DECK}&bridge=gdg.k2`, "/rcc-live-lecture/");
     expect(takeBridge()).toBe("gdg.k2");
     expect(replace).toHaveBeenLastCalledWith({ from: "app" }, "", `/rcc-live-lecture/#/checkin/stage?deck=${DECK}&bridge=saved`);
-    expect(store.values()).toEqual(["gdg.k2"]);
+    expect(store.values()).toEqual([JSON.stringify({ key: "gdg.k2", origin: "https://deck.example.com" })]);
   });
 
   it("F38.6 a key added after ?bridge=saved or an empty ?bridge= leaves the address bar too (STAGE-risk-2)", () => {
@@ -292,7 +320,7 @@ describe("the stage's link (stageLink.ts)", () => {
       expect(replace, first).toHaveBeenLastCalledWith({ from: "app" }, "", `/rcc-live-lecture/#/checkin/stage?bridge=saved&deck=${DECK}`);
       expect(location.hash, first).not.toContain("gdg.k2");
     }
-    expect(store.values()).toEqual(["gdg.k2"]);
+    expect(store.values()).toEqual([JSON.stringify({ key: "gdg.k2", origin: "https://deck.example.com" })]);
   });
 
   it("F38.6 when the browser won't store the key, the key stays in the address bar, so a reload still feeds the phones", () => {

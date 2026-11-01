@@ -437,7 +437,7 @@ describe("F8 the next class on the same channel starts clean", () => {
         teams: ["Red 1 0"],
         roster: [`${name(1)} 0`],
       });
-      await expect(one.s[0].mutation(api.checkin.quiz.answer, { poll: vote, choice: 0 })).rejects.toThrow("That question is gone.");
+      await expect(one.s[0].mutation(api.checkin.quiz.answer, { poll: vote, choice: 0 })).rejects.toThrow("That quiz or vote is gone.");
     }
     // A new backend on the same Thursday; the first one's queued jobs are dropped with its clock.
     vi.clearAllTimers();
@@ -535,7 +535,7 @@ describe("F8 the next class on the same channel starts clean", () => {
       roster: [`${name(3)} 0`],
     });
     // The open vote can't be answered, and student 1 checks in again, to this class.
-    await expect(s1.mutation(api.checkin.quiz.answer, { poll: vote, choice: 0 })).rejects.toThrow("That question is gone.");
+    await expect(s1.mutation(api.checkin.quiz.answer, { poll: vote, choice: 0 })).rejects.toThrow("That quiz or vote is gone.");
     await until(t, C1 + 21 * MIN);
     expect(await checkIn(t, s1)).toMatchObject({ already: false });
     // The older rows stay as the attendance from before the first class ("Earlier" in Past
@@ -611,7 +611,7 @@ describe("LX-convex-1 a class opened by saving the next morning's start takes no
     // 21:32: one more slide, then a question.
     vi.setSystemTime(MON_6PM + 3.5 * HOUR + 2 * MIN);
     await slide(t, CH, 7, { title: "Monday wrap-up" });
-    await expect(ask("Tonight's quiz?")).rejects.toThrow("Questions open 45 minutes before class starts.");
+    await expect(ask("Tonight's quiz?")).rejects.toThrow("Quizzes and votes open 45 minutes before class starts.");
     expect(await openClass(t)).toBe(tuesday);
     // Tuesday 8:14: the room sees no slide and no question, and asking is still refused.
     vi.setSystemTime(TUE_9AM - 46 * MIN);
@@ -622,7 +622,7 @@ describe("LX-convex-1 a class opened by saving the next morning's start takes no
       past: (await s1.query(api.live.past.past, { channel: CH })).map((p) => p.question),
     });
     expect(await read()).toEqual({ deck: null, slides: [], quiz: null, past: [] });
-    await expect(ask("Still too early?")).rejects.toThrow("Questions open 45 minutes before class starts.");
+    await expect(ask("Still too early?")).rejects.toThrow("Quizzes and votes open 45 minutes before class starts.");
     // 8:15: a press shows and a question opens, in Tuesday's class.
     vi.setSystemTime(TUE_9AM - 45 * MIN);
     await slide(t, CH, 0, { title: "Tuesday" });

@@ -5,7 +5,8 @@
 // "<channel>.<key>" value with a dot, so no real bridge value can be this word.
 export const SAVED = "saved";
 
-// This tab's copy of the bridge key. sessionStorage, so it ends when the tab closes.
+// This tab's copy of the bridge key and the origin of the deck it came with, as JSON
+// ({ key, origin }). sessionStorage, so it ends when the tab closes.
 const STORE = "rcc-live:stage-bridge";
 
 // Hosts a browser loads over http even inside an https page (localhost, any name ending in
@@ -84,16 +85,30 @@ export function bridgeIn(params: URLSearchParams): string | null {
   return keys[keys.length - 1] ?? (all.includes(SAVED) ? SAVED : null);
 }
 
-// The bridge key this tab saved from an earlier link, or null.
-export function savedBridge(): string | null {
+// The bridge key this tab saved from an earlier link, with the origin of the deck that link named
+// (null when it named none), or null. A value saved by an older version (the key alone) counts as
+// none, since it has no origin.
+export type Saved = { key: string; origin: string | null };
+export function savedBridge(): Saved | null {
   try {
-    return sessionStorage.getItem(STORE);
+    const s: unknown = JSON.parse(sessionStorage.getItem(STORE) ?? "null");
+    if (!s || typeof s !== "object") return null;
+    const { key, origin } = s as Record<string, unknown>;
+    return typeof key === "string" && key && (origin === null || typeof origin === "string") ? { key, origin } : null;
   } catch {
     return null;
   }
 }
 
-// When the address bar has #/checkin/stage?bridge=<channel>.<key>, saves the key in this tab and
+// The saved key for this deck: only when the deck is on the origin the key came with, so a later
+// ?bridge=saved link that names another deck (a link someone sent, a site that isn't a deck-kit
+// deck) never gets it in its address, where that site's logs or script could read it.
+export function keyFor(saved: Saved | null, deck: URL | null): string | null {
+  return saved && saved.origin !== null && deck && deck.origin === saved.origin ? saved.key : null;
+}
+
+// When the address bar has #/checkin/stage?bridge=<channel>.<key>, saves the key in this tab, with
+// the origin of the link's ?deck= (keyFor hands the key only to a deck there), and
 // puts ?bridge=saved in the address bar in its place (one ?bridge=, where the first one was), so
 // the key never shows on the projector and a reload still finds it. The key is the last ?bridge=
 // that isn't "saved" or empty (bridgeIn). Returns the key, or null when the link has none. When the browser won't
@@ -103,11 +118,14 @@ export function takeBridge(): string | null {
   const at = location.hash.indexOf("?");
   const path = (at === -1 ? location.hash : location.hash.slice(0, at)).replace(/^#/, "").split("/").filter(Boolean).join("/");
   if (path !== "checkin/stage") return null;
-  const key = at === -1 ? null : bridgeIn(new URLSearchParams(location.hash.slice(at + 1)));
+  const params = new URLSearchParams(at === -1 ? "" : location.hash.slice(at + 1));
+  const key = bridgeIn(params);
   if (!key || key === SAVED) return null;
+  const origin = deckAddress(params.get("deck") ?? "", location.protocol === "https:")?.origin ?? null;
+  const value = JSON.stringify({ key, origin });
   try {
-    sessionStorage.setItem(STORE, key);
-    if (sessionStorage.getItem(STORE) !== key) return key;
+    sessionStorage.setItem(STORE, value);
+    if (sessionStorage.getItem(STORE) !== value) return key;
     history.replaceState(history.state, "", location.pathname + location.search + hashWith(location.hash, "bridge", SAVED));
   } catch {
     // Storage or the address bar refused: the key stays in the link.

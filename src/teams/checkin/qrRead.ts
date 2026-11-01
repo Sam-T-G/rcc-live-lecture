@@ -9,7 +9,8 @@
 // makeQrReader() itself touches no browser API, so a page can call it while it renders:
 //   const [read] = useState(makeQrReader);
 //   const text = await read(video); // the QR's text, or null when the frame has none
-import jsQR from "jsqr";
+// jsQR (130 kB) loads with import() only when the reader picks it, so it stays out of the main
+// bundle every student phone downloads (src/blocks/camera.test.ts checks).
 
 type Detector = { detect: (src: HTMLVideoElement) => Promise<{ rawValue: string }[]> };
 type DetectorClass = { new (o: { formats: string[] }): Detector; getSupportedFormats?: () => Promise<string[]> };
@@ -20,7 +21,11 @@ const WIDTH = 640; // jsQR is slow on full frames; 640 px wide still reads a pho
 export function makeQrReader(): QrReader {
   let reader: Promise<QrReader> | null = null;
   return async (v) => {
-    reader ??= pickReader();
+    // A jsQR download that fails (the connection dropped) is tried again on the next frame.
+    reader ??= pickReader().catch((e: unknown) => {
+      reader = null;
+      throw e;
+    });
     return (await reader)(v);
   };
 }
@@ -37,10 +42,11 @@ async function pickReader(): Promise<QrReader> {
   } catch {
     /* the browser's detector won't start: read with jsQR */
   }
-  return jsqrReader();
+  return await jsqrReader();
 }
 
-function jsqrReader(): QrReader {
+async function jsqrReader(): Promise<QrReader> {
+  const { default: jsQR } = await import("jsqr");
   const canvas = document.createElement("canvas");
   const g = canvas.getContext("2d", { willReadFrequently: true });
   return async (v) => {

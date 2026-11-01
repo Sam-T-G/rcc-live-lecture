@@ -4,12 +4,17 @@
 // how scanError puts the time in front of the refusal.
 import { describe, expect, it, vi } from "vitest";
 import * as server from "../../../convex/lib";
-import { EARLY_MS, EARLY_SCAN, scanError, scanOpensAt } from "./util";
+import * as attendance from "../../../convex/checkin/attendance";
+import { EARLY_MS, EARLY_SCAN, STILL_OPEN, scanError, scanOpensAt } from "./util";
 
 describe("LX-check-copy-1 the early-scan refusal", () => {
   it("util.ts's EARLY_MS and EARLY_SCAN match convex/lib.ts", () => {
     expect(EARLY_MS).toBe(server.EARLY_MS);
     expect(EARLY_SCAN).toBe(server.EARLY_SCAN);
+  });
+
+  it("sweep1-ledger-2 util.ts's STILL_OPEN matches setClassStart's refusal", () => {
+    expect(STILL_OPEN).toBe(attendance.STILL_OPEN);
   });
 
   it("gets the time scanning opens in the browser's time zone; other refusals, or no saved start, stay as they are", () => {

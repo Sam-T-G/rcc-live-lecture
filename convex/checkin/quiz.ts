@@ -7,7 +7,7 @@
 // (lib.ensureLecture), the way a deck press or a pass scan does, and is refused more than 45
 // minutes before the open class's saved start (lib.notOpenYet), so a question asked the evening
 // before isn't the next morning's. Between classes `current` is null, and a poll from an earlier
-// class can't be answered ("That question is gone.").
+// class can't be answered ("That quiz or vote is gone.").
 //
 //   current({ channel })        anyone     the newest poll in this class, or null. Its counts and
 //                                          right answer come back only once it has ended.
@@ -183,7 +183,7 @@ export const ask = mutation({
 
     const lecture = await ensureLecture(ctx, channel);
     const now = Date.now();
-    if (notOpenYet(lecture, now)) throw new ConvexError("Questions open 45 minutes before class starts.");
+    if (notOpenYet(lecture, now)) throw new ConvexError("Quizzes and votes open 45 minutes before class starts.");
     const start = lectureStart(lecture);
     const prev = await newest(ctx, channel);
     if (prev?.open) {
@@ -231,11 +231,11 @@ export const answer = mutation({
   handler: async (ctx, { poll, choice }) => {
     const me = await requireUser(ctx);
     const p = await ctx.db.get(poll);
-    if (!p) throw new ConvexError("That question is gone.");
+    if (!p) throw new ConvexError("That quiz or vote is gone.");
     // A question from an earlier class, even one nobody ended, can't be answered.
     const { start } = await lectureWindow(ctx, p.channel);
-    if (p._creationTime < start) throw new ConvexError("That question is gone.");
-    if (!p.open) throw new ConvexError("The professor ended this question.");
+    if (p._creationTime < start) throw new ConvexError("That quiz or vote is gone.");
+    if (!p.open) throw new ConvexError(`The professor ended this ${(p.kind ?? "quiz") === "vote" ? "vote" : "quiz"}.`);
     if (!Number.isInteger(choice) || choice < 0 || choice >= p.choices.length) throw new ConvexError("Pick one of the choices.");
     if (!(await checkedIn(ctx, p.channel, me.tokenIdentifier))) throw new ConvexError("Check in first.");
     const had = await ctx.db.query("pollAnswers").withIndex("by_poll_and_user", (q) => q.eq("poll", poll).eq("user", me.tokenIdentifier)).first();

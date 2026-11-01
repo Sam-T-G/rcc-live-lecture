@@ -41,12 +41,12 @@ vi.mock("react", async (orig) => {
   };
 });
 
-type Sent = { name: string; args: Record<string, unknown>; resolve: (v: unknown) => void };
+type Sent = { name: string; args: Record<string, unknown>; resolve: (v: unknown) => void; reject: (e: unknown) => void };
 const server = vi.hoisted(() => ({ results: {} as Record<string, unknown>, sent: [] as Sent[], saved: [] as { rows: unknown; name: string }[] }));
 vi.mock("convex/react", () => ({
   useQuery: (ref: FunctionReference<"query">, args: unknown) => (typeof args === "object" ? server.results[getFunctionName(ref)] : undefined),
   useMutation: (ref: FunctionReference<"mutation">) => (args: Record<string, unknown>) =>
-    new Promise((resolve) => server.sent.push({ name: getFunctionName(ref), args, resolve })),
+    new Promise((resolve, reject) => server.sent.push({ name: getFunctionName(ref), args, resolve, reject })),
   useConvex: () => ({ query: async () => [] }),
 }));
 vi.mock("../../blocks/ui", async (orig) => ({
@@ -61,6 +61,7 @@ vi.mock("./sheet", async (orig) => ({
 }));
 
 const { ClassStart, Scanner } = await import("./Teacher");
+const { STILL_OPEN } = await import("./util");
 const { nearestStart } = await import("./sheet");
 
 // ---------- a page as plain data ----------
@@ -256,6 +257,28 @@ describe("F15 Save on the class start form", () => {
     expect(sent("checkin/attendance:setClassStart").map((s) => s.args.startsAt)).toEqual([pst(11, 5, 15, 0)]);
   });
 
+  it("sweep1-ledger-2 a start refused because the class is still open names its first check-in and offers Save anyway, which sends sameClass", async () => {
+    // No start saved; Sample student 1 came at 1:30 PM, 60 minutes before the 2:30 PM start.
+    server.results["checkin/attendance:lectures"] = [{ ...open, startedAt: pst(11, 5, 13, 30), startsAt: null }];
+    server.results["checkin/attendance:classStart"] = null;
+    server.results["checkin/attendance:sheet"] = [{ name: "Sample student 1", email: "student1@example.edu", at: pst(11, 5, 13, 30), lateMin: null }];
+    typeIn(form, "Class starts", "14:30");
+    press(form(), "Save");
+    sent("checkin/attendance:setClassStart")[0].reject({ data: STILL_OPEN });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(alertText(form())).toMatch(
+      /^This class is still open\. Its first check-in, Sample student 1 at 1:30\sPM, is more than 45 minutes before 2:30\sPM\. If Sample student 1 is in this class, press Save anyway\. If 2:30\sPM is the next class's start, press End class, then save it\.$/,
+    );
+    expect(press(form(), "Save anyway")).toBe("clicked");
+    expect(sent("checkin/attendance:setClassStart").map((s) => s.args)).toEqual([
+      { channel: "gdg", startsAt: pst(11, 5, 14, 30), graceMin: 5 },
+      { channel: "gdg", startsAt: pst(11, 5, 14, 30), graceMin: 5, sameClass: true },
+    ]);
+    // Typing another time takes the offer away.
+    typeIn(form, "Class starts", "14:00");
+    expect(buttons(form(), "Save anyway")).toEqual([]);
+  });
+
   it("CKA-risk-5 a bad 'Late after' says 'Late after', never 'Grace', and sends nothing", () => {
     for (const bad of ["", "61", "-1", "2.5"]) {
       hooks.slots = new Map();
@@ -282,6 +305,13 @@ describe("F14 This class before the first class", () => {
     expect(buttons(page(), /^Remove/)).toEqual([]);
   });
 
+  it("sweep1-tests-5 F14.3 with nobody checked in, Download is disabled and saves nothing", () => {
+    server.results["checkin/attendance:sheet"] = [];
+    server.results["checkin/read:names"] = [];
+    expect(press(page(), "Download attendance (CSV)")).toBe("disabled");
+    expect(server.saved).toEqual([]);
+  });
+
   it("with a class running, Download names the file with this class's date and start time", () => {
     press(page(), "Download attendance (CSV)");
     expect(server.saved.map((s) => s.name)).toEqual(["attendance-gdg-2026-11-05-1430.csv"]);
@@ -292,7 +322,7 @@ describe("F14 Remove asks first", () => {
   it("CKA-risk-4 the first press on Remove only asks, naming the student; the second removes that check-in", () => {
     expect(press(page(), "Remove Sample student 1")).toBe("clicked");
     expect(sent("checkin/attendance:removeCheckin")).toEqual([]);
-    expect(words(page())).toContain("Remove Sample student 1 from this class? Their phone shows their pass again.");
+    expect(words(page())).toContain("Remove Sample student 1 from this class? Their phone shows their pass again, and their quiz and vote answers in this class are removed.");
     expect(words(page())).not.toContain("Remove Sample student 2 from this class?");
     press(page(), "Remove");
     expect(sent("checkin/attendance:removeCheckin").map((s) => s.args)).toEqual([{ checkin: "c1" }]);

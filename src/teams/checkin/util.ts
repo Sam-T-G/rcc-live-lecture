@@ -14,6 +14,10 @@ export const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour:
 export const EARLY_MS = 45 * 60_000;
 export const EARLY_SCAN = "Scanning opens 45 minutes before class starts.";
 
+// setClassStart's refusal of a start for the next class while this one is open
+// (convex/checkin/attendance.ts STILL_OPEN; util.test.ts checks they match).
+export const STILL_OPEN = "This class is still open. Press End class, then save the next start.";
+
 // When the class with this saved start takes scans, or null with no saved start.
 export const scanOpensAt = (startsAt: number | null | undefined) => (startsAt == null ? null : startsAt - EARLY_MS);
 

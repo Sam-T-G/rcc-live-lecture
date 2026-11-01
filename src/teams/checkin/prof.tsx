@@ -10,12 +10,16 @@
 //                button pinned to the bottom of the page (StaffGate and #/admin show it; #/live
 //                and #/checkin/student show it with line={STUDENT_ENDING}).
 //   <DoorGate>{(device) => <Scanner device={device} />}</DoorGate>   #/checkin/kiosk. A paired
-//                iPad scans with its device token; a scanner who signs in scans as themselves
-//                (device is undefined). A professor or admin is never left signed in on a door
-//                iPad that anyone in line can use to open #/admin or the attendance list: on an
-//                unpaired iPad they get the pairing screen with Sign out, and on a paired one they
-//                are signed out before the scanner opens. Whenever a scanner is signed in, the
-//                scanner shows who and a Sign out button.
+//                iPad scans with its device token; a scanner signed in (on #/admin, on their own
+//                phone) scans as themselves (device is undefined). The kiosk shows no Google
+//                button: Google keeps its own sign-in in Safari after the app's Sign out, and its
+//                account list would sign anyone in line back in as that staff member with one tap.
+//                A professor or admin is never left signed in on a door iPad that anyone in line
+//                can use to open #/admin or the attendance list: on an unpaired iPad they get the
+//                pairing screen with Sign out (and are told to sign out of Google in Safari too),
+//                and on a paired one they are signed out before the scanner opens. Whenever a
+//                scanner is signed in, the scanner shows who, when the sign-in ends (Google's
+//                renewal never runs on the kiosk route) and a Sign out button.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -211,7 +215,7 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
       </Screen>
     );
   if (token && status?.status === "paired") return <WhoIsSignedIn>{children(token)}</WhoIsSignedIn>;
-  if (me?.role === "scanner") return <WhoIsSignedIn>{children(undefined)}</WhoIsSignedIn>;
+  if (me?.role === "scanner") return <WhoIsSignedIn ends>{children(undefined)}</WhoIsSignedIn>;
   // (status can't be "paired" here; saying so lets TypeScript narrow it for PairScreen.)
   if (me === undefined || !token || status === undefined || status.status === "paired")
     return (
@@ -224,19 +228,27 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
 
 // The scanner, with "Signed in as …" and Sign out above it whenever someone is signed in on the
 // iPad (a scanner, or anyone signed in on a paired iPad who isn't staff), so the next person at
-// the door can see the sign-in and end it.
-function WhoIsSignedIn({ children }: { children: ReactNode }) {
+// the door can see the sign-in and end it. `ends`: the scanner opened for this sign-in, so it also
+// says when the sign-in ends. Google's renewal never runs on #/checkin/kiosk (auth.tsx onDoorIPad),
+// so the scanner closes then with no other warning.
+function WhoIsSignedIn({ ends, children }: { ends?: boolean; children: ReactNode }) {
   const { user } = useGoogleUser();
   if (!user) return <>{children}</>;
   return (
     <>
       <div style={{ padding: "8px 24px 0" }}>
         <SignedInAs />
+        {ends && typeof user.exp === "number" && (
+          <p className="muted">Your sign-in ends at {clock(user.exp - SIGN_IN_DROP_MS)}. After that, sign in again on #/admin.</p>
+        )}
       </div>
       {children}
     </>
   );
 }
+
+// A sign-in ends this long before its token runs out (DROP in src/blocks/auth.tsx).
+const SIGN_IN_DROP_MS = 60_000;
 
 type Code = { code: string; expiresAt: number };
 type Unpaired = { status: "none" } | ({ status: "waiting" } & Code);
@@ -333,17 +345,22 @@ export function PairScreen({ me, token, status }: { me: StaffMe; token: string; 
             {me.email} is signed in as {me.role === "admin" ? "an admin" : "a professor"}. The door iPad opens the scanner only once it's paired or a
             scanner signs in, so nobody in line can open #/admin or the attendance list on your account.
           </p>
-          <p>Sign out here, then type the code above on #/admin, under Pair a door iPad, from your own laptop or phone.</p>
+          <p>
+            Sign out here. Then sign out of Google in Safari too (google.com, your picture, Sign out): Google keeps its own sign-in, and anyone in line
+            could pick your account from Google's list to sign in as you. Then type the code above on #/admin, under Pair a door iPad, from your own
+            laptop or phone.
+          </p>
           <p>
             <Button variant="secondary" onClick={signOut}>Sign out</Button>
           </p>
         </Card>
       ) : (
-        <Card title="Or sign in">
+        <Card title="Scanners">
           {me === null ? (
             <>
-              <p>Scanners can sign in here instead of pairing.</p>
-              <SignInButton />
+              <p>On your own phone, sign in on #/admin, then open #/checkin/kiosk there.</p>
+              <p className="muted">A scanner's sign-in ends in under an hour. A paired iPad scans for the whole class.</p>
+              <p className="muted">Nobody signs in to Google on this iPad. Google keeps the account in Safari, and anyone in line could sign in with it.</p>
             </>
           ) : (
             <NotStaff me={me} />

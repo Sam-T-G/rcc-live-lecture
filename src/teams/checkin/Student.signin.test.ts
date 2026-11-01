@@ -1,6 +1,7 @@
 // @vitest-environment node
-// Student (Student.tsx) signed out: the line above the sign-in matches it. StudentSignIn is the
-// typed form for now and becomes Google's button later, so the line doesn't say to type (ROLES-UI-risk-5).
+// Student (Student.tsx) signed out: the line above the sign-in matches it. StudentSignIn is
+// Google's button (the typed form under it only in `npm run dev` builds), so the line doesn't say
+// to type (ROLES-UI-risk-5).
 // Signed in with Google, the page says when the sign-in ends for its last 5 minutes (sweep1-ledger-1).
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
