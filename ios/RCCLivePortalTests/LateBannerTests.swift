@@ -173,11 +173,19 @@ struct LateBannerTests {
         #expect(LateColors.fillLight == Palette.error.light && LateColors.wordsDark == Palette.surface.dark)
     }
 
-    @Test("sweep1-ios-1 at accessibility text sizes only the newest card shows; at other sizes, all")
+    @Test("sweep1-ios-1 at accessibility text sizes or in landscape only the newest card shows")
     func cardsAtLargeText() {
         let showing = [cy, ben, ana]
-        #expect(LateBannerView.cards(showing, accessibilitySize: false) == showing)
-        #expect(LateBannerView.cards(showing, accessibilitySize: true) == [cy])
-        #expect(LateBannerView.cards([], accessibilitySize: true).isEmpty)
+        #expect(LateBannerView.cards(showing, tight: true) == [cy])
+        #expect(LateBannerView.cards([], tight: true).isEmpty)
+        #expect(LateBannerView.cards([], tight: false).isEmpty)
+        #expect(LateBannerView.cards([cy], tight: false) == [cy])
+    }
+
+    @Test("sweep1-ios-fixcheck-2 five late arrivals show only the newest two cards")
+    func cardsCapped() {
+        let five = [cy, ben, ana, cy, ben]
+        #expect(LateBannerView.cards(five, tight: false) == [cy, ben])
+        #expect(LateBannerView.cards(five, tight: true) == [cy])
     }
 }

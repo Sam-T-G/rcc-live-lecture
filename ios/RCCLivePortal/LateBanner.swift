@@ -182,7 +182,8 @@ enum LateColors {
     static var words: Color { Palette.surface.color }
 }
 
-/// The banner at the bottom of the deck screen: one card per new late arrival, newest first.
+/// The banner at the bottom of the deck screen: a card for each of the newest 2 late arrivals
+/// (1 in landscape or at the accessibility text sizes; see `cards`), newest first.
 /// DeckView puts it in a bottom inset, so the slides and buttons move up above it and it covers
 /// nothing, like #/portal (src/portal/Page.tsx, --late-room).
 struct LateBannerView: View {
@@ -190,9 +191,11 @@ struct LateBannerView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.verticalSizeClass) private var verticalSize
 
     var body: some View {
-        let cards = LateBannerView.cards(banner.showing, accessibilitySize: typeSize.isAccessibilitySize)
+        let tight = typeSize.isAccessibilitySize || verticalSize == .compact
+        let cards = LateBannerView.cards(banner.showing, tight: tight)
         VStack(spacing: 8) {
             ForEach(cards) { arrival in
                 Text(LateLines.line(for: arrival))
@@ -214,9 +217,13 @@ struct LateBannerView: View {
         .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: cards)
     }
 
-    /// The cards on screen. At the accessibility text sizes one card can fill a third of the
-    /// screen, so only the newest shows there; VoiceOver still reads every arrival out.
-    static func cards(_ showing: [LateArrival], accessibilitySize: Bool) -> [LateArrival] {
-        accessibilitySize ? Array(showing.prefix(1)) : showing
+    /// The cards on screen, newest first. The banner's height comes out of the deck screen, so
+    /// it shows the newest 2, and only the newest 1 when `tight`: at the accessibility text
+    /// sizes (one card can fill a third of the screen) or in landscape on a phone (compact
+    /// height, about 380 pt for the header, slide, buttons and banner). A card left out never
+    /// shows later: it came in no later than the ones on screen, so its 8 seconds end no later.
+    /// VoiceOver still reads every arrival out (sweep1-ios-fixcheck-2).
+    static func cards(_ showing: [LateArrival], tight: Bool) -> [LateArrival] {
+        Array(showing.prefix(tight ? 1 : 2))
     }
 }

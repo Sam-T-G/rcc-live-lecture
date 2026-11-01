@@ -5,6 +5,8 @@
 // - a color in Palette (ios/RCCLivePortal/Palette.swift) differs from its token, light or dark;
 // - a screen uses a system color (red, orange, blue, the unset AccentColor) instead of Palette:
 //   docs/design.md says no blue, and red only for something that failed;
+// - the deck screen's body drops `.tint(Palette.accent.color)`, so its arrows go back to the
+//   unset AccentColor's system blue (sweep1-ios-fixcheck-1);
 // - the late banner covers the deck screen instead of taking its own room at the bottom, the way
 //   #/portal pins it at the bottom and grows the page (sweep1-ios-1);
 // - Back to live is shorter than the 44 pt phone tap size (sweep1-ios-2).
@@ -82,6 +84,15 @@ describe("iOS app colors and layout follow docs/design.md", () => {
         .flatMap((line, i) => [...line.matchAll(system)].map((m) => `${file}:${i + 1} ${m[0]}`)),
     );
     expect(hits).toEqual([]);
+  });
+
+  it("the deck screen tints its arrows with Palette's green, so they aren't the unset AccentColor's blue", () => {
+    // The project sets no AccentColor, so without this tint the Previous and Next chevrons
+    // draw in system blue, which the system-color check above can't see (sweep1-ios-fixcheck-1).
+    const deck = code(SWIFT["DeckView.swift"]);
+    const body = /struct DeckView\b[^{]*\{[\s\S]*?\n {4}var body: some View \{\n([\s\S]*?)\n {4}\}\n/.exec(deck)?.[1];
+    expect(body, "DeckView's body not found").toBeDefined();
+    expect(body).toMatch(/^\s*\.tint\(\s*Palette\.accent\.color\s*\)/m);
   });
 
   it("the late banner sits in its own room at the bottom of the deck screen, covering nothing", () => {
