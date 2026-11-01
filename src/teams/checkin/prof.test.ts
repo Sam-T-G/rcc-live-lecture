@@ -178,13 +178,17 @@ describe("ROLES DoorGate and the pairing screen on #/checkin/kiosk", () => {
     expect(html).not.toContain("[scanner");
   });
 
-  it("ROLES a code past its expiry shows 'The code expired.' and a 'Get a new code' button", () => {
+  // sweep2-checkin-check-1: the first paint comes before the server's clock answers (effects don't
+  // run here), and this iPad's clock may be fast, so a code past it shows "Getting a code…", not
+  // "The code expired.". pairing.test.ts checks "The code expired." once the clock answers.
+  it("ROLES a code past its expiry hides the code; before the server's clock answers it says 'Getting a code…', not 'The code expired.'", () => {
     store.set(DEVICE, TOKEN);
     results["staff:me"] = null;
     results["staff:deviceStatus"] = { status: "waiting", code: "482913", expiresAt: Date.now() - 1000 };
     const html = kiosk();
-    expect(html).toContain("The code expired.");
-    expect(html).toContain("Get a new code");
+    expect(html).toContain("Getting a code…");
+    expect(html).not.toContain("The code expired.");
+    expect(html).not.toContain("Get a new code");
     expect(html).not.toContain("482 913");
   });
 

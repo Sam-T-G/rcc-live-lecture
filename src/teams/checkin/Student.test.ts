@@ -1,12 +1,14 @@
 // @vitest-environment node
 // The pass page (Student.tsx), rendered to HTML with made-up query results (no backend). Effects
 // don't run here: Student.timing.test.ts checks when the page asks for codes and hides an old one.
-import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import { readFileSync } from "node:fs";
+import { cloneElement, createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HideLate, Student, StudentPass } from "./Student";
 import LateBanner from "./LateBanner";
 import { ErrorBoundary } from "../../blocks/ui";
+import { parse } from "../../styles/cssRules";
 
 // Stand-ins for the quiz card and the late banner, so a test sees where each one sits.
 vi.mock("./Quiz", () => ({ QuizCard: () => "[quiz card]" }));
@@ -118,5 +120,48 @@ describe("sweep2-ledger-1 F16.1 the late banner on #/checkin/student", () => {
   it("neither the pass nor the checked-in screen draws a banner of its own", () => {
     expect(render(false)).not.toContain("[late banner]");
     expect(render(true)).not.toContain("[late banner]");
+  });
+});
+
+// sweep2-checkin-fixcheck-1: the banner's ErrorBoundary sits outside <Screen>, so its failed
+// state ("The late banner didn't load." + Try again) would land after <main class="page"> with no
+// side gutter (body has no margin; only .page pads its sides). Student() wraps the boundary in
+// .student-late (checkin.css), fixed 16px in from each side of the screen like portal's
+// .portal-late, so the error line keeps the gutter while the banner itself stays fixed as before.
+describe("sweep2-checkin-fixcheck-1 the late banner's error line on #/checkin/student", () => {
+  type El = ReactElement<{ children?: ReactNode; label?: string; className?: string }>;
+  const tree = (node: ReactNode): El[] =>
+    Array.isArray(node) ? node.flatMap(tree) : isValidElement(node) ? [node as El, ...tree((node as El).props.children)] : [];
+  const kids = (e: El) => tree(e.props.children);
+
+  function wrapper() {
+    answers.now = { "checkin/pass:mine": PASS, "checkin/read:me": false, "checkin/attendance:myHideLate": false };
+    return tree(Student()).find((e) => e.props.className === "student-late" && kids(e).some((c) => c.type === ErrorBoundary));
+  }
+
+  it("the banner's ErrorBoundary sits in a .student-late wrapper", () => {
+    expect(wrapper()).toBeDefined();
+  });
+
+  it("the boundary's failed state renders inside the wrapper", () => {
+    const w = wrapper();
+    expect(w).toBeDefined();
+    const b = new ErrorBoundary({ label: "The late banner" });
+    b.state = { failed: true };
+    const html = renderToStaticMarkup(cloneElement(w!, undefined, b.render()));
+    expect(html).toMatch(
+      /^<div class="student-late"><div class="row"><p class="status status--error"[^>]*>The late banner didn(?:’|'|&#x27;)t load\.<\/p><button[^>]*>Try again<\/button><\/div><\/div>$/,
+    );
+  });
+
+  it(".student-late is fixed 16px in from each side, and its error row takes taps", () => {
+    const rules = parse(readFileSync(new URL("./checkin.css", import.meta.url), "utf8"));
+    const decls = (sel: string) => Object.fromEntries(rules.filter((r) => r.selectors.includes(sel)).flatMap((r) => r.decls));
+    const box = decls(".student-late");
+    expect(box.position).toBe("fixed");
+    expect(box.left).toBe("16px");
+    expect(box.right).toBe("16px");
+    expect(box["pointer-events"]).toBe("none");
+    expect(decls(".student-late > .row")["pointer-events"]).toBe("auto");
   });
 });

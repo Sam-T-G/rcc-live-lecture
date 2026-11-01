@@ -227,7 +227,7 @@ describe("sweep2-checkin-3 an iPad whose clock is off still shows a code the ser
     expect(bigValue(el)).toBeUndefined();
   });
 
-  it("until the server's clock answers, the iPad's own clock decides; the answer brings the code back", async () => {
+  it("until the server's clock answers, a code past the iPad's own clock doesn't show; the answer brings the code back", async () => {
     skew.ahead = 11 * 60_000;
     skew.answer = false;
     vi.setSystemTime(T0 + skew.ahead);
@@ -239,5 +239,67 @@ describe("sweep2-checkin-3 an iPad whose clock is off still shows a code the ser
     render(waiting("482913", T0 + 600_000));
     el = render(waiting("482913", T0 + 600_000));
     expect(bigValue(el)).toBe("482 913");
+  });
+});
+
+// sweep2-checkin-check-1: on a reload of a fast iPad with a code waiting, the code is already past
+// by the iPad's own clock, so before the server's clock answered the screen said "The code
+// expired." with "Get a new code" for 100-170 ms, then showed the code. Until the answer comes
+// (or the call fails, or 5 s pass), a waiting code past the iPad's clock shows "Getting a code…".
+describe("sweep2-checkin-check-1 a fast iPad's reload doesn't flash 'The code expired.'", () => {
+  const FAST = 15 * 60_000;
+
+  it("before the server's clock answers, it shows 'Getting a code…', then the code", async () => {
+    skew.ahead = FAST;
+    skew.answer = false;
+    vi.setSystemTime(T0 + FAST);
+    render(waiting("684791", T0 + 300_000));
+    let el = render(waiting("684791", T0 + 300_000));
+    expect(words(el)).not.toContain("expired");
+    expect(button(el, "Get a new code")).toBeUndefined();
+    expect(words(el)).toContain("Getting a code…");
+    expect(request).not.toHaveBeenCalled();
+    skew.release();
+    await settle();
+    render(waiting("684791", T0 + 300_000));
+    el = render(waiting("684791", T0 + 300_000));
+    expect(bigValue(el)).toBe("684 791");
+  });
+
+  it("when the server's clock call fails, the iPad's own clock decides at once", async () => {
+    skew.ahead = FAST;
+    vi.setSystemTime(T0 + FAST);
+    serverClock.mockImplementationOnce(() => Promise.reject(new Error("offline")));
+    render(waiting("684791", T0 + 300_000));
+    await settle();
+    render(waiting("684791", T0 + 300_000));
+    const el = render(waiting("684791", T0 + 300_000));
+    expect(words(el)).toContain("The code expired.");
+    expect(button(el, "Get a new code")).toBeDefined();
+  });
+
+  it("when the server's clock hasn't answered in 5 s, the iPad's own clock decides", async () => {
+    skew.ahead = FAST;
+    skew.answer = false;
+    vi.setSystemTime(T0 + FAST);
+    render(waiting("684791", T0 + 300_000));
+    vi.advanceTimersByTime(4_999);
+    let el = render(waiting("684791", T0 + 300_000));
+    expect(words(el)).toContain("Getting a code…");
+    vi.advanceTimersByTime(1);
+    render(waiting("684791", T0 + 300_000));
+    el = render(waiting("684791", T0 + 300_000));
+    expect(words(el)).toContain("The code expired.");
+    // An answer that late is ignored, the way a 5 s round trip is.
+    skew.release();
+    await settle();
+    el = render(waiting("684791", T0 + 300_000));
+    expect(words(el)).toContain("The code expired.");
+  });
+
+  it("a code still good on the iPad's own clock shows at once, before the server's clock answers", () => {
+    skew.answer = false;
+    const el = render(waiting("684791", T0 + 300_000));
+    expect(bigValue(el)).toBe("684 791");
   });
 });

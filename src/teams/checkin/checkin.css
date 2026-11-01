@@ -17,6 +17,11 @@
 .late { position: fixed; left: 16px; right: 16px; bottom: max(16px, calc(var(--banner-stack-space, 0px) + 8px)); display: flex; flex-direction: column; gap: 8px; z-index: 50; pointer-events: none; }
 .late__item { margin: 0 auto; max-width: 640px; width: 100%; padding: 14px 18px; border-radius: var(--radius); background: var(--error); color: var(--surface); font-size: 1.25rem; font-weight: 700; text-align: center; box-shadow: 0 6px 24px rgb(0 0 0 / 0.25); animation: late-in 300ms ease-out; }
 .late__grace { width: 4em; }
+/* #/checkin/student keeps the banner outside <Screen> (Student.tsx), so the page's gutter doesn't
+   reach it. If the banner fails, ErrorBoundary's error line and Try again show here instead, 16px
+   in from each side like .late. The .late inside stays fixed on its own. */
+.student-late { position: fixed; left: 16px; right: 16px; bottom: max(16px, calc(var(--banner-stack-space, 0px) + 8px)); z-index: 50; pointer-events: none; }
+.student-late > .row { pointer-events: auto; padding: 8px 12px; background: var(--surface); border-radius: var(--radius); }
 @keyframes late-in { from { transform: translateY(24px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .late__item { animation: none; } }
 /* Kiosk (#/checkin/kiosk): the door iPad, read from about 1 m. Two columns in landscape, one in

@@ -398,21 +398,34 @@ const CLOCK_TRIP_MS = 5_000;
 // How far this screen's clock runs ahead of the server's, in ms (negative: behind), from one
 // checkin.attendance.clock call when the screen opens, the same estimate LateBanner.tsx makes.
 // 0 (the screen's own clock, as LateBanner uses) until the answer comes back, and when the call
-// fails or took over 5 s, since an answer that slow could be off by minutes.
-function useClockAhead(): number {
+// fails or took over 5 s, since an answer that slow could be off by minutes. `known` turns true
+// once the answer is in, the call fails, or 5 s pass; until then `ahead` is only a placeholder.
+function useClockAhead(): { ahead: number; known: boolean } {
   const serverClock = useMutation(api.checkin.attendance.clock);
   const [ahead, setAhead] = useState(0);
+  const [known, setKnown] = useState(false);
   useEffect(() => {
     const sent = Date.now();
+    let late = false;
+    const timer = setTimeout(() => {
+      late = true;
+      setKnown(true);
+    }, CLOCK_TRIP_MS);
     serverClock({}).then(
       (server) => {
         const back = Date.now();
-        if (typeof server === "number" && Number.isFinite(server) && back - sent <= CLOCK_TRIP_MS) setAhead((sent + back) / 2 - server);
+        if (!late && typeof server === "number" && Number.isFinite(server) && back - sent <= CLOCK_TRIP_MS) setAhead((sent + back) / 2 - server);
+        clearTimeout(timer);
+        setKnown(true);
       },
-      () => {},
+      () => {
+        clearTimeout(timer);
+        setKnown(true);
+      },
     );
+    return () => clearTimeout(timer);
   }, [serverClock]);
-  return ahead;
+  return { ahead, known };
 }
 
 // The pairing screen, shown from the status query (api.staff.deviceStatus). It asks for a code
@@ -456,9 +469,12 @@ export function PairScreen({ me, token, status }: { me: StaffMe; token: string; 
 
   // expiresAt is the server's time. On this iPad's clock the code ends `ahead` ms later, so an iPad
   // whose clock runs fast still shows a code the server takes, once the server's clock answers.
-  const ahead = useClockAhead();
+  // Until then, a waiting code already past by this iPad's clock shows "Getting a code…": on a
+  // reload of a fast iPad it would otherwise flash "The code expired." before the code.
+  const { ahead, known } = useClockAhead();
   const expired = usePassed(status.status === "waiting" ? status.expiresAt + ahead : undefined);
   const live = status.status === "waiting" && !expired ? status : null;
+  const unsure = status.status === "waiting" && expired && !known;
 
   return (
     <Screen title="Pair this iPad" wide>
@@ -475,7 +491,7 @@ export function PairScreen({ me, token, status }: { me: StaffMe; token: string; 
             <Button onClick={() => void ask()}>Try again</Button>
           </p>
         </>
-      ) : phase === "expired" || (phase === "showing" && status.status === "waiting") ? (
+      ) : !unsure && (phase === "expired" || (phase === "showing" && status.status === "waiting")) ? (
         <>
           <p>The code expired.</p>
           <p>
