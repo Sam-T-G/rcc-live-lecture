@@ -95,6 +95,30 @@ describe("the pass and the checked-in screen", () => {
   });
 });
 
+// DS-PHONE-risk-3: the pass and the checked-in screen keep their own titles as the page heading,
+// as before the design pass; "Your check-in pass" names only the loading and signed-out screens.
+describe("DS-PHONE-risk-3 each screen's page heading", () => {
+  const h1s = (html: string) => [...html.matchAll(/<h1[^>]*>(.*?)<\/h1>/g)].map((m) => m[1].replace(/<[^>]+>/g, "").trim());
+
+  it("the pass's heading is 'Show this to the professor'", () => {
+    const html = render(false);
+    expect(h1s(html)).toEqual(["Show this to the professor"]);
+    expect(html).not.toContain("Your check-in pass");
+  });
+
+  it("the checked-in screen's heading is 'You’re checked in.', with no student name under it", () => {
+    const html = render(true);
+    expect(h1s(html)).toEqual(["You’re checked in."]);
+    expect(html).not.toContain("Your check-in pass");
+    expect(html).not.toContain(PASS.name);
+  });
+
+  it("while the pass loads, the heading is 'Your check-in pass'", () => {
+    answers.now = { "checkin/pass:mine": null, "checkin/read:me": false };
+    expect(h1s(renderToStaticMarkup(createElement(StudentPass)))).toEqual(["Your check-in pass"]);
+  });
+});
+
 // sweep2-ledger-1: a scan flips checkin.read.me to true and StudentPass swaps the pass for the
 // checked-in screen. A banner inside either screen would mount again then and count the scan's
 // own late arrival as already seen, so the late student's phone would never show it. The banner

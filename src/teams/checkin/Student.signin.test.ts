@@ -25,8 +25,16 @@ beforeEach(() => {
 describe("Student signed out", () => {
   it("ROLES-UI-risk-5 says to sign in, not to type a name and email, above the sign-in", () => {
     const html = renderToStaticMarkup(createElement(Student));
-    expect(html).toContain("<p>Sign in to get your pass.</p>[sign-in]");
+    expect(html).toContain("<p>Sign in to get your pass.</p>");
+    expect(html.indexOf("Sign in to get your pass.")).toBeLessThan(html.indexOf("[sign-in]"));
     expect(html).not.toMatch(/type your name/i);
+  });
+
+  it("DS-PHONE-design-4 the page is named 'Your check-in pass'; the sentence is in the pass and the sign-in is in the action bar at the bottom", () => {
+    const html = renderToStaticMarkup(createElement(Student));
+    expect(html).toMatch(/<h1 class="bar__title">Your check-in pass<\/h1>/);
+    expect(html).toMatch(/<main class="ph__body"><section class="pass pass--out"><p>Sign in to get your pass.<\/p><\/section><\/main>/);
+    expect(html).toMatch(/<\/main><div class="phone-actions">\[sign-in\]<\/div><\/div>$/);
   });
 });
 

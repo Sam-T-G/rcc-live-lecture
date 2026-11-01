@@ -78,8 +78,9 @@ export function LiveSlides({ pin = null }: { pin?: number | null }) {
 
   // The phone frame (checkin.css .ph): the page's name with who is signed in and their team, the
   // slide card, then the quiz, the team leaderboard, questions and past quizzes. The action bar at
-  // the bottom holds the late banner, then Back, I'm lost and Next in one row while a slide is up
-  // or loading; empty, it draws nothing (live.css).
+  // the bottom holds the late banner, then Back, I'm lost (the filled main button) and Next in one
+  // row while a slide is up; while the deck loads or before the slides start it holds only the late
+  // banner, and empty it draws nothing (live.css).
   return (
     <div className="ph ph--live" data-surface="phone">
       <header className="bar bar--static ph-head">
@@ -142,13 +143,7 @@ export function LiveSlides({ pin = null }: { pin?: number | null }) {
         <ErrorBoundary label="The late banner">
           <LateBanner />
         </ErrorBoundary>
-        {slide === undefined ? (
-          <>
-            <Button variant="neutral" className="ph-back" disabled>← Back</Button>
-            <Button variant="secondary" className="ph-wait" disabled>I’m lost</Button>
-            <Button variant="neutral" className="ph-next" disabled>Next →</Button>
-          </>
-        ) : slide !== null && (
+        {slide && (
           <>
             <Button variant="neutral" className="ph-back" disabled={!before} onClick={() => before && setPinned(before.index)}>← Back</Button>
             <ErrorBoundary key={slide.index} label="The I’m lost button">
@@ -235,7 +230,7 @@ function Lost({ index }: { index: number }) {
   // updates the button.
   return (
     <div className="lost">
-      <Button variant="secondary" block className="lost__button" aria-pressed={mine === true} busy={busy} onClick={() => void tap()}>
+      <Button block className="lost__button" aria-pressed={mine === true} busy={busy} onClick={() => void tap()}>
         {mine && <span aria-hidden="true">✓ </span>}I’m lost
       </Button>
       <p className="lost__note muted">

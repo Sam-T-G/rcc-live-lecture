@@ -234,19 +234,48 @@ describe("#/live, the student phone", () => {
     results["checkin/read:me"] = true;
     results["live/read:mine"] = false;
     let html = open("#/live");
-    expect(html).toMatch(/<button aria-pressed="false" type="button" class="btn btn--secondary btn--block lost__button">/);
+    expect(html).toMatch(/<button aria-pressed="false" type="button" class="btn btn--block lost__button">/);
     expect(lostSlot(html)).toBe("I’m lost The professor sees how many people are lost on each slide. Your name isn’t shown.");
 
     results["live/read:mine"] = true;
     html = open("#/live");
-    expect(html).toMatch(/<button aria-pressed="true" type="button" class="btn btn--secondary btn--block lost__button">/);
+    expect(html).toMatch(/<button aria-pressed="true" type="button" class="btn btn--block lost__button">/);
     expect(lostSlot(html)).toBe("✓ I’m lost You’re counted as lost on slide 3. Tap again to undo.");
 
     // Right after a slide change, before `mine` arrives: the button shows, not pressed and not busy.
     delete results["live/read:mine"];
     html = open("#/live");
-    expect(html).toMatch(/<button aria-pressed="false" type="button" class="btn btn--secondary btn--block lost__button">/);
+    expect(html).toMatch(/<button aria-pressed="false" type="button" class="btn btn--block lost__button">/);
     expect(html).not.toContain("aria-busy");
+  });
+
+  it("DS-PHONE-design-1 I'm lost is the filled main button (the default Button), pressed or not, never the outline", () => {
+    deckOn(2);
+    auth.user = STUDENT;
+    results["checkin/read:me"] = true;
+    for (const pressed of [false, true]) {
+      results["live/read:mine"] = pressed;
+      const cls = /<button aria-pressed="(?:true|false)" type="button" class="([^"]*lost__button[^"]*)"/.exec(open("#/live"))?.[1];
+      expect(cls, String(pressed)).toBe("btn btn--block lost__button");
+    }
+  });
+
+  it("DS-PHONE-risk-2 while the deck loads, the action bar draws no buttons, the same as before the design pass", () => {
+    results["deck:current"] = undefined;
+    // The action bar's markup: from its opening tag to the end of the page.
+    const bar = (html: string) => html.slice(html.indexOf('<div class="phone-actions ph-actions">'));
+    const who = [
+      () => { auth.user = null; }, // signed out
+      () => { auth.user = STUDENT; results["checkin/read:me"] = false; }, // not checked in
+      () => { auth.user = STUDENT; results["checkin/read:me"] = true; }, // checked in
+    ];
+    for (const set of who) {
+      set();
+      const html = bar(open("#/live"));
+      expect(html).toContain("[late banner]");
+      expect(html).not.toContain("<button");
+      expect(html).not.toContain("I’m lost");
+    }
   });
 
   it("LIVE-risk-1 I'm lost reads and taps the slide on screen: the live one, or the one the student paged back to", async () => {

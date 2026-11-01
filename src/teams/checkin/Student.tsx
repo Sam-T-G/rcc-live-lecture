@@ -4,10 +4,12 @@
 // the phone comes back to the page, and as the code turns 20 s old (passTiming.ts); a code over
 // 25 s old on screen means those asks stopped getting through, so it shows "Getting a new code…"
 // in place of a QR the door would refuse.
-// Layout (docs/design.md, phone): the app bar names the page, then the pass, the student's ticket,
-// top-anchored under it: the QR on its white plate, the perforation, the name and the code a
-// professor reads out when the camera fails. Checked in, the pass turns into its stub on the green
-// field. The late opt-out and the signed-in line follow the pass. checkin.css draws the frame.
+// Layout (docs/design.md, phone): signed out and while the pass loads, the app bar names the page;
+// signed out, Google's button sits in the action bar at the bottom. The pass, the student's ticket,
+// is top-anchored under "Show this to the professor": the QR on its white plate, the perforation,
+// the name and the code a professor reads out when the camera fails. Checked in, the pass turns
+// into its stub on the green field. The late opt-out and the signed-in line follow the pass.
+// checkin.css draws the frame.
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -23,26 +25,36 @@ import { QuizCard } from "./Quiz";
 import { askForCodes, codeIsOld, msUntilNewCode } from "./passTiming";
 import { why } from "./util";
 
-// The phone frame for the pass page: the app bar with the page's name, then its body.
-function PassFrame({ children }: { children: ReactNode }) {
+// The phone frame for the pass page: the app bar with the page's name (signed out and while the
+// pass loads; the pass and the checked-in screen carry their own title as the page heading), then
+// its body, then the action bar at the bottom when the screen has one (kit .phone-actions).
+function PassFrame({ title, actions, children }: { title?: string; actions?: ReactNode; children: ReactNode }) {
   return (
     <div className="ph" data-surface="phone">
-      <header className="bar ph__bar">
-        <h1 className="bar__title">Your check-in pass</h1>
-      </header>
+      {title && (
+        <header className="bar ph__bar">
+          <h1 className="bar__title">{title}</h1>
+        </header>
+      )}
       <main className="ph__body">{children}</main>
+      {actions && <div className="phone-actions">{actions}</div>}
     </div>
   );
 }
 
+// A screen's own title as the page heading, at the card-title size its h2 had (.text-h2), with no
+// margin of its own: the card's gap spaces it.
+const HEAD = { margin: 0 };
+
 export function Student() {
   const { user } = useGoogleUser();
+  // Signed out: the pass holds the sentence; Google's button is the screen's action, in the action
+  // bar at the bottom, in reach of the thumb.
   if (!user)
     return (
-      <PassFrame>
+      <PassFrame title="Your check-in pass" actions={<StudentSignIn />}>
         <section className="pass pass--out">
           <p>Sign in to get your pass.</p>
-          <StudentSignIn />
         </section>
       </PassFrame>
     );
@@ -105,11 +117,10 @@ export function StudentPass() {
     return (
       <PassFrame>
         <section className="stub">
-          <h2 className="lockup">
+          <h1 className="text-h2 lockup" style={HEAD}>
             <Icon name="check" className="icon--d" />
             You’re checked in.
-          </h2>
-          {pass && <p className="stub__name">{pass.name}</p>}
+          </h1>
         </section>
         <QuizCard />
         <div className="ph-go">
@@ -125,7 +136,7 @@ export function StudentPass() {
   // takes the square's place.
   if (!pass)
     return (
-      <PassFrame>
+      <PassFrame title="Your check-in pass">
         <section className="pass">
           {err ? (
             <Status kind="error">{err}</Status>
@@ -146,7 +157,7 @@ export function StudentPass() {
   return (
     <PassFrame>
       <section className="pass">
-        <h2 className="pass__head">Show this to the professor</h2>
+        <h1 className="text-h2 pass__head" style={HEAD}>Show this to the professor</h1>
         <div className={old ? "pass__qr qr--wait" : "pass__qr"}>
           {old ? <Status kind="loading">Getting a new code…</Status> : <QR value={"RCC-" + pass.code} size={280} />}
         </div>
