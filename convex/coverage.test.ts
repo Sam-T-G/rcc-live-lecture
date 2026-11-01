@@ -14,13 +14,11 @@ const SOURCES = import.meta.glob<string>("./**/*.test.ts", { query: "?raw", impo
 const ALL_SOURCES: Record<string, string> = { ...SOURCES, "./coverage.test.ts": SELF };
 // Every Convex module's source as text: the same files test.setup.ts loads, minus _generated/.
 const MODULE_SOURCES = import.meta.glob<string>("./**/!(*.*.*)*.ts", { query: "?raw", import: "default", eager: true });
-// F39.2 leaves convex/host/ out until UZ deletes it (and this skip with it). F39.3 doesn't: its
-// host-only functions are still deployed, so each one still needs its authMatrix test.
-const SKIP_MODULES = ["host/"];
 // The staff checks: a function whose handler calls one of these, or calls a function in its own
 // file that does, is host-only (requireHost in convex/lib.ts is requireProf by another name). So is
 // one that runs a host-only function through ctx.runQuery, runMutation or runAction, in any module
-// (host/ai.ts gates its Gemini calls that way): the caller's sign-in goes along to that function.
+// (live.questions.organize gates its Gemini call that way): the caller's sign-in goes along to
+// that function.
 const GUARDS = ["requireProf", "requireAdmin", "requireScanner", "requireHost"];
 // Functions that answer whether the caller may do something, instead of refusing. Their tests
 // throw when the answer is no, so authMatrix checks them like any host-only function.
@@ -29,20 +27,19 @@ const ANSWERS = ["api.checkin.pass.amHost", "api.checkin.pass.canScan"];
 // authMatrix(SCANNER, ...) call counts for.
 const DOOR = ["api.checkin.pass.scan", "api.checkin.pass.canScan"];
 
-type Fn = { ref: string; hasKey: boolean; guarded: boolean; skipped: boolean };
+type Fn = { ref: string; hasKey: boolean; guarded: boolean };
 type Registered = { isQuery?: boolean; isMutation?: boolean; isAction?: boolean; isInternal?: boolean; exportArgs?: () => string };
 
 // Every query, mutation and action a Convex module exports, as `api.<module>.<name>` or
 // `internal.<module>.<name>`, whether its args include `key` (none may: the "ROLES-UI no
-// function takes a key arg" test below), whether it calls a staff check, and whether its module
-// is in SKIP_MODULES.
+// function takes a key arg" test below), and whether it calls a staff check. Every module counts:
+// none is skipped.
 async function convexFunctions(): Promise<Fn[]> {
   type Found = Omit<Fn, "guarded"> & { file: string; name: string };
   const found: Found[] = [];
   for (const [file, load] of Object.entries(modules)) {
     const mod = file.replace(/^\.\//, "").replace(/\.[cm]?[jt]s$/, "");
     if (mod.startsWith("_generated/")) continue;
-    const skipped = SKIP_MODULES.some((s) => mod.startsWith(s));
     for (const [name, value] of Object.entries((await load()) as Record<string, unknown>)) {
       const f = value as Registered;
       if (typeof value !== "function" || !(f.isQuery || f.isMutation || f.isAction)) continue;
@@ -52,7 +49,6 @@ async function convexFunctions(): Promise<Fn[]> {
         name,
         ref: `${f.isInternal ? "internal" : "api"}.${mod.split("/").join(".")}.${name}`,
         hasKey: args.type === "object" && !!args.value && "key" in args.value,
-        skipped,
       });
     }
   }
@@ -69,7 +65,7 @@ async function convexFunctions(): Promise<Fn[]> {
     }
   }
   return found
-    .map((f) => ({ ref: f.ref, hasKey: f.hasKey, skipped: f.skipped, guarded: refs.has(f.ref) }))
+    .map((f) => ({ ref: f.ref, hasKey: f.hasKey, guarded: refs.has(f.ref) }))
     .sort((a, b) => a.ref.localeCompare(b.ref));
 }
 
@@ -304,8 +300,8 @@ describe("F39 every Convex function is tested", async () => {
     expect(Object.keys(MODULE_SOURCES).sort()).toEqual(loaded.sort());
   });
 
-  it("F39.2 every exported function outside convex/host/ is named in a test", () => {
-    expect(fns.filter((f) => !f.skipped && !names(all, f.ref)).map((f) => f.ref)).toEqual([]);
+  it("F39.2 every exported function in every module is named in a test, with no module skipped", () => {
+    expect(fns.filter((f) => !names(all, f.ref)).map((f) => f.ref)).toEqual([]);
   });
 
   it("F39.2 every HTTP route is called with its method in a test", async () => {
@@ -322,8 +318,7 @@ describe("F39 every Convex function is tested", async () => {
     expect(hostOnly.filter((f) => !checked.has(f.ref)).map((f) => f.ref)).toEqual([]);
   });
 
-  it("ROLES-UI no function takes a key arg, convex/host/ included: the server reads who is calling from the sign-in (DECK_BRIDGE_KEY reaches POST /deck in the request body, not as an arg)", async () => {
-    expect(fns.some((f) => f.skipped)).toBe(true); // convex/host/ is in the list
+  it("ROLES-UI no function takes a key arg: the server reads who is calling from the sign-in (DECK_BRIDGE_KEY reaches POST /deck in the request body, not as an arg)", async () => {
     expect(fns.filter((f) => f.hasKey).map((f) => f.ref)).toEqual([]);
   });
 
@@ -340,8 +335,8 @@ describe("F39 every Convex function is tested", async () => {
         "api.staff.add",
         "api.staff.approvePairing",
         "api.staff.unpair",
-        "api.host.qa.list",
-        "api.host.points.adjust",
+        "api.live.questions.forHost",
+        "api.live.groups.adjust",
       ]),
     );
     for (const open of ["api.checkin.read.count", "api.checkin.pass.refresh", "api.live.questions.remove", "api.staff.me", "api.staff.requestPairing", "api.staff.deviceStatus"])
@@ -372,17 +367,20 @@ describe("F39 every Convex function is tested", async () => {
 
   it("ROLES-UI-convex-1 a function that gates itself by running a host-only function (ctx.runQuery, runMutation or runAction) is host-only too, across modules", () => {
     const guarded = fns.filter((f) => f.guarded).map((f) => f.ref);
-    // host/ai.ts gates each Gemini call through ctx.runQuery(api.host.questions.forHost or api.host.qa.list).
-    expect(guarded).toEqual(expect.arrayContaining(["api.host.ai.draftQuestion", "api.host.ai.feedback", "api.host.ai.organize"]));
+    // live.questions.organize calls no staff check itself: it gates its Gemini call by running
+    // api.live.questions.forHost (requireProf) through ctx.runQuery, so only that rule finds it.
+    expect(guardedNames(MODULE_SOURCES["./live/questions.ts"]).has("organize")).toBe(false);
+    expect(guarded).toContain("api.live.questions.organize");
+    // Across modules: a ref to another module's host-only function counts the same way.
     const scan = (src: string, refs: string[]) => [...guardedNames(src, new Set(refs))].sort();
-    const refs = ["api.host.qa.list", "internal.staff.check"];
+    const refs = ["api.room.qa.list", "internal.staff.check"];
     expect(
       scan(
-        `export const a = action({ handler: async (ctx) => { await ctx.runQuery(api.host.qa.list, { channel }); } });\n` +
+        `export const a = action({ handler: async (ctx) => { await ctx.runQuery(api.room.qa.list, { channel }); } });\n` +
           `export const b = action({ handler: async (ctx) => ctx.runMutation(\n  internal.staff.check,\n  {},\n) });\n` +
-          `export const c = action({ handler: async (ctx) => { await ctx.runAction(api.host.qa.listAll, {}); } });\n` +
+          `export const c = action({ handler: async (ctx) => { await ctx.runAction(api.room.qa.listAll, {}); } });\n` +
           `export const d = action({ handler: async (ctx) => { await ctx.runQuery(api.deck.current, {}); } });\n` +
-          `export const e = action({ handler: async (ctx) => { /* ctx.runQuery(api.host.qa.list) */ return "ctx.runQuery(api.host.qa.list)"; } });`,
+          `export const e = action({ handler: async (ctx) => { /* ctx.runQuery(api.room.qa.list) */ return "ctx.runQuery(api.room.qa.list)"; } });`,
         refs,
       ),
     ).toEqual(["a", "b"]);
@@ -409,7 +407,7 @@ describe("F39 every Convex function is tested", async () => {
     // SCANNER lets a scanner and a paired iPad in, so it counts only for the door scanner: a
     // professor function checked with SCANNER would pass with the door let in.
     expect(check(`await authMatrix(SCANNER, (as, t, device) => as.query(api.checkin.quiz.history, { device, channel: CH }))`)).toEqual([null]);
-    expect(check(`await authMatrix(SCANNER, (as) => as.query(api.host.qa.list, { channel: CH }))`)).toEqual([null]);
+    expect(check(`await authMatrix(SCANNER, (as) => as.query(api.live.questions.forHost, { channel: CH }))`)).toEqual([null]);
     // Without a matrix from test.helpers.ts first, nothing compares the rows, so a function anyone can call passes.
     expect(check(`await authMatrix((as) => as.query(api.a.names, {}))`)).toEqual([null]);
     expect(check(`expect(await authMatrix((as) => as.query(api.a.names, {}))).toMatchObject({ googleAdmin: true })`)).toEqual([null]);

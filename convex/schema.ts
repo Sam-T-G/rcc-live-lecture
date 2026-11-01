@@ -285,6 +285,11 @@ export default defineSchema({
     .index("by_channel_and_lecture", ["channel", "lecture"])
     .index("by_channel_and_user", ["channel", "user"]),
 
+  // Retired 2026-10-30 (Sam's decision 1). The professor view now uses polls/pollAnswers,
+  // groups/groupSettings/groupPoints/groupResults and questions/questionVotes. No function reads
+  // or writes the five tables below. Their definitions stay so prod keeps its documents and a push
+  // never has to drop a table that holds data. Remove them only after Sam exports and deletes the data.
+
   // team: host. A question the professor asked the room on one slide. `correct` never goes to
   // students (questions.current leaves it out).
   quizQuestions: defineTable({
