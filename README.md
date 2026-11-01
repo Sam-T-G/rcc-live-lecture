@@ -12,7 +12,7 @@ The building blocks (Google sign-in, live data, QR codes, phone location, the sl
 1. Get invited to the Convex team (Sam) and to this repo.
 2. `git clone https://github.com/Sam-T-G/rcc-live-lecture && cd rcc-live-lecture && npm install`
 3. `npx convex dev`: log in, pick the existing project `rcc-live-lecture`. This makes your own dev backend and writes `.env.local`. Leave it running.
-4. Set your dev backend's env vars: `npx convex env set HOST_EMAILS "you@gmail.com"` and `npx convex env set DECK_BRIDGE_KEY <the value Sam sends you>` (`GEMINI_API_KEY` only if your team adds AI).
+4. Set your dev backend's env vars: `npx convex env set ADMIN_EMAILS "you@gmail.com"` (makes you an admin on your backend: the professor pages and #/admin) and `npx convex env set DECK_BRIDGE_KEY <the value Sam sends you>` (`GEMINI_API_KEY` only if your team adds AI).
 5. `scripts/doctor.sh` until it says Ready, and send Sam the dev deployment name it prints. Typed test sign-ins work only on the dev backends in `DEV_HOSTS` in `convex/auth.config.ts`, and hold roles (`staff:devGrant`) only on the ones in `DEV_HOSTS` in `convex/checkin/prof.ts`. Add your deployment's host (`<name>.convex.cloud`) to both lists to use them on yours; until then, every typed sign-in on your backend shows "The server didn’t accept that sign-in."
 6. `npm run dev`, open <http://localhost:5173/#/lab>, and check each panel.
 
@@ -28,4 +28,4 @@ Google Cloud Console → APIs & Services → Credentials → that OAuth client �
 
 ## Deploy
 
-`scripts/deploy.sh` from a clean `main`: pushes `convex/` to the prod deployment, builds against it, and publishes `dist/` to the `gh-pages` branch. Prod env vars (`HOST_EMAILS`, `DECK_BRIDGE_KEY`, `GEMINI_API_KEY`) are set with `npx convex env set --prod ...`.
+`scripts/deploy.sh` from a clean `main`: pushes `convex/` to the prod deployment, builds against it, and publishes `dist/` to the `gh-pages` branch. Prod env vars (`ADMIN_EMAILS`, `DECK_BRIDGE_KEY`, `GEMINI_API_KEY`) are set with `npx convex env set --prod ...`.
