@@ -233,4 +233,4 @@ import { Screen, Big, Status, Card, Todo } from "../../blocks/ui";
 
 ## Shared data between teams
 
-Tables and read functions the teams agreed on before the meeting: [docs/contracts.md](docs/contracts.md). Sample data for your own backend: `npx convex run dev/seed:fill '{"channel":"gdg"}'` (and `dev/seed:clear`). The lecture's channel is `CHANNEL` from `src/blocks/deck.ts`.
+Tables and read functions the teams agreed on before the meeting: [docs/contracts.md](docs/contracts.md). Sample data for your own backend: `npx convex run dev/seed:fill '{"channel":"gdg"}'` (and `dev/seed:clear`). fill runs only on the dev backends in `DEV_HOSTS`, so first add your deployment's host to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 5), which also turns on typed test sign-ins and test roles there. The lecture's channel is `CHANNEL` from `src/blocks/deck.ts`.

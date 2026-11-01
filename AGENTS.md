@@ -45,7 +45,7 @@ No other frameworks, UI kits, routers, or state libraries. Ask the lead before a
 3. **Stay in your lane.** Each team owns its folders (below). Touch shared files only where marked, and say when you do.
 4. **Reuse a block before writing new plumbing.** Sign-in, QR codes, location, the slide feed, and AI calls already exist. Never write a second version.
 5. **Report in plain words.** After each step, tell the lead in two or three sentences what changed and what to try in the browser. The room hears it read aloud.
-6. **Your backend is yours alone.** Every lead's dev deployment has its own data, so another team's tables look empty until the merge at freeze. Build against the read functions in docs/contracts.md and fill them with `npx convex run dev/seed:fill '{"channel":"gdg"}'`.
+6. **Your backend is yours alone.** Every lead's dev deployment has its own data, so another team's tables look empty until the merge at freeze. Build against the read functions in docs/contracts.md and fill them with `npx convex run dev/seed:fill '{"channel":"gdg"}'`. fill runs only on the dev backends in `DEV_HOSTS`, so first add your deployment's host (`<name>.convex.cloud`) to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 5). That also turns on typed test sign-ins and test roles on your backend.
 7. **Never touch prod.** No `npx convex deploy`, no `scripts/deploy.sh`, no env changes; `.claude/settings.json` blocks them. Sam deploys `main` at the review break and at freeze.
 
 ## Who owns what

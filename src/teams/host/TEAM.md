@@ -19,7 +19,7 @@ The PM keeps this current; the agent reads it before every change. Copied from t
 
 - Pages: #/host (hosts only: the Google accounts in HOST_EMAILS). Already registered; build in `src/teams/host/Page.tsx` and files next to it.
 - Server: `convex/host/`. Functions are called as `api.host.<file>.<function>`.
-- Data: Writes nothing to start. Reads `deck:current`, `checkin/read:count` and `names`, `live/read:lostCount` and `lostBySlide`. On your own laptop those tables are empty: fill them with `npx convex run dev/seed:fill '{"channel":"gdg"}'`. See docs/contracts.md.
+- Data: Writes nothing to start. Reads `deck:current`, `checkin/read:count` and `names`, `live/read:lostCount` and `lostBySlide`. On your own laptop those tables are empty: fill them with `npx convex run dev/seed:fill '{"channel":"gdg"}'` after adding your deployment's host to `DEV_HOSTS` in `convex/checkin/prof.ts` and `convex/auth.config.ts` (README step 5). See docs/contracts.md.
 - Channel: `CHANNEL` from `src/blocks/deck.ts` (`"gdg"`).
 - Only two teams? This team doesn't run; Check-in and Live slides each take one number.
 

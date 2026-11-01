@@ -185,7 +185,7 @@ async function classSettings(ctx: Ctx, channel: string, start: number): Promise<
 
 // When this class's teams lock: 5 minutes after class starts or after the first check-in,
 // whichever is later. Null with no start time and nobody checked in.
-function lockTime(win: LectureWindow, first: Doc<"checkins"> | null) {
+export function lockTime(win: LectureWindow, first: Doc<"checkins"> | null) {
   const times = [win.startsAt, first?.at].filter((t): t is number => typeof t === "number");
   return times.length ? Math.max(...times) + WINDOW_MS : null;
 }

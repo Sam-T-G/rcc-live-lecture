@@ -35,7 +35,7 @@ The writing side is each team's job: Check-in writes the kiosk code and the chec
 
 ## Building before the other team's part exists
 
-Your dev backend starts empty. To see real-looking numbers before another team merges:
+Your dev backend starts empty. fill runs only on the dev backends in `DEV_HOSTS`, so first add your deployment's host (`<name>.convex.cloud`) to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 5); that also turns on typed test sign-ins and test roles there. Then, to see real-looking numbers before another team merges:
 
 ```sh
 npx convex run dev/seed:fill '{"channel":"gdg"}'    # 8 sample check-ins, some lost taps on the current slide

@@ -9,7 +9,7 @@
 // with upvotes. The rows belong to that class, so they leave the screens when the class ends.
 // fill adds nothing when the channel has sample students already, refuses while a question is
 // open (the sample quiz would take its place on every phone), and runs only on the dev backends
-// in DEV_HOSTS (convex/checkin/prof.ts): add your own dev deployment's host there first.
+// in DEV_HOSTS: add your own dev deployment's host to both lists (README step 5) first.
 // Every sample student's user is "sample:<n>", so clear finds their rows in every table and never
 // touches a real student's (a real user is "<issuer>|<subject>"). clear runs on any backend.
 // Internal: the CLI and the dashboard can run these, the browser can't. Leads only.
@@ -18,7 +18,7 @@ import type { Doc } from "../_generated/dataModel";
 import { internalMutation, type MutationCtx } from "../_generated/server";
 import { cloudHost, isDevBackend } from "../checkin/prof";
 import { ensureLecture, lectureStart, lectureWindow } from "../lib";
-import { ensureGroup } from "../live/groups";
+import { ensureGroup, lockTime } from "../live/groups";
 
 const SAMPLE = "sample:";
 // Every sample user sorts from SAMPLE up to this (";" comes right after ":"), so a range on an
@@ -49,7 +49,9 @@ const plural = (n: number, one: string) => `${n} ${n === 1 ? one : one + "s"}`;
 // the list typed test roles use), by the host in CONVEX_CLOUD_URL (Convex sets it in every
 // function). Anything else counts as prod: prod's URL, a custom domain, a deployment that isn't on
 // the list, a URL that can't be read. A lead who runs fill on their own dev deployment adds its
-// host to DEV_HOSTS first.
+// host to DEV_HOSTS in both convex/checkin/prof.ts and convex/auth.config.ts first (README step
+// 5; a test fails when the two lists differ), which also lets typed test sign-ins and test roles
+// work there.
 function refuseOnProd() {
   const host = cloudHost();
   if (!host)
@@ -57,7 +59,8 @@ function refuseOnProd() {
   if (host.includes(PROD)) throw new ConvexError(`dev/seed:fill adds made-up students, so it never runs on prod (${PROD}).`);
   if (!isDevBackend())
     throw new ConvexError(
-      `dev/seed:fill adds made-up students, so it runs only on the dev backends in DEV_HOSTS (convex/checkin/prof.ts), and ${host} isn't one, so it added nothing. Add your dev deployment's host there to use it.`,
+      `dev/seed:fill adds made-up students, so it runs only on the dev backends in DEV_HOSTS, and ${host} isn't one, so it added nothing. ` +
+        `If it's your own dev backend (never prod), add its host to DEV_HOSTS in convex/checkin/prof.ts and in convex/auth.config.ts (README step 5).`,
     );
 }
 
@@ -187,7 +190,10 @@ export const fill = internalMutation({
 // is left checked in to it, the row goes back to how a class with no check-in has it (its team
 // size only), so the next real check-in is dealt Red, Blue, Yellow and queues a fresh lock. A
 // lock job fill queued that hasn't fired yet finds nobody, or the real students' later lock time,
-// and locks nothing early. A class with a real student still checked in keeps its lock.
+// and locks nothing early. A class with a real student still checked in keeps its lock. When the
+// class's saved start says the lock time has passed, the row is written fresh with scheduled:
+// false, as live.groups.lock does when its time comes with nobody here, so live.groups.status
+// shows no lock time that has passed until the next check-in queues a new one.
 async function reopenTeams(ctx: MutationCtx, channel: string, removed: Doc<"checkins">[]) {
   const win = await lectureWindow(ctx, channel);
   if (win.lecture === null || !removed.some((r) => r._creationTime >= win.start)) return;
@@ -201,8 +207,12 @@ async function reopenTeams(ctx: MutationCtx, channel: string, removed: Doc<"chec
     .withIndex("by_channel", (q) => q.eq("channel", channel).gte("_creationTime", win.start))
     .order("desc")
     .first();
-  if (set && (set.lockedAt !== undefined || set.scheduled === true))
-    await ctx.db.patch("groupSettings", set._id, { lockedAt: undefined, scheduled: undefined });
+  if (!set || (set.lockedAt === undefined && set.scheduled !== true)) return;
+  const at = lockTime(win, null);
+  if (at !== null && at <= Date.now()) {
+    await ctx.db.delete("groupSettings", set._id);
+    await ctx.db.insert("groupSettings", { channel, size: set.size, scheduled: false });
+  } else await ctx.db.patch("groupSettings", set._id, { lockedAt: undefined, scheduled: undefined });
 }
 
 export const clear = internalMutation({

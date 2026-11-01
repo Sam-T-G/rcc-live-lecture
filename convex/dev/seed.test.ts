@@ -159,6 +159,10 @@ describe("dev seed", () => {
     if (!mine) throw new Error("no real check-in");
     await prof.mutation(api.live.groups.adjust, { channel: CH, checkin: mine._id as Id<"checkins">, delta: 2, reason: "Helped a classmate" });
     await prof.mutation(api.live.groups.adjust, { channel: CH, team: 0, delta: 1 });
+    // A point change for a sample student on another-channel, which clear(gdg) must keep.
+    const other = (await everyRow(t)).checkins.find((r) => r.channel === "another-channel" && r.user === "sample:1");
+    if (!other) throw new Error("no sample check-in on another-channel");
+    await prof.mutation(api.live.groups.adjust, { channel: "another-channel", checkin: other._id as Id<"checkins">, delta: 3, reason: "Helped a classmate" });
 
     const before = await everyRow(t);
     // The rows clear(gdg) may remove: sample students' rows on gdg, their answers on gdg's polls,
@@ -177,10 +181,13 @@ describe("dev seed", () => {
         ["another-channel", true],
       ]),
     );
-    expect(kept.groupPoints.map((r) => [r.user === undefined, r.delta]).sort()).toEqual([
-      [false, 2],
-      [true, 1],
-    ]);
+    expect(kept.groupPoints.map((r) => [r.channel, r.user === undefined ? null : r.user === "sample:1", r.delta]).sort()).toEqual(
+      [
+        [CH, false, 2],
+        [CH, null, 1],
+        ["another-channel", true, 3],
+      ].sort(),
+    );
     expect(kept.polls.map((r) => [r.channel, r.question]).sort()).toEqual(
       [
         [CH, "Real quiz?"],
@@ -330,6 +337,48 @@ describe("dev seed", () => {
     await clear(t);
     expect(await count(t)).toBe(1);
     expect(sampleRows(await everyRow(t))).toEqual([]);
+  });
+
+  it("UZ-fixcheck-1 fill on a lead's own dev backend says to add its host to both DEV_HOSTS lists, since auth.config.test fails when they differ", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", "https://brave-otter-456.convex.cloud");
+    const t = setup();
+    await expect(fill(t)).rejects.toThrow(
+      "dev/seed:fill adds made-up students, so it runs only on the dev backends in DEV_HOSTS, and brave-otter-456.convex.cloud isn't one, so it added nothing. " +
+        "If it's your own dev backend (never prod), add its host to DEV_HOSTS in convex/checkin/prof.ts and in convex/auth.config.ts (README step 5).",
+    );
+  });
+
+  it("UZ-fixcheck-2 clear after the sample students' team lock fired, in a class whose saved start time has passed, shows no lock time until the next real check-in", async () => {
+    const t = setup();
+    const prof = await professor(t);
+    const startsAt = Date.now();
+    await prof.mutation(api.checkin.attendance.setClassStart, { channel: CH, startsAt, graceMin: 5 });
+    await fill(t);
+    vi.advanceTimersByTime(10 * 60_000);
+    await t.finishInProgressScheduledFunctions();
+    expect(await t.query(api.live.groups.status, { channel: CH })).toMatchObject({ locked: true });
+
+    await clear(t);
+    // The saved start's lock time (startsAt + 5 min) is 5 minutes ago, so no screen shows it.
+    expect(await t.query(api.live.groups.status, { channel: CH })).toEqual({ size: 4, locked: false, locksAt: null });
+
+    const first = Date.now();
+    for (const k of [1, 2, 3]) await checkIn(t, typed(t, "Student " + k, `student${k}@example.edu`));
+    expect((await t.query(api.live.groups.leaderboard, { channel: CH })).teams.map((g) => g.label)).toEqual(["Red", "Blue", "Yellow"]);
+    expect(await t.query(api.live.groups.status, { channel: CH })).toEqual({ size: 4, locked: false, locksAt: first + 5 * 60_000 });
+    vi.advanceTimersByTime(5 * 60_000);
+    await t.finishInProgressScheduledFunctions();
+    expect(await t.query(api.live.groups.status, { channel: CH })).toMatchObject({ locked: true });
+  });
+
+  it("UZ-fixcheck-2 clear before the saved start's lock time keeps showing that lock time", async () => {
+    const t = setup();
+    const prof = await professor(t);
+    const startsAt = Date.now() + 20 * 60_000;
+    await prof.mutation(api.checkin.attendance.setClassStart, { channel: CH, startsAt, graceMin: 5 });
+    await fill(t);
+    await clear(t);
+    expect(await t.query(api.live.groups.status, { channel: CH })).toEqual({ size: 4, locked: false, locksAt: startsAt + 5 * 60_000 });
   });
 
   it("fill takes 1 to 40 people, as whole numbers", async () => {
