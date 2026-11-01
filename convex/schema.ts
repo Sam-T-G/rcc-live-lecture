@@ -129,6 +129,7 @@ export default defineSchema({
     code: v.string(),
     prevCode: v.string(),
     at: v.number(), // when `code` was made
+    prevAt: v.optional(v.number()), // when `prevCode` was made (missing on passes from before 2026-11)
     hideLate: v.optional(v.boolean()), // the student turned off the late banner for themselves
   })
     .index("by_user", ["user"])

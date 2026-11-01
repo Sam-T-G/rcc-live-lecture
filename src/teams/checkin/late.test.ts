@@ -6,44 +6,46 @@ import { lateLine, newArrivals, type Late, type Seen } from "./late";
 
 const row = (id: string, at: number): Late => ({ id, first: "Sample", lateMin: 10, at });
 const ids = (rows: Late[]) => rows.map((r) => r.id);
+// The phone's clock when each later feed arrives: every row here is under a minute old then.
+const NOW = 60;
 
 describe("F16 the late banner shows each late arrival once, and only ones after the page opened", () => {
   it("checkin-frontend-15 an older arrival that comes back into the list of 5 (someone ticks or unticks the opt-out) never shows; a new one shows once", () => {
     // The 5 newest late arrivals when the page opens: E, D, C, B, A. F is older and cut off.
-    let r = newArrivals([row("e", 50), row("d", 40), row("c", 30), row("b", 20), row("a", 10)], null);
+    let r = newArrivals([row("e", 50), row("d", 40), row("c", 30), row("b", 20), row("a", 10)], null, 50);
     expect(r.fresh).toEqual([]);
     // E ticks the opt-out, so F comes back into the list.
-    r = newArrivals([row("d", 40), row("c", 30), row("b", 20), row("a", 10), row("f", 5)], r.seen);
+    r = newArrivals([row("d", 40), row("c", 30), row("b", 20), row("a", 10), row("f", 5)], r.seen, NOW);
     expect(r.fresh).toEqual([]);
     // E unticks it: E is back.
-    r = newArrivals([row("e", 50), row("d", 40), row("c", 30), row("b", 20), row("a", 10)], r.seen);
+    r = newArrivals([row("e", 50), row("d", 40), row("c", 30), row("b", 20), row("a", 10)], r.seen, NOW);
     expect(r.fresh).toEqual([]);
     // G walks in late: it shows, once.
     const withG = [row("g", 60), row("e", 50), row("d", 40), row("c", 30), row("b", 20)];
-    r = newArrivals(withG, r.seen);
+    r = newArrivals(withG, r.seen, NOW);
     expect(ids(r.fresh)).toEqual(["g"]);
-    r = newArrivals(withG, r.seen);
+    r = newArrivals(withG, r.seen, NOW);
     expect(r.fresh).toEqual([]);
     // G ticks and unticks the opt-out: G doesn't show again.
-    r = newArrivals(withG.slice(1), r.seen);
-    r = newArrivals(withG, r.seen);
+    r = newArrivals(withG.slice(1), r.seen, NOW);
+    r = newArrivals(withG, r.seen, NOW);
     expect(r.fresh).toEqual([]);
   });
 
   it("checkin-frontend-15 two arrivals scanned in the same millisecond both show, each once", () => {
-    let r = newArrivals([row("a", 10)], null);
-    r = newArrivals([row("g", 60), row("a", 10)], r.seen);
+    let r = newArrivals([row("a", 10)], null, 10);
+    r = newArrivals([row("g", 60), row("a", 10)], r.seen, NOW);
     expect(ids(r.fresh)).toEqual(["g"]);
-    r = newArrivals([row("h", 60), row("g", 60), row("a", 10)], r.seen);
+    r = newArrivals([row("h", 60), row("g", 60), row("a", 10)], r.seen, NOW);
     expect(ids(r.fresh)).toEqual(["h"]);
     expect(r.seen).toEqual({ at: 60, ids: ["g", "h"] } satisfies Seen);
-    expect(newArrivals([row("h", 60), row("g", 60), row("a", 10)], r.seen).fresh).toEqual([]);
+    expect(newArrivals([row("h", 60), row("g", 60), row("a", 10)], r.seen, NOW).fresh).toEqual([]);
   });
 
   it("F16.2 with no late arrivals when the page opens, the first one after shows", () => {
-    let r = newArrivals([], null);
+    let r = newArrivals([], null, 0);
     expect(r.fresh).toEqual([]);
-    r = newArrivals([row("a", 10)], r.seen);
+    r = newArrivals([row("a", 10)], r.seen, NOW);
     expect(ids(r.fresh)).toEqual(["a"]);
   });
 });

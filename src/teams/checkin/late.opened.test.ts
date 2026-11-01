@@ -38,6 +38,20 @@ describe("F16.2 the late banner shows only arrivals after its page opened", () =
     expect(r.fresh).toEqual([]);
   });
 
+  it("CKP-risk-3 a class start saved after students arrived doesn't show them on a page opened before they arrived either: only arrivals scanned in the last minute are new", () => {
+    // The projector opens at 21:25. Ana and Ben are scanned at 21:31 and 21:33 with no start saved.
+    let r = newArrivals([], null, T - 5 * MIN);
+    // At 21:36 the professor saves start 21:30 with grace 0.
+    r = newArrivals([row("ben", T + 3 * MIN, 3), row("ana", T + 1 * MIN, 1)], r.seen, T + 6 * MIN);
+    expect(r.fresh).toEqual([]);
+    // Cy walks in at 21:37 and the feed brings her 2 s later: she shows. Ana and Ben stay quiet.
+    r = newArrivals([row("cy", T + 7 * MIN, 7), row("ben", T + 3 * MIN, 3), row("ana", T + 1 * MIN, 1)], r.seen, T + 7 * MIN + 2_000);
+    expect(ids(r.fresh)).toEqual(["cy"]);
+    // An arrival exactly a minute old still shows; one a millisecond older doesn't.
+    expect(ids(newArrivals([row("dee", T + 8 * MIN)], r.seen, T + 9 * MIN).fresh)).toEqual(["dee"]);
+    expect(newArrivals([row("dee", T + 8 * MIN)], r.seen, T + 9 * MIN + 1).fresh).toEqual([]);
+  });
+
   it("an arrival with a scan time just after the phone's clock at open (the server's clock runs ahead) counts as seen, not new", () => {
     let r = newArrivals([row("ana", T + 2_000)], null, T);
     expect(r.fresh).toEqual([]);

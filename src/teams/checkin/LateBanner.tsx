@@ -4,9 +4,10 @@
 // Where it renders, as <LateBanner /> with no props: #/checkin/student (the pass and the
 // checked-in screen), #/live, #/live/leaderboard, #/portal and #/checkin/stage. The iOS app shows
 // the same lines from its own copy (ios/RCCLivePortal/LateBanner.swift).
-// It remembers the newest arrival time in the first list it gets and shows only later arrivals
-// (late.ts), so an arrival from before the page opened never shows, even when it comes back into
-// the list of 5 because someone ticked or unticked the opt-out.
+// It shows only arrivals scanned after the page opened, each once, and only when the list brings
+// them within a minute of their scan (late.ts newArrivals). So an older arrival never shows when
+// it comes back into the list of 5 because someone ticked or unticked the opt-out, or when the
+// professor saves the class start after students walked in.
 import { useEffect, useRef, useState } from "react";
 import "./checkin.css";
 import { useQuery } from "convex/react";
@@ -24,7 +25,7 @@ export default function LateBanner() {
 
   useEffect(() => {
     if (!feed) return;
-    const { fresh, seen: next } = newArrivals(feed, seen.current);
+    const { fresh, seen: next } = newArrivals(feed, seen.current, Date.now());
     seen.current = next;
     if (fresh.length === 0) return;
     const ids = new Set(fresh.map((f) => f.id));

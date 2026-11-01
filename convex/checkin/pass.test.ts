@@ -213,22 +213,24 @@ describe("F11 scan rules", () => {
     vi.setSystemTime(T0 + 60_001);
     await expect(scan(t, bCode)).rejects.toThrow(OLD);
 
-    // b's phone wakes 90 s in and gets a new code. The old one had run out, so it doesn't come back
-    // as the code before the new one: a screenshot of it stays refused.
+    // b's phone wakes 90 s in and gets a new code. The old one is the code before the new one now,
+    // but it had run out, so a screenshot of it stays refused as old (CKP-check-2).
     await refreshAt(b, T0 + 90 * SEC);
-    await expect(scan(t, bCode)).rejects.toThrow(NOT_A_PASS);
+    await expect(scan(t, bCode)).rejects.toThrow(OLD);
     expect((await scan(t, await codeOf(b))).already).toBe(false);
     expect(await t.query(api.checkin.read.count, { channel: CH })).toBe(2);
   });
 
-  it("F11.3 the longest a code scans is just under 100 s: its phone wakes 59 s in, while the code still scans, and sleeps again", async () => {
+  it("F11.3 the longest a code scans is 60 s: its phone wakes 59 s in, while the code still scans, and sleeps again (CKP-spec-2)", async () => {
     const t = setup();
     const s = student(t, 1);
     const code = await passCode(s);
     await refreshAt(s, T0 + 59 * SEC); // the new code replaces it, so it's the code before the new one
-    vi.setSystemTime(T0 + 59 * SEC + 39_999);
+    vi.setSystemTime(T0 + 60 * SEC);
     expect((await scan(t, code)).already).toBe(false);
-    vi.setSystemTime(T0 + 59 * SEC + 40_000);
+    vi.setSystemTime(T0 + 60 * SEC + 1);
+    await expect(scan(t, code)).rejects.toThrow(OLD);
+    vi.setSystemTime(T0 + 59 * SEC + 39_999); // 40 s after it was replaced: the 10-29 rule's last moment
     await expect(scan(t, code)).rejects.toThrow(OLD);
   });
 
@@ -306,24 +308,20 @@ describe("F8 one check-in per student per class", () => {
     expect(await s2.query(api.live.groups.mine, { channel: CH })).not.toBeNull();
   });
 
-  it("checkin-backend-2 a classStarts start saved on an earlier day doesn't make this class's scan late (the lateMin scan stores until attendance works it out when read)", async () => {
+  it("checkin-backend-2 a classStarts start saved on an earlier day doesn't make this class's scan late; the start saved for this class does (CKP-spec-3: worked out when read, never stored)", async () => {
     const t = setup();
-    // The classStarts row, written the way setClassStart wrote it on 10-29.
-    const saveStart = (startsAt: number) =>
-      t.run(async (ctx) => {
-        const row = await ctx.db.query("classStarts").withIndex("by_channel", (q) => q.eq("channel", CH)).unique();
-        if (row) await ctx.db.patch("classStarts", row._id, { startsAt });
-        else await ctx.db.insert("classStarts", { channel: CH, startsAt, graceMin: 5 });
-      });
-    await saveStart(T0 - 7 * DAY); // last week's class
+    // Last week's start, in the classStarts row the way setClassStart wrote it on 10-29.
+    await t.run((ctx) => ctx.db.insert("classStarts", { channel: CH, startsAt: T0 - 7 * DAY, graceMin: 5 }));
     await checkIn(t, student(t, 1));
-    await saveStart(T0); // today's class: a scan 12 minutes in is 12 minutes late
+    // Today's start, saved on the teacher page: a scan 12 minutes in is 12 minutes late.
+    await admin(t).mutation(api.checkin.attendance.setClassStart, { channel: CH, startsAt: T0, graceMin: 5 });
     vi.setSystemTime(T0 + 12 * 60 * SEC);
     await checkIn(t, student(t, 2));
-    expect((await checkinRows(t)).map((r) => [r.name, r.lateMin])).toEqual([
-      ["Sample student 1", undefined],
+    expect((await admin(t).query(api.checkin.attendance.sheet, { channel: CH })).map((r) => [r.name, r.lateMin])).toEqual([
+      ["Sample student 1", null],
       ["Sample student 2", 12],
     ]);
+    expect((await checkinRows(t)).map((r) => r.lateMin)).toEqual([undefined, undefined]);
   });
 });
 

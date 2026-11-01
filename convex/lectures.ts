@@ -12,6 +12,29 @@ import { internalMutation } from "./_generated/server";
 import { lectureClosesAt } from "./lib";
 import { saveExtraCredit } from "./live/groups";
 
+// Run once on prod right after the deploy that added classes, before the next class:
+// `npx convex run --prod lectures:endEarlier '{"channel":"gdg"}'` (Sam's session; agents never
+// touch prod). Until a channel's first class opens, every read counts every check-in it ever had
+// (lib.lectureWindow), so a student who checked in on 10-29 reads as checked in: their pass page
+// says "You're checked in." with no QR and the door never scans them. This adds a class that is
+// already over (it opened and ended now), so nobody counts as checked in until the next class
+// opens, and the older check-ins stay under "Earlier" on the attendance page. Returns false and
+// changes nothing when the channel has a class already.
+export const endEarlier = internalMutation({
+  args: { channel: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, { channel }) => {
+    const any = await ctx.db
+      .query("lectures")
+      .withIndex("by_channel", (q) => q.eq("channel", channel))
+      .first();
+    if (any) return false;
+    const now = Date.now();
+    await ctx.db.insert("lectures", { channel, startedAt: now, endedAt: now });
+    return true;
+  },
+});
+
 export const close = internalMutation({
   // `scheduled` is true for the job lib.ensureLecture queues; leave it out when running by hand.
   args: { lecture: v.id("lectures"), scheduled: v.optional(v.boolean()) },

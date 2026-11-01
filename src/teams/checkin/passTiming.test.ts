@@ -1,8 +1,8 @@
 // @vitest-environment node
 // The pass page's timing helpers in passTiming.ts: when to ask for a new code and when to hide the
 // one on screen. window and document are plain EventTargets here. These tests call the helpers
-// only: how Student.tsx wires them up (its effects, the timer, signing out on "Sign in first.")
-// has no test yet.
+// only: Student.timing.test.ts checks how Student.tsx wires them up (its effects, the timer,
+// hiding an old code, signing out on "Sign in first.").
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { askForCodes, codeIsOld, msUntilNewCode } from "./passTiming";
 

@@ -1,6 +1,6 @@
 // @vitest-environment node
 // The pass page (Student.tsx), rendered to HTML with made-up query results (no backend). Effects
-// don't run here: passTiming.test.ts checks when the page asks for codes and hides an old one.
+// don't run here: Student.timing.test.ts checks when the page asks for codes and hides an old one.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";

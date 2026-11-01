@@ -81,7 +81,9 @@ function after(ms: number): string {
   return show();
 }
 
-const row = (id: string, at: number): Late => ({ id, first: "Sample" + id, lateMin: 10, at });
+// The phone's clock when each test starts (21:30); `row` times are seconds after it.
+const T = Date.UTC(2026, 10, 5, 21, 30);
+const row = (id: string, s: number): Late => ({ id, first: "Sample" + id, lateMin: 10, at: T + s * 1_000 });
 const lines = (html: string) => [...html.matchAll(/<p class="late__item">([^<]*)<\/p>/g)].map((m) => m[1]);
 
 beforeEach(() => {
@@ -89,6 +91,7 @@ beforeEach(() => {
   server.feed = undefined;
   server.asked = [];
   vi.useFakeTimers();
+  vi.setSystemTime(T);
   vi.stubGlobal("window", globalThis);
 });
 afterEach(() => {
@@ -128,5 +131,40 @@ describe("F16 LateBanner shows each late arrival once, and only ones after the p
     expect(lines(show([b, a]))).toEqual([lateLine(b), lateLine(a)]);
     expect(lines(after(5_000))).toEqual([lateLine(b)]);
     expect(after(3_000)).toBe("");
+  });
+});
+
+describe("F16.2 LateBanner never shows an arrival from before its page opened", () => {
+  const MIN = 60_000;
+  const at = (id: string, ms: number, lateMin = 10): Late => ({ id, first: "Sample" + id, lateMin, at: ms });
+
+  it("CKP-spec-1 an arrival scanned before the page opened that comes into the feed later (she unticks the opt-out) never shows; a new one does", () => {
+    // Xena is scanned 10 min late at 21:40 with the opt-out ticked. Yuri opens #/live at 21:42: the feed is empty.
+    vi.setSystemTime(T + 12 * MIN);
+    expect(show([])).toBe("");
+    // At 21:48 Xena unticks it.
+    vi.setSystemTime(T + 18 * MIN);
+    expect(show([at("xena", T + 10 * MIN)])).toBe("");
+    // Zed walks in late at 21:50 and the feed brings him a second later: he shows.
+    vi.setSystemTime(T + 20 * MIN + 1_000);
+    const zed = at("zed", T + 20 * MIN);
+    expect(lines(show([zed, at("xena", T + 10 * MIN)]))).toEqual([lateLine(zed)]);
+  });
+
+  it("CKP-check-1 CKP-risk-3 a class start saved after students arrived shows none of them, on a page opened after they arrived or before", () => {
+    // No start saved, so lateFeed is empty. Ana and Ben are scanned at 21:31 and 21:33.
+    // A phone opens #/live at 21:34.
+    vi.setSystemTime(T + 4 * MIN);
+    expect(show([])).toBe("");
+    // At 21:36 the professor saves start 21:30 with grace 0: lateFeed now counts both as late.
+    vi.setSystemTime(T + 6 * MIN);
+    expect(show([at("ben", T + 3 * MIN, 3), at("ana", T + 1 * MIN, 1)])).toBe("");
+
+    // The projector opened at 21:25, before both arrived.
+    hooks.slots = [];
+    vi.setSystemTime(T - 5 * MIN);
+    expect(show([])).toBe("");
+    vi.setSystemTime(T + 6 * MIN);
+    expect(show([at("ben", T + 3 * MIN, 3), at("ana", T + 1 * MIN, 1)])).toBe("");
   });
 });

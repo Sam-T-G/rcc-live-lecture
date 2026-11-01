@@ -6,15 +6,15 @@
 //   the phone wakes and as the code turns 20 s old, so with the page open a new code shows every
 //   20 to 25 s.
 // - scan takes the current code until it's 60 s old, and the code before it until the next new
-//   code replaces it or until 40 s after it was replaced, whichever comes first. With the page
-//   open that's 20 to 25 s after it was replaced (the 10-29 timing table said 40 s, which holds
-//   only once the page stops asking).
-// - A code that was already over 60 s old when a new one replaced it (the phone slept) never
-//   scans again.
+//   code replaces it, until 40 s after it was replaced, or until it's 60 s old, whichever comes
+//   first. With the page open that's 20 to 25 s after it was replaced (the 10-29 timing table
+//   said 40 s, which holds only once the page stops asking).
+// - A code over 60 s old never scans, so the pass's "A screenshot stops working within a minute."
+//   holds. Scanning it gets "That code is old." while it's the pass's code or the one before it
+//   (the phone slept, woke and got a new code), and "That code isn't a pass." once two newer
+//   codes replaced it.
 // So while its owner's page stays open, a code (or a screenshot of it) scans for 40 to 50 s after
-// it was made. Once the page stops asking, the current code scans until it's 60 s old and a
-// replaced one until 40 s after it was replaced, so no code scans 100 s after it was made (the
-// longest: replaced just as it turned 60 s old, then the phone slept).
+// it was made, and at most 60 s once the page stops asking.
 //
 // The name on the pass follows the sign-in (cleaned by lib.cleanName, so it's never an email)
 // while the student isn't checked in to the current class: a typo is fixed by signing out and in
@@ -29,7 +29,7 @@
 import { mutation, query, type MutationCtx } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
-import { checkedIn, cleanName, ensureLecture, LECTURE_MS, lectureStart, randomCode, requireUser } from "../lib";
+import { checkedIn, cleanName, ensureLecture, lectureStart, randomCode, requireUser } from "../lib";
 import { isProf, pairedDevice, requireScanner, staffRole } from "./prof";
 import { ensureGroup } from "../live/groups";
 
@@ -112,12 +112,13 @@ export const refresh = mutation({
       await ctx.db.insert("passes", { user: me.tokenIdentifier, name, email: me.email ?? "", code: await freshCode(ctx), prevCode: "", at: now });
       return null;
     }
-    const change: { name?: string; code?: string; prevCode?: string; at?: number } = {};
+    const change: { name?: string; code?: string; prevCode?: string; at?: number; prevAt?: number } = {};
     if (name !== p.name && channel !== undefined && !(await checkedInNow(ctx, channel, me.tokenIdentifier))) change.name = name;
     if (now - p.at >= EVERY) {
-      // The replaced code scans for a while longer as the code before this one, unless it had
-      // already run out: then a screenshot of it stays refused.
-      change.prevCode = now - p.at <= CURRENT_MS ? p.code : "";
+      // The replaced code becomes the code before this one, with when it was made: it scans until
+      // it's 60 s old (passFor), and after that a scan of it says "That code is old."
+      change.prevCode = p.code;
+      change.prevAt = p.at;
       change.code = await freshCode(ctx);
       change.at = now;
     }
@@ -138,7 +139,8 @@ async function passFor(ctx: MutationCtx, code: string, now: number): Promise<Doc
   // By id, since an old pass can hold the same code as its code and as the code before it.
   const scans = new Map<string, Doc<"passes">>();
   for (const p of current) if (now - p.at <= CURRENT_MS) scans.set(p._id, p);
-  for (const p of before) if (now - p.at < PREVIOUS_MS) scans.set(p._id, p);
+  // A pass from before prevAt was stored kept a replaced code only while it still scanned.
+  for (const p of before) if (now - p.at < PREVIOUS_MS && (p.prevAt === undefined || now - p.prevAt <= CURRENT_MS)) scans.set(p._id, p);
   if (scans.size === 1) return [...scans.values()][0];
   if (scans.size === 0 && current.length + before.length > 0) throw new ConvexError(OLD);
   throw new ConvexError(NOT_A_PASS);
@@ -168,17 +170,9 @@ export const scan = mutation({
       .first();
     // The name on this class's check-in; a pass made before names were cleaned can still hold an email.
     const name = row ? row.name : cleanName(p.name);
-    if (!row) {
-      // Minutes late, stored on the row because attendance.sheet and lateFeed read it from here
-      // until they work it out when read (package CKA); then this block goes. Late = after the
-      // classStarts row's start plus grace, counted only when that start is within 12 hours of
-      // the scan, so a start saved on an earlier day can't make everyone days late.
-      const start = await ctx.db.query("classStarts").withIndex("by_channel", (q) => q.eq("channel", channel)).unique();
-      const counts = start !== null && Math.abs(now - start.startsAt) < LECTURE_MS;
-      const over = counts ? now - (start.startsAt + start.graceMin * 60_000) : -1;
-      const lateMin = counts && over > 0 ? Math.max(1, Math.round((now - start.startsAt) / 60_000)) : undefined;
-      await ctx.db.insert("checkins", { channel, user: p.user, name, email: p.email, at: now, lateMin });
-    }
+    // No lateMin: attendance.sheet and lateFeed work lateness out from `at` and the class's start
+    // and grace when read, so a start saved or moved later still counts.
+    if (!row) await ctx.db.insert("checkins", { channel, user: p.user, name, email: p.email, at: now });
     await ensureGroup(ctx, channel, p.user); // Live slides: deals a team in arrival order (Red, Blue, Yellow, ...)
     const email = isProf(await staffRole(ctx)) ? p.email : "";
     return { name, email, already: row !== null };
