@@ -24,14 +24,14 @@ struct Hex: Equatable {
 /// stylesheets. Each line ends with its token; src/styles/ios.test.ts fails when a hex here
 /// differs from tokens.css, or when a screen uses a system color instead of one of these.
 enum Palette {
-    static let bg = Hex(light: 0xF7FAF8, dark: 0x121412) // --bg
+    static let bg = Hex(light: 0xEEF2EE, dark: 0x181C19) // --bg
     static let accent = Hex(light: 0x00732D, dark: 0x96D6A0) // --accent
     static let accentText = Hex(light: 0xFFFFFF, dark: 0x003410) // --accent-text
     static let warn = Hex(light: 0xFFE5C0, dark: 0x624000) // --warn
     static let warnText = Hex(light: 0x4F3400, dark: 0xFCDEB5) // --warn-text
     static let lineStrong = Hex(light: 0x727873, dark: 0x919791) // --line-strong
     static let error = Hex(light: 0xC5150F, dark: 0xFFB3A8) // --error
-    static let surface = Hex(light: 0xFFFFFF, dark: 0x1B211C) // --surface
+    static let surface = Hex(light: 0xFFFFFF, dark: 0x222823) // --surface
 }
 
 /// The web's buttons on #/portal: `filled` is the main button (green, words in --accent-text),

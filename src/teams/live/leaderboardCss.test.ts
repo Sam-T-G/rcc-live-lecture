@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parse, splitTop } from "../../styles/cssRules";
 
-const rules = ["live.css", "leaderboard.css"].flatMap((f) => parse(readFileSync(new URL("./" + f, import.meta.url), "utf8")));
+const rules = ["live.css", "leaderboard.css", "stageboard.css"].flatMap((f) => parse(readFileSync(new URL("./" + f, import.meta.url), "utf8")));
 // Every declaration of `prop` in a rule with a selector that has all of `parts`, in file order.
 const decls = (prop: string, ...parts: string[]) =>
   rules

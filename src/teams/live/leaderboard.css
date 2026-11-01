@@ -1,6 +1,7 @@
 /* Team leaderboard rows (Leaderboard.tsx). live.css draws the rows; these rules place what a row
    holds: the place beside two lines, the team and its extra credit on the first, and right
-   answers, points per student and students on the second. */
+   answers, points per student and students on the second. The projector's board is in
+   stageboard.css. */
 
 /* The phone card (.board--card), at every width: three columns every row shares (live.css makes
    each row a subgrid), so the extra credit lines up from row to row. The `ol` makes these rules
@@ -9,21 +10,3 @@ ol.board.board--card { grid-template-columns: 2.2em minmax(0, 1fr) auto; }
 ol.board.board--card .board__rank { grid-row: 1 / span 2; }
 ol.board.board--card .board__ec { grid-column: 3; grid-row: 1; }
 ol.board.board--card .board__members { grid-column: 2 / -1; grid-row: 2; }
-
-/* The projector: the same three columns in every row. Its numbers line is .board__score: the
-   second line of a row up to six teams, in the small projector size. */
-.board--big .board__row { grid-template-columns: 2.2em minmax(0, 1fr) auto; }
-ol.board.board--big .board__score { grid-column: 2 / -1; font-size: var(--proj-small); font-weight: 400; }
-/* Six teams and a two-line note under them came out 2 px taller than 1080, so the projector
-   scrolled: 80 at the bottom instead of 96. */
-.projector:has(> .board--big) { padding-bottom: calc(80 * var(--stage-u)); }
-/* 7 or more teams (.board--many): the same two lines, tighter, so ten teams and the "Plus 2 more
-   teams" line fit on 1920 x 1080. The numbers can't share the first line: beside the extra
-   credit they are wider than a column, and the name gets 0 px (UB-r3-check-1). The page's top
-   and bottom margins and the space between its parts shrink to make the room. */
-.projector:has(> .board--many) { padding-block: calc(48 * var(--stage-u)); gap: calc(16 * var(--stage-u)); }
-ol.board.board--many { row-gap: calc(8 * var(--stage-u)); }
-ol.board.board--many .board__row { padding-block: calc(6 * var(--stage-u)); row-gap: 0; }
-ol.board.board--many :is(.board__name, .board__ec) { line-height: 1; }
-ol.board.board--many .board__rank { grid-row: 1 / span 2; }
-ol.board.board--many .board__score { grid-row: 2; font-size: var(--proj-ledger); }

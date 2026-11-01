@@ -1,6 +1,7 @@
 // The team leaderboard. <Leaderboard /> is the card on the phone page and <GroupBadge /> tells a
-// student their team. #/live/leaderboard shows it big for the projector. The professor picks the
-// team size on #/host (Points), so neither has a professor button.
+// student their team. #/live/leaderboard shows it big for the projector: <Leaderboard big /> draws
+// StageBoard.tsx, which BoardPage.tsx puts on the stage. useBoard() reads what both show. The
+// professor picks the team size on #/host (Points), so neither has a professor button.
 import { useEffect } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -8,6 +9,7 @@ import { api } from "../../../convex/_generated/api";
 import { CHANNEL } from "../../blocks/deck";
 import { useGoogleUser } from "../../blocks/auth";
 import { Card, Status } from "../../blocks/ui";
+import { StageBoard } from "./StageBoard";
 import "./leaderboard.css";
 
 // "You're on Green." Also puts a student who checked in before their team was dealt onto one.
@@ -25,9 +27,19 @@ export function GroupBadge() {
   return <p className={"group-badge group--" + team.color}>You’re on {team.label}</p>;
 }
 
-type Row = FunctionReturnType<typeof api.live.groups.leaderboard>["teams"][number];
+export type Row = FunctionReturnType<typeof api.live.groups.leaderboard>["teams"][number];
 
-const plural = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+// The board and the viewer's team as the server sends them, and the teams the board lists:
+// teams with nobody checked in to this class are left off. `board` and `me` are undefined while
+// they load.
+export function useBoard() {
+  const board = useQuery(api.live.groups.leaderboard, { channel: CHANNEL });
+  const me = useQuery(api.live.groups.mine, { channel: CHANNEL });
+  const teams = (board?.teams ?? []).filter((g) => g.members > 0);
+  return { board, me, teams };
+}
+
+export const plural = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 // Extra credit as the board shows it: whole numbers as they are, a split place to one decimal
 // (three teams tied for 2nd get 4 / 3 each: "+1.3").
 const credit = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
@@ -36,7 +48,7 @@ const credit = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 // professor has changed them), points per student, and students. The projector leaves out the
 // number of students so the line fits, and puts the numbers in .board__score, which stays on
 // screen with 7 or more teams (.board--many hides only .board__members).
-function TeamRow({ g, mine, big }: { g: Row; mine: boolean; big?: boolean }) {
+export function TeamRow({ g, mine, big }: { g: Row; mine: boolean; big?: boolean }) {
   const score = g.changes === 0 ? `${g.correct} right` : plural(g.points, "point");
   const parts = [score, `${g.perStudent.toFixed(1)} per student`, ...(big ? [] : [plural(g.members, "student")])];
   return (
@@ -50,7 +62,7 @@ function TeamRow({ g, mine, big }: { g: Row; mine: boolean; big?: boolean }) {
 }
 
 // "Teams are final." or when they will be.
-function LockNote() {
+export function LockNote() {
   const status = useQuery(api.live.groups.status, { channel: CHANNEL });
   if (!status) return null;
   if (status.locked) return <p className="muted">Teams are final.</p>;
@@ -59,40 +71,35 @@ function LockNote() {
   return <p className="muted">Teams are still forming. They lock at {t}.</p>;
 }
 
-// The projector (#/live/leaderboard) fits up to BIG_MAX teams on one 1920 x 1080 screen: two
-// columns of two-line rows up to BIG_ROOMY teams, then one-line rows without the numbers line.
-// Past BIG_MAX it lists BIG_MAX teams and says how many more there are; each student's phone
-// shows their own team's place.
-const BIG_ROOMY = 6;
-const BIG_MAX = 10;
-
-// The teams the projector lists: the top BIG_MAX, or, when the viewer's team is lower down (as on
-// the phone card), the top BIG_MAX - 1 and the viewer's team.
-function bigRows<T extends { team: number }>(teams: T[], mine?: number): { shown: T[]; more: number } {
-  if (teams.length <= BIG_MAX) return { shown: teams, more: 0 };
-  const me = teams.slice(BIG_MAX).find((g) => g.team === mine);
-  const shown = me ? [...teams.slice(0, BIG_MAX - 1), me] : teams.slice(0, BIG_MAX);
-  return { shown, more: teams.length - shown.length };
+// How the board ranks, under the rows on the phone card and the projector alike.
+export function BoardNote({ questions }: { questions: number }) {
+  return (
+    <p className="muted">
+      {questions === 0
+        ? "No quiz with a right answer has ended yet."
+        : `After ${plural(questions, "quiz", "quizzes")} with a right answer.`} Teams rank by points per
+      student: 1st place gets 5 extra credit, 2nd gets 3, 3rd gets 1.
+    </p>
+  );
 }
 
-// big: the projector version (#/live/leaderboard, inside <Projector>, which gives the title). The
-// room sees it, so it has no professor buttons and no fold nobody can open from the seats. Teams
-// with nobody checked in to this class are left off.
+// big: the projector version (#/live/leaderboard, inside <Projector>, which gives the title):
+// StageBoard.tsx. The room sees it, so it has no professor buttons and no fold nobody can open
+// from the seats.
 export function Leaderboard({ big }: { big?: boolean }) {
-  const board = useQuery(api.live.groups.leaderboard, { channel: CHANNEL });
-  const me = useQuery(api.live.groups.mine, { channel: CHANNEL });
-  const teams = (board?.teams ?? []).filter((g) => g.members > 0);
-  const many = big && teams.length > BIG_ROOMY;
-  const cls = "board" + (big ? " board--big" : " board--card") + (many ? " board--many" : "");
-  const projector = bigRows(teams, me?.team);
-  // The phone card shows the first 3 rows, and every other team tied for a place that earns extra
-  // credit (a 3-way tie for 2nd shows all three). Teams tied with no points stay in the fold.
-  const cardTop = teams.filter((g, i) => i < 3 || g.ec > 0);
-  const top = big ? projector.shown : cardTop;
-  const rest = big ? [] : teams.filter((g) => !cardTop.includes(g));
+  return big ? <StageBoard /> : <BoardCard />;
+}
+
+// The phone card shows the first 3 rows, and every other team tied for a place that earns extra
+// credit (a 3-way tie for 2nd shows all three). Teams tied with no points stay in the fold.
+function BoardCard() {
+  const { board, me, teams } = useBoard();
+  const cls = "board board--card";
+  const top = teams.filter((g, i) => i < 3 || g.ec > 0);
+  const rest = teams.filter((g) => !top.includes(g));
   const mineBelow = rest.find((g) => g.team === me?.team);
-  const body = (
-    <>
+  return (
+    <Card title="Team leaderboard">
       <LockNote />
       {board === undefined ? (
         <Status kind="loading">Loading the scores…</Status>
@@ -101,12 +108,9 @@ export function Leaderboard({ big }: { big?: boolean }) {
       ) : (
         <>
           <ol className={cls}>
-            {top.map((g) => <TeamRow key={g.team} g={g} big={big} mine={g.team === me?.team} />)}
+            {top.map((g) => <TeamRow key={g.team} g={g} mine={g.team === me?.team} />)}
             {mineBelow && <TeamRow g={mineBelow} mine />}
           </ol>
-          {big && projector.more > 0 && (
-            <p className="board__more">Plus {projector.more} more {projector.more === 1 ? "team" : "teams"}. Your phone shows your team’s place.</p>
-          )}
           {rest.length > 0 && (
             <details>
               <summary>All {teams.length} teams</summary>
@@ -115,15 +119,9 @@ export function Leaderboard({ big }: { big?: boolean }) {
               </ol>
             </details>
           )}
-          <p className="muted">
-            {board.questions === 0
-              ? "No quiz with a right answer has ended yet."
-              : `After ${plural(board.questions, "quiz", "quizzes")} with a right answer.`} Teams rank by points per
-            student: 1st place gets 5 extra credit, 2nd gets 3, 3rd gets 1.
-          </p>
+          <BoardNote questions={board.questions} />
         </>
       )}
-    </>
+    </Card>
   );
-  return big ? body : <Card title="Team leaderboard">{body}</Card>;
 }

@@ -1,7 +1,9 @@
 // @vitest-environment node
 // Layout and size rules each surface needs (DESIGN-BRIEF.md "Who looks at what"), checked in the
-// stylesheets themselves: the door iPad at 820 x 1180 portrait, the projector at 1920 x 1080 and
-// the student phone. The browser checker measures the same things on the running pages.
+// stylesheets themselves: controls' edges everywhere and the student phone. The door iPad's checks
+// are in src/teams/checkin/kiosk.surfaces.test.ts and the projector's in
+// src/teams/checkin/stage.surfaces.test.ts, beside their stylesheets. The browser checker measures
+// the same things on the running pages.
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parse, type Rule } from "./cssRules";
@@ -15,6 +17,7 @@ const SHEETS = Object.fromEntries(
 );
 const checkin = read("teams/checkin/checkin.css");
 const live = read("teams/live/live.css");
+const stageboard = read("teams/live/stageboard.css");
 const index = read("index.css");
 const kit = read("styles/kit.css");
 
@@ -30,80 +33,6 @@ function value(rules: Rule[], selector: string, prop: string, media?: RegExp): s
   }
   return out;
 }
-
-describe("door iPad (#/checkin/kiosk at 820 x 1180 portrait)", () => {
-  it("'Start check-in' stays on one line: the button is absolutely placed, so it shrinks to half its box", () => {
-    expect(value(checkin, ".kiosk__start", "white-space")).toBe("nowrap");
-  });
-
-  it("the kiosk is one column on a portrait screen, so the camera takes the full width", () => {
-    const portrait = checkin.filter(
-      (r) => r.selectors.includes(".kiosk") && r.at.some((a) => /@media[^{]*orientation:\s*portrait/.test(a)),
-    );
-    expect(portrait.flatMap((r) => r.decls)).toContainEqual(["grid-template-columns", "1fr"]);
-  });
-});
-
-describe("projector (#/checkin/stage and #/live/leaderboard at 1920 x 1080)", () => {
-  // Stage sizes come from --stage-u or the --proj-* tokens (tokens.css), so the 1920 x 1080 floors
-  // (40 body, 32 smallest) hold at any projector size. A px or rem size is a phone size; a
-  // percentage is a share of the stage-sized card.
-  const SIZED = ["font-size", "width", "height", "padding", "gap"];
-  const stageSized = (v: string) => /var\(--(proj-[\w-]+|stage-u)\)/.test(v) || /^(0|auto|\d+%)$/.test(v);
-
-  it("the check-in card on the deck sizes its box and words in stage units", () => {
-    const bad = checkin
-      .filter((r) => r.selectors.some((s) => /\.stage__(card|hide|count|hint|poll|q|answered|bar|show)\b/.test(s)))
-      .flatMap((r) => r.decls.filter(([k, v]) => SIZED.includes(k) && !stageSized(v)).map(([k, v]) => `${r.selectors.join(", ")} { ${k}: ${v} }`));
-    expect(bad).toEqual([]);
-    expect(value(checkin, ".stage__card", "width")).toMatch(/stage-u/);
-    expect(value(checkin, ".stage__card", "font-size")).toMatch(/--proj-/);
-  });
-
-  it("the check-in card takes its colors from tokens, not raw hex or rgb()", () => {
-    const raw = checkin
-      .filter((r) => r.selectors.some((s) => s.includes(".stage__")))
-      .flatMap((r) => r.decls.filter(([k, v]) => k !== "box-shadow" && /#[0-9a-f]{3,6}\b|rgba?\(/i.test(v)).map(([k, v]) => `${r.selectors.join(", ")} { ${k}: ${v} }`));
-    expect(raw).toEqual([]);
-  });
-
-  it("the 'Check-in' button that brings the card back keeps its green fill (DESIGN-fixcheck-1)", () => {
-    // Stage.tsx puts data-theme="light" on it. The base `[data-theme] { background-color: var(--bg) }`
-    // outranks the base `button { background-color: var(--accent) }` in the same layer, so without
-    // its own fill the button was a #f7faf8 pill on the white slide (1.05:1).
-    expect(value(checkin, ".stage__show", "background-color")).toBe("var(--accent)");
-    expect(value(checkin, ".stage__show", "color")).toBe("var(--accent-text)");
-  });
-
-  it("with an ended quiz's bars on it, the check-in card fits the stage (DCHK-1)", () => {
-    // The card can't scroll (overflow: hidden), so at 1920 x 1080 a 125-character question and
-    // four choices cut off choice D. The QR shrinks while the bars show, and the question and each
-    // choice stop at a line count with "...". The browser checker measures the card itself.
-    expect(value(checkin, ".stage__card:has(.stage__bars) .qr", "width")).toMatch(/^40%/);
-    for (const [sel, lines] of [[".stage__q", "4"], [".stage__poll:has(.stage__bars) .stage__q", "3"], [".stage__label", "2"]]) {
-      expect(value(checkin, sel, "-webkit-line-clamp"), sel).toBe(lines);
-    }
-    for (const sel of [".stage__q", ".stage__label"]) {
-      expect(value(checkin, sel, "display"), sel).toBe("-webkit-box");
-      expect(value(checkin, sel, "overflow"), sel).toBe("hidden");
-    }
-  });
-
-  it("past six teams the big board's rows are one line, so ten teams fit 1080 tall (DESIGN-fixcheck-2)", () => {
-    // Two-line rows are 165 stage px: three rows (six teams) fit. Leaderboard.tsx adds
-    // .board--many past six and lists at most ten (Page.test.ts).
-    expect(value(live, ".board--many .board__members", "display")).toBe("none");
-    expect(value(live, ".board--many .board__rank", "grid-row")).toBe("auto");
-    expect(value(live, ".board--many .board__rank", "font-size")).toMatch(/^var\(--proj-/);
-  });
-
-  it("the big leaderboard sizes its words from the --proj-* tokens", () => {
-    for (const sel of [".board--big .board__rank", ".board--big .board__name", ".board--big .board__score, .board--big .board__ec", ".board--big .board__members", ".board--big small"]) {
-      const first = sel.split(", ")[0];
-      expect(value(live, first, "font-size"), sel).toMatch(/^var\(--proj-/);
-    }
-  });
-});
 
 describe("controls' edges (3:1 for UI parts)", () => {
   // --line is for dividers only (tokens.css): 1.44:1 on --bg. A button, field or toggle draws its
@@ -161,9 +90,9 @@ describe("design fixes that only a stylesheet shows (DESIGN-fixcheck-3)", () => 
 
   it("the quiz question and the big board's names and scores set their line height (DESIGN-design-7)", () => {
     expect(value(checkin, ".quiz__q", "line-height")).toBeTruthy();
-    expect(value(live, ".board--big .board__name", "line-height")).toBeTruthy();
-    expect(value(live, ".board--big .board__score", "line-height")).toBeTruthy();
-    expect(value(live, ".board--big .board__ec", "line-height")).toBeTruthy();
+    expect(value(stageboard, ".board--big .board__name", "line-height")).toBeTruthy();
+    expect(value(stageboard, ".board--big .board__score", "line-height")).toBeTruthy();
+    expect(value(stageboard, ".board--big .board__ec", "line-height")).toBeTruthy();
   });
 
   it("#/ui's forced hover on a segmented option draws the hover layer (DESIGN-spec-3)", () => {

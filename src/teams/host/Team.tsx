@@ -1,8 +1,6 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { CHANNEL } from "../../blocks/deck";
-// The `.group--<color>` styles in live.css set each team's --group color.
-import "../live/live.css";
 
 // A team from live.groups (describe(): { team, color, label }) as a colored dot and its label.
 export function TeamChip({ color, label }: { color: string; label: string }) {

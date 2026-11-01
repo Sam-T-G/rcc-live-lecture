@@ -1,253 +1,889 @@
-/* Styles for the parts in src/blocks/kit.tsx. Tokens only (src/styles/tokens.css),
-   no raw colors. docs/design.md shows each part, and #/ui shows every state.
-   This is the "kit" layer: it beats the base layer (src/index.css), and any
-   team stylesheet beats it. */
+/* The kit: one treatment per part, shared by every area. docs/design.md says what each part is
+   for and #/ui shows every part in every state, light and dark. Tokens only
+   (src/styles/tokens.css), no raw colors. This is the "kit" layer: it beats the base layer
+   (src/index.css), and any team stylesheet beats it, so a page restyles a part with one plain
+   class rule.
+
+   Rungs, low to high: .well < page < .card < .focal < .sheet; .bar is the sticky rung; the color
+   field (.color-field, .qfield, .stub, .stage-card, .first) is the green field for a live or
+   done state. Names the app already used keep their meaning: .row is the base flex row (a list
+   row is .rows > .row), .field is <Field> (the color field is .color-field), .page is <Screen>,
+   .ledger is the GDG ledger line (the stage leaderboard's ledger is .pledger). */
 @layer kit {
-  /* ------------------------------------------------------- <Button> */
-  /* Busy: the words keep their place (and stay readable to a screen reader),
-     so the button never changes width, and a spinner in the button's own word
-     color sits on top. */
-  .btn__label { display: inline-flex; align-items: center; gap: var(--rcc-space-2); }
+  /* --------------------------------------------------------------- icons */
+  /* Phosphor Bold geometry: a 256 grid, 24 stroke, round caps and joins, no fills, currentColor,
+     aria-hidden. 24 beside 400/500 words, 32 (.icon--d) beside 700 words. */
+  .icon { width: 1.25em; height: 1.25em; flex: none; fill: none; stroke: currentColor; stroke-width: 24;
+    stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.2em; }
+  .icon--fill { fill: currentColor; stroke: none; }
+  .icon--d { stroke-width: 32; }
+  .icon--m { width: var(--icon-m); height: var(--icon-m); vertical-align: -0.25em; }
+  .icon--s { width: var(--icon-s); height: var(--icon-s); vertical-align: -0.15em; }
+
+  /* --------------------------------------------------------- text roles */
+  .t-ledger { font-size: var(--t-ledger); font-weight: var(--w-head); color: var(--muted); letter-spacing: .01em; }
+  .card-title { font-size: var(--t-h3); font-weight: var(--w-head); }
+  .title { font-size: var(--t-h1); font-weight: var(--w-head); }
+  .headline { font-size: var(--t-display); font-weight: var(--w-loud); line-height: 1.15; }
+  .question { font-size: var(--t-h2); font-weight: var(--w-loud); line-height: 1.25; text-wrap: balance; }
+  .code { font-family: var(--font-code); font-weight: var(--w-head); font-variant-ligatures: none;
+    font-variant-numeric: tabular-nums; letter-spacing: .04em; user-select: all; -webkit-user-select: all; }
+  .code__gap { display: inline-block; width: .5em; }
+
+  /* A glyph before a heading or sentence hangs: it sits in a 24 column on the first line, and
+     wrapped lines start under the words, never under the glyph. */
+  .hang { display: grid; grid-template-columns: 24px minmax(0, 1fr); column-gap: var(--s2); align-items: start; }
+  .hang > .icon { width: 24px; height: 24px; margin-top: calc((1lh - 24px) / 2); }
+  @supports not (height: 1lh) { .hang > .icon { margin-top: .1em; } }
+  .hang > :not(.icon) { grid-column: 2; min-width: 0; }
+  .hang--stop > .icon { color: var(--st-stop-mark); }
+  .hang--open > .icon { color: var(--st-open-mark); }
+  .hang--in > .icon { color: var(--st-in-mark); }
+
+  /* ---------------------------------------------------------- numerals */
+  .num { font-variant-numeric: tabular-nums lining-nums; font-weight: var(--w-loud); line-height: 1; letter-spacing: -0.02em; }
+  .n-hero { font-size: var(--n-hero); }
+  .n-lg { font-size: var(--n-lg); }
+  .n-md { font-size: var(--n-md); }
+  .n-sm { font-size: var(--n-sm); }
+  .num--accent { color: var(--accent); }
+  .num__of { font-size: .45em; font-weight: var(--w-head); color: var(--muted); letter-spacing: 0; }
+  .n-hero .num__of { font-size: var(--t-h1); }
+  /* A unit after a readout value ("PM", "s"): body size, 500, so a time never makes a third size. On a
+     display numeral (--n-lg and up) it is .55em on the same baseline, so "%" never reads as a digit. */
+  .num__unit { font-size: var(--t-body); font-weight: var(--w-head); letter-spacing: 0; margin-inline-start: .2em; }
+  :is(.n-hero, .n-lg, .readout__n--lg, .readout--lead .readout__n, .tally__lead, .p-count, .p-rank) .num__unit {
+    font-size: .55em; margin-inline-start: .04em; }
+  .count { display: inline-flex; align-items: baseline; gap: var(--s2); }
+  .count__l { font-size: var(--t-body); font-weight: var(--w-head); }
+  /* The staff big number: one size (72, 700) and one label on its baseline. */
+  .numeral { display: inline-flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; }
+  .numeral__n { font-size: var(--t-numeral); font-weight: var(--w-loud); line-height: 1; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums lining-nums; }
+  .numeral__l { font-size: var(--t-h3); font-weight: var(--w-head); color: var(--muted); }
+
+  /* Readout: label above, numeral below, the one way a number is labeled on host, staff and kiosk.
+     Two rows (a 20 label line, then the value), so in a row of readouts labels share one baseline
+     and values another. One lead readout per group, in slot 1. */
+  .readout { display: grid; grid-template-rows: 20px auto; row-gap: var(--s1); align-items: end; align-content: start; min-width: 0; }
+  .readout__l { font-size: var(--t-small); font-weight: var(--w-head); color: var(--muted); line-height: 20px; }
+  .readout__n, .readout__n--md, .readout__n--lg { font-variant-numeric: tabular-nums lining-nums; font-weight: var(--w-loud); line-height: 1; }
+  .readout__n, .readout__n--md { font-size: var(--n-md); }
+  .readout__n--lg { font-size: var(--n-lg); }
+  .readout--lead :is(.readout__n, .readout__n--md, .readout__n--lg) { font-size: var(--n-lg); color: var(--accent); }
+  .readout__n--accent { color: var(--accent); }
+  .readout__n--zero { color: var(--muted); }
+  :is(.readout__n, .readout__n--md, .readout__n--lg) .num__of { font-size: var(--t-body); }
+  .readouts { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); column-gap: var(--s6); justify-self: stretch; }
+
+  /* Count sentence: one lead numeral, the other counts in one line on its baseline. */
+  .tally { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--s3); row-gap: var(--s1); }
+  .tally__lead { font-weight: var(--w-loud); line-height: .9; font-variant-numeric: tabular-nums lining-nums; letter-spacing: -0.03em; }
+  .tally__of { font-size: var(--t-h1); font-weight: var(--w-head); color: var(--muted); }
+  .tally__w { font-size: var(--t-h3); font-weight: var(--w-head); }
+  .tally__line, .tally__rest { font-size: var(--t-body); color: var(--muted); }
+  .tally__line { flex-basis: 100%; }
+  :is(.tally__line, .tally__rest) b { color: var(--text); font-weight: var(--w-loud); font-variant-numeric: tabular-nums; }
+  .tally--accent .tally__lead { color: var(--accent); }
+
+  /* Heading line: a title, one state word, one fact line, the action at the end. */
+  .hline { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--s4); row-gap: var(--s1); align-items: center; }
+  .hline__t { display: flex; align-items: baseline; gap: var(--s3); font-size: var(--t-h3); font-weight: var(--w-head); }
+  .stateword { font-weight: var(--w-head); }
+  .stateword--open { color: var(--st-in-mark); }
+  .stateword--ended { color: var(--muted); }
+  .facts { grid-column: 1; font-size: var(--t-small); color: var(--muted); }
+  .facts-list { display: flex; flex-wrap: wrap; column-gap: .3em; }
+  .facts-list > * { white-space: nowrap; }
+  .facts-list > :not(:last-child)::after { content: ","; }
+  .hline__end { grid-row: 1 / span 2; grid-column: 2; display: flex; gap: var(--s2); align-items: center; }
+
+  /* Ledger numerals: place, credit, late minutes, counts in heads. */
+  .ln { font-variant-numeric: tabular-nums lining-nums; text-align: right; white-space: nowrap; }
+  .ln--place, .ln--credit { font-weight: var(--w-loud); }
+  .ln--tied { font-weight: var(--w-body); color: var(--muted); margin-inline-start: .3em; }
+  .ln--zero { color: var(--muted); font-weight: var(--w-body); }
+  .ln--late { color: var(--st-open-mark); font-weight: var(--w-head); }
+  .headn { color: var(--muted); font-variant-numeric: tabular-nums; margin-inline-start: .35em; }
+
+  /* The room count: one drawing for the check-in count on every surface. */
+  .roomn { display: inline-flex; align-items: baseline; gap: .28em; white-space: nowrap; }
+  .roomn__n { display: inline-block; min-width: 2ch; text-align: end; font-weight: var(--w-loud); line-height: 1;
+    font-variant-numeric: tabular-nums lining-nums; letter-spacing: -0.02em; }
+  .roomn__l { font-size: var(--t-body); font-weight: var(--w-head); }
+
+  /* State lockup: the glyph and the state word as one line, the glyph at cap height. */
+  .lockup { font-weight: var(--w-loud); line-height: 1.15; text-wrap: balance; }
+  .lockup > .icon { width: .82em; height: .82em; vertical-align: -0.08em; margin-inline-end: .22em; }
+  .lockup--in > .icon { color: var(--st-in-mark); }
+  .lockup--stop > .icon { color: var(--st-stop-mark); }
+  .lockup--open > .icon { color: var(--st-open-mark); }
+  .lockup--plain { font-weight: var(--w-head); }
+
+  /* Pending numerals: still muted values while data loads. */
+  .pend { color: var(--muted); }
+  :is(.num, .roomn__n, .track__n, .tally__lead).pend { color: var(--muted); font-weight: var(--w-body); }
+
+  /* ------------------------------------------------------------ surfaces */
+  .well { background: var(--well); border-radius: var(--r-xl); padding: var(--s3); }
+  .well--tight { border-radius: var(--r-lg); padding: var(--s2); }
+  .card { background: var(--raised); border-radius: var(--r-lg); box-shadow: var(--hl), var(--card-ring); padding: var(--s6); }
+  .card__bleed { margin-inline: calc(-1 * var(--s6)); border-radius: 0; }
+  .card__bleed:first-child { margin-top: calc(-1 * var(--s6)); border-radius: var(--r-lg) var(--r-lg) 0 0; }
+  /* The one focal object per screen: marked by its rung (raised and the one shadow), never a green rule. */
+  .focal { position: relative; background: var(--focal-fill); border-radius: var(--r-xl); padding: var(--s6);
+    box-shadow: var(--hl), var(--shadow-1); }
+  .sheet { background: var(--overlay); border-radius: var(--r-xl); padding: var(--s6); box-shadow: var(--hl), var(--shadow-2); }
+  .scrim { position: fixed; inset: 0; z-index: var(--z-scrim); background: var(--scrim); display: grid; place-items: center;
+    padding: var(--s6); transition: opacity var(--fx) var(--ease); }
+  .scrim > .sheet { z-index: var(--z-sheet); width: min(480px, 100%); }
+  /* A secondary block with no card: a 1px --line-strong rule over its heading, its list under it. */
+  .plane { display: grid; gap: var(--s3); align-content: start; margin-top: var(--s6); padding-top: var(--s4); border-top: 1px solid var(--line-strong); }
+  .plane:first-child { margin-top: 0; }
+  /* The sticky app bar, one rung above the page in both themes: light --raised with --shadow-bar,
+     dark --bar with --hl. Solid, no blur. */
+  .bar { position: sticky; top: 0; z-index: var(--z-bar); background: var(--chrome); box-shadow: var(--hl), var(--shadow-bar);
+    min-height: var(--bar-h); display: flex; align-items: center; gap: var(--s4); padding: 0 var(--page-margin); }
+  .bar--static { position: relative; }
+  .bar__title { font-size: var(--t-body); font-weight: var(--w-head); }
+  .bar__id { display: grid; min-width: 0; line-height: 1.25; }
+  .bar__class { font-size: var(--t-small); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar__end { margin-left: auto; display: flex; align-items: center; gap: var(--s3); }
+  /* The band under the app bar (the host's slide track): on the page, one --line rule under it. */
+  .band { position: sticky; top: var(--bar-h); z-index: var(--z-bar); background: var(--page); box-shadow: 0 1px 0 var(--line); }
+  /* The color field: a live or done state for a student or the room, filled edge to edge. */
+  .color-field { background: var(--field); color: var(--on-field); border-radius: var(--r-xl); padding: var(--s4);
+    transition: background-color var(--fx-slow) var(--ease), color var(--fx-slow) var(--ease); }
+  :is(.color-field, .qfield, .stub, .stage-card, .first) :is(.muted, .t-ledger, .ledger) { color: var(--on-field-muted); }
+  :is(.color-field, .qfield, .stub, .stage-card, .first, .door__panel--in) :focus-visible { outline-color: var(--on-field); }
+  .card-head { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s4); }
+  .card-head__end { margin-left: auto; display: flex; align-items: center; gap: var(--s2); }
+  /* Section header: a small label over a title, a text link on the title's last baseline (never
+     centered between the lines); icon-only buttons center. The link wraps under the title at 320. */
+  .sec-head { display: flex; flex-wrap: wrap; align-items: last baseline; justify-content: space-between; column-gap: var(--s3); margin-bottom: var(--s4); }
+  .sec-head__text { min-width: 0; }
+  .sec-head__link { flex: none; line-height: inherit; }
+  .sec-head--icon { align-items: center; }
+  @supports not (align-items: last baseline) { .sec-head { align-items: flex-end; } }
+  /* Paired values share one grid: labels in row 1, values in row 2, one size per row, values on
+     one baseline. Each pair is display: contents, so its label and value join the shared rows. */
+  .pairs { display: grid; grid-template-rows: auto auto; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+    column-gap: var(--s4); row-gap: var(--s1); align-items: last baseline; }
+  .pairs > * { display: contents; }
+  @supports not (align-items: last baseline) { .pairs { align-items: end; } }
+  .pairs__l { font-size: var(--t-small); font-weight: var(--w-head); color: var(--muted); }
+  .pairs__v { font-size: var(--t-h2); font-weight: var(--w-head); line-height: 1.25; font-variant-numeric: tabular-nums lining-nums; }
+
+  /* -------------------------------------------------------------- layout */
+  /* Host and staff: main column and a 400 aside (360 under 1366). Each card ends at its content. */
+  .desk { display: grid; grid-template-columns: minmax(0, 1fr) var(--aside-w); gap: var(--s6); align-items: start; }
+  .desk__full { grid-column: 1 / -1; }
+  @media (max-width: 900px) { .desk { grid-template-columns: minmax(0, 1fr); } }
+  /* The phone shell: a 100svh column, the body scrolling between the bars, nothing under the
+     action bar. Margin 16 (8 around a field). */
+  .phone { display: flex; flex-direction: column; height: 100vh; height: 100svh; overflow: hidden; }
+  .phone > * { flex-shrink: 0; position: relative; }
+  .phone__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s3);
+    padding: var(--s4) max(var(--field-gutter), env(safe-area-inset-right)) var(--s4) max(var(--field-gutter), env(safe-area-inset-left)); }
+  .phone__body > * { flex-shrink: 0; }
+  .phone .bar { position: relative; padding: 0 max(var(--phone-gutter), env(safe-area-inset-right)) 0 max(var(--phone-gutter), env(safe-area-inset-left)); }
+
+  /* ------------------------------------------------------------- <Button> */
+  /* A bare .btn (and a bare <button>, index.css) is the primary. One class makes each other look.
+     Hover and press swap the fill one rung; nothing lifts. */
+  .btn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
+    white-space: nowrap; text-decoration: none; touch-action: manipulation;
+    transition: background-color var(--fx) var(--ease), color var(--fx) var(--ease); }
+  .btn__label { display: inline-flex; align-items: center; gap: var(--s2); }
+  .btn--primary { background-color: var(--accent); color: var(--on-accent); box-shadow: none; }
+  .btn--tonal { background-color: var(--tonal); color: var(--on-tonal); box-shadow: none; }
+  .btn--outline, .btn--secondary { background-color: transparent; color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); }
+  /* One outline per surface: 2px on phone and iPad, 1px on laptop, never paler. */
+  :is(.phone, [data-surface="phone"], [data-surface="kiosk"]) :is(.btn--outline, .btn--secondary) { box-shadow: var(--hl), inset 0 0 0 2px var(--line-strong); }
+  /* Neutral: a fill one rung off a --raised bar, --text words (I'm lost where the field holds the green). */
+  .btn--neutral { background-color: var(--neutral-btn); color: var(--text); box-shadow: none; }
+  /* Raised: the main action when the color field is on screen: --raised, the one shadow, --text words. */
+  .btn--raised { background-color: var(--raised); color: var(--text); box-shadow: var(--hl), var(--shadow-1); }
+  .btn--quiet { background-color: transparent; color: var(--accent); box-shadow: none; }
+  .btn--plain { background-color: transparent; color: var(--text); box-shadow: none; }
+  .btn--danger { background-color: var(--error); color: var(--on-error); box-shadow: none; }
+  .btn--danger-quiet { background-color: transparent; color: var(--error); box-shadow: none; }
+  .btn--on-field { background-color: var(--field-btn); color: var(--on-field-btn); box-shadow: none; }
+  .btn--lg { min-height: 56px; padding-inline: var(--s8); font-size: var(--t-body); }
+  .btn--sm, .btn--small { min-height: var(--btn-sm); padding-block: 0; padding-inline: var(--s3); font-size: var(--t-small); }
+  .btn--block { display: flex; width: 100%; }
+  .btn--icon { padding: 0; width: var(--tap); }
+  .btn--icon.btn--sm { width: var(--btn-sm); }
+  .btn--icon.btn--lg { width: 56px; }
+  /* Ghost: the one style for laptop row actions (Keep, Dismiss, Delete, Remove, Unpair). Muted words,
+     no ring at rest; the --line-strong ring shows on hover and keyboard focus. */
+  .btn--ghost { min-height: var(--btn-sm); padding: 0 var(--s3); font-size: var(--t-small); background-color: transparent; color: var(--muted); box-shadow: none; }
+  .btn--ghost:is(:hover, :focus-visible) { color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .btn--ghost.btn--danger-quiet, .btn--ghost.btn--danger-quiet:is(:hover, :focus-visible) { color: var(--error); }
+  .row__actions .btn--danger-quiet:not(:first-child), .cluster > .btn--danger-quiet.btn--ghost:not(:first-child) { margin-inline-start: var(--s2); }
+  @media (hover: hover) {
+    :is(.btn--plain, .btn--quiet, .btn--outline, .btn--secondary, .btn--danger-quiet):hover:not(:disabled, [aria-disabled="true"]) { background-color: var(--bar); }
+    .btn--raised:hover:not(:disabled, [aria-disabled="true"]) { background-color: var(--lift); }
+  }
+  @supports (color: color-mix(in srgb, red, blue)) {
+    @media (hover: hover) {
+      .btn--tonal:hover:not(:disabled, [aria-disabled="true"]) { background-color: color-mix(in srgb, var(--tonal) 85%, var(--on-tonal)); }
+    }
+  }
+  /* Disabled keeps the footprint as a fill step: the neutral fill, no ring, --muted words (4.5:1 or
+     more), the same size, radius and slot, aria-disabled and the reason line where one exists. Never
+     a paler ring, never opacity. A busy button keeps its own look (the spinner shows instead). */
+  :is(button, .btn):is(:disabled, [aria-disabled="true"]):not([aria-busy="true"], .link, .switch, .choice, .tabs__tab, .seg__item) {
+    background-color: var(--neutral-btn); background-image: none; color: var(--muted); box-shadow: none; opacity: 1; cursor: not-allowed; }
+  :is(.color-field, .qfield, .stub) :is(button, .btn):is(:disabled, [aria-disabled="true"]):not([aria-busy="true"]) { background-color: var(--tile-out); color: var(--on-tile-out); }
+  .btn-why { display: inline-flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+  .btn-why__text { font-size: var(--t-small); color: var(--muted); }
+  /* Busy: the words keep their place (and stay readable to a screen reader), so the button never
+     changes width, and a spinner in the button's own word color sits on top after 0.4s. It is the
+     only spinner in the app. Reduced motion shows a still clock glyph instead. */
   .btn[aria-busy="true"] { opacity: 1; cursor: progress; }
   .btn[aria-busy="true"] .btn__label { opacity: 0; }
-  .btn__spinner {
-    position: absolute;
-    inset: 0;
-    margin: auto;
-    width: 1.25em;
-    height: 1.25em;
-    border: 2px solid currentColor;
-    border-inline-end-color: transparent;
-    border-radius: 50%;
-    animation: rcc-spin 1s linear infinite;
+  .btn__spinner { position: absolute; inset: 0; margin: auto; width: 1.25em; height: 1.25em; border: 2px solid currentColor;
+    border-inline-end-color: transparent; border-radius: 50%; opacity: 0;
+    animation: rcc-spin 800ms linear infinite, rcc-show 1ms linear 400ms forwards; }
+  @media (prefers-reduced-motion: reduce) {
+    .btn__spinner { animation: rcc-show 1ms linear 400ms forwards; border: 0; border-radius: 0; background: currentColor;
+      -webkit-mask: var(--clock-glyph) center / contain no-repeat; mask: var(--clock-glyph) center / contain no-repeat; }
   }
 
-  /* -------------------------------------------------------- <Field> */
-  /* Label, hint, error, then the field: the error stays above the phone's
-     keyboard, and a screen reader hears it before the field. */
-  .field { margin: 0 0 var(--rcc-space-4); }
-  .field__label { margin-bottom: var(--rcc-space-2); }
-  .field__hint,
-  .field__error { margin: 0 0 var(--rcc-space-2); font-size: var(--fs-small); line-height: var(--lh-small); }
-  .field__hint { color: var(--muted); }
-  .field__error { color: var(--error); font-weight: var(--rcc-weight-strong); }
+  /* --------------------------------------------------------------- link */
+  /* One style for every text action outside a sentence (Show slide, See all teams, Sign out, Ask the
+     AI after a quiz): --text at 500, a full target, a chevron only when it opens something. Green
+     stays on the field, the one primary and the right answer. Links inside a sentence stay green. */
+  .link { display: inline-flex; align-items: center; gap: var(--s1); min-height: var(--tap); padding: 0; border: 0;
+    background: transparent; color: var(--text); font: inherit; font-size: var(--t-label); font-weight: var(--w-head);
+    text-decoration: none; text-underline-offset: 3px; cursor: pointer; white-space: nowrap; touch-action: manipulation; }
+  .link:is(:hover, :focus-visible) { text-decoration: underline; text-decoration-thickness: 1px; }
+  .link .icon { width: 1em; height: 1em; stroke-width: 28; }
+  .link--sm { min-height: var(--btn-sm); font-size: var(--t-small); }
+  .link--plain { color: var(--text); text-decoration: underline; }
+  :is(.color-field, .qfield, .stub, .stage-card, .first) .link { color: var(--on-field); }
+  /* Page links in a bar that aren't the current page: --muted 500, never green. */
+  .bar .link:not([aria-current="page"]) { color: var(--muted); }
+  .bar .link:not([aria-current="page"]):is(:hover, :focus-visible) { color: var(--text); }
+
+  /* -------------------------------------------------------------- <Field> */
+  /* Label, then hint, then error, then the control, so the error stays above a phone's keyboard and
+     a screen reader hears it before the field. .fld is the same part under its kit name. */
+  .field, .fld { display: grid; gap: var(--s1); min-width: 0; margin: 0 0 var(--s4); }
+  .field__label { margin: 0; }
+  .label { font-size: var(--t-label); font-weight: var(--w-head); }
+  .field__hint, .hint { margin: 0; font-size: var(--t-small); line-height: var(--lh-small); color: var(--muted); }
+  /* An error: the st-stop fill and its warning glyph hanging before the words. */
+  .field__error, .fld__err { position: relative; margin: 0; padding: var(--s2) var(--s3) var(--s2) calc(var(--s3) + 1.1em + var(--s2));
+    border-radius: var(--r-sm); background: var(--st-stop); color: var(--on-st-stop); font-size: var(--t-small); line-height: var(--lh-small);
+    font-weight: var(--w-head); }
+  .field__error::before { content: ""; position: absolute; left: var(--s3); top: calc(var(--s2) + (1lh - 1.1em) / 2); width: 1.1em; height: 1.1em;
+    background: var(--st-stop-mark); -webkit-mask: var(--warn-glyph) center / contain no-repeat; mask: var(--warn-glyph) center / contain no-repeat; }
+  @supports not (height: 1lh) { .field__error::before { top: calc(var(--s2) + .25em); } }
+  .fld__err > .icon { position: absolute; left: var(--s3); top: calc(var(--s2) + .25em); width: 1.1em; height: 1.1em; color: var(--st-stop-mark); }
   .field select { display: block; width: 100%; }
-  /* In a row of controls, the row's gap does the spacing. */
   .row > :is(.field, .seg-field) { margin-bottom: 0; }
+  .input, .textarea, .select { width: 100%; min-height: var(--tap); padding: 0 var(--s3); border-radius: var(--r-sm);
+    border: 1px solid var(--line-strong); background: var(--raised); color: var(--text); font-size: max(1rem, 16px); }
+  .textarea { padding: var(--s3); min-height: 96px; resize: vertical; line-height: 1.5; overflow-x: hidden; }
+  .select { appearance: none; -webkit-appearance: none; padding-right: var(--s8); background-color: var(--raised);
+    background-image: var(--select-chev); background-position: right var(--s3) center; background-size: 16px 16px; background-repeat: no-repeat; }
+  .select--sm { min-height: var(--btn-sm); font-size: var(--t-small); width: auto; }
+  .select-wrap { position: relative; display: block; color: var(--muted); }
+  .select-wrap--sm { display: inline-block; }
+  .select-wrap > .select { background-image: none; color: var(--text); }
+  .select-wrap::after { content: ""; position: absolute; right: var(--s3); top: 50%; width: 16px; height: 16px; margin-top: -8px;
+    background: currentColor; pointer-events: none; -webkit-mask: var(--select-chev) center / 16px 16px no-repeat; mask: var(--select-chev) center / 16px 16px no-repeat; }
+  .input::placeholder, .textarea::placeholder { color: var(--muted); opacity: 1; }
+  :is(.input, .textarea, .select, input, select, textarea)[aria-invalid="true"] { border: 2px solid var(--st-stop-mark); }
+  /* Disabled steps down from enabled: sunken fill, muted words, no edge. */
+  :is(.input, .select, .textarea, input, select, textarea):disabled { background-color: var(--well); color: var(--muted); border-color: transparent; box-shadow: none; cursor: default; opacity: 1; }
+  .select-wrap:has(> .select:disabled)::after { opacity: .6; }
+  .input--code { font-family: var(--font-code); font-weight: var(--w-head); letter-spacing: .12em; font-variant-ligatures: none; }
+  .select-inset { display: inline-block; padding-inline-start: calc(var(--s3) + 1px); }
+  .input-row { display: flex; gap: var(--s2); align-items: end; }
+  .input-row > .fld { flex: 1; }
+  /* A field and its button joined: one outer pill. The button is the outline secondary while the field
+     is empty and the green primary once it has text. */
+  .join { display: flex; min-width: 0; }
+  .join > .input { flex: 1 1 auto; min-width: 0; border-radius: var(--r-full) 0 0 var(--r-full); padding-inline-start: var(--s4); }
+  .join > .btn { flex: none; border-radius: 0 var(--r-full) var(--r-full) 0; background-color: transparent; color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--line-strong); padding-inline: var(--s5) var(--s6); }
+  .join:has(> .input:not(:placeholder-shown)) > .btn:not(:disabled):not([aria-disabled="true"]) { background-color: var(--accent); color: var(--on-accent); box-shadow: none; }
+  .counter-hint { font-size: var(--t-ledger); color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
 
-  /* --------------------------------------------------------- <Tabs> */
-  .tabs__list {
-    display: flex;
-    gap: var(--rcc-space-1);
-    margin: 0 0 var(--rcc-space-4);
-    border-bottom: var(--rcc-hairline) solid var(--line);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .tabs__tab {
-    position: relative;
-    flex: none;
-    min-height: var(--rcc-target-min);
-    padding: var(--rcc-space-2) var(--rcc-space-4);
-    border-radius: var(--rcc-radius-sm) var(--rcc-radius-sm) 0 0;
-    background-color: transparent;
-    color: var(--muted);
-  }
-  /* The chosen tab: green words and a 3px bar under them, drawn on a
-     pseudo-element so the tab's own box never moves. */
-  .tabs__tab[aria-selected="true"] { color: var(--accent); }
-  .tabs__tab[aria-selected="true"]::after {
-    content: "";
-    position: absolute;
-    inset: auto var(--rcc-space-2) 0;
-    height: 3px;
-    border-radius: 3px 3px 0 0;
-    background: var(--accent);
-  }
-  /* Tabs don't change shape when pressed: they sit on a line. */
-  .tabs__tab:is(:active, [data-force="active"]):not(:disabled) { border-radius: var(--rcc-radius-sm) var(--rcc-radius-sm) 0 0; }
+  /* Check row: the whole 48 row is the target; the box is 24 and draws its check. */
+  .checkrow { display: flex; gap: var(--s3); align-items: flex-start; min-height: 48px; padding: var(--s3) 0; cursor: pointer; font-size: var(--t-small); }
+  .checkrow input { appearance: none; -webkit-appearance: none; position: relative; width: 24px; height: 24px; margin: 0; flex: none;
+    display: grid; place-items: center; border-radius: 6px; border: 2px solid var(--line-strong); background: var(--raised); cursor: pointer;
+    transition: background-color var(--fx) var(--ease); }
+  .checkrow input:checked { background: var(--accent); border-color: var(--accent); }
+  .checkrow input:checked::before { content: ""; width: 6px; height: 12px; margin-top: -3px;
+    border: solid var(--on-accent); border-width: 0 3px 3px 0; transform: rotate(45deg); }
+  .radio { appearance: none; -webkit-appearance: none; width: 24px; height: 24px; margin: 0; border-radius: 50%;
+    border: 2px solid var(--line-strong); background: var(--raised); cursor: pointer; flex: none; }
+  .radio:checked { border: 7px solid var(--accent); }
+  /* Role picker: ruled radio rows, a 16 square tick box, the word and the role's sentence, 44 tall. */
+  .rolepick { display: grid; border: 0; margin: 0; padding: 0; }
+  .rolepick__row { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: var(--s3); align-items: start; min-height: var(--tap);
+    padding: var(--s3) 0; margin: 0; cursor: pointer; border-top: 1px solid var(--line); font-size: var(--t-body); font-weight: var(--w-head); }
+  .rolepick__row:first-of-type { border-top: 0; }
+  .rolepick__row:has(:focus-visible) { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-off); }
+  .rolepick__row input { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; margin: .25em 0 0; border-radius: var(--r-xs);
+    border: 2px solid var(--line-strong); background: var(--raised); }
+  .rolepick__row input:checked { background: var(--accent); border-color: var(--accent); }
+  .rolepick__row input:focus-visible { outline: none; }
+  .rolepick__say { grid-column: 2; font-size: var(--t-small); font-weight: var(--w-body); color: var(--muted); }
+
+  /* Switch: a real <button role="switch">, the knob on the spatial track. */
+  .switch { display: inline-flex; align-items: center; gap: var(--s3); min-height: 40px; padding: 0 var(--s2) 0 0;
+    border: 0; background: transparent; font-size: var(--t-label); font-weight: var(--w-head); cursor: pointer; color: var(--text); }
+  .switch__track { position: relative; width: 44px; height: 24px; border-radius: var(--r-full); background: var(--bar);
+    box-shadow: inset 0 0 0 2px var(--line-strong); transition: background-color var(--fx) var(--ease); flex: none; }
+  .switch__track::after { content: ""; position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--line-strong); transition: transform var(--sp-fast) var(--ease-sp), background-color var(--fx) var(--ease); }
+  .switch[aria-checked="true"] .switch__track { background: var(--accent); box-shadow: none; }
+  .switch[aria-checked="true"] .switch__track::after { transform: translateX(20px); background: var(--on-accent); }
+  .switch:disabled .switch__track { opacity: 1; background: var(--well); }
+
+  /* --------------------------------------------------------------- <Tabs> */
+  /* Page sections: words and a 3px green rule under the chosen tab, drawn on a pseudo-element so the
+     tab's own box never moves. In a bar the row is the bar's height. Panels switch instantly. */
+  .tabs__list { display: flex; gap: var(--s1); margin: 0 0 var(--s4); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+  .bar .tabs__list { margin: 0; border-bottom: 0; align-self: stretch; }
+  .tabs__tab { position: relative; display: inline-flex; align-items: center; gap: var(--s2); flex: none; min-height: var(--rcc-target-min);
+    padding: var(--s2) var(--s4); border: 0; border-radius: var(--r-sm) var(--r-sm) 0 0; background-color: transparent; color: var(--muted);
+    font-size: var(--t-label); font-weight: var(--w-head); cursor: pointer; transition: color var(--fx) var(--ease); }
+  .bar .tabs__tab { min-height: var(--bar-h); }
+  .tabs__tab:hover { color: var(--text); }
+  .tabs__tab:is([aria-selected="true"], [aria-current="page"]) { color: var(--text); }
+  .tabs__tab:is([aria-selected="true"], [aria-current="page"])::after { content: ""; position: absolute; inset: auto var(--s2) 0;
+    height: 3px; border-radius: 3px 3px 0 0; background: var(--accent); }
+  .tabs__tab:is(:active, [data-force="active"]):not(:disabled) { border-radius: var(--r-sm) var(--r-sm) 0 0; }
   .tabs__tab:is(:focus-visible, [data-force="focus"]) { outline-offset: -3px; }
-  .tabs__panel:focus-visible { outline-offset: var(--rcc-space-1); }
+  .tabs__tab[aria-disabled="true"], .tabs__tab[aria-disabled="true"]:hover { color: var(--muted); cursor: default; }
+  .tabs__panel:focus-visible { outline-offset: var(--s1); }
+  /* A tab's count: a plain numeral after its label ("Questions 12"), no fill. */
+  .tabs__n { min-width: 0; padding: 0; background: none; color: var(--muted); font-size: inherit; font-weight: var(--w-head);
+    font-variant-numeric: tabular-nums lining-nums; line-height: inherit; }
 
-  /* ----------------------------------------------------- <Segmented> */
-  /* Real radio buttons, hidden but focusable, so arrow keys and screen readers
-     work with no script. The chosen option changes fill, ring and words
-     together: a tinted fill alone is too faint to see (GDG §2.5). */
-  .seg {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: var(--rcc-space-1);
-    max-width: 100%;
-    padding: var(--rcc-space-1);
-    border-radius: var(--rcc-radius-full);
-    box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong);
-  }
-  .seg__option {
-    position: relative;
-    display: block;
-    min-height: 0;
-    margin: 0;
-  }
-  .seg__input {
-    position: absolute;
-    opacity: 0;
-    width: 1px;
-    height: 1px;
-    margin: 0;
-    pointer-events: none;
-  }
-  .seg__label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: var(--tap);
-    min-width: var(--tap);
-    padding: var(--rcc-space-2) var(--rcc-space-5);
-    border-radius: var(--rcc-radius-full);
-    font-size: var(--fs-label);
-    line-height: var(--lh-label);
-    font-weight: var(--rcc-weight-strong);
-    color: var(--text);
-    cursor: pointer;
-    transition: background-color var(--rcc-dur-fast-effects) var(--rcc-ease-standard);
-  }
+  /* ---------------------------------------------------------- <Segmented> */
+  /* A 2 or 3 option switch is text options on the line: the chosen one --text 700 over a 2px
+     --text underline, the others --muted 500, --s5 apart. No track, no fill, no check glyph, no
+     pill. Real radio buttons (hidden but focusable), so arrow keys and screen readers work. */
+  .seg { display: inline-flex; flex-wrap: wrap; gap: 0 var(--s5); max-width: 100%; padding: 0; border-radius: 0; background: none; box-shadow: none; }
+  .seg__option { position: relative; display: block; min-height: 0; margin: 0; }
+  .seg__input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+  .seg__label, .seg__item { position: relative; display: inline-flex; align-items: center; min-height: var(--tap); padding: 0; border: 0;
+    border-radius: var(--r-xs); background-color: transparent; color: var(--muted); font-size: var(--t-label); line-height: var(--lh-label);
+    font-weight: var(--w-head); white-space: nowrap; cursor: pointer; transition: color var(--fx) var(--ease), background-color var(--fx) var(--ease); }
+  .seg__label::after, .seg__item::after { content: ""; position: absolute; left: 0; right: 0; bottom: 8px; height: 2px;
+    background: transparent; transition: background-color var(--fx) var(--ease); }
+  .seg__item .icon { display: none; }
   @media (hover: hover) {
-    .seg__option:hover .seg__label { background-color: color-mix(in srgb, currentColor var(--rcc-state-hover), transparent); }
+    :is(.seg__option:hover .seg__label, .seg__item:hover) { color: var(--text); background-color: color-mix(in srgb, currentColor var(--rcc-state-hover), transparent); }
   }
-  .seg__label[data-force="hover"] { background-color: color-mix(in srgb, currentColor var(--rcc-state-hover), transparent); }
-  .seg__input:checked + .seg__label {
-    background-color: var(--accent-soft);
-    color: var(--accent-soft-text);
-    box-shadow: inset 0 0 0 2px var(--accent);
-  }
-  .seg__input:focus-visible + .seg__label,
-  .seg__label[data-force="focus"] { outline: 3px solid var(--focus); outline-offset: 2px; }
-  .seg-field:disabled .seg__label { opacity: 0.5; cursor: not-allowed; }
-  /* Full width: each option takes an equal share (phones). */
+  .seg__label[data-force="hover"] { color: var(--text); background-color: color-mix(in srgb, currentColor var(--rcc-state-hover), transparent); }
+  .seg__input:checked + .seg__label, .seg__item:is([aria-checked="true"], [aria-pressed="true"]) { color: var(--text); font-weight: var(--w-loud); box-shadow: none; }
+  .seg__input:checked + .seg__label::after, .seg__item:is([aria-checked="true"], [aria-pressed="true"])::after { background: var(--text); }
+  .seg__input:focus-visible + .seg__label, .seg__label[data-force="focus"] { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-off); }
+  .seg-field:disabled .seg__label { color: var(--muted); cursor: not-allowed; }
   .seg--block { display: flex; }
-  .seg--block .seg__option { flex: 1 1 0; }
+  .seg--block :is(.seg__option, .seg__item) { flex: none; }
+  /* Laptop: 32 tall. */
+  .seg--sm :is(.seg__label, .seg__item) { min-height: var(--btn-sm); }
+  .seg--sm :is(.seg__label, .seg__item)::after { bottom: 4px; }
 
-  /* -------------------------------------------------------- <Badge> */
-  /* Square corners: a badge is never pressed (GDG §4.3: round means press).
-     The 1px edge marks it out where its fill alone is too faint. */
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    min-height: 2.154em;  /* 28 at 13px; it grows with --fs-badge on the projector */
-    padding: 0 0.615em;   /* 8 at 13px */
-    border-radius: var(--rcc-radius-xs);
-    box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong);
-    font-size: var(--fs-badge);
-    line-height: 1.231; /* 16 on 13 */
-    letter-spacing: var(--rcc-track-label-md);
-    font-weight: var(--rcc-weight-strong);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    vertical-align: middle;
-  }
-  .badge--neutral { background: var(--fill); color: var(--text); }
-  .badge--accent { background: var(--accent-soft); color: var(--accent-soft-text); }
-  .badge--live { background: var(--live); color: var(--live-text); }
-  .badge--warn { background: var(--warn); color: var(--warn-text); }
-  .badge--error { background: var(--error-soft); color: var(--error-soft-text); }
+  /* -------------------------------------------------------------- <Badge> */
+  /* Square-ish (radius 4), sized to the content, never pressed. Only for a state that differs between
+     items in one list and that the reader acts on. The word carries the meaning; color and glyph repeat it. */
+  /* 13px and 24 tall on a page; --fs-badge grows it on the projector (32 stage px), so every size is in em. */
+  .badge { display: inline-flex; align-items: center; gap: .46em; min-height: 1.846em; padding: 0 .615em;
+    border-radius: var(--r-xs); background: var(--bar); color: var(--text); box-shadow: none;
+    font-size: var(--fs-badge); line-height: 1.231; letter-spacing: .01em; font-weight: var(--w-head);
+    font-variant-numeric: tabular-nums; white-space: nowrap; vertical-align: middle; }
+  .badge .icon { width: 1.077em; height: 1.077em; stroke-width: 28; }
+  .badge--neutral { background: var(--bar); color: var(--text); }
+  .badge--in, .badge--accent { background: var(--st-in); color: var(--on-st-in); }
+  .badge--in .icon, .badge--accent .icon { color: var(--st-in-mark); }
+  .badge--open, .badge--warn { background: var(--st-open); color: var(--on-st-open); }
+  .badge--open .icon, .badge--warn .icon { color: var(--st-open-mark); }
+  .badge--stop, .badge--error { background: var(--st-stop); color: var(--on-st-stop); }
+  .badge--stop .icon, .badge--error .icon { color: var(--st-stop-mark); }
+  .badge--wait { background: var(--st-wait); color: var(--on-st-wait); }
+  .badge--quiet { background: var(--well); color: var(--muted); }
+  /* Retired: the Live badge draws as the state word in --st-in-mark (no pill, no dot). */
+  .badge--live { min-height: 0; padding: 0; background: none; color: var(--st-in-mark); font-size: inherit; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+  .badge--live .dot { display: none; }
 
-  /* ------------------------------------------------------- <Banner> */
-  /* A status box: a tinted fill plus a 1px edge that carries the boundary. */
-  .banner {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--rcc-space-3) var(--rcc-space-4);
-    margin: 0 0 var(--rcc-space-4);
-    padding: var(--rcc-space-3) var(--rcc-space-4);
-    border-radius: var(--radius);
-    box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong);
-  }
+  /* ---------------------------------------------------- team, <TeamChip> */
+  /* A team is always a chip and its written name. The chip is one part: 16 x 16, radius 4, an ink
+     edge so a pale team color holds, at one size everywhere but the stage (which scales it by font-size). */
+  .team { display: inline-flex; align-items: center; gap: var(--s2); font-weight: var(--w-head); min-width: 0; }
+  .team__chip, .team-swatch { display: inline-block; width: 16px; height: 16px; flex: none; border-radius: var(--r-xs);
+    background: var(--c, var(--muted)); box-shadow: var(--chip-ring); vertical-align: -0.15em; }
+  [data-surface="projector"] .team__chip, .projector .team__chip { width: .75em; height: .75em; }
+  /* The team line: the chip and "You're on Purple", no pill, no stroke. .team-pill is its old name. */
+  .teamline, .team-pill { display: inline-flex; align-items: center; gap: var(--s2); min-height: 32px; padding: 0; background: none;
+    box-shadow: none; color: inherit; font-size: var(--t-small); font-weight: var(--w-head); }
+  /* Credit: a numeral ("+3" at 700), never a chip; "+0" is plain neutral words. */
+  .credit { display: inline; min-height: 0; padding: 0; background: none; color: inherit; font-weight: var(--w-loud);
+    font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+  /* The twelve team colors, by the name live.groups gives (group--<color> on a row, a chip or a
+     badge): --c for the kit's chip, and --group with the words that read on it (--group-text) for
+     the parts drawn before the kit had one. */
+  .group--red { --c: var(--team-red); } .group--yellow { --c: var(--team-yellow); } .group--green { --c: var(--team-green); }
+  .group--orange { --c: var(--team-orange); } .group--purple { --c: var(--team-purple); } .group--pink { --c: var(--team-pink); }
+  .group--teal { --c: var(--team-teal); } .group--brown { --c: var(--team-brown); } .group--gray { --c: var(--team-gray); }
+  .group--navy { --c: var(--team-navy); } .group--lime { --c: var(--team-lime); } .group--blue { --c: var(--team-blue); }
+  :is(.group--red, .group--yellow, .group--green, .group--orange, .group--purple, .group--pink, .group--teal, .group--brown,
+    .group--gray, .group--navy, .group--lime, .group--blue) { --group: var(--c); --group-text: var(--on-team); }
+  .group--yellow { --group-text: var(--on-team-yellow); }
+
+  /* ------------------------------------------------- <Banner>, <Notice> */
+  /* A state's fill, a 20 glyph in its mark color, the title, one line and one action at the end. No
+     strip, no border. */
+  .banner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s4); margin: 0 0 var(--s4);
+    padding: var(--s3) var(--s4); border-radius: var(--r-lg); box-shadow: none;
+    background: var(--st-wait); color: var(--on-st-wait); font-size: var(--t-small); }
+  .banner > .icon { flex: none; align-self: flex-start; width: 20px; height: 20px; margin-top: .15em; color: var(--st-wait-mark); }
   .banner__body { flex: 1 1 14rem; min-width: 0; }
-  .banner__title { margin: 0; font-weight: var(--rcc-weight-strong); }
+  .banner__title { margin: 0; font-size: var(--t-body); font-weight: var(--w-head); }
   .banner__text > :last-child { margin-bottom: 0; }
-  .banner__action { flex: none; display: flex; flex-wrap: wrap; gap: var(--rcc-space-2); }
-  .banner--info { background: var(--fill); color: var(--text); }
-  .banner--success { background: var(--accent-soft); color: var(--accent-soft-text); }
-  .banner--warn { background: var(--warn); color: var(--warn-text); }
-  .banner--error { background: var(--error-soft); color: var(--error-soft-text); }
-  /* Inside a banner, quiet words and links take the banner's own ink, which
-     is measured against its fill. A filled <a class="btn"> keeps its own
-     words: the banner's ink on the green or red fill is under 3:1. */
+  .banner__action { flex: none; display: flex; flex-wrap: wrap; gap: var(--s2); align-self: center; }
+  .banner__time { font-weight: var(--w-loud); font-size: 1.1em; font-variant-numeric: tabular-nums lining-nums; }
+  .banner--info { background: var(--st-wait); color: var(--on-st-wait); }
+  .banner--success { background: var(--st-in); color: var(--on-st-in); }
+  .banner--success > .icon { color: var(--st-in-mark); }
+  .banner--warn { background: var(--st-open); color: var(--on-st-open); }
+  .banner--warn > .icon { color: var(--st-open-mark); }
+  .banner--error { background: var(--st-stop); color: var(--on-st-stop); }
+  .banner--error > .icon { color: var(--st-stop-mark); }
+  /* Inside a banner, quiet words, links and outline buttons take the banner's own ink, which is
+     measured against its fill. A filled <a class="btn"> keeps its own words. */
   .banner :is(.muted, a:not(.btn)) { color: inherit; }
-  .banner :is(.btn--secondary, .btn--quiet) { color: inherit; }
-  .banner .btn--secondary { box-shadow: inset 0 0 0 var(--rcc-hairline) currentColor; }
-  /* <BannerStack>: banners pinned to the bottom of the screen, above the
-     iPhone home bar. Taps pass through the gaps. While a stack shows,
-     --banner-stack-space is how far its top sits above the bottom of the
-     screen (src/blocks/stackSpace.ts): the page pads its bottom by that much,
-     so its last button scrolls up above the banners, and a focused control
-     scrolls into view above them too. */
+  .banner :is(.btn--secondary, .btn--outline, .btn--quiet) { color: inherit; }
+  .banner :is(.btn--secondary, .btn--outline) { box-shadow: inset 0 0 0 1px currentColor; }
+  /* An error on the green field or the stage card: a solid field-tile card, the red glyph its only red. */
+  .banner--inset { background: var(--field-tile); color: var(--on-field-tile); border-radius: var(--r-lg); box-shadow: var(--hl); }
+  .banner--inset > .icon { color: var(--st-stop-mark); }
+  /* The sign-in ending bar: full width, sticky under the app bar, its action at the end. */
+  .banner--bar { position: sticky; top: var(--bar-h); z-index: var(--z-banner); margin: 0; border-radius: 0; padding: var(--s3) var(--page-margin); }
+  /* <BannerStack>: banners pinned to the bottom of the screen, above the iPhone home bar. Taps pass
+     through the gaps. While a stack shows, --banner-stack-space is how far its top sits above the
+     bottom of the screen (src/blocks/stackSpace.ts): the page pads its bottom by that much, so its
+     last button scrolls up above the banners, and a focused control scrolls into view above them. */
   html { scroll-padding-bottom: var(--banner-stack-space, 0px); }
   body { padding-bottom: var(--banner-stack-space, 0px); }
-  .banner-stack {
-    position: fixed;
-    inset: auto var(--rcc-space-4) calc(var(--rcc-space-4) + env(safe-area-inset-bottom, 0px));
-    z-index: 50;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--rcc-space-2);
-    pointer-events: none;
-  }
-  .banner-stack > * {
-    width: min(100%, 40rem);
-    margin: 0;
-    pointer-events: auto;
-    box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong), var(--rcc-elevation-2);
-  }
+  .banner-stack { position: fixed; inset: auto var(--s4) calc(var(--s4) + env(safe-area-inset-bottom, 0px)); z-index: 50;
+    display: flex; flex-direction: column; align-items: center; gap: var(--s2); pointer-events: none; }
+  .banner-stack > * { width: min(100%, 40rem); margin: 0; pointer-events: auto; box-shadow: var(--hl), var(--shadow-2); }
+  /* Notice: an error or warning with no part of its own to sit in. The fill, no ring, --r-md, a 20
+     glyph hanging in a 24 column, words at --t-body. Never on the green field. */
+  .notice { display: grid; grid-template-columns: 24px minmax(0, 1fr); column-gap: var(--s3); align-items: start; margin: 0;
+    padding: var(--s3) var(--s4); border-radius: var(--r-md); border: 0; box-shadow: none;
+    background: var(--st-stop); color: var(--on-st-stop); font-size: var(--t-body); line-height: 1.5; text-wrap: pretty; }
+  .notice > .icon { width: 20px; height: 20px; margin: calc((1.5em - 20px) / 2) 2px 0; color: var(--st-stop-mark); }
+  .notice > :not(.icon) { grid-column: 2; min-width: 0; margin: 0; }
+  .notice--warn { background: var(--st-open); color: var(--on-st-open); }
+  .notice--warn > .icon { color: var(--st-open-mark); }
+  .notice--plain { background: var(--well); color: var(--text); }
+  .notice--plain > .icon { color: var(--muted); }
+  .notice__action { margin-top: var(--s2); }
+  /* Offline: the warning glyph and the word in --st-stop-mark, no fill, in a reserved bar slot that
+     holds its width online and offline, so the bar's links never shift. */
+  .offline { display: inline-flex; align-items: center; gap: var(--s1); color: var(--st-stop-mark); font-size: var(--t-small); font-weight: var(--w-loud); }
+  .offline .icon { width: 1.1em; height: 1.1em; }
+  .offline-slot { display: inline-flex; justify-content: flex-end; min-width: 6.5em; }
+  .offline-slot:empty::before { content: "\200b"; }
 
-  /* --------------------------------------------------------- <Stat> */
-  .stat { display: flex; flex-direction: column; gap: var(--rcc-space-1); min-width: 0; }
-  .stat__value {
-    font-size: var(--fs-stat);
-    line-height: 1.25;
-    letter-spacing: var(--rcc-track-headline-lg);
-    font-weight: var(--rcc-weight-strong);
-    font-variant-numeric: tabular-nums lining-nums;
-  }
-  .stat__label { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--muted); }
-  .stat--accent .stat__value { color: var(--accent); }
+  /* ---------------------------------------------------------- <Stat> */
+  /* Label above, numeral below: Stat renders the readout part. */
+  .stat { display: grid; grid-template-rows: auto auto; row-gap: var(--s1); align-content: start; min-width: 0; }
+  .stat__value { order: 2; font-size: var(--n-md); line-height: 1; letter-spacing: -0.02em; font-weight: var(--w-loud);
+    font-variant-numeric: tabular-nums lining-nums; }
+  .stat__label { order: 1; font-size: var(--t-small); line-height: 20px; font-weight: var(--w-head); color: var(--muted); }
+  .stat--accent .stat__value { font-size: var(--n-lg); color: var(--accent); }
 
-  /* --------------------------------------------------- <EmptyState> */
-  .empty { padding: var(--rcc-space-8) var(--rcc-space-4); text-align: center; }
-  .empty__title { margin: 0 0 var(--rcc-space-2); font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: var(--rcc-weight-strong); }
-  .empty__text { margin: 0 auto var(--rcc-space-4); max-width: 34ch; color: var(--muted); }
-  .empty__action { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--rcc-space-2); }
+  /* -------------------------------------- empty, error and loading in place */
+  /* An empty or error state draws the part it stands in for, empty: its frame, heading and action
+     slot stay; the message takes the slot of the thing that failed. Loading, empty and error look
+     different at a glance: still blocks; a sentence with its action; a glyph with Try again. */
+  .state { display: grid; justify-items: start; gap: var(--s3); padding: var(--s6); border-radius: var(--r-lg);
+    background: var(--raised); box-shadow: var(--hl); }
+  .state__title { font-size: var(--t-h3); font-weight: var(--w-head); }
+  .state__text { color: var(--muted); max-width: 48ch; }
+  .focal.state { border-radius: var(--r-xl); box-shadow: var(--hl), var(--shadow-1); }
+  /* One quiet line in an aside or an empty table: the sentence on the well, top-aligned. */
+  .state--inline { grid-template-columns: minmax(0, 1fr); align-items: center; padding: var(--s4); background: var(--well);
+    border-radius: var(--r-md); box-shadow: none; }
+  .state--inline .state__text { font-size: var(--t-small); }
+  .state--error { grid-template-columns: 24px minmax(0, 1fr); column-gap: var(--s3); align-items: start; padding: 0;
+    background: none; color: var(--text); border-radius: 0; box-shadow: none; }
+  .state--error > .icon { width: 24px; height: 24px; color: var(--st-stop-mark); margin-top: calc((1.25em - 24px) / 2 + .1em); }
+  .state--error > :not(.icon) { grid-column: 2; }
+  .state--error :is(.state__title, .state__text) { color: var(--text); }
+  .state--error .state__text + .state__text { color: var(--muted); }
+  .state--inline.state--error { padding: var(--s4); background: var(--well); border-radius: var(--r-md); }
+  .state--inline.state--error > .icon { width: 20px; height: 20px; }
+  .loading-line { display: flex; align-items: center; gap: var(--s2); color: var(--muted); font-size: var(--t-small); }
+  /* <EmptyState>: the heading, the sentence and the one action, top-aligned in its region. */
+  .empty { display: grid; justify-items: start; gap: var(--s2); padding: var(--s4) 0; text-align: start; }
+  .empty__title { margin: 0; font-size: var(--t-h3); line-height: var(--lh-h3); font-weight: var(--w-head); }
+  .empty__text { margin: 0; max-width: 48ch; color: var(--muted); }
+  .empty__action { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s2); }
 
-  /* ----------------------------------------------------- <Skeleton> */
-  /* Grey blocks where the content will go, so nothing jumps when it lands.
-     They hold still: no shimmer or pulse (GDG motion.md §5.6). */
-  .skeleton { display: grid; gap: var(--rcc-space-3); margin: 0 0 var(--rcc-space-4); }
-  .skeleton__line,
-  .skeleton__block { display: block; border-radius: var(--rcc-radius-xs); background: var(--fill); }
-  .skeleton__line { height: 1em; }
-  .skeleton__line:nth-child(3n + 2) { width: 92%; }
+  /* <Skeleton>, .skel: each value that will arrive is a still solid block, --r-xs, the cap height of
+     the line it stands for, never a shimmer. In dark a block is always lighter than its ground. */
+  .skeleton { display: grid; gap: 0; margin: 0 0 var(--s4); }
+  .skeleton__line, .skel--line { display: block; height: 12px; margin: calc((1.5em - 12px) / 2) 0; border-radius: var(--r-xs); background: var(--skel-fill); }
+  .skeleton__line:nth-child(3n + 1) { width: 90%; }
+  .skeleton__line:nth-child(3n + 2) { width: 78%; }
   .skeleton__line:nth-child(3n + 3) { width: 64%; }
-  .skeleton__block { width: 100%; border-radius: var(--rcc-radius-sm); }
+  .skeleton__block { display: block; width: 100%; border-radius: var(--r-lg); background: var(--skel-fill); }
+  .skel { display: block; background: var(--skel-fill); border-radius: var(--r-xs); height: 1em; }
+  .skel--num { display: inline-block; width: 2ch; height: 1em; vertical-align: -0.1em; }
+  .skel--block { height: var(--h, 120px); border-radius: var(--r-lg); }
+  .skel-lines { display: grid; gap: 0; }
+  .skel-lines > .skel { height: 12px; margin: calc((1.5em - 12px) / 2) 0; }
+  .skel-lines > .skel:nth-child(1) { width: 90%; } .skel-lines > .skel:nth-child(2) { width: 78%; } .skel-lines > .skel:nth-child(3) { width: 64%; }
+  .skel--w40 { width: 40%; } .skel--w60 { width: 60%; } .skel--w64 { width: 64%; } .skel--w78 { width: 78%; } .skel--w80 { width: 80%; } .skel--w90 { width: 90%; }
+  /* AI drafting: one 2px --accent rule across the top of the rows; it grows once, still under reduced motion. */
+  .loadrule { display: block; height: 2px; background: var(--accent); transform-origin: left center; animation: rcc-sendbar var(--sp-slow) var(--ease) both; }
+  @media (prefers-reduced-motion: reduce) { .loadrule { animation: none; } }
 
-  /* ------------------------------------------------- <ConfirmButton> */
-  .confirm {
-    display: flex;
-    flex-direction: column;
-    gap: var(--rcc-space-3);
-    padding: var(--rcc-space-4);
-    border-radius: var(--radius);
-    background: var(--fill);
-    box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong);
-  }
-  .confirm__question { margin: 0; font-weight: var(--rcc-weight-strong); }
-  .confirm__actions { display: flex; flex-wrap: wrap; gap: var(--rcc-space-2); }
+  /* ----------------------------------------------------- <ConfirmButton> */
+  /* In place: the box rises to the overlay rung where the button was; the question starts with the
+     warning glyph; the confirming button is the only red fill. overlay: the same box as a sheet,
+     centered on the scrim. Focus goes to Cancel; Escape closes. */
+  .confirm { display: flex; flex-direction: column; gap: var(--s3); padding: var(--s3) var(--s4); border-radius: var(--r-md);
+    background: var(--overlay); color: var(--text); box-shadow: var(--hl), var(--shadow-2); }
+  .confirm__question, .confirm__q { position: relative; margin: 0; padding-inline-start: calc(1.1em + var(--s2)); font-size: var(--t-body); font-weight: var(--w-head); }
+  .confirm__question::before { content: ""; position: absolute; left: 0; top: calc((1lh - 1.1em) / 2); width: 1.1em; height: 1.1em; background: var(--st-stop-mark);
+    -webkit-mask: var(--warn-glyph) center / contain no-repeat; mask: var(--warn-glyph) center / contain no-repeat; }
+  @supports not (height: 1lh) { .confirm__question::before { top: .2em; } }
+  .confirm__actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
   .confirm .status--error { margin-block: 0; }
+  .sheet.confirm { max-width: 480px; padding: var(--s6); border-radius: var(--r-xl); }
+  .sheet.confirm .confirm__actions { justify-content: flex-end; }
+  .confirm-q { display: flex; gap: var(--s2); align-items: baseline; }
+  .confirm-q .icon { color: var(--st-stop-mark); width: 1.1em; height: 1.1em; vertical-align: -0.15em; }
 
-  /* ------------------------------------------------------ <Projector> */
-  /* The 1920 x 1080 stage for the room's screen. Every size below is a stage
-     size from presentation.md §13.3, scaled to the window by --stage-u. */
+  /* ---------------------------------------------------------- <Rows>, tables */
+  /* Every host and staff table sits in a --well inset 4 on all sides (radius 12) with a --raised
+     head (radius 8, 40 tall), on the page or inside a card; rows sit flat on the well with 1px
+     --line rules, 44 tall, every cell on the head's column edges, numbers right under right heads.
+     The selected row is a --raised fill step in the same columns; a new row tints st-in; the
+     in-row confirm rises to the overlay. Every body row has the same fill (no zebra). Charts, the
+     QR, the phone's lists and a question list sit straight on their card or page. */
+  .ruled { display: grid; }
+  .ruled--well, .reg { background: var(--well); border-radius: var(--r-md); padding: var(--s1); align-content: start; }
+  .ruled__head, .ruled__row { display: grid; grid-template-columns: var(--rcols, minmax(0, 1fr) auto); column-gap: var(--s4); align-items: center; padding-inline: var(--s3); }
+  .ruled__head { min-height: 36px; font-size: var(--t-small); font-weight: var(--w-head); color: var(--muted); border-bottom: 2px solid var(--line-strong); }
+  :is(.ruled--well, .reg) > .ruled__head { min-height: 40px; background: var(--raised); border-bottom: 0; border-radius: var(--r-sm); box-shadow: var(--hl); }
+  .ruled__row { min-height: var(--row-h); font-size: var(--t-small); border-top: 1px solid var(--line); }
+  .ruled__head + .ruled__row, .ruled > .ruled__row:first-child { border-top: 0; }
+  /* One line per place cell: "2nd" then "tied" muted, on the row's first baseline. */
+  .ruled__row > .ln--place { white-space: nowrap; }
+  :is(.ruled--well, .reg) > .ruled__row:not(.is-selected, .is-new, .is-confirm) { background: transparent; }
+  .ruled__row.is-selected { position: relative; background: var(--raised); border-radius: var(--r-sm); border-top-color: transparent; box-shadow: var(--hl); }
+  .ruled__row.is-selected + .ruled__row { border-top-color: transparent; }
+  .ruled__row.is-new { background: var(--st-in); color: var(--on-st-in); border-radius: var(--r-sm); border-top-color: transparent; }
+  .ruled__row.is-new + .ruled__row { border-top-color: transparent; }
+  .ruled__row.is-confirm { position: relative; z-index: 2; background: var(--overlay); color: var(--text); border-radius: var(--r-md); border-top-color: transparent;
+    box-shadow: var(--hl), var(--shadow-2); min-height: 56px; padding-block: var(--s2); }
+  .ruled__row.is-confirm + .ruled__row { border-top-color: transparent; }
+  .ruled__row--empty { color: var(--muted); min-height: var(--row-h); }
+  :is(.ruled--well, .reg, .rows) > :is(.ruled__row, .row):empty { display: none; }
+  .ruled .end, .ruled .n { text-align: right; }
+  /* The end row of a list that scrolls inside its card: "N more", raised, so no row is cut in half. */
+  .rows__more { display: flex; align-items: center; min-height: var(--row-h); padding-inline: var(--s3); border-radius: var(--r-sm);
+    background: var(--raised); color: var(--text); font-size: var(--t-small); font-weight: var(--w-head); }
+  /* Charts in a raised card sit on the card: the track and a selected row take --on-raised. */
+  :is(.card, .focal, .hcard, .livestate, .pass) .rbars { background: transparent; border-radius: 0; padding: 0; }
+  :is(.card, .focal, .hcard, .livestate, .pass) .rbars > .ruled__head { background: transparent; border-radius: 0; box-shadow: none; border-bottom: 2px solid var(--line-strong); }
+  :is(.card, .focal, .hcard, .livestate, .pass) .rbars > .ruled__row.is-selected { background: var(--on-raised); border-radius: 0; box-shadow: none; }
+
+  /* .rows: the same part for a list of items (questions, people): rows in a well, row actions in
+     one fixed column. With three or more actions a row shows them on hover, keyboard focus or when
+     selected (.rows--reveal); one or two actions show on every row. */
+  .rows { display: grid; gap: 0; padding: var(--s1); background: var(--well); border-radius: var(--r-md); }
+  .rows__head { display: grid; grid-template-columns: var(--cols, minmax(0, 1fr) auto); gap: var(--s4); align-items: center;
+    min-height: 40px; padding: 0 var(--s3); background: var(--raised); box-shadow: var(--hl); position: sticky; top: 0; z-index: 2;
+    border-radius: var(--r-sm); font-size: var(--t-small); font-weight: var(--w-head); color: var(--muted); }
+  .rows__head :is(.n, .end) { text-align: right; }
+  .rows > .row { display: grid; grid-template-columns: var(--row-lead, auto) minmax(0, 1fr) auto; gap: var(--s4); align-items: start;
+    padding: var(--s3); min-height: var(--row-h); position: relative; border-top: 1px solid var(--line); transition: background-color var(--fx-slow) var(--ease); }
+  .rows > :is(.rows__head, .row:first-child) + .row, .rows > .row:first-child { border-top: 0; }
+  .rows > :is(.is-selected, .is-new, .row--confirm) + .row { border-top-color: transparent; }
+  .row__main { display: grid; gap: var(--s1); min-width: 0; }
+  .row__text { font-weight: var(--w-head); }
+  .row__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); font-size: var(--t-small); color: var(--muted); }
+  .row__time { font-size: var(--t-small); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row__actions { display: flex; grid-column: 3; gap: var(--s2); flex-wrap: wrap; justify-content: flex-end; }
+  .rows--reveal > .row:not(.is-selected):not(:hover):not(:focus-within) .row__actions { visibility: hidden; }
+  .rows > .row.is-selected { background: var(--raised); border-radius: var(--r-sm); border-top-color: transparent; box-shadow: var(--hl); z-index: 1; }
+  .rows > .row.is-dismissed :is(.row__text, .row__meta) { color: var(--muted); }
+  .rows > .row.is-dismissed .row__text { font-weight: var(--w-body); }
+  .rows > .row.is-new { background: var(--st-in); color: var(--on-st-in); border-radius: var(--r-sm); }
+  .rows > .row.is-new .row__meta { color: var(--on-st-in); }
+  .rows > .row.row--confirm { background: var(--overlay); color: var(--text); border-radius: var(--r-md); min-height: 56px; align-items: center;
+    box-shadow: var(--hl), var(--shadow-2); z-index: 2; }
+  .rows > .row--empty { color: var(--muted); }
+  .vote { display: grid; justify-items: center; align-content: start; min-width: 48px; padding-top: 2px; }
+  .vote__n { font-size: var(--n-sm); font-weight: var(--w-loud); font-variant-numeric: tabular-nums; }
+  .answer { padding: var(--s2) var(--s3); border-radius: var(--r-sm); background: var(--well); font-size: var(--t-small); }
+  .answer__l { font-weight: var(--w-head); }
+
+  /* .table: a real <table> as the same part (well, raised head, 44 rows, 1px rules). */
+  .table { width: 100%; border-collapse: separate; border-spacing: 0; padding: var(--s1); font-size: var(--t-small); background: var(--well); border-radius: var(--r-md); }
+  .table th { text-align: left; font-weight: var(--w-head); color: var(--muted); padding: 0 var(--s3); height: 40px; border-bottom: 0;
+    background: var(--raised); font-size: var(--t-small); white-space: nowrap; }
+  .table thead th:first-child { border-radius: var(--r-sm) 0 0 var(--r-sm); }
+  .table thead th:last-child { border-radius: 0 var(--r-sm) var(--r-sm) 0; }
+  .table td { padding: 0 var(--s3); height: var(--row-h); white-space: nowrap; border-bottom: 0; border-top: 1px solid var(--line); }
+  .table tbody tr:first-child td { border-top: 0; }
+  .table tr.is-new td { background: var(--st-in); color: var(--on-st-in); border-top-color: transparent; }
+  .table tr.is-selected td { background: var(--raised); border-top-color: transparent; }
+  .table tr:is(.is-new, .is-selected) + tr td { border-top-color: transparent; }
+  .table :is(.n, .end) { text-align: right; font-variant-numeric: tabular-nums; }
+  .trunc { display: block; max-width: var(--trunc, 26ch); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ------------------------------------------------- answer choices, <Choice> */
+  /* A to D: a tile with its letter tile and full words, the same letter on phone, host and stage.
+     Picked and sent: the tile keeps its fill and letter; a 3px ring inset 2px from the edge and the
+     state word mark it. Failed: the same ring in --st-stop-mark, so it never moves between states.
+     Out after sending: a solid fill, never opacity. Right: st-in fill, ring and the check. */
+  .choices { display: grid; gap: var(--s3); }
+  .choice { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: var(--s4);
+    min-height: var(--choice-h); width: 100%; padding: var(--s3) var(--s4); text-align: left;
+    border: 0; border-radius: var(--r-lg); background: var(--field-tile); color: var(--on-field-tile);
+    font-size: var(--t-choice); font-weight: var(--w-head); cursor: pointer; box-shadow: var(--hl); touch-action: manipulation;
+    transition: background-color var(--fx) var(--ease), box-shadow var(--fx) var(--ease), transform var(--sp-fast) var(--ease-sp); }
+  .choice--on-page { background: var(--raised); color: var(--text); box-shadow: var(--hl), inset 0 0 0 1px var(--line-strong); }
+  .choice:active { transform: scale(0.98); }
+  /* The letter tile: one drawing, 44 x 44, radius 4. --bar off the field, --field-letter on it,
+     --on-raised inside a raised card, --raised on a well; only the right answer fills green. */
+  .letter { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--r-xs); flex: none;
+    background: var(--bar); color: var(--text); font-weight: var(--w-loud); font-size: 1.25rem; }
+  .choice:not(.choice--on-page) .letter, .qfield .letter { background: var(--field-letter); color: var(--on-field-tile); }
+  :where(.well, .table, .rows, .ruled--well, .reg) .letter { background: var(--raised); }
+  :where(.card, .focal, .hcard, .pass, .livestate) :where(.rbars, .barrow) .letter { background: var(--on-raised); }
+  .letter--empty { background: var(--bar); color: var(--muted); }
+  .letter--sm { width: 24px; height: 24px; font-size: var(--t-small); }
+  .letter-row { display: flex; gap: var(--s2); }
+  .choice__state { display: inline-flex; align-items: center; gap: var(--s1); font-size: var(--t-body); font-weight: var(--w-head); white-space: nowrap; }
+  .choice__state .icon { width: 18px; height: 18px; stroke-width: 32; }
+  .choice:is([aria-pressed="true"], .is-picked) { background: var(--field-tile); color: var(--on-field-tile);
+    box-shadow: var(--hl), inset 0 0 0 2px var(--field-tile), inset 0 0 0 5px var(--text); }
+  .choice--on-page:is([aria-pressed="true"], .is-picked) { background: var(--raised); color: var(--text);
+    box-shadow: inset 0 0 0 2px var(--raised), inset 0 0 0 5px var(--text); }
+  /* Sending: a 3px --accent bar along the tile's bottom inside edge grows once; reduced motion shows
+     the clock glyph before "Sending" instead. */
+  .choice[aria-busy="true"] { position: relative; overflow: hidden; cursor: progress; }
+  .choice[aria-busy="true"]::after { content: ""; position: absolute; left: 5px; right: 5px; bottom: 5px; height: 3px; background: var(--accent);
+    transform-origin: left center; animation: rcc-sendbar var(--sp-slow) var(--ease) both; }
+  :is(.color-field, .qfield) .choice[aria-busy="true"]::after { background: var(--st-in-mark); }
+  .choice__clock { display: none; width: 18px; height: 18px; }
+  @media (prefers-reduced-motion: reduce) {
+    .choice[aria-busy="true"]::after { display: none; }
+    .choice[aria-busy="true"] .choice__clock { display: inline-block; }
+  }
+  .choice.is-locked { cursor: default; }
+  .choice.is-locked:active { transform: none; }
+  .choice.is-out { background: var(--tile-out); color: var(--on-tile-out); box-shadow: none; cursor: default; }
+  .choice--on-page.is-out { background: var(--raised); color: var(--muted); }
+  .choice.is-out .letter { background: var(--out-letter); color: var(--on-out-letter); }
+  .choice--on-page.is-out .letter { background: var(--bar); color: var(--text); }
+  .choice.is-right { background: var(--st-in); color: var(--on-st-in); box-shadow: inset 0 0 0 var(--ring-select) var(--st-in-mark); }
+  .choice.is-right .letter { background: var(--accent); color: var(--on-accent); }
+  .choice.is-right:is(.is-picked, [aria-pressed="true"]) { background: var(--st-in); color: var(--on-st-in);
+    box-shadow: var(--hl), inset 0 0 0 var(--ring-select) var(--st-in-mark); }
+  .choice.is-error { background: var(--field-tile); color: var(--on-field-tile);
+    box-shadow: inset 0 0 0 2px var(--field-tile), inset 0 0 0 5px var(--st-stop-mark); }
+  .choice--on-page.is-error { background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 2px var(--raised), inset 0 0 0 5px var(--st-stop-mark); }
+  .choice.is-error .choice__state .icon { color: var(--st-stop-mark); }
+  .lockline { display: flex; align-items: flex-start; gap: var(--s2); font-size: var(--t-small); }
+  :is(.color-field, .qfield) .lockline { color: var(--on-field); }
+
+  /* ------------------------------------------------------------ bar charts */
+  /* One bar part for phone results, host and stage: letter, words, the track on line 2, and the
+     count and percent on the label line in two right-aligned tabular columns, so the counts make
+     one right edge. 2px bar ends, 12 tall. While a poll is open no bar is green; after it ends the
+     right answer fills --accent and every other bar --bar-rest. */
+  .bars { display: grid; gap: var(--s2); }
+  .barrow { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; column-gap: var(--s4);
+    min-height: 64px; padding: var(--s2) var(--s4); border-radius: var(--r-lg); background: var(--raised); box-shadow: var(--hl); }
+  .barrow__text { display: grid; gap: var(--s2); min-width: 0; }
+  .barrow__label { display: flex; gap: var(--s2); align-items: center; flex-wrap: nowrap; min-width: 0; font-weight: var(--w-head); line-height: 1.3; }
+  .barrow__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barrow__tag { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: var(--s1); white-space: nowrap;
+    color: var(--text); font-size: var(--t-small); font-weight: var(--w-head); }
+  .barrow__tag .icon { width: 1em; height: 1em; stroke-width: 32; }
+  .barrow__track, .rbar__track { display: block; height: 12px; border-radius: 2px; background: var(--track); overflow: hidden; }
+  :where(.card, .focal, .hcard, .pass, .livestate) :is(.barrow__track, .rbar__track) { background: var(--on-raised); }
+  .barrow__fill, .rbar__fill { display: block; height: 100%; width: calc(var(--f, 0) * 100%); min-width: min(2px, calc(var(--f, 0) * 100000px));
+    border-radius: 0 2px 2px 0; background: var(--bar-rest); transition: width var(--sp) var(--ease); }
+  .barrow__n { display: grid; grid-template-columns: 32px 44px; column-gap: var(--s1); align-items: baseline; justify-content: end;
+    text-align: right; font-size: var(--n-sm); font-weight: var(--w-loud); line-height: 1.1; font-variant-numeric: tabular-nums lining-nums; }
+  .barrow__pct, .rbar__pct { grid-column: 2; display: block; font-size: var(--t-small); font-weight: var(--w-head); color: var(--muted); letter-spacing: 0; }
+  .barrow.is-lead .barrow__label, .is-lead .rbar__label { font-weight: var(--w-loud); }
+  :is(.barrow, .ruled__row).is-lead :is(.barrow__fill, .rbar__fill) { background: var(--text); }
+  :is(.barrow, .ruled__row).is-right :is(.barrow__fill, .rbar__fill) { background: var(--accent); }
+  :is(.barrow, .ruled__row).is-right .letter { background: var(--accent); color: var(--on-accent); }
+  .barrow.is-right .barrow__tag { color: var(--st-in-mark); }
+  /* Where the right answer is the screen's first thing (phone results, the stage): st-in fill and ring too. */
+  :is(.bars--hero, .bars--stage, [data-surface="projector"] .bars) .barrow.is-right {
+    background: var(--st-in); color: var(--on-st-in); box-shadow: inset 0 0 0 var(--ring-select) var(--st-in-mark); }
+  :is(.bars--hero, .bars--stage, [data-surface="projector"] .bars) .barrow.is-right .barrow__track { background: var(--raised); }
+  :is(.bars--hero, .bars--stage, [data-surface="projector"] .bars) .barrow.is-right :is(.barrow__pct, .barrow__tag) { color: var(--on-st-in); }
+  /* Yours, after results: "Your answer" in words and a 2px --line-strong ring; the right row's green ring wins. */
+  .barrow.is-mine:not(.is-right) { box-shadow: var(--hl), inset 0 0 0 2px var(--line-strong); }
+  .barrow.is-mine:not(.is-right) .barrow__tag, .barrow__tag--mine { color: var(--text); }
+  /* The stage: the same part scaled by font-size; the right row's ring is the projector rule, 6 stage px. */
+  :is(.bars--stage, [data-surface="projector"] .bars) { gap: .5em; }
+  :is(.bars--stage, [data-surface="projector"]) .barrow { grid-template-columns: 2.25em minmax(0, 1fr) auto; column-gap: .75em;
+    min-height: 3em; padding: .5em .75em; border-radius: .5em; }
+  :is(.bars--stage, [data-surface="projector"]) .barrow .letter { width: 2.25em; height: 2.25em; font-size: 1em; border-radius: .2em; }
+  :is(.bars--stage, [data-surface="projector"]) .barrow__text { gap: .4em; padding-right: .25em; }
+  :is(.bars--stage, [data-surface="projector"]) .barrow__track { height: .625em; border-radius: .05em; }
+  :is(.bars--stage, [data-surface="projector"]) .barrow__n { font-size: 1.2em; grid-template-columns: 1.6em 2.4em; column-gap: .3em; }
+  :is(.bars--stage, [data-surface="projector"]) .barrow__pct { font-size: .7em; }
+  :is(.bars--stage, [data-surface="projector"] .bars) .barrow.is-right { box-shadow: inset 0 0 0 var(--p-rule) var(--st-in-mark); }
+  :is(.bars--stage, [data-surface="projector"]) .barrow__tag { font-size: .85em; }
+
+  /* The same chart as ruled rows (host, staff, phone results): letter, words over the track, count and
+     percent at the end (columns 44 / the words / 40 + 48). */
+  .rbars { --rcols: 44px minmax(0, 1fr) 96px; }
+  .rbars .ruled__row { min-height: 60px; padding-block: var(--s2); font-size: var(--t-body); }
+  .rbar__text { display: grid; gap: var(--s2); min-width: 0; }
+  .rbar__label { display: flex; gap: var(--s3); align-items: baseline; font-weight: var(--w-head); }
+  .rbar__tag { margin-inline-start: auto; font-size: var(--t-small); font-weight: var(--w-head); color: var(--st-in-mark); white-space: nowrap; }
+  .rbar__tag .icon { width: 1em; height: 1em; vertical-align: -0.12em; margin-inline-end: .2em; }
+  .rbar__n { display: grid; grid-template-columns: 40px 48px; column-gap: var(--s2); align-items: baseline; justify-content: end;
+    text-align: right; font-size: var(--n-sm); font-weight: var(--w-loud); line-height: 1.1; font-variant-numeric: tabular-nums lining-nums; }
+  .rbar__n > :first-child:not(.rbar__pct) { grid-column: 1; }
+  .rbars .is-empty .rbar__n, .rbar__n.ln--zero { color: var(--muted); font-weight: var(--w-body); }
+
+  /* ------------------------------------------------------------------ QR */
+  /* A QR is always black modules on a white plate in both themes, radius 12, no ring and no well. The
+     code draws its own 4-module quiet zone (qr.tsx), so the plate adds nothing around it; --qr-pad
+     adds room only for a code drawn without one. .qr stays as the plate's name inside .pass and
+     .stage-card. Waiting: the same square on --bar with the step named. */
+  .qrcode, :is(.pass, .stage-card) .qr { display: grid; place-items: center; background: var(--qr-tile); color: var(--qr-ink);
+    border-radius: var(--r-md); padding: var(--qr-pad, 0px); overflow: hidden; box-shadow: none; }
+  .qrcode svg, :is(.pass, .stage-card) .qr svg { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 0; }
+  .qr--wait { display: grid; place-items: center; aspect-ratio: 1; border-radius: var(--r-md); background: var(--bar); color: var(--muted);
+    font-size: var(--t-small); text-align: center; }
+
+  /* ---------------------------------------------------------- camera well */
+  .cam { position: relative; background: var(--cam); border-radius: var(--r-xl); overflow: hidden; aspect-ratio: 4 / 3; display: grid; place-items: center; color: var(--cam-mark); }
+  .cam--off { background: var(--well); color: var(--muted); }
+  .cam__corners { position: absolute; inset: 14%; color: var(--cam-mark); transition: color var(--fx) var(--ease); pointer-events: none; }
+  .cam__corners svg { width: 100%; height: 100%; display: block; }
+  .cam.is-ok .cam__corners { color: var(--cam-mark-ok); }
+  .cam__msg { position: relative; display: grid; gap: var(--s3); justify-items: center; text-align: center; padding: var(--s6); max-width: 30ch; }
+
+  /* ---------------------------------------------------------- late banner */
+  /* <LateBanner>: each arrival is one strip on --warn, no edge rule (the amber fill step is its edge).
+     .late is the stack the page places; the strip scales by font-size (phone 17, stage 48). */
+  .late__item { display: block; margin: 0; padding: .6em .9em; border-radius: var(--r-lg); background: var(--warn); color: var(--on-warn);
+    box-shadow: var(--hl), var(--shadow-2); font-size: var(--t-body); line-height: 1.35; font-weight: var(--w-head); text-align: start; }
+  /* The projector has no shadows: on the stage and the team board the strip is its fill alone. */
+  :is(.projector, .stage, [data-surface="projector"]) .late__item { box-shadow: none; }
+  .lower3 { display: flex; align-items: center; gap: calc(20 * var(--stage-u)); min-height: calc(104 * var(--stage-u)); padding: 0 calc(36 * var(--stage-u));
+    background: var(--warn); color: var(--on-warn); border-radius: calc(16 * var(--stage-u)); font-size: var(--p-body); font-weight: var(--w-head); white-space: nowrap; }
+  .lower3 .icon { width: 1em; height: 1em; stroke-width: 32; }
+  .lower3 b { font-weight: var(--w-loud); }
+  .lower3__more { font-weight: var(--w-body); margin-inline-start: calc(12 * var(--stage-u)); }
+  .enter-rise { animation: rcc-rise var(--sp-slow) var(--ease) both; }
+  @media (prefers-reduced-motion: reduce) { .enter-rise { animation: rcc-fade var(--fx-slow) var(--ease) both; } }
+
+  /* --------------------------------------------------------- whoami */
+  /* The bar's who-is-signed-in line: the name only (--muted, email in its title), Sign out as a
+     quiet link, so the current tab rule is the one marked thing in the bar. */
+  .whoami { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s3); font-size: var(--t-small); color: var(--muted); }
+  .whoami .btn { min-height: 32px; padding-inline: 0; background-color: transparent; color: var(--muted); font-size: var(--t-small); font-weight: var(--w-body); box-shadow: none; }
+  .whoami .btn:hover { background-color: transparent; color: var(--text); text-decoration: underline; }
+
+  /* ------------------------------------------------------------ sign-in */
+  /* Google's button is the one control the app doesn't style (auth.tsx renders GSI's own): only its
+     box is ours, with no fill, border or shadow. */
+  .signin { display: grid; gap: var(--s5); justify-items: start; max-width: 520px; }
+  .gsi-box { display: flex; min-height: 44px; background: none; border: 0; box-shadow: none; }
+
+  /* ====================================================== kiosk parts */
+  [data-surface="kiosk"] { --tap: 56px; font-size: var(--k-body); }
+  .k-bar { display: flex; align-items: center; gap: var(--s4); min-height: calc(88 * var(--k-u)); padding: 0 var(--k-gutter);
+    background: var(--chrome); box-shadow: var(--hl), var(--shadow-bar); }
+  .k-bar__count { display: inline-flex; align-items: baseline; gap: var(--s2); font-size: var(--k-label); font-weight: var(--w-head); }
+  .k-bar__count .num { font-size: calc(40 * var(--k-u)); }
+  .k-bar__door { margin-inline-start: auto; font-size: calc(28 * var(--k-u)); font-weight: var(--w-head); color: var(--text); }
+  .k-bar .btn { min-height: calc(56 * var(--k-u)); font-size: var(--k-label); }
+  .k-staffbtn { display: inline-flex; align-items: center; gap: calc(10 * var(--k-u)); min-height: calc(56 * var(--k-u)); padding: 0 calc(20 * var(--k-u)) 0 calc(16 * var(--k-u));
+    border: 0; border-radius: var(--r-full); background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 2px var(--text);
+    font: inherit; font-size: calc(22 * var(--k-u)); font-weight: var(--w-head); cursor: pointer; }
+  .k-staffbtn .icon { width: calc(24 * var(--k-u)); height: calc(24 * var(--k-u)); }
+  .k-staffbtn[aria-expanded="true"] { background: var(--text); color: var(--page); }
+  .k-label { font-size: var(--k-label); font-weight: var(--w-head); }
+  .k-code, .pair__code { font-family: var(--font-code); font-size: var(--k-code); font-weight: var(--w-loud); line-height: 1; letter-spacing: .02em;
+    font-variant-numeric: tabular-nums; font-variant-ligatures: none; white-space: nowrap; }
+  .pair__gap { display: inline-block; width: .5em; }
+  .btn--k { min-height: var(--k-btn); padding: 0 calc(40 * var(--k-u)); font-size: calc(28 * var(--k-u)); }
+  /* The door: bar, then one panel of two rows in every state (the status band at --k-door, the camera
+     window in the rest), then the typed-code strip. A result floods the whole panel, so the flood
+     frames the window: Checked in on --field, Already on --st-in, Refused and Camera blocked on
+     --st-stop-fill. Nothing moves between states; only fills, glyphs and words change. */
+  .door { display: flex; flex-direction: column; min-height: 100vh; min-height: 100svh; background: var(--page); color: var(--text); }
+  .door > .k-bar { flex: none; }
+  .door .roomn__n { font-size: calc(64 * var(--k-u)); min-width: 2ch; text-align: start; }
+  .door .roomn__l { font-size: calc(28 * var(--k-u)); }
+  .door__panel { flex: 1; display: grid; grid-template-rows: var(--k-door) minmax(0, 1fr); min-height: 0; background: var(--raised); color: var(--text);
+    transition: background-color var(--fx) var(--ease), color var(--fx) var(--ease); }
+  .door__panel--in { background: var(--field); color: var(--on-field); }
+  .door__panel--already { background: var(--st-in); color: var(--on-st-in); }
+  .door__panel--stop { background: var(--st-stop-fill); color: var(--on-st-stop-fill); }
+  .door__status { display: grid; align-content: end; padding: calc(32 * var(--k-u)) var(--k-gutter); }
+  .door__status .lockup { font-size: var(--k-status); line-height: 1.02; letter-spacing: -0.01em; }
+  .door__status .lockup > .icon { stroke-width: 32; }
+  .door__panel--in .lockup > .icon, .door__panel--stop .lockup > .icon { color: currentColor; }
+  .door__panel--already .lockup > .icon { color: var(--st-in-mark); }
+  .door__name { font-size: var(--k-name); font-weight: var(--w-head); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .door__prompt { font-size: var(--k-prompt); font-weight: var(--w-head); line-height: 1.15; }
+  .door__cam { position: relative; margin: 0 var(--k-gutter) var(--k-gutter); border-radius: calc(16 * var(--k-u)); background: var(--cam); overflow: hidden; }
+  .target { position: absolute; top: 50%; left: 50%; width: calc(320 * var(--k-u)); height: calc(320 * var(--k-u)); transform: translate(-50%, -50%);
+    color: var(--cam-mark); transition: color var(--fx) var(--ease); }
+  .target svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .target polyline { fill: none; stroke: currentColor; stroke-width: calc(10 * var(--k-u)); stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+  .door__panel--in .target { color: var(--cam-mark-ok); }
+  /* Start check-in is the camera window itself: --cam, a 4px --cam-mark-ok ring, the glyph over the words. */
+  .camstart { position: relative; margin: 0 var(--k-gutter) var(--k-gutter); padding: 0; border: 0; border-radius: calc(16 * var(--k-u)); font: inherit;
+    background: var(--cam); color: var(--cam-mark-ok); box-shadow: inset 0 0 0 calc(4 * var(--k-u)) var(--cam-mark-ok);
+    display: grid; place-content: center; justify-items: center; gap: calc(24 * var(--k-u)); cursor: pointer; }
+  .camstart .icon { width: calc(128 * var(--k-u)); height: calc(128 * var(--k-u)); stroke-width: 18; }
+  .camstart > span { font-size: calc(64 * var(--k-u)); font-weight: var(--w-loud); line-height: 1.05; white-space: nowrap; }
+  .camstart--wait { background: var(--well); color: var(--muted); box-shadow: none; cursor: default; pointer-events: none; }
+  /* The typed code: a field and a separate 64 Check in button, padded above the home bar. */
+  .door__strip { flex: none; display: grid; grid-template-columns: minmax(0, 1fr); row-gap: calc(8 * var(--k-u));
+    padding: calc(16 * var(--k-u)) var(--k-gutter) calc(var(--k-gutter) + env(safe-area-inset-bottom)); background: var(--page); }
+  .codein { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: calc(12 * var(--k-u)); }
+  .codein .input { min-height: calc(64 * var(--k-u)); border: 2px solid var(--line-strong); border-radius: var(--r-md); font-size: calc(28 * var(--k-u)); }
+  .codein .btn { min-height: calc(64 * var(--k-u)); padding: 0 calc(36 * var(--k-u)); font-size: calc(24 * var(--k-u)); }
+  /* Pairing: the code at 144 in the middle band, a label over it, the time it works until under it. */
+  .pair__body { display: grid; justify-items: start; padding: calc(64 * var(--k-u)) var(--k-gutter) calc(40 * var(--k-u)); gap: calc(12 * var(--k-u)); }
+  .pair__group { display: grid; width: max-content; max-width: 100%; }
+  .pair__group > :not(.pair__code) { inline-size: 0; min-inline-size: 100%; }
+  .pair__label { font-size: var(--k-label); font-weight: var(--w-head); color: var(--muted); }
+  .pair__until { font-size: calc(28 * var(--k-u)); font-weight: var(--w-head); }
+  .pair__how { font-size: calc(28 * var(--k-u)); line-height: 1.35; margin-top: calc(36 * var(--k-u)); max-width: 30ch; }
+  .pair__expired { font-size: calc(40 * var(--k-u)); font-weight: var(--w-loud); }
+  .pair__code--old { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--st-stop-mark); text-decoration-thickness: calc(6 * var(--k-u)); }
+
+  /* ================================================== projector parts */
+  [data-surface="projector"] { font-size: var(--p-body); }
+  /* <Projector>: the 1920 x 1080 stage for the room's screen, every size a stage size scaled by --stage-u. */
   .projector {
     --fs-h1: var(--proj-head);
     --lh-h1: 1.1;
@@ -277,18 +913,195 @@
   }
   .projector > * { margin: 0; }
   .projector .big__label { font-size: var(--proj-small); }
-  /* Rows read from the back of the room: stage-sized space and a 2px rule. */
-  .projector .list > li {
-    padding-block: calc(24 * var(--stage-u));
-    border-bottom-width: max(var(--rcc-hairline), calc(2 * var(--stage-u)));
-  }
+  .projector .list > li { padding-block: calc(24 * var(--stage-u)); border-bottom-width: max(var(--rcc-hairline), calc(2 * var(--stage-u))); }
+  .p-head { font-size: var(--p-head); font-weight: var(--w-head); line-height: 1.1; }
+  .p-body { font-size: var(--p-body); line-height: 1.3; }
+  .p-small { font-size: var(--p-small); line-height: 1.3; }
+  .p-ledger { font-size: var(--p-ledger); font-weight: var(--w-head); }
+  .p-count { font-size: var(--p-count); }
+  .p-rank { font-size: var(--p-rank); }
+  .stage__frame { position: absolute; inset: var(--p-margin); }
+  /* The check-in card: a green field 600 wide. The top row (what to do and hide), the QR at full width,
+     then the count with "checked in" on its baseline. One size and place in every state. */
+  .stage-card { position: absolute; right: var(--p-margin); bottom: var(--p-margin); width: var(--p-card);
+    background: var(--field); color: var(--on-field); border-radius: var(--p-radius); padding: calc(32 * var(--stage-u));
+    display: grid; grid-template-columns: minmax(0, 1fr); gap: calc(16 * var(--stage-u)); }
+  .stage-card .icon { stroke-width: 32; }
+  .stage-card__top { display: flex; align-items: center; justify-content: space-between; gap: calc(16 * var(--stage-u)); min-height: calc(56 * var(--stage-u)); }
+  .stage-card__scan { font-size: var(--p-small); font-weight: var(--w-head); }
+  .stage-card .qr { width: 100%; border-radius: calc(16 * var(--stage-u)); }
+  .stage-card__count { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: calc(16 * var(--stage-u)); }
+  .stage-card__count .num { font-size: var(--p-count); line-height: .8; letter-spacing: -0.03em; }
+  .stage-card__label { font-size: var(--p-small); font-weight: var(--w-head); }
+  /* Loading: the step word in the numeral's slot at the head size; an error keeps the last count muted. */
+  .stage-card__step { font-size: var(--p-head); font-weight: var(--w-loud); line-height: .8; letter-spacing: -0.01em; color: var(--on-field-muted); }
+  .stage-card__count--stale :is(.num, .stage-card__label) { color: var(--on-field-muted); }
+  .stage-card__hide { width: max(24px, calc(56 * var(--stage-u))); height: max(24px, calc(56 * var(--stage-u))); min-height: 0; padding: 0;
+    background-color: transparent; color: var(--on-field); box-shadow: inset 0 0 0 max(1px, calc(3 * var(--stage-u))) var(--on-field-muted); }
+  .stage-card__hide .icon { width: 50%; height: 50%; }
+  .stage-card__poll { border-top: var(--p-rule) solid var(--on-field-muted); padding-top: calc(16 * var(--stage-u)); font-size: var(--p-small); }
+  /* While a question shows, the card steps down to the sunken rung and keeps its box; its count at 160. */
+  .stage-card--poll { background: var(--well); color: var(--text); }
+  .stage-card--poll .stage-card__count .num { font-size: var(--p-rank); }
+  .stage-card--poll .stage-card__label { color: var(--muted); }
+  .stage-card--poll .stage-card__hide { color: var(--text); box-shadow: inset 0 0 0 calc(3 * var(--stage-u)) var(--line-strong); }
+  .stage-card--poll :focus-visible { outline-color: var(--focus); }
+  /* A presenter note in the bottom-left lane: --well, --muted words at 40, the clock or warning glyph,
+     its action at the end. Never a card the size of the stage card. */
+  .pnote { display: flex; gap: calc(16 * var(--stage-u)); align-items: flex-start; max-width: calc(880 * var(--stage-u)); min-height: calc(96 * var(--stage-u));
+    padding: calc(20 * var(--stage-u)) calc(28 * var(--stage-u)); border-radius: calc(16 * var(--stage-u));
+    background: var(--well); color: var(--muted); font-size: var(--p-small); line-height: 1.3; }
+  .pnote b { color: var(--text); font-weight: var(--w-head); }
+  .pnote .icon { color: var(--st-open-mark); width: 1em; height: 1em; margin-top: .15em; stroke-width: 24; }
+  .pnote--row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: calc(24 * var(--stage-u)); align-items: end; }
+  .ptab { display: inline-flex; align-items: center; gap: .4em; padding: calc(16 * var(--stage-u)) calc(28 * var(--stage-u));
+    border-radius: calc(16 * var(--stage-u)); box-shadow: inset 0 0 0 calc(4 * var(--stage-u)) var(--line-strong);
+    color: var(--muted); font-size: var(--p-small); font-weight: var(--w-head); }
+  .ptab .icon { width: 1em; height: 1em; }
+  /* The leaderboard: the title and lock line on top, the 1st place block left, the ranked ledger right. */
+  .lbtitle { display: flex; align-items: baseline; justify-content: space-between; }
+  .lbtitle h4, .lbtitle h1 { margin: 0; font-size: var(--p-q); font-weight: var(--w-head); }
+  .lbtitle .lockup { font-size: var(--p-small); font-weight: var(--w-head); }
+  .lbtitle .lockup .icon { color: var(--muted); stroke-width: 24; }
+  .lbgrid { display: grid; grid-template-columns: calc(640 * var(--stage-u)) minmax(0, 1fr); gap: calc(48 * var(--stage-u)); align-items: start; }
+  .lbbody { display: grid; align-content: start; gap: calc(32 * var(--stage-u)); }
+  .first { display: grid; gap: calc(20 * var(--stage-u)); padding: calc(40 * var(--stage-u)); background: var(--field); color: var(--on-field); border-radius: var(--p-radius); }
+  .first__rank { font-size: var(--p-rank); font-weight: var(--w-loud); line-height: .85; letter-spacing: -0.03em; }
+  .first__ord { font-size: .42em; vertical-align: 1em; letter-spacing: 0; margin-inline-start: .04em; }
+  .first__team { display: flex; align-items: center; gap: calc(24 * var(--stage-u)); font-size: var(--p-head); font-weight: var(--w-loud); line-height: 1; }
+  .first__team .team__chip { width: calc(64 * var(--stage-u)); height: calc(64 * var(--stage-u)); border-radius: calc(8 * var(--stage-u)); box-shadow: 0 0 0 calc(4 * var(--stage-u)) var(--on-field); }
+  .first__credit { font-size: var(--p-body); font-weight: var(--w-loud); }
+  .first__line { font-size: var(--p-body); line-height: 1.25; }
+  .first__line b { font-weight: var(--w-loud); font-variant-numeric: tabular-nums; }
+  .pledger { --lcols: calc(104 * var(--stage-u)) minmax(0, 1fr) calc(150 * var(--stage-u)) calc(230 * var(--stage-u)) calc(250 * var(--stage-u)); display: grid; }
+  .pledger__head, .pledger__row { display: grid; grid-template-columns: var(--lcols); column-gap: calc(24 * var(--stage-u)); align-items: center; }
+  .pledger__head { font-size: var(--p-ledger); font-weight: var(--w-head); color: var(--muted); padding-bottom: calc(12 * var(--stage-u)); }
+  .pledger__row { min-height: calc(104 * var(--stage-u)); border-top: var(--p-rule) solid var(--line); font-size: var(--p-body); }
+  .pledger__row.is-held { box-shadow: inset 0 0 0 var(--p-rule) var(--accent); }
+  .pledger .n { text-align: right; font-variant-numeric: tabular-nums lining-nums; }
+  .pledger__place { font-weight: var(--w-loud); }
+  .pledger .team { gap: calc(20 * var(--stage-u)); }
+  .pledger .team__chip { width: calc(32 * var(--stage-u)); height: calc(32 * var(--stage-u)); border-radius: calc(6 * var(--stage-u)); }
+  .pledger__row--empty .pledger__place { color: var(--muted); font-weight: var(--w-body); }
+  .lbfoot { font-size: var(--p-small); color: var(--muted); line-height: 1.3; }
 
-  /* ----------------------------------------------- forced colors */
-  /* Windows High Contrast drops fills and box-shadows: give the edges and the
-     chosen states a real line. */
+  /* =================================================== phone parts */
+  /* The pass: the student's ticket. QR, then the name and the code on one axis. */
+  .pass, .stub { display: grid; gap: var(--s3); padding: var(--s4); border-radius: var(--r-xl); overflow: hidden; }
+  .pass { background: var(--raised); box-shadow: var(--hl), var(--shadow-1); }
+  .pass__head { font-size: var(--t-h3); font-weight: var(--w-head); }
+  .pass__note { font-size: var(--t-small); color: var(--muted); }
+  /* The checked-in stub: the field with a perforation, In at and Late after as paired values. */
+  .stub { background: var(--field); color: var(--on-field); }
+  .stub .lockup { font-size: var(--t-display); }
+  .stub .lockup > .icon { color: var(--on-field); }
+  .stub__name { font-size: 1.25rem; font-weight: var(--w-head); }
+  .perf { position: relative; height: 0; margin: var(--s1) calc(-1 * var(--s4)); border: 0; border-top: 2px dashed var(--on-field-muted); overflow: visible; }
+  .perf::before, .perf::after { content: ""; position: absolute; top: -13px; width: 24px; height: 24px; border-radius: 50%; background: var(--perf-bg, var(--page)); }
+  .perf::before { left: -12px; }
+  .perf::after { right: -12px; }
+  .stub__times { display: grid; grid-template-rows: auto auto; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); column-gap: var(--s4); row-gap: var(--s1); align-items: last baseline; }
+  .stub__times > * { display: contents; }
+  .stub__l { display: block; font-size: var(--t-small); font-weight: var(--w-head); }
+  .stub__v { display: block; font-size: 1.5rem; font-weight: var(--w-head); line-height: 1.25; font-variant-numeric: tabular-nums lining-nums; }
+  .stub__u { font-size: var(--t-body); margin-inline-start: .2em; }
+  /* The quiz field: the question then the tiles. It fills the phone body from the folded rows to the
+     action bar, so its edges hold still in open, sending, sent and retry. One 20 glyph size inside. */
+  .qfield { display: flex; flex-direction: column; justify-content: space-between; gap: var(--s3); flex: 1 0 auto; padding: var(--s4);
+    background: var(--field); color: var(--on-field); border-radius: var(--r-xl); }
+  .qfield .icon { width: 20px; height: 20px; }
+  .qfield__q { font-size: var(--t-h1); font-weight: var(--w-loud); line-height: 1.2; text-wrap: balance; }
+  .qfield .choices { gap: var(--s2); }
+  .qfield .choice { border-radius: var(--r-md); }
+  .qfield .choice:not([aria-pressed="true"], .is-picked, .is-error, .is-right) { box-shadow: var(--hl); }
+  .qfield .choice.is-out .letter { background: var(--out-letter); color: var(--on-out-letter); }
+  .qfield__foot { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: var(--s4); align-items: start; font-size: var(--t-small); color: var(--on-field); }
+  .qfield__foot > .icon { justify-self: center; }
+  /* The slide card: --raised, the screen's one raised object, no shadow. */
+  .livestate { display: grid; gap: var(--s3); padding: var(--s4); background: var(--raised); border-radius: var(--r-lg); box-shadow: var(--hl), var(--card-ring); }
+  .livestate__where { font-size: var(--t-small); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .livestate__title { font-size: var(--t-h1); font-weight: var(--w-head); line-height: 1.2; }
+  /* The phone's action bar: in the flow at the bottom, the sticky-bar rung. One 56 row: Back and
+     Next as 56 icon buttons (.btn--neutral, no stroke) at the ends, the main action between. The
+     why-line shows above the row only after a tap on the disabled Next. */
+  .phone-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); z-index: var(--z-bar);
+    padding: var(--s4) max(var(--s4), env(safe-area-inset-right)) max(var(--s4), env(safe-area-inset-bottom)) max(var(--s4), env(safe-area-inset-left));
+    background: var(--chrome); border-radius: 0; box-shadow: var(--hl), var(--shadow-bar-up); }
+  .phone-actions > .btn { flex: 1 1 0; min-width: 0; min-height: 56px; }
+  .phone-actions > .btn--icon { flex: none; width: 56px; height: 56px; padding: 0; border-radius: var(--r-full); }
+  .phone-actions > .btn--icon .icon { width: 24px; height: 24px; }
+  .phone-actions > :not(.btn) { flex-basis: 100%; }
+  .phone-actions__why { order: -1; font-size: var(--t-small); color: var(--muted); }
+  /* The phone leaderboard: ruled rows on the page, two lines each (name, then the meta), rank and
+     credit on the name's first baseline. */
+  .board-ph { --rcols: 28px minmax(0, 1fr) auto; }
+  .board-ph :is(.ruled__head, .ruled__row) { column-gap: var(--s3); padding-inline: 0; }
+  .board-ph .ruled__row { min-height: 64px; padding-block: var(--s2); font-size: var(--t-body); align-items: first baseline; }
+  .board-ph__rank { text-align: right; font-size: var(--n-sm); font-weight: var(--w-loud); font-variant-numeric: tabular-nums lining-nums; }
+  .board-ph__meta { display: block; font-size: var(--t-small); font-weight: var(--w-body); color: var(--muted); }
+  .board-ph__credit { text-align: right; font-size: var(--n-sm); font-weight: var(--w-loud); line-height: 1.1; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+
+  /* ==================================================== host parts */
+  /* The slide track: the lecture's own timeline with the lost taps over each slide. One fixed-height
+     row; every lost count one size (24, 700) on one baseline; the current slide is its filled segment
+     and bold number; past slides with no taps print a muted 0, future slides nothing. */
+  .track { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr) auto; column-gap: var(--s8); align-items: end; height: 88px; padding: var(--s2) 0; }
+  .track__where { display: grid; padding-bottom: 2px; min-width: 0; }
+  .track__of { font-size: var(--t-small); font-weight: var(--w-head); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .track__title { font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .track__lane { display: grid; grid-template-columns: 44px repeat(var(--slides, 12), minmax(0, 1fr)); grid-template-rows: 32px 8px 20px;
+    column-gap: var(--s1); row-gap: var(--s1); align-items: end; min-width: 0; }
+  .track__rl { font-size: var(--t-small); font-weight: var(--w-head); color: var(--muted); line-height: 20px; align-self: end; }
+  .track__n { text-align: center; font-size: 1.5rem; font-weight: var(--w-loud); line-height: 1; font-variant-numeric: tabular-nums lining-nums; align-self: end; }
+  .track__n--zero { color: var(--muted); }
+  .track__seg { height: 8px; border-radius: var(--r-xs); background: var(--line-strong); }
+  .track__seg--now { background: var(--text); }
+  .track__i { text-align: center; font-size: var(--t-small); color: var(--muted); line-height: 20px; font-variant-numeric: tabular-nums; }
+  .track__i--now { color: var(--text); font-weight: var(--w-loud); }
+  .track__room { padding-bottom: 2px; }
+  .track__room .roomn__n { font-size: var(--n-md); }
+  /* The host's focal card: one padding on every tab, ends at its content. */
+  .hcard { display: grid; gap: var(--s5); padding: var(--s6) var(--s8); background: var(--focal-fill); border-radius: var(--r-xl);
+    box-shadow: var(--hl), var(--shadow-1); min-width: 0; align-content: start; }
+  .qrow { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; column-gap: var(--s4); align-items: baseline; }
+  .qrow__votes { text-align: center; font-size: var(--n-sm); font-weight: var(--w-loud); font-variant-numeric: tabular-nums; }
+  .qrow__text { font-size: var(--t-body); font-weight: var(--w-head); }
+  .qrow__meta, .qrow__time { font-size: var(--t-small); color: var(--muted); }
+  .qrow__time { font-variant-numeric: tabular-nums; }
+  /* A side panel waiting for data: the well, one quiet line at the top, ending at its content. */
+  .side-wait { display: grid; align-content: start; min-height: 96px; padding: var(--s4); border-radius: var(--r-xl); background: var(--well); }
+
+  /* ==================================================== staff parts */
+  .reg { --rcols: minmax(0, 1fr) 120px 120px 96px; }
+  .reg .ruled__row { font-size: var(--t-body); }
+  .reg__time { font-variant-numeric: tabular-nums; text-align: right; }
+  .reg__time small { font-size: var(--t-small); margin-inline-start: .2em; }
+  .reg__empty { color: var(--muted); }
+  .staffhead .tally__lead { font-size: var(--n-lg); }
+  /* The scan result: the fill step is its edge, no ring. */
+  .scanres { display: grid; gap: var(--s1); padding: var(--s4) var(--s5); border-radius: var(--r-lg); background: var(--st-in); color: var(--on-st-in); box-shadow: none; }
+  .scanres .lockup { font-size: var(--t-h2); }
+  .indep { font-size: var(--t-small); color: var(--muted); }
+
+  @keyframes rcc-sendbar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @keyframes rcc-rise { from { transform: translateY(110%); } to { transform: none; } }
+  @keyframes rcc-fade { from { opacity: 0; } to { opacity: 1; } }
+
+  /* ------------------------------------------------------- more contrast */
+  /* Every raised and sunken edge turns into a 2px --line-strong ring. */
+  @media (prefers-contrast: more) {
+    :is(.card, .panel, .rows, .choice, .barrow, .pass, .hcard, .scanres, .livestate, .sheet, .confirm) { box-shadow: inset 0 0 0 2px var(--line-strong); }
+    :is(.well, .ruled--well, .reg, .table) { box-shadow: inset 0 0 0 2px var(--line-strong); }
+    .ruled__row.is-selected, .rows > .row.is-selected { box-shadow: inset 0 0 0 2px var(--text); }
+    .focal { box-shadow: inset 0 0 0 2px var(--text); }
+  }
+  /* ------------------------------------------------------- forced colors */
+  /* Windows High Contrast drops fills and box-shadows: give the edges and the chosen states a real line. */
   @media (forced-colors: active) {
-    .badge, .banner, .seg, .confirm { border: 1px solid CanvasText; }
+    .badge, .banner, .notice, .state, .seg, .confirm { border: 1px solid CanvasText; }
     .seg__input:checked + .seg__label { outline: 2px solid Highlight; outline-offset: -2px; }
-    .tabs__tab[aria-selected="true"]::after { background: Highlight; forced-color-adjust: none; }
+    .tabs__tab:is([aria-selected="true"], [aria-current="page"])::after { background: Highlight; forced-color-adjust: none; }
+    .choice:is([aria-pressed="true"], .is-picked), .rows > .row.is-selected, .barrow.is-mine { outline: 3px solid Highlight; }
+    .ruled__row.is-confirm, .rows > .row.row--confirm, .banner--inset { outline: 2px solid CanvasText; }
   }
 }

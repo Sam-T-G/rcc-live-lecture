@@ -1,23 +1,26 @@
 /* =============================================================================
    RCC Live Lecture: design tokens.
 
-   Copied from the GDG on Campus RCC design system: github.com/Sam-T-G/rcc-gdg,
-   docs/04-brand/design-system/tokens.css (v1.0 of 2026-08-31, read 2026-10-31).
-   Its contrast audit is foundations.md §2.5; the projector sizes come from
-   presentation.md §13.3. Every value is GDG's unless a comment says the app
-   chose it. Never edit rcc-gdg from here: copy a changed value over, then run
-   `npm test`.
+   Two sets, one file:
+   - The GDG on Campus RCC design system's own tokens (--rcc-*): github.com/Sam-T-G/rcc-gdg,
+     docs/04-brand/design-system/tokens.css (v1.0 of 2026-08-31, read 2026-10-31). Its contrast
+     audit is foundations.md §2.5; the projector sizes come from presentation.md §13.3. Never edit
+     rcc-gdg from here: copy a changed value over, then run `npm test`.
+   - The app's design system (docs/design.md): the rungs (--well, --page, --raised, --bar,
+     --overlay), the color field, the state triples, team colors, type roles (--t-*), numerals
+     (--n-*), space (--s*), radius (--r-*), motion (--fx*, --sp*) and the kiosk (--k-*) and
+     projector (--p-*) sizes. Light fills are GDG v1.0; the dark rungs and the field are the
+     app's (docs/design.md "Where the app differs from GDG on purpose").
 
-   Pages use the short names at the bottom of each block (--bg, --text,
-   --accent, --fs-body, ...). src/styles/contrast.ts lists the text and
-   background pairs those names make, and src/styles/contrast.test.ts measures
-   every one in light and dark. docs/design.md says which name goes where, and
-   #/ui shows all of them.
+   Pages use the app's names. The short names pages used before (--bg, --surface, --fill,
+   --accent-text, --error-soft and the rest) stay as aliases at the bottom, declared on every
+   theme scope so they resolve inside a [data-theme] island. src/styles/contrast.ts lists the
+   pairs the app draws and src/styles/contrast.test.ts measures every one in light and dark;
+   ios/RCCLivePortal/Palette.swift mirrors the hex values ios.test.ts checks.
 
-   Left out on purpose: --rcc-fill-green and --rcc-fill-yellow (the licensed
-   bright fills: under --rcc-on-surface words they fail contrast in dark),
-   blue (GDG keeps it for links to other documents, and this app has none),
-   the Step, and the narrative and expressive motion tiers (decks only).
+   Left out on purpose: --rcc-fill-green and --rcc-fill-yellow (the licensed bright fills),
+   blue (GDG keeps it for links to other documents), the Step, and the narrative and expressive
+   motion tiers (decks only).
    ============================================================================= */
 
 /* Cascade layers: tokens, then base elements (src/index.css), then the kit
@@ -74,17 +77,17 @@
     --card-pad: var(--rcc-space-4);
 
     /* Hit areas. GDG's floor is 48px; --tap (44px) is the app's floor for
-       anything tapped on a phone, and --rcc-control-sm is for laptop pages only. */
+       anything tapped on a phone or iPad, and --rcc-control-sm is for laptop pages only. */
     --rcc-target-min: 3rem;    /* 48 */
     --rcc-control-sm: 2.25rem; /* 36 */
     --tap: 2.75rem;            /* 44 (app) */
 
     /* --------------------------------------------------------------- shape */
-    --rcc-radius-xs: 0.25rem;  /*  4: badges, inline code */
-    --rcc-radius-sm: 0.5rem;   /*  8: inputs, pressed buttons */
-    --rcc-radius-md: 0.75rem;  /* 12: a card in a grid */
-    --rcc-radius-lg: 1rem;     /* 16: page cards, banners */
-    --rcc-radius-xl: 1.5rem;   /* 24: page-level panels */
+    --rcc-radius-xs: 0.25rem;  /*  4: badges, chips, letter tiles */
+    --rcc-radius-sm: 0.5rem;   /*  8: inputs */
+    --rcc-radius-md: 0.75rem;  /* 12: grouped rows, the QR plate */
+    --rcc-radius-lg: 1rem;     /* 16: cards, tiles, banners */
+    --rcc-radius-xl: 1.5rem;   /* 24: wells, fields, focal cards, sheets */
     --rcc-radius-full: 9999px; /* only things you can press */
     --rcc-hairline: 1px;
     --radius: var(--rcc-radius-lg);
@@ -141,6 +144,112 @@
     --proj-ledger: max(var(--rcc-size-code-sm), calc(32 * var(--stage-u)));
     --proj-digits: max(4rem, calc(240 * var(--stage-u)));
     --proj-margin: max(var(--rcc-space-4), calc(96 * var(--stage-u)));
+
+    /* ================================ the app's design system (docs/design.md) */
+    --font: var(--rcc-font-text);
+    --font-code: var(--rcc-font-code);
+    --w-body: var(--rcc-weight-body);
+    --w-head: var(--rcc-weight-strong);
+    --w-loud: var(--rcc-weight-loud);
+
+    /* Space: --sN is N x 4px. Nothing off this ladder. */
+    --s1: var(--rcc-space-1); --s2: var(--rcc-space-2); --s3: var(--rcc-space-3); --s4: var(--rcc-space-4);
+    --s5: var(--rcc-space-5); --s6: var(--rcc-space-6); --s8: var(--rcc-space-8); --s10: var(--rcc-space-10);
+    --s12: var(--rcc-space-12); --s16: var(--rcc-space-16); --s24: 6rem;
+
+    /* Shape: GDG's scale, nested (inner = outer minus padding). Full radius only for things you press. */
+    --r-xs: var(--rcc-radius-xs); --r-sm: var(--rcc-radius-sm); --r-md: var(--rcc-radius-md);
+    --r-lg: var(--rcc-radius-lg); --r-xl: var(--rcc-radius-xl); --r-full: var(--rcc-radius-full);
+
+    /* Lines: the 3px select ring and the focus ring (3px, 2px clear; 3px clear on kiosk and projector). */
+    --ring-select: 3px;
+    --focus-w: 3px;
+    --focus-off: 2px;
+
+    /* Motion: GDG's two tracks. Effects never overshoot; spatial may, a little. */
+    --fx-fast: var(--rcc-dur-fast-effects);
+    --fx: var(--rcc-dur-default-effects);
+    --fx-slow: 220ms;
+    --sp-fast: var(--rcc-dur-fast-spatial);
+    --sp: var(--rcc-dur-default-spatial);
+    --sp-slow: 480ms;
+    --ease: var(--rcc-ease-standard);
+    --ease-sp: var(--rcc-ease-spatial);  /* the phone's answer tap and the switch knob only */
+    --ease-exit: var(--rcc-ease-exit);
+    --hold-result: 3000ms;  /* a kiosk result before it goes back to idle */
+    --hold-new: 4000ms;     /* a row just added keeps its tint this long */
+
+    /* Layers */
+    --z-bar: 10; --z-banner: 20; --z-scrim: 30; --z-sheet: 31;
+
+    /* Type roles (rem, so Safari's text size scales them) */
+    --t-display: 2rem;      /* 32: the phone's state headline */
+    --t-h1: 1.75rem;        /* 28: page or slide title */
+    --t-h2: 1.5rem;         /* 24: the question */
+    --t-h3: 1.125rem;       /* 18: card title */
+    --t-choice: 1.1875rem;  /* 19: answer tile words */
+    --t-body: 1.0625rem;    /* 17 */
+    --t-small: 0.9375rem;   /* 15: hints, meta, table cells, readout labels */
+    --t-label: 0.9375rem;   /* 15 at 500: buttons, field names */
+    --t-ledger: 0.8125rem;  /* 13: badges and chips only (laptop) */
+
+    /* Numerals: one role (.num: 700, tabular and lining, line-height 1), four sizes */
+    --n-hero: 6rem;      /* 96: the one live number on a laptop screen */
+    --n-lg: 3rem;        /* 48: the one lead readout when no live number is on screen */
+    --n-md: 2rem;        /* 32: readouts beside a lead one */
+    --n-sm: 1.25rem;     /* 20: bar values, table numbers, upvotes */
+    --t-numeral: 4.5rem; /* 72: the staff big number */
+
+    /* Icons on the 24 grid: two sizes, one stroke that scales with the size */
+    --icon-s: 16px; --icon-m: 20px;
+
+    /* Phone */
+    --choice-h: 72px; --phone-gutter: 16px; --field-gutter: 8px;
+    /* Laptop */
+    --page-margin: 48px; --page-max: 1344px; --bar-h: 56px; --row-h: 44px; --btn-sm: 32px;
+    --aside-w: 400px;  /* the host and staff right column */
+
+    /* Kiosk unit: 1px on the iPad (#/ui shrinks it to preview). */
+    --k-u: 1px;
+
+    /* The warning glyph drawn by CSS where a part has no markup for it (a Status error, a field
+       error, a confirm's question), as a mask in the state's mark color. */
+    --warn-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cg fill='none' stroke='%23000' stroke-width='24' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M128 100v44'/%3E%3Cpath d='M114.2 40l-88 152A16 16 0 0 0 40 216h176a16 16 0 0 0 13.8-24l-88-152a16 16 0 0 0-27.6 0z'/%3E%3C/g%3E%3Ccircle cx='128' cy='180' r='16' fill='%23000'/%3E%3C/svg%3E");
+    /* The busy button's still glyph under reduced motion (kit.css .btn[aria-busy]) */
+    --clock-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cg fill='none' stroke='%23000' stroke-width='24' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='128' cy='128' r='96'/%3E%3Cpath d='M128 72v56h56'/%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  /* Sizes built from a unit, declared again on [data-surface] so a scope that changes --k-u or
+     --stage-u (a preview in #/ui, a smaller window) gets sizes from its own unit. */
+  :root,
+  [data-surface] {
+    /* Kiosk: the door iPad at about 1m */
+    --k-status: calc(96 * var(--k-u));  /* the status word */
+    --k-name: calc(80 * var(--k-u));    /* the student's name under it */
+    --k-prompt: calc(48 * var(--k-u));
+    --k-code: calc(144 * var(--k-u));   /* the 6-digit pairing code, 140 or more */
+    --k-num: calc(72 * var(--k-u));
+    --k-body: calc(22 * var(--k-u));
+    --k-label: calc(18 * var(--k-u));   /* the iPad's floor is 16 */
+    --k-panel: calc(440 * var(--k-u));
+    --k-door: calc(432 * var(--k-u));   /* the door's status band, the same in every state */
+    --k-medal: calc(80 * var(--k-u));
+    --k-btn: calc(72 * var(--k-u));     /* Start check-in */
+    --k-gutter: calc(24 * var(--k-u));
+
+    /* Projector: 1 stage px at 1920 x 1080. Everything scales with the window. */
+    --p-count: calc(240 * var(--stage-u));   /* the stage count: the one number */
+    --p-rank: calc(160 * var(--stage-u));    /* anything read alone */
+    --p-head: calc(92 * var(--stage-u));
+    --p-q: calc(64 * var(--stage-u));        /* the stage question and the leaderboard title */
+    --p-body: calc(48 * var(--stage-u));
+    --p-small: calc(40 * var(--stage-u));    /* the floor for a sentence */
+    --p-ledger: calc(32 * var(--stage-u));   /* the floor for any text */
+    --p-margin: calc(96 * var(--stage-u));
+    --p-rule: calc(6 * var(--stage-u));
+    --p-card: calc(600 * var(--stage-u));    /* the check-in card; its QR fills it */
+    --p-radius: calc(24 * var(--stage-u));
+    --p-ring: calc(4 * var(--stage-u));      /* presenter note, the poll card's ring */
   }
 
   /* ---------------------------------------------------------- light colors */
@@ -185,8 +294,66 @@
     --rcc-elevation-key: 0.3;
     --rcc-elevation-ambient: 0.15;
 
-    /* Cards: white on the tinted page (GDG §2.6). */
-    --surface: var(--rcc-surface-container-lowest);
+    /* The rungs, low to high: a well sits one step under the page, a card one step over it. */
+    --well: #e4e9e5;      /* sunken: rows, tables, readouts */
+    --page: #eef2ee;      /* the ground */
+    --raised: #ffffff;    /* content, cards, fields, a table head inside a well */
+    --bar: #dce3dd;       /* neutral badges, letter tiles, bar tracks; #dce3dd keeps green and red words at 4.61:1 on it (#d9e0da was 4.48) */
+    --overlay: #ffffff;   /* sheets and confirms, always with --shadow-2 and the scrim */
+    --hl: 0 0 #0000;      /* the dark-only 1px top highlight on a raised thing */
+    --scrim: rgb(16 20 18 / .48);
+    --chrome: #ffffff;    /* sticky bars: one rung above the page (light --raised, dark --bar) */
+    --on-raised: #dce3dd; /* a part inside a raised card: letter tiles, bar tracks, a selected row */
+    --focal-fill: #ffffff;
+    --lift: #ffffff;
+    --track: #e4e9e5;     /* a bar chart's track */
+    --neutral-btn: #dce3dd; /* .btn--neutral and every disabled button */
+    --skel-fill: #e4e9e5; /* a skeleton block, always lighter than its ground in dark */
+    --bar-rest: #575a58;  /* every poll bar that is not the lead or the right answer */
+
+    --on-accent: #ffffff;
+    --accent-soft: #cff1d3; --on-accent-soft: #003a13;
+    --tonal: #cff1d3; --on-tonal: #003a13;
+
+    /* The color field: a live or done state, filled edge to edge, and what sits on it. */
+    --field: #00732d; --on-field: #ffffff; --on-field-muted: #cff1d3;
+    --field-tile: #ffffff; --on-field-tile: #1e201e;
+    --field-letter: #e4e9e5;
+    --field-btn: #ffffff; --on-field-btn: #00732d;
+    --pick: #cff1d3; --on-pick: #003a13;
+    --tile-out: #ffffff; --on-tile-out: #575a58;   /* an unpicked tile after sending: never opacity */
+    --out-letter: #dce3dd; --on-out-letter: #1e201e;
+
+    /* State triples: fill, words on it, mark (glyph, rule or ring, 3:1 or more on the fill). */
+    --st-in: #cff1d3;   --on-st-in: #003a13;   --st-in-mark: #00732d;   /* right, sent, paired, added */
+    --st-open: #ffe5c0; --on-st-open: #4f3400; --st-open-mark: #8a5a00; /* private, sign-in ending, needs you */
+    --st-stop: #ffeae6; --on-st-stop: #6f0604; --st-stop-mark: #c5150f; /* refused, failed, field error */
+    --st-wait: #e3eae3; --on-st-wait: #1e201e; --st-wait-mark: #575a58; /* ended, already in, waiting */
+    --st-stop-fill: #b3261e; --on-st-stop-fill: #ffffff;                /* the kiosk's refused flood */
+
+    --on-error: #ffffff;
+    --live: #00732d; --on-live: #ffffff;   /* retired from screens: no Live badge */
+    --on-warn: #4f3400;
+
+    --ink: 30 32 30;
+    --shadow-1: 0 1px 2px rgb(var(--ink) / .22), 0 2px 6px 1px rgb(var(--ink) / .10);
+    --shadow-2: 0 2px 4px rgb(var(--ink) / .24), 0 8px 20px 4px rgb(var(--ink) / .14);
+    --shadow-bar: 0 1px 3px rgb(var(--ink) / .12);
+    --shadow-bar-up: 0 -1px 3px rgb(var(--ink) / .12);
+    --card-ring: 0 0 0 1px rgb(var(--ink) / .08);   /* a non-focal raised card's edge in light */
+    --chip-ring: inset 0 0 0 1px rgb(var(--ink) / .16);  /* the team swatch's edge */
+
+    /* Teams: data, always a chip and the written name. 3:1 or more on page and well. */
+    --team-red: #c5221f; --team-yellow: #a66f00; --team-green: #188038; --team-orange: #c25400;
+    --team-purple: #8430ce; --team-pink: #c2185b; --team-teal: #0e7c8a; --team-brown: #8a5a2b;
+    --team-gray: #646b76; --team-navy: #1e3a8a; --team-lime: #4d7c0f; --team-blue: #2a5bd7;
+    --on-team: #ffffff; --on-team-yellow: #000000;   /* words on a team color: 4.5:1 or more on each one */
+
+    /* Camera and QR: a QR is always black on white. */
+    --cam: #1e201e; --cam-mark: #ffffff; --cam-mark-ok: #96d6a0;
+    --qr-tile: #ffffff; --qr-ink: #000000;
+    --p-well: #d2d9d3;   /* the projector's well: projectors crush light neutral steps */
+    --select-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23575a58' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 
   /* ----------------------------------------------------------- dark colors */
@@ -230,8 +397,42 @@
       --rcc-elevation-key: 0.44;
       --rcc-elevation-ambient: 0.24;
 
-      /* Cards step one tone up from the page in dark (GDG §4.4), not down. */
-      --surface: var(--rcc-surface-container);
+      --well: #111512; --page: #181c19; --raised: #222823; --bar: #2d332e; --overlay: #383f39;
+      --hl: inset 0 1px 0 rgb(255 255 255 / .06);
+      --scrim: rgb(0 0 0 / .64);
+      --chrome: #2d332e; --on-raised: #383f39; --focal-fill: #2a302c; --lift: #383f39;
+      --track: #2d332e; --neutral-btn: #383f39; --skel-fill: #383f39; --bar-rest: #8a918c;
+      --on-accent: #003410;
+      --accent-soft: #26402c; --on-accent-soft: #c6eccb;
+      --tonal: #81c995; --on-tonal: #0d3b1e;
+      --field: #025620; --on-field: #ffffff; --on-field-muted: #b5e8bd;
+      --field-tile: #22773f; --on-field-tile: #ffffff;
+      --field-letter: #0e4420;
+      --field-btn: #ffffff; --on-field-btn: #025620;
+      --pick: #22773f; --on-pick: #ffffff;
+      --tile-out: #0e4420; --on-tile-out: #e6e9e6;
+      --out-letter: #025620; --on-out-letter: #ffffff;
+      --st-in: #00531e;   --on-st-in: #c6eccb;   --st-in-mark: #96d6a0;
+      --st-open: #624000; --on-st-open: #fcdeb5; --st-open-mark: #e7ae58;
+      --st-stop: #910906; --on-st-stop: #ffdbd4; --st-stop-mark: #ffb3a8;
+      --st-wait: #383f39; --on-st-wait: #e6e9e6; --st-wait-mark: #b9bcba;
+      --st-stop-fill: #8c1d18; --on-st-stop-fill: #ffffff;
+      --on-error: #660604;
+      --live: #96d6a0; --on-live: #003410;
+      --on-warn: #fcdeb5;
+      --ink: 0 0 0;
+      --shadow-1: 0 1px 2px rgb(0 0 0 / .5), 0 8px 24px rgb(0 0 0 / .45);
+      --shadow-2: 0 2px 4px rgb(0 0 0 / .5), 0 8px 20px 4px rgb(0 0 0 / .32);
+      --shadow-bar: 0 0 #0000;
+      --shadow-bar-up: 0 0 #0000;
+      --card-ring: 0 0 #0000;
+      --team-red: #ff8a80; --team-yellow: #f2c14e; --team-green: #7fd492; --team-orange: #ff9a4d;
+      --team-purple: #c39bff; --team-pink: #ff8abf; --team-teal: #4cc9d8; --team-brown: #d8a673;
+      --team-gray: #aeb4be; --team-navy: #a9b8ff; --team-lime: #b5e06b; --team-blue: #6fc3ff;
+      --on-team: #1e201e; --on-team-yellow: #1e201e;
+      --cam: #0b0e0c;
+      --p-well: #0c0f0d;
+      --select-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23b9bcba' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     }
   }
 
@@ -275,34 +476,68 @@
     --rcc-elevation-key: 0.44;
     --rcc-elevation-ambient: 0.24;
 
-    --surface: var(--rcc-surface-container);
+    --well: #111512; --page: #181c19; --raised: #222823; --bar: #2d332e; --overlay: #383f39;
+    --hl: inset 0 1px 0 rgb(255 255 255 / .06);
+    --scrim: rgb(0 0 0 / .64);
+    --chrome: #2d332e; --on-raised: #383f39; --focal-fill: #2a302c; --lift: #383f39;
+    --track: #2d332e; --neutral-btn: #383f39; --skel-fill: #383f39; --bar-rest: #8a918c;
+    --on-accent: #003410;
+    --accent-soft: #26402c; --on-accent-soft: #c6eccb;
+    --tonal: #81c995; --on-tonal: #0d3b1e;
+    --field: #025620; --on-field: #ffffff; --on-field-muted: #b5e8bd;
+    --field-tile: #22773f; --on-field-tile: #ffffff;
+    --field-letter: #0e4420;
+    --field-btn: #ffffff; --on-field-btn: #025620;
+    --pick: #22773f; --on-pick: #ffffff;
+    --tile-out: #0e4420; --on-tile-out: #e6e9e6;
+    --out-letter: #025620; --on-out-letter: #ffffff;
+    --st-in: #00531e;   --on-st-in: #c6eccb;   --st-in-mark: #96d6a0;
+    --st-open: #624000; --on-st-open: #fcdeb5; --st-open-mark: #e7ae58;
+    --st-stop: #910906; --on-st-stop: #ffdbd4; --st-stop-mark: #ffb3a8;
+    --st-wait: #383f39; --on-st-wait: #e6e9e6; --st-wait-mark: #b9bcba;
+    --st-stop-fill: #8c1d18; --on-st-stop-fill: #ffffff;
+    --on-error: #660604;
+    --live: #96d6a0; --on-live: #003410;
+    --on-warn: #fcdeb5;
+    --ink: 0 0 0;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / .5), 0 8px 24px rgb(0 0 0 / .45);
+    --shadow-2: 0 2px 4px rgb(0 0 0 / .5), 0 8px 20px 4px rgb(0 0 0 / .32);
+    --shadow-bar: 0 0 #0000;
+    --shadow-bar-up: 0 0 #0000;
+    --card-ring: 0 0 #0000;
+    --team-red: #ff8a80; --team-yellow: #f2c14e; --team-green: #7fd492; --team-orange: #ff9a4d;
+    --team-purple: #c39bff; --team-pink: #ff8abf; --team-teal: #4cc9d8; --team-brown: #d8a673;
+    --team-gray: #aeb4be; --team-navy: #a9b8ff; --team-lime: #b5e06b; --team-blue: #6fc3ff;
+    --on-team: #1e201e; --on-team-yellow: #1e201e;
+    --cam: #0b0e0c;
+    --p-well: #0c0f0d;
+    --select-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23b9bcba' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 
-  /* ---------------------------------------------- the app's color names */
+  /* ---------------------------------------------- the app's short names */
   /* Declared on every theme scope, so a [data-theme] element works them out
      from its own colors. The names index.css had before (--bg, --surface,
      --text, --muted, --line, --accent, --accent-text, --error, --radius) keep
-     working, so every page picked up these colors without an edit. */
+     working, so every page picked up the design system without an edit. */
   :root,
   [data-theme] {
-    --bg: var(--rcc-surface);                         /* the page */
-    --fill: var(--rcc-surface-container-high);        /* table heads, neutral badges, skeletons */
+    --bg: var(--page);                                /* the page */
+    --surface: var(--raised);                         /* a card */
+    --fill: var(--bar);                               /* table heads, neutral badges */
     --text: var(--rcc-on-surface);
     --muted: var(--rcc-on-surface-variant);           /* hints, times, labels under numbers */
     --line: var(--rcc-outline-variant);               /* dividers; never a control's only edge */
     --line-strong: var(--rcc-outline);                /* field and outline-button edges */
-    --accent: var(--rcc-primary);                     /* links, the main button, big numbers */
-    --accent-text: var(--rcc-on-primary);             /* words on an --accent fill */
-    --accent-soft: var(--rcc-primary-container);      /* a chosen option, a success banner */
-    --accent-soft-text: var(--rcc-on-primary-container);
+    --accent: var(--rcc-primary);                     /* links, the main button, the live number */
+    --accent-text: var(--on-accent);                  /* words on an --accent fill */
+    --accent-soft-text: var(--on-accent-soft);
     --error: var(--rcc-error);                        /* error words, the danger button */
-    --error-text: var(--rcc-on-error);                /* words on an --error fill */
-    --error-soft: var(--rcc-error-container);         /* an error banner */
-    --error-soft-text: var(--rcc-on-error-container);
-    --live: var(--rcc-highlight);                     /* the Live badge */
-    --live-text: var(--rcc-on-highlight);
-    --warn: var(--rcc-highlight-container);           /* a warning banner */
-    --warn-text: var(--rcc-on-highlight-container);
+    --error-text: var(--on-error);                    /* words on an --error fill */
+    --error-soft: var(--st-stop);                     /* an error banner */
+    --error-soft-text: var(--on-st-stop);
+    --live-text: var(--on-live);
+    --warn: var(--rcc-highlight-container);           /* the late banner, the sign-in ending */
+    --warn-text: var(--on-warn);
     --code-bg: var(--rcc-code-surface);
     --code-text: var(--rcc-code-on-surface);
     --focus: var(--rcc-focus-ring);
@@ -313,6 +548,12 @@
     --rcc-elevation-1: 0 1px 2px 0 rgb(var(--rcc-elevation-ink) / var(--rcc-elevation-key)), 0 1px 3px 1px rgb(var(--rcc-elevation-ink) / var(--rcc-elevation-ambient));
     --rcc-elevation-2: 0 1px 2px 0 rgb(var(--rcc-elevation-ink) / var(--rcc-elevation-key)), 0 2px 6px 2px rgb(var(--rcc-elevation-ink) / var(--rcc-elevation-ambient));
   }
+
+  /* ------------------------------------------------------ per surface */
+  [data-surface="kiosk"],
+  [data-surface="projector"] { --focus-off: 3px; }
+  /* The stage has no shadows, so its well is a deeper tone step. */
+  [data-surface="projector"] { --well: var(--p-well); }
 
   /* ------------------------------------------------------ breakpoints */
   /* 600 and 1024, GDG's tiers. */
@@ -327,6 +568,17 @@
       --rcc-page-margin: var(--rcc-space-12);
     }
   }
+  /* The laptop's page margin and aside under 1366. */
+  @media (min-width: 1024px) and (max-width: 1365px) {
+    :root { --page-margin: 32px; --aside-w: 360px; }
+  }
+
+  /* GDG's sampled spring, where the browser has linear() (Safari 17.2+). iPadOS 16 keeps the cubic-bezier. */
+  @supports (transition-timing-function: linear(0, 1)) {
+    :root {
+      --ease-sp: linear(0, 0.0714 5%, 0.2269 10%, 0.405 15%, 0.5719 20%, 0.7116 25%, 0.8195 30%, 0.8975 35%, 0.9503 40%, 0.9834 45%, 1.0024 50%, 1.0117 55%, 1.015 60%, 1.0147 65%, 1.0127 70%, 1.01 75%, 1.0074 80%, 1.0051 85%, 1.0033 90%, 1.0019 95%, 1);
+    }
+  }
 
   /* ---------------------------------------------------- reduced motion */
   /* Movement stops; color and opacity changes stay. src/index.css also cuts
@@ -335,6 +587,9 @@
     :root {
       --rcc-dur-fast-spatial: 0ms;
       --rcc-dur-default-spatial: 0ms;
+      --sp-fast: 0ms;
+      --sp: 0ms;
+      --sp-slow: 0ms;
     }
   }
 }

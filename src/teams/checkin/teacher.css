@@ -1,5 +1,16 @@
-/* #/checkin/teacher (Teacher.tsx): attendance on the professor's laptop, 1280 to 1440 wide. The
-   two columns and the camera come from .scanner in checkin.css. Tokens only (src/styles/tokens.css). */
+/* #/checkin/teacher (Teacher.tsx): attendance on the professor's laptop, 1280 to 1440 wide.
+   Tokens only (src/styles/tokens.css). */
+
+/* The two columns and the camera, here and on #/checkin/quiz (QuizDesk.tsx). */
+.scanner { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+.scanner__video { width: 100%; border-radius: 12px; background: #000; transform: scaleX(-1); }
+.scanner__video--off { aspect-ratio: 16 / 9; }
+.scanner__names { list-style: none; padding: 0; margin: 16px 0 0; font-size: 1.3rem; }
+.scanner__names li { padding: 4px 0; border-bottom: 1px solid var(--line); }
+@media (max-width: 720px) { .scanner { grid-template-columns: 1fr; } }
+/* The name in the last scan's card (LastScan): the same size as the pass's name in checkin.css,
+   set here so the student's pass can change without moving this one. */
+.scanner .pass__name { font-size: 1.5rem; font-weight: 700; margin: 12px 0 0; }
 
 /* "Class started Thu Nov 5, 2:28 PM" and End class. End class's question box, and the line End
    day returns, take the row's full width. */

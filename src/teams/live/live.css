@@ -23,19 +23,8 @@
 .q__meta button { min-height: 0; padding: 0 4px; background: transparent; color: var(--muted); text-decoration: underline; font-weight: 400; }
 
 .board__row--mine { outline: 2px solid var(--accent); }
-/* Team leaderboard. Each color also has its name written out, so it never relies on color alone. */
-.group--red { --group: #c5221f; --group-text: #ffffff; }
-.group--yellow { --group: #f9ab00; --group-text: #1f1500; }
-.group--green { --group: #188038; --group-text: #ffffff; }
-.group--orange { --group: #e8710a; --group-text: #1f0d00; }
-.group--purple { --group: #8430ce; --group-text: #ffffff; }
-.group--pink { --group: #e52592; --group-text: #ffffff; }
-.group--teal { --group: #129eaf; --group-text: #00181c; }
-.group--brown { --group: #8a5a2b; --group-text: #ffffff; }
-.group--gray { --group: #6b7280; --group-text: #ffffff; }
-.group--navy { --group: #1e3a8a; --group-text: #ffffff; }
-.group--lime { --group: #84cc16; --group-text: #142000; }
-.group--blue { --group: #1a73e8; --group-text: #ffffff; }
+/* Team leaderboard. Each color also has its name written out, so it never relies on color alone.
+   The team colors (.group--<color>: --group, --group-text) are tokens, set in the kit (kit.css). */
 .group-badge { display: inline-block; margin: 0 0 12px; padding: 6px 14px; border-radius: 999px; font-weight: 600; background: var(--group); color: var(--group-text); }
 .board { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 10px; }
 .board__row { display: grid; grid-template-columns: 2.2em 1fr auto auto; align-items: center; gap: 4px 14px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); border-left: 10px solid var(--group); }
@@ -60,24 +49,9 @@
   .board:not(.board--big) .board__members { grid-column: 2; grid-row: 2; }
   .board:not(.board--big) .board__ec { grid-column: 3; grid-row: 2; }
 }
-/* #/live/leaderboard on the 1920 x 1080 projector, inside <Projector>: stage sizes (tokens.css). */
-/* Two columns, and the rank beside both lines of a row: six teams fit on one screen. Leaderboard.tsx
-   adds .board--many past six teams: one-line rows without "3 students", so ten fit, and past ten
-   it lists the top teams and a .board__more line. */
-.board--big { grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(800 * var(--stage-u))), 1fr)); gap: calc(16 * var(--stage-u)) calc(32 * var(--stage-u)); margin: 0; }
-.board--big .board__rank { grid-row: 1 / span 2; }
-.board--big .board__row { padding: calc(24 * var(--stage-u)) calc(32 * var(--stage-u)); gap: calc(8 * var(--stage-u)) calc(32 * var(--stage-u)); border-radius: calc(16 * var(--stage-u)); border-width: max(1px, calc(2 * var(--stage-u))); border-left-width: calc(24 * var(--stage-u)); }
-.board--big .board__rank { font-size: var(--proj-head); line-height: 1; }
-.board--big .board__name { font-size: var(--proj-body); line-height: 1.1; }
-.board--big .board__score, .board--big .board__ec { font-size: var(--proj-body); line-height: 1.1; }
-.board--big .board__members { font-size: var(--proj-small); }
-.board--big small { font-size: var(--proj-small); }
-.board--big .board__row--mine { outline-width: max(2px, calc(4 * var(--stage-u))); }
-.board--many { gap: calc(12 * var(--stage-u)) calc(32 * var(--stage-u)); }
-.board--many .board__row { padding-block: calc(12 * var(--stage-u)); }
-.board--many .board__rank { grid-row: auto; font-size: var(--proj-body); line-height: 1.1; }
+/* The projector board (stageboard.css) with 7 or more teams leaves out the students line.
+   Leaderboard.test.ts reads this file for it. */
 .board--many .board__members { display: none; }
-.board__more { margin: 0; color: var(--muted); }
 
 /* Past questions */
 .past { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -105,10 +79,3 @@
    CheckInFirst), for a signed-in student who isn't checked in, with or without a slide up. */
 .live-checkin { display: grid; gap: var(--rcc-space-2); margin-bottom: var(--rcc-space-4); }
 .live-checkin__note { margin: 0; }
-
-/* The late banner on #/live/leaderboard, in projector sizes so the back of the room can read it
-   (docs/design.md: nothing on the projector under 32px; body words 48px). The wrapper takes no
-   space, so the projector's column gap doesn't add a row under the board. */
-.live-board__late { display: contents; }
-.live-board__late .late { left: var(--proj-margin); right: var(--proj-margin); bottom: calc(48 * var(--stage-u)); gap: calc(16 * var(--stage-u)); }
-.live-board__late .late__item { max-width: none; padding: calc(24 * var(--stage-u)) calc(40 * var(--stage-u)); border-radius: calc(24 * var(--stage-u)); font-size: var(--proj-body); line-height: 1.2; }

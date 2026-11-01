@@ -67,6 +67,31 @@
 .uikit-states .tabs__list { margin: 0; }
 /* <BannerStack> in place, so it shows in each theme instead of over the page. */
 .uikit-pinned .banner-stack { position: static; margin: 0 0 var(--rcc-space-6); }
+/* Parts that sit over the page or at the screen's edges, drawn in place in each theme. */
+.uikit-scrim { position: relative; inset: auto; z-index: auto; min-height: 15rem; margin: var(--s4) 0 0; border-radius: var(--r-xl); }
+.uikit-surfaces { display: grid; gap: var(--s4); }
+.uikit-surfaces > * { min-height: 3.5rem; }
+.uikit-surfaces > .bar { padding-inline: var(--s4); }
+.uikit-qfield { flex: none; margin: 0 0 var(--s4); }
+.uikit-qfield .choices { margin: var(--s3) 0 0; }
+.uikit-pass { width: 15rem; justify-items: center; text-align: center; }
+.uikit-pass > p { margin: 0; }
+.uikit-wait { width: 13rem; margin: 0; }
+.uikit-states .readouts, .readouts { margin: 0 0 var(--s4); }
+.tally { margin: 0 0 var(--s4); }
+.uikit-states + .bars, .bars + .bars { margin-top: var(--s4); }
+
+/* Door iPad parts at 0.7 (--k-u) and projector parts at 0.42 (--stage-u): the same parts at a
+   share of their real size, so they fit beside each other. */
+.uikit-scaled { display: grid; gap: var(--s4); padding: var(--s4); border-radius: var(--r-xl); background: var(--page); overflow: hidden; }
+.uikit-band { flex: none; display: block; }
+.uikit-band .door__status { padding-block: calc(24 * var(--k-u)); }
+.uikit-camstart { min-height: calc(280 * var(--k-u)); margin: 0; }
+.uikit-scaled .door__strip, .uikit-scaled .pair__body { padding-inline: 0; }
+.uikit-stage .stage-card, .uikit-stage-card { position: static; }
+.uikit-stage .lower3 { justify-self: start; }
+.uikit-stage .pnote { margin: 0; }
+.uikit-stage .lbgrid { grid-template-columns: minmax(0, 1fr); }
 
 /* #/ui/projector */
 .uikit-board { font-variant-numeric: tabular-nums; }

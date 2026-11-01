@@ -1,0 +1,48 @@
+/* The team leaderboard on the projector (#/live/leaderboard, BoardPage.tsx and StageBoard.tsx),
+   inside <Projector>: stage sizes (--stage-u and the --proj-* sizes in tokens.css). live.css and
+   leaderboard.css draw the rows; these rules size and place them for the stage, and the late
+   banner on this page. stage.surfaces.test.ts and leaderboardCss.test.ts check them. */
+
+/* The projector: the same three columns in every row. Its numbers line is .board__score: the
+   second line of a row up to six teams, in the small projector size. */
+.board--big .board__row { grid-template-columns: 2.2em minmax(0, 1fr) auto; }
+ol.board.board--big .board__score { grid-column: 2 / -1; font-size: var(--proj-small); font-weight: 400; }
+/* Six teams and a two-line note under them came out 2 px taller than 1080, so the projector
+   scrolled: 80 at the bottom instead of 96. */
+.projector:has(> .board--big) { padding-bottom: calc(80 * var(--stage-u)); }
+/* 7 or more teams (.board--many): the same two lines, tighter, so ten teams and the "Plus 2 more
+   teams" line fit on 1920 x 1080. The numbers can't share the first line: beside the extra
+   credit they are wider than a column, and the name gets 0 px (UB-r3-check-1). The page's top
+   and bottom margins and the space between its parts shrink to make the room. */
+.projector:has(> .board--many) { padding-block: calc(48 * var(--stage-u)); gap: calc(16 * var(--stage-u)); }
+ol.board.board--many { row-gap: calc(8 * var(--stage-u)); }
+ol.board.board--many .board__row { padding-block: calc(6 * var(--stage-u)); row-gap: 0; }
+ol.board.board--many :is(.board__name, .board__ec) { line-height: 1; }
+ol.board.board--many .board__rank { grid-row: 1 / span 2; }
+ol.board.board--many .board__score { grid-row: 2; font-size: var(--proj-ledger); }
+
+/* #/live/leaderboard on the 1920 x 1080 projector, inside <Projector>: stage sizes (tokens.css). */
+/* Two columns, and the rank beside both lines of a row: six teams fit on one screen. StageBoard.tsx
+   adds .board--many past six teams: one-line rows without "3 students", so ten fit, and past ten
+   it lists the top teams and a .board__more line. live.css loads after this file, so the two
+   rules for the board itself name .board too, to outrank its .board { gap; margin }. */
+.board.board--big { grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(800 * var(--stage-u))), 1fr)); gap: calc(16 * var(--stage-u)) calc(32 * var(--stage-u)); margin: 0; }
+.board--big .board__rank { grid-row: 1 / span 2; }
+.board--big .board__row { padding: calc(24 * var(--stage-u)) calc(32 * var(--stage-u)); gap: calc(8 * var(--stage-u)) calc(32 * var(--stage-u)); border-radius: calc(16 * var(--stage-u)); border-width: max(1px, calc(2 * var(--stage-u))); border-left-width: calc(24 * var(--stage-u)); }
+.board--big .board__rank { font-size: var(--proj-head); line-height: 1; }
+.board--big .board__name { font-size: var(--proj-body); line-height: 1.1; }
+.board--big .board__score, .board--big .board__ec { font-size: var(--proj-body); line-height: 1.1; }
+.board--big .board__members { font-size: var(--proj-small); }
+.board--big small { font-size: var(--proj-small); }
+.board--big .board__row--mine { outline-width: max(2px, calc(4 * var(--stage-u))); }
+.board.board--many { gap: calc(12 * var(--stage-u)) calc(32 * var(--stage-u)); }
+.board--many .board__row { padding-block: calc(12 * var(--stage-u)); }
+.board--many .board__rank { grid-row: auto; font-size: var(--proj-body); line-height: 1.1; }
+.board__more { margin: 0; color: var(--muted); }
+
+/* The late banner on #/live/leaderboard, in projector sizes so the back of the room can read it
+   (docs/design.md: nothing on the projector under 32px; body words 48px). The wrapper takes no
+   space, so the projector's column gap doesn't add a row under the board. */
+.live-board__late { display: contents; }
+.live-board__late .late { left: var(--proj-margin); right: var(--proj-margin); bottom: calc(48 * var(--stage-u)); gap: calc(16 * var(--stage-u)); }
+.live-board__late .late__item { max-width: none; padding: calc(24 * var(--stage-u)) calc(40 * var(--stage-u)); border-radius: calc(24 * var(--stage-u)); font-size: var(--proj-body); line-height: 1.2; }

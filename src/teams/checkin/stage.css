@@ -1,6 +1,40 @@
-/* #/checkin/stage (Stage.tsx): what the stage adds to the card's rules in checkin.css. The room
-   reads it from the back of A-210 on a 1920 x 1080 projector, so every size here is a stage size
-   (--stage-u and the --proj-* sizes in tokens.css). */
+/* #/checkin/stage (Stage.tsx): the deck full screen with the check-in card on top. The room reads
+   it from the back of A-210 on a 1920 x 1080 projector, so every size here is a stage size
+   (--stage-u and the --proj-* sizes in tokens.css). stage.surfaces.test.ts checks the card's
+   sizes and colors. */
+body.stage-body { margin: 0; overflow: hidden; }
+.stage { position: fixed; inset: 0; background: #000; }
+.stage__deck { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+/* The card is read from the back of A-210 on a 1920 x 1080 projector, so every size is a stage
+   size (--stage-u and --proj-* in tokens.css), and Stage.tsx themes it light like the deck under it. */
+.stage__card { position: absolute; right: calc(24 * var(--stage-u)); bottom: calc(24 * var(--stage-u)); box-sizing: border-box; width: calc(440 * var(--stage-u)); max-height: calc(100% - 48 * var(--stage-u)); overflow: hidden; padding: calc(64 * var(--stage-u)) calc(24 * var(--stage-u)) calc(24 * var(--stage-u)); border-radius: calc(24 * var(--stage-u)); background: var(--surface); color: var(--text); box-shadow: var(--rcc-elevation-2); font-size: var(--proj-ledger); line-height: 1.2; display: flex; flex-direction: column; align-items: center; text-align: center; }
+/* <QR> writes its px width inline; the card's width wins, so phones can scan it from the seats.
+   It gives up some room while a quiz is on the card. */
+.stage__card .qr { width: 100% !important; margin: 0; }
+.stage__card:has(.stage__poll) .qr { width: 60% !important; }
+.stage__card:has(.stage__bars) .qr { width: 40% !important; }
+.stage__card .qr svg { display: block; width: 100%; height: auto; }
+.stage__hide { position: absolute; top: calc(8 * var(--stage-u)); right: calc(8 * var(--stage-u)); width: calc(56 * var(--stage-u)); height: calc(56 * var(--stage-u)); min-height: 0; padding: 0; border-radius: 50%; background: transparent; color: var(--muted); box-shadow: none; font-size: var(--proj-small); line-height: 1; }
+.stage__count { margin: calc(8 * var(--stage-u)) 0 0; font-size: var(--proj-small); }
+.stage__count b { font-size: var(--proj-head); line-height: 1; font-variant-numeric: tabular-nums; margin-right: calc(12 * var(--stage-u)); }
+.stage__hint { margin: 0; color: var(--muted); font-size: var(--proj-ledger); }
+.stage__poll { width: 100%; margin-top: calc(16 * var(--stage-u)); padding-top: calc(16 * var(--stage-u)); border-top: max(1px, calc(2 * var(--stage-u))) solid var(--line); text-align: left; }
+/* The card can't grow past the stage, so a long question or choice stops at a line count with "...": the
+   question at 4 lines (3 once the bars show) and each choice at 2. Phones show the whole text. */
+.stage__q { margin: 0 0 calc(8 * var(--stage-u)); font-weight: 700; font-size: var(--proj-small); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
+.stage__poll:has(.stage__bars) .stage__q { -webkit-line-clamp: 3; line-clamp: 3; }
+.stage__label { min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.stage__answered { margin: 0; font-size: var(--proj-small); }
+.stage__answered b { font-size: var(--proj-head); line-height: 1; font-variant-numeric: tabular-nums; margin-right: calc(12 * var(--stage-u)); }
+.stage__bars { list-style: none; margin: 0; padding: 0; display: grid; gap: calc(8 * var(--stage-u)); }
+.stage__bar { position: relative; display: flex; justify-content: space-between; gap: calc(12 * var(--stage-u)); padding: calc(8 * var(--stage-u)) calc(16 * var(--stage-u)); border-radius: calc(12 * var(--stage-u)); background: var(--fill); overflow: hidden; font-size: var(--proj-ledger); }
+.stage__bar > span:not(.stage__fill), .stage__bar b { position: relative; }
+.stage__fill { position: absolute; inset: 0 auto 0 0; background: var(--line); }
+.stage__bar--right { font-weight: 700; }
+.stage__bar--right .stage__fill { background: color-mix(in srgb, var(--accent) 35%, var(--surface)); }
+/* Stage.tsx themes this button light like the card. The base [data-theme] rule paints --bg over a
+   button's fill (it outranks `button` in the same layer), so the green fill is set again here. */
+.stage__show { position: absolute; right: calc(24 * var(--stage-u)); bottom: calc(24 * var(--stage-u)); min-height: 0; background-color: var(--accent); color: var(--accent-text); padding: calc(12 * var(--stage-u)) calc(24 * var(--stage-u)); font-size: var(--proj-ledger); opacity: 0.85; }
 
 /* An ended quiz: the right choice gets "✓ right answer" on its own line under its words and a
    green edge, so it shows even when nobody picked it (its fill is 0 wide then). The edge takes 4

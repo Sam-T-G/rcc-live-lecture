@@ -2,19 +2,102 @@
 // src/styles/kit.css, the tokens in src/styles/tokens.css. docs/design.md shows each part with an
 // example, and #/ui shows every part in every state, light and dark. The older parts (Screen,
 // Card, Big, Status, Todo) stay in src/blocks/ui.tsx.
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { Status } from "./ui";
 import { pinnedSpace, setStackSpace } from "./stackSpace";
 
-export type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
+// ---------- Icon ----------
+// The kit's glyphs, drawn by hand to the Phosphor Bold construction (a 256 grid, 24 stroke, round
+// caps and joins, no fills), in currentColor and hidden from screen readers: the words beside a
+// glyph carry its meaning. One meaning per glyph: the lock means "can't change", Sent is the check.
+export type IconName =
+  | "check"
+  | "x"
+  | "warning"
+  | "clock"
+  | "lock"
+  | "eye"
+  | "repeat"
+  | "inbox"
+  | "arrow-left"
+  | "arrow-right"
+  | "chevron-right";
 
-// A button in one of four looks: primary (the one main action on a screen), secondary
-// (outlined), quiet (words only) or danger (red, for what can't be undone). `busy` keeps the
-// width, shows a spinner and ignores presses while a request runs. `small` is for laptop pages
-// only; phones keep the 48px button. `type` is "button" unless you pass "submit", so a Button
+const GLYPHS: Record<IconName, ReactNode> = {
+  check: <path d="M40 144l56 56L216 80" />,
+  x: <path d="M200 56L56 200M200 200L56 56" />,
+  warning: (
+    <>
+      <path d="M128 100v44" />
+      <path d="M114.2 40l-88 152A16 16 0 0 0 40 216h176a16 16 0 0 0 13.8-24l-88-152a16 16 0 0 0-27.6 0z" />
+      <circle cx="128" cy="180" r="16" fill="currentColor" stroke="none" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="128" cy="128" r="96" />
+      <path d="M128 72v56h56" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="40" y="88" width="176" height="128" rx="8" />
+      <path d="M92 88V56a36 36 0 0 1 72 0v32" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M128 56C48 56 16 128 16 128s32 72 112 72 112-72 112-72-32-72-112-72z" />
+      <circle cx="128" cy="128" r="40" />
+    </>
+  ),
+  repeat: <path d="M24 128a72 72 0 0 1 72-72h136M200 24l32 32-32 32M232 128a72 72 0 0 1-72 72H24M56 232l-32-32 32-32" />,
+  inbox: (
+    <>
+      <rect x="32" y="48" width="192" height="160" rx="8" />
+      <path d="M32 152h48l16 24h64l16-24h48" />
+    </>
+  ),
+  "arrow-left": <path d="M216 128H40M112 56l-72 72 72 72" />,
+  "arrow-right": <path d="M40 128h176M144 56l72 72-72 72" />,
+  "chevron-right": <path d="M96 48l80 80-80 80" />,
+};
+
+export function Icon({ name, className }: { name: IconName; className?: string }) {
+  return (
+    <svg className={className ? `icon ${className}` : "icon"} viewBox="0 0 256 256" aria-hidden="true" focusable="false">
+      {GLYPHS[name]}
+    </svg>
+  );
+}
+
+// ---------- Button ----------
+export type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
+// Every look a Button can take: the four above and the design system's others.
+export type ButtonLook = ButtonVariant | "outline" | "tonal" | "neutral" | "raised" | "plain" | "danger-quiet" | "on-field" | "ghost";
+
+// A button in one of these looks: primary (the one main action on a screen), secondary or outline
+// (outlined; the same look), quiet (green words), plain (neutral words: Cancel, row actions),
+// tonal (a quiet action with no primary nearby), neutral (a fill one rung off its bar), raised
+// (the main action when the green field is on screen), danger (red, inside a confirm only),
+// danger-quiet (red words), on-field (the white button on a green field) or ghost (a laptop row
+// action). `size` "lg" is the 56 main action, "sm" the 32 laptop button (`small` is the same).
+// `busy` keeps the width, shows a spinner and ignores presses while a request runs. Disabled keeps
+// the button's shape on the neutral fill. `type` is "button" unless you pass "submit", so a Button
 // inside a form never submits it by accident.
 export function Button({
   variant = "primary",
+  size,
   small,
   block,
   busy,
@@ -23,8 +106,16 @@ export function Button({
   onClick,
   children,
   ...rest
-}: ComponentProps<"button"> & { variant?: ButtonVariant; small?: boolean; block?: boolean; busy?: boolean }) {
-  const cls = ["btn", variant !== "primary" && `btn--${variant}`, small && "btn--small", block && "btn--block", className]
+}: ComponentProps<"button"> & { variant?: ButtonLook; size?: "sm" | "lg"; small?: boolean; block?: boolean; busy?: boolean }) {
+  const cls = [
+    "btn",
+    variant !== "primary" && `btn--${variant}`,
+    size === "lg" && "btn--lg",
+    size === "sm" && "btn--sm",
+    small && "btn--small",
+    block && "btn--block",
+    className,
+  ]
     .filter(Boolean)
     .join(" ");
   return (
@@ -182,27 +273,54 @@ export function Segmented<T extends string>({
 
 export type Tone = "neutral" | "accent" | "live" | "warn" | "error";
 
-// A short label on something: "Live", "Late", "3 of 4", "Ended". The words carry the meaning;
-// the color only repeats it.
+// A short label on something that differs between items in one list and that the reader acts
+// on: "Late", "5 min late", "Permanent". The words carry the meaning; the color only repeats it.
+// accent draws as the in state, warn as open, error as stop; live is retired and draws as a
+// green state word. StateChip has the state tones and their glyphs.
 export function Badge({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
   return <span className={`badge badge--${tone}`}>{children}</span>;
 }
 
-// A box that says how something went or what to do next. An error banner is announced at once
-// (role alert); the others are read when they change (role status).
+// The state tones: in (right, sent, paired, added), open (private, needs you), stop (refused,
+// failed), wait (ended, dismissed), quiet (a type fact such as AI draft), and Badge's tones.
+export type StateTone = Tone | "in" | "open" | "stop" | "wait" | "quiet";
+
+// A badge for a state, with its glyph before the words: check (Kept, Paired), eye (Shared with
+// students), lock (Private, Permanent), clock (late), x (Refused), repeat (Ended).
+export function StateChip({ tone, glyph, children }: { tone: StateTone; glyph?: IconName; children: ReactNode }) {
+  return (
+    <span className={`badge badge--${tone}`}>
+      {glyph && <Icon name={glyph} />}
+      {children}
+    </span>
+  );
+}
+
+const BANNER_GLYPH = { info: "inbox", success: "check", warn: "warning", error: "warning" } as const;
+
+// A box that says how something went or what to do next: the state's fill, its glyph, the title,
+// one line and one action at the end. An error banner is announced at once (role alert); the
+// others are read when they change (role status). `bar` pins it full width under the app bar
+// (the sign-in ending); `inset` draws it as the card on a green field or the stage card.
 export function Banner({
   tone = "info",
   title,
   action,
+  bar,
+  inset,
   children,
 }: {
   tone?: "info" | "success" | "warn" | "error";
   title?: ReactNode;
   action?: ReactNode;
+  bar?: boolean;
+  inset?: boolean;
   children?: ReactNode;
 }) {
+  const cls = `banner banner--${tone}${bar ? " banner--bar" : ""}${inset ? " banner--inset" : ""}`;
   return (
-    <div className={`banner banner--${tone}`} role={tone === "error" ? "alert" : "status"}>
+    <div className={cls} role={tone === "error" ? "alert" : "status"}>
+      <Icon name={BANNER_GLYPH[tone]} />
       <div className="banner__body">
         {title && <p className="banner__title">{title}</p>}
         {children && <div className="banner__text">{children}</div>}
@@ -235,6 +353,212 @@ export function BannerStack({ children }: { children: ReactNode }) {
   return (
     <div ref={ref} className="banner-stack">
       {children}
+    </div>
+  );
+}
+
+// An error or warning with no part of its own to sit in (a sign-in that failed, not checked in):
+// the state's fill, its glyph hanging before the words, an optional action under them. Never on
+// the green field; a message that stands in for a region's content takes that content's slot.
+export function Notice({ tone = "stop", action, children }: { tone?: "stop" | "warn" | "plain"; action?: ReactNode; children: ReactNode }) {
+  return (
+    <div className={tone === "stop" ? "notice" : `notice notice--${tone}`} role={tone === "stop" ? "alert" : "status"}>
+      <Icon name={tone === "plain" ? "clock" : "warning"} />
+      <div>{children}</div>
+      {action && <div className="notice__action">{action}</div>}
+    </div>
+  );
+}
+
+// A switch for one setting that applies at once: a real button with role="switch", the knob on
+// the spatial track. Where it picks between options, use Segmented instead.
+export function Switch({
+  checked,
+  onChange,
+  disabled,
+  children,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button type="button" role="switch" className="switch" aria-checked={checked} disabled={disabled} onClick={() => onChange(!checked)}>
+      <span className="switch__track" aria-hidden="true" />
+      <span>{children}</span>
+    </button>
+  );
+}
+
+// A team: its color chip and its written name, always together (live.groups gives `color` and
+// `label`). The chip is the one 16 swatch with an ink edge; the stage scales it.
+export function TeamChip({ color, label }: { color: string; label: ReactNode }) {
+  return (
+    <span className={`team group--${color}`}>
+      <span className="team__chip" aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
+// The slide track (#/host): the lecture's own timeline with a count over each slide. `counts[i]`
+// is slide i's count: a number for a slide already shown (0 prints muted), null for one not
+// reached (prints nothing). `at` is the current slide's index, drawn with a filled segment and a
+// bold number; its count is the same size as the rest. `where` (the slide and its title),
+// `label` (what the counts are, on their baseline) and `end` (a room count) are the page's words.
+export function SlideTrack({
+  counts,
+  at,
+  where,
+  label,
+  end,
+}: {
+  counts: (number | null)[];
+  at: number | null;
+  where?: ReactNode;
+  label?: ReactNode;
+  end?: ReactNode;
+}) {
+  const n = counts.length;
+  return (
+    <div className="track">
+      <div className="track__where">{where}</div>
+      <div className="track__lane" style={{ "--slides": n } as CSSProperties}>
+        <span className="track__rl" style={{ gridRow: 1, gridColumn: 1 }}>
+          {label}
+        </span>
+        {counts.map((c, i) => (
+          <span
+            key={`n${i}`}
+            className={c === 0 ? "track__n track__n--zero" : "track__n"}
+            style={{ gridRow: 1, gridColumn: i + 2 }}
+          >
+            {c ?? ""}
+          </span>
+        ))}
+        {counts.map((_, i) => (
+          <span
+            key={`s${i}`}
+            className={i === at ? "track__seg track__seg--now" : "track__seg"}
+            style={{ gridRow: 2, gridColumn: i + 2 }}
+            aria-hidden="true"
+          />
+        ))}
+        {counts.map((_, i) => (
+          <span key={`i${i}`} className={i === at ? "track__i track__i--now" : "track__i"} style={{ gridRow: 3, gridColumn: i + 2 }}>
+            {i + 1}
+          </span>
+        ))}
+      </div>
+      {end && <div className="track__room">{end}</div>}
+    </div>
+  );
+}
+
+// A laptop table or list as ruled rows: in a sunken well with a raised head (`well`, the default)
+// on the page or in a card, or straight on its card (`well={false}`, for a chart). `cols` is the
+// grid's columns (`"minmax(0, 1fr) 120px 96px"`), shared by the head and every Row, so each cell
+// sits on its head's edges. `head` is the column labels; put `className="end"` on a numeric
+// cell to right-align it.
+export function Rows({ head, cols, well = true, children }: { head?: ReactNode[]; cols?: string; well?: boolean; children?: ReactNode }) {
+  return (
+    <div className={well ? "ruled ruled--well" : "ruled"} style={cols ? ({ "--rcols": cols } as CSSProperties) : undefined}>
+      {head && (
+        <div className="ruled__head">
+          {head.map((h, i) => (
+            <span key={i}>{h}</span>
+          ))}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+// One row of Rows. `selected` is a fill step in the same columns; `fresh` tints a row just added
+// (st-in) for a moment; `confirm` is the in-row confirm risen to the overlay.
+export function Row({ selected, fresh, confirm, children }: { selected?: boolean; fresh?: boolean; confirm?: boolean; children: ReactNode }) {
+  const cls = ["ruled__row", selected && "is-selected", fresh && "is-new", confirm && "is-confirm"].filter(Boolean).join(" ");
+  return <div className={cls}>{children}</div>;
+}
+
+// An answer choice: the letter tile and the full words, 72 tall, the same letter on phone, host
+// and stage. `state` draws picked or sent (the ring), sending (busy), error (the red ring), right
+// (st-in) or out (after sending); `word` is the state's word and glyph at the end ("Sent").
+// On the green field by default; `onPage` draws it on the page.
+export function Choice({
+  letter,
+  state,
+  word,
+  onPage,
+  children,
+  ...rest
+}: Omit<ComponentProps<"button">, "type"> & {
+  letter: string;
+  state?: "picked" | "sending" | "sent" | "error" | "right" | "out";
+  word?: ReactNode;
+  onPage?: boolean;
+}) {
+  const cls = [
+    "choice",
+    onPage && "choice--on-page",
+    (state === "picked" || state === "sent") && "is-picked",
+    state === "sent" && "is-locked",
+    state === "error" && "is-error",
+    state === "right" && "is-right",
+    state === "out" && "is-out",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <button {...rest} type="button" className={cls} aria-busy={state === "sending" || undefined}>
+      <span className="letter">{letter}</span>
+      <span>{children}</span>
+      {word && (
+        <span className="choice__state">
+          {state === "sending" && <Icon name="clock" className="choice__clock" />}
+          {word}
+        </span>
+      )}
+    </button>
+  );
+}
+
+export type Bar = { letter: string; label: ReactNode; count: number; right?: boolean; lead?: boolean; mine?: boolean; tag?: ReactNode };
+
+// One bar chart for phone results, host and stage: each choice's letter, words, track, and its
+// count and percent on the label line. While a poll is open no bar is green (mark the leading
+// one `lead`); after it ends the `right` one fills green. `tag` is the plain words on the label
+// line ("Right answer", "Your answer"). `hero` gives the right row the st-in fill and ring where
+// it is the screen's first thing; `stage` sizes it for the projector.
+export function Bars({ bars, hero, stage }: { bars: Bar[]; hero?: boolean; stage?: boolean }) {
+  const total = bars.reduce((a, b) => a + b.count, 0);
+  const cls = ["bars", hero && "bars--hero", stage && "bars--stage"].filter(Boolean).join(" ");
+  return (
+    <div className={cls}>
+      {bars.map((b) => {
+        const share = total ? b.count / total : 0;
+        const row = ["barrow", b.right && "is-right", b.lead && "is-lead", b.mine && "is-mine"].filter(Boolean).join(" ");
+        return (
+          <div key={b.letter} className={row}>
+            <span className="letter">{b.letter}</span>
+            <span className="barrow__text">
+              <span className="barrow__label">
+                <span className="barrow__name">{b.label}</span>
+                {b.tag && <span className="barrow__tag">{b.tag}</span>}
+              </span>
+              <span className="barrow__track">
+                <span className="barrow__fill" style={{ "--f": share } as CSSProperties} />
+              </span>
+            </span>
+            <span className="barrow__n">
+              <span>{b.count}</span>
+              <span className="barrow__pct">{Math.round(share * 100)}%</span>
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -283,7 +607,9 @@ export function Skeleton({ lines = 3, height, label = "Loading" }: { lines?: num
 // closes when onConfirm finishes. When it throws, the box stays open so the person can try again
 // and shows the error under the question (a ConvexError's words, or "Something went wrong. Try
 // again."); pass `onError` to show it on the page instead. The error never escapes as an
-// unhandled rejection. `defaultOpen` starts it asking (#/ui uses it).
+// unhandled rejection. `defaultOpen` starts it asking (#/ui uses it). The question box takes the
+// button's place; with `overlay` it opens as a sheet centered on a scrim over the page instead,
+// for a confirm that ends something for everyone (End class, Delete a question from every phone).
 export function ConfirmButton({
   children,
   question,
@@ -294,6 +620,7 @@ export function ConfirmButton({
   variant = "danger",
   disabled,
   defaultOpen,
+  overlay,
 }: {
   children: ReactNode;
   question: ReactNode;
@@ -304,6 +631,7 @@ export function ConfirmButton({
   variant?: "danger" | "primary";
   disabled?: boolean;
   defaultOpen?: boolean;
+  overlay?: boolean;
 }) {
   const [open, setOpen] = useState(!!defaultOpen);
   const [busy, setBusy] = useState(false);
@@ -336,16 +664,17 @@ export function ConfirmButton({
     }
   }
 
-  if (!open)
-    return (
-      <Button ref={opener} variant={variant} disabled={disabled} onClick={() => show(true)}>
-        {children}
-      </Button>
-    );
-  return (
+  const opening = (
+    <Button ref={opener} variant={variant} disabled={overlay && open ? true : disabled} onClick={() => show(true)}>
+      {children}
+    </Button>
+  );
+  if (!open) return opening;
+  const box = (
     <div
-      className="confirm"
-      role="group"
+      className={overlay ? "sheet confirm" : "confirm"}
+      role={overlay ? "dialog" : "group"}
+      aria-modal={overlay || undefined}
       aria-labelledby={questionId}
       onKeyDown={(e) => {
         if (e.key === "Escape" && !busy) show(false);
@@ -364,6 +693,13 @@ export function ConfirmButton({
         </Button>
       </div>
     </div>
+  );
+  if (!overlay) return box;
+  return (
+    <>
+      {opening}
+      <div className="scrim">{box}</div>
+    </>
   );
 }
 

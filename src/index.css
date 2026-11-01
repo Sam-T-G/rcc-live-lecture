@@ -69,22 +69,25 @@
   pre { overflow-x: auto; background: var(--code-bg); color: var(--code-text); padding: var(--rcc-space-4); border-radius: var(--rcc-radius-sm); }
 
   /* ------------------------------------------------------------ links */
-  /* Underlined: green beside body words is under 3:1, so color alone can't mark a link. */
+  /* Underlined: green beside body words is under 3:1, so color alone can't mark a link. A text
+     action outside a sentence is the kit's .link instead (--text, no green). */
   a {
     color: var(--accent);
     text-decoration: underline;
-    text-underline-offset: 0.15em;
+    text-underline-offset: 3px;
     text-decoration-thickness: from-font;
   }
 
   /* ------------------------------------------------------------ focus */
   /* An outline rather than GDG's box-shadow ring, so a team rule that sets
-     box-shadow on a button can't hide it. 3px, 2px clear of the control,
-     3:1 or more on every ground (contrast.ts). [data-force] is for #/ui only. */
+     box-shadow on a button can't hide it. 3px, 2px clear of the control (3px
+     on the kiosk and the projector, set by [data-surface] in tokens.css), 3:1
+     or more on every ground (contrast.ts). On the green field the ring turns
+     --on-field (kit.css). [data-force] is for #/ui only. */
   :focus-visible,
   [data-force="focus"] {
-    outline: 3px solid var(--focus);
-    outline-offset: 2px;
+    outline: var(--focus-w) solid var(--focus);
+    outline-offset: var(--focus-off);
   }
 
   /* ---------------------------------------------------------- controls */
@@ -93,13 +96,14 @@
   /* A bare <button> is the main (primary) button. One class makes the others:
      .btn--secondary (outlined), .btn--quiet (words only), .btn--danger (red,
      for what can't be undone), .btn--small (laptop pages only), .btn--block
-     (full width). The same classes work on an <a class="btn">. The kit's
-     <Button> adds a busy state. */
+     (full width); the kit (kit.css) adds the rest and the disabled and busy
+     looks. The same classes work on an <a class="btn">. 44 tall: the tap
+     floor on a phone or iPad. */
   button,
   .btn {
     --state: 0%;
-    min-height: var(--rcc-target-min);
-    padding: var(--rcc-space-2) var(--rcc-space-6);
+    min-height: var(--tap);
+    padding: var(--rcc-space-2) var(--rcc-space-5);
     border: 0;
     border-radius: var(--rcc-radius-full);
     background-color: var(--accent);
@@ -158,8 +162,9 @@
     --state: var(--rcc-state-pressed);
     border-radius: var(--rcc-radius-sm); /* press feedback is a shape change (GDG §7.2) */
   }
-  /* 50% rather than GDG's 38%, so a locked quiz answer stays readable on a phone. */
-  :is(button, .btn):is(:disabled, [aria-disabled="true"]) { opacity: 0.5; cursor: not-allowed; }
+  /* Disabled: kit.css draws it as a fill step (the neutral fill, --muted words, the same shape),
+     never by opacity, so a locked quiz answer stays readable on a phone. */
+  :is(button, .btn):is(:disabled, [aria-disabled="true"]) { cursor: not-allowed; }
 
   /* ----------------------------------------------------------- fields */
   label {
@@ -179,7 +184,7 @@
   input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"]),
   select,
   textarea {
-    min-height: var(--rcc-target-min);
+    min-height: var(--tap);
     padding: var(--rcc-space-2) var(--rcc-space-3);
     /* 16px or more, or iOS Safari zooms the page when the field gets focus. */
     font-size: max(1rem, var(--fs-body));
@@ -200,7 +205,8 @@
   textarea { min-height: 6rem; resize: vertical; }
   ::placeholder { color: var(--muted); opacity: 1; }
   :is(input, select, textarea)[aria-invalid="true"] { border-color: var(--error); }
-  :is(input, select, textarea):disabled { opacity: 0.5; cursor: not-allowed; }
+  /* Disabled fields step down to the sunken fill in kit.css. */
+  :is(input, select, textarea):disabled { cursor: not-allowed; }
   input[type="checkbox"],
   input[type="radio"] {
     width: 1.25rem;
@@ -244,12 +250,19 @@
 
   /* ---------------------------------------------------- small helpers */
   .muted { color: var(--muted); }
+  .small { font-size: var(--t-small); line-height: var(--lh-small); }
   .error { color: var(--error); }
+  .nowrap { white-space: nowrap; }
+  .measure { max-width: 62ch; }
   .row { display: flex; flex-wrap: wrap; gap: var(--rcc-space-3); align-items: center; }
   /* Lets a long email in a row shrink to the row and break, at 320 wide. */
   .row > * { min-width: 0; }
-  .stack { display: flex; flex-direction: column; gap: var(--rcc-space-3); }
+  /* .stack: a column; --gap sets its gap (12 by default). .cluster: a wrapping row (gap 8).
+     .spread: a row with its ends pushed apart. */
+  .stack { display: flex; flex-direction: column; gap: var(--gap, var(--rcc-space-3)); }
   .stack > * { margin: 0; }
+  .cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap, var(--rcc-space-2)); }
+  .spread { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--rcc-space-4); }
   /* The ledger line: dates, rooms, counters. Tokens, never a sentence (GDG §9.7). */
   .ledger {
     font-family: var(--rcc-font-code);
@@ -286,13 +299,15 @@
   }
   .page--wide { max-width: calc(78rem + 2 * var(--rcc-page-margin)); }
 
-  /* <Card> */
+  /* <Card>: the raised rung. Its edge is the fill step over the page and, in light, an 8% ink ring;
+     in dark the fill step and the top highlight. Never a --line hairline. */
   .panel {
     margin-block: var(--rcc-space-4);
     padding: var(--card-pad);
-    background: var(--surface);
-    border: var(--rcc-hairline) solid var(--line);
-    border-radius: var(--radius);
+    background: var(--raised);
+    border: 0;
+    border-radius: var(--r-lg);
+    box-shadow: var(--hl), var(--card-ring);
   }
   .panel > :first-child { margin-top: 0; }
   .panel > :last-child { margin-bottom: 0; }
@@ -314,44 +329,41 @@
   .big__value {
     font-size: var(--fs-big);
     line-height: 1;
-    font-weight: var(--rcc-weight-strong);
+    font-weight: var(--w-loud);
     letter-spacing: -0.03em;
     font-variant-numeric: tabular-nums lining-nums;
     color: var(--accent);
   }
   .big__label { color: var(--muted); font-size: var(--fs-body); }
 
-  /* <Status>: waiting on the server, nothing yet, or failed. */
+  /* <Status>: waiting on the server, nothing yet, or failed. Loading names the step in a still
+     line: the only spinner in the app is a pressed button's. */
   .status { margin: 0; padding-block: var(--rcc-space-3); color: var(--muted); }
-  /* The spinner shows only when the wait passes 0.4 s, so a quick load
-     doesn't flash it. */
-  .status--loading { display: flex; align-items: center; gap: var(--rcc-space-2); }
-  .status--loading::before {
-    content: "";
-    flex: none;
-    width: 1em;
-    height: 1em;
-    border: 2px solid currentColor;
-    border-inline-end-color: transparent;
-    border-radius: 50%;
-    opacity: 0;
-    animation: rcc-spin 1s linear infinite, rcc-show 1ms 400ms forwards;
-  }
-  /* An error is a box: a tinted fill and a 1px edge (the fill alone is under
-     3:1). The inline space is a transparent border, so a team rule that sets
-     `padding: 8px 0` on .status (host.css) can't push the words to the edge,
-     which is also why the visible edge is an outline. */
+  /* An error is the kit's notice: the st-stop fill, no ring, the warning glyph hanging before the
+     words in --st-stop-mark. The inline space is a transparent border, so a team rule that sets
+     `padding: 8px 0` on .status (host.css) can't push the words or the glyph to the edge. */
   .status--error {
+    position: relative;
     margin-block: var(--rcc-space-2);
     padding-block: var(--rcc-space-2);
     border: 0 solid transparent;
-    border-inline-width: var(--rcc-space-3);
-    border-radius: var(--rcc-radius-sm);
-    outline: var(--rcc-hairline) solid var(--line-strong);
-    outline-offset: calc(-1 * var(--rcc-hairline));
+    border-inline-width: calc(var(--rcc-space-3) + 1.1em + var(--rcc-space-2)) var(--rcc-space-3);
+    border-radius: var(--r-md);
     background: var(--error-soft);
     color: var(--error-soft-text);
   }
+  .status--error::before {
+    content: "";
+    position: absolute;
+    left: calc(-1 * (1.1em + var(--rcc-space-2)));
+    top: calc(var(--rcc-space-2) + (1lh - 1.1em) / 2);
+    width: 1.1em;
+    height: 1.1em;
+    background: var(--st-stop-mark);
+    -webkit-mask: var(--warn-glyph) center / contain no-repeat;
+    mask: var(--warn-glyph) center / contain no-repeat;
+  }
+  @supports not (height: 1lh) { .status--error::before { top: calc(var(--rcc-space-2) + .3em); } }
 
   /* <QR> */
   .qr { margin: 0; max-width: 100%; }

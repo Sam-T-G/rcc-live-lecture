@@ -9,7 +9,7 @@
 //     slide up. Beside the slide: the quiz, the team leaderboard, past quizzes and votes, and the
 //     questions board, each in its own ErrorBoundary, so a card whose query fails shows its own
 //     error and the slide stays up.
-//   #/live/leaderboard: the team board on the projector.
+//   #/live/leaderboard: the team board on the projector (BoardPage.tsx).
 //   Both show the late banner (first names, for students who didn't opt out). Any other
 //   #/live/<parts>, #/live/leaderboard/<part> included, shows "No page at #/live/<parts>".
 import { useState } from "react";
@@ -17,12 +17,13 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { SignedInAs, useGoogleUser } from "../../blocks/auth";
 import { CHANNEL, useDeckSlide } from "../../blocks/deck";
-import { Button, Projector } from "../../blocks/kit";
+import { Button } from "../../blocks/kit";
 import { Link, useRoute } from "../../blocks/router";
 import { Card, ErrorBoundary, Screen, Status } from "../../blocks/ui";
 import LateBanner from "../checkin/LateBanner";
 import { SignInEnding, STUDENT_ENDING } from "../checkin/prof";
 import { QuizCard } from "../checkin/Quiz";
+import BoardPage from "./BoardPage";
 import { GroupBadge, Leaderboard } from "./Leaderboard";
 import PastQuestions from "./PastQuestions";
 import Questions, { SIGN_IN_ID } from "./Questions";
@@ -34,17 +35,7 @@ const QUESTIONS_ID = "live-questions";
 export default function LivePage() {
   const [, ...rest] = useRoute();
   const [part] = rest;
-  if (part === "leaderboard" && rest.length === 1)
-    return (
-      <Projector title="Team leaderboard">
-        <ErrorBoundary label="The team leaderboard">
-          <Leaderboard big />
-        </ErrorBoundary>
-        <div className="live-board__late">
-          <LateBanner />
-        </div>
-      </Projector>
-    );
+  if (part === "leaderboard" && rest.length === 1) return <BoardPage />;
   if (rest.length > 0)
     return (
       <Screen title={`No page at #/live/${rest.join("/")}`}>
