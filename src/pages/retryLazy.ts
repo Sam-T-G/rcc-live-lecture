@@ -1,7 +1,9 @@
 // A React.lazy that can load again after a failed import. React.lazy keeps a failed import and
 // throws the same error on every later render, so an ErrorBoundary's Try again could never bring
-// the part back without a page reload (for example after a deploy deleted the old chunk, or on a
-// phone that was offline for a moment). retryLazy(load) returns `pick`: call it once per mount
+// the part back without a page reload (for example on a phone that was offline for a moment).
+// After a deploy, Try again still fails: the deploy replaces the whole gh-pages branch, so the
+// old chunk's file is gone and every import asks for that same file; only a page reload, which
+// loads the new build, brings the part back. retryLazy(load) returns `pick`: call it once per mount
 // (`const [C] = useState(pick)`) to get the component. After an import fails, the next pick builds
 // a new lazy component that runs `load` again; until then every pick returns the same one, so a
 // part that loaded never imports twice.

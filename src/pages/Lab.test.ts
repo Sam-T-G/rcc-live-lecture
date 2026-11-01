@@ -12,8 +12,28 @@ import { getFunctionName, type FunctionReference } from "convex/server";
 import { ConvexError } from "convex/values";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Lab, { Ai, Sync } from "./Lab";
-import { retryLazy } from "./retryLazy";
 import Vision from "./LabVision";
+
+// retryLazy as Lab.tsx calls it: the real one, around a loader that counts each import of the
+// vision chunk and fails the next `fail` of them, the way a dropped connection does. LAB-spec-1
+// tests the real retryLazy on its own (vi.importActual), and LAB-fixcheck-1 tests Lab.tsx's use of it.
+const chunk = vi.hoisted(() => ({ imports: 0, fail: 0, last: null as Promise<unknown> | null }));
+vi.mock("./retryLazy", async (orig) => {
+  const real = await orig<typeof import("./retryLazy")>();
+  return {
+    retryLazy: <P extends object>(load: () => Promise<{ default: ComponentType<P> }>) =>
+      real.retryLazy(() => {
+        chunk.imports++;
+        const p =
+          chunk.fail > 0
+            ? (chunk.fail--, Promise.reject(new TypeError("Failed to fetch dynamically imported module")))
+            : load();
+        chunk.last = p;
+        return p;
+      }),
+  };
+});
+const { retryLazy } = await vi.importActual<typeof import("./retryLazy")>("./retryLazy");
 
 const hooks = vi.hoisted(() => ({ slots: [] as unknown[], at: 0 }));
 vi.mock("react", async (orig) => {
@@ -241,8 +261,7 @@ describe("#/lab", () => {
   });
 
   it("LAB-spec-1 when the vision chunk fails to load, the next mount of the panel (the boundary's Try again) runs the import again and the panel loads", async () => {
-    // The first import fails (a deploy deleted the old chunk, or the phone was offline); any
-    // later one works. React.lazy keeps a failed import and throws it on every later render, so
+    // The first import fails (the phone was offline for a moment); any later one works. React.lazy keeps a failed import and throws it on every later render, so
     // Try again has to get a new lazy component that imports again.
     let imports = 0;
     const pick = retryLazy(async () => {
@@ -273,6 +292,71 @@ describe("#/lab", () => {
     // Once it has loaded, later mounts reuse it without importing again.
     expect(await mount()).toBe("[vision panel]");
     expect(imports).toBe(2);
+  });
+
+  it("LAB-fixcheck-2 a chunk that never loads again (a deploy deleted it) fails on every Try again, and each one imports again", async () => {
+    // A deploy replaces the whole gh-pages branch, so the old hashed chunk is gone for good and
+    // only a page reload (which loads the new build) brings the panel back. retryLazy can't fix
+    // that; it only makes sure each Try again asks again instead of replaying the old error.
+    let imports = 0;
+    const pick = retryLazy(async (): Promise<{ default: ComponentType }> => {
+      imports++;
+      throw new TypeError("Failed to fetch dynamically imported module");
+    });
+    for (let mount = 1; mount <= 3; mount++) {
+      const C = pick();
+      expect(() => renderToStaticMarkup(createElement(C))).toThrow();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(() => renderToStaticMarkup(createElement(C))).toThrow("Failed to fetch dynamically imported module");
+      expect(imports).toBe(mount);
+    }
+  });
+
+  it("LAB-fixcheck-1 Lab.tsx: the vision panel inside 'The vision panel' boundary picks its component on each mount, so after a failed chunk load the boundary's Try again (a new mount) imports again and the panel loads", async () => {
+    // A fresh copy of Lab.tsx: the other tests' page renders already loaded the vision chunk in
+    // the copy imported at the top of this file.
+    vi.resetModules();
+    const { default: FreshLab } = await import("./Lab");
+    // The panel as Lab renders it: the child of the ErrorBoundary labelled "The vision panel".
+    hooks.slots = [];
+    hooks.at = 0;
+    const boundary = elements(FreshLab()).find((e) => (e.props as { label?: string }).label === "The vision panel");
+    expect(boundary, "an ErrorBoundary labelled 'The vision panel'").toBeDefined();
+    const Panel = (boundary!.props.children as ReactElement).type as () => ReactNode;
+
+    // One mount of the panel, as the boundary does it (first render, or Try again after the
+    // fallback): fresh hook state, call the panel, then render the component it picked outside
+    // Suspense, wait for its import, and render it again. A render that throws returns its words.
+    async function mount() {
+      hooks.slots = [];
+      hooks.at = 0;
+      // The panel returns <Suspense fallback=...><Vision /></Suspense>; C is Vision.
+      const C = ((Panel() as ReactElement<{ children?: ReactNode }>).props.children as ReactElement | undefined)?.type as ComponentType | undefined;
+      expect(C, "the component the panel picked").toBeDefined();
+      const show = () => {
+        hooks.at = 1;
+        try {
+          return plain(renderToStaticMarkup(createElement(C!)));
+        } catch (e) {
+          return `threw: ${(e as Error).message}`;
+        }
+      };
+      show();
+      await chunk.last?.catch(() => {});
+      await new Promise((r) => setTimeout(r, 0));
+      return show();
+    }
+
+    chunk.imports = 0;
+    chunk.fail = 1;
+    expect(await mount()).toBe("threw: Failed to fetch dynamically imported module");
+    expect(chunk.imports).toBe(1);
+    // Try again: the same panel mounts again and gets a new import, which works.
+    expect(await mount()).toContain("Vision (on the device)");
+    expect(chunk.imports).toBe(2);
+    // Once it has loaded, a later mount reuses it without importing again.
+    expect(await mount()).toContain("Vision (on the device)");
+    expect(chunk.imports).toBe(2);
   });
 
   it("blocks-frontend-21 the vision panel shows a blocked camera and a model that didn't load as Status errors (role=alert)", async () => {

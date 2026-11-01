@@ -19,7 +19,7 @@ GDG on Campus RCC, Thursday 2026-10-29, 2:30 to 3:30 pm, BLCIS A-210. The deck i
 - [ ] `npx convex dev` (log in, pick the existing project `rcc-live-lecture`), leave it running in its own terminal.
 - [ ] `npx convex env set HOST_EMAILS "<your gmail>"` and `npx convex env set DECK_BRIDGE_KEY "<the value from Sam>"`.
 - [ ] `scripts/doctor.sh` until it says Ready. Send Sam the dev deployment name it prints.
-- [ ] `npm run dev`, open `http://localhost:5173/#/lab`, sign in with Google, press Ping.
+- [ ] `npm run dev`, open `http://localhost:5173/#/lab`, sign in with Google, press Ping. (Since 2026-10-31 only professors and admins see Ping: an admin adds the lead's Gmail as a professor on #/admin first. Everyone else sees "Only professors and admins can press Ping...".)
 - [ ] Open Claude Code in the repo. Try `/next` with a throwaway ask, then `git checkout .` to drop it.
 
 **Sam, at 2:25:** open the deck with the slide feed on, sending to every lead's backend and to prod:
