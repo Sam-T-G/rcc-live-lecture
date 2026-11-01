@@ -375,32 +375,31 @@ function Choices() {
   return (
     <>
       <Tabs
-        label="Professor view"
+        label="Attendance"
         tabs={[
-          { id: "now", label: "Now", panel: <p>Slide 12 of 30 · 3 students lost on this slide</p> },
-          { id: "questions", label: "Questions", panel: <p>Why does the loop stop at 9? · 6 votes</p> },
-          { id: "teams", label: "Teams", panel: <p>1. Green · 6 right · 2.0 per student</p> },
+          { id: "today", label: "This class", panel: <p>28 checked in · 3 late</p> },
+          { id: "past", label: "Past classes", panel: <p>Oct 29 · 31 checked in · 4 late</p> },
         ]}
       />
       <div className="uikit-states">
         <State name="Hover">
           <div className="tabs__list">
             <button type="button" className="tabs__tab" data-force="hover">
-              Questions
+              Past classes
             </button>
           </div>
         </State>
         <State name="Pressed">
           <div className="tabs__list">
             <button type="button" className="tabs__tab" data-force="active">
-              Questions
+              Past classes
             </button>
           </div>
         </State>
         <State name="Keyboard focus">
           <div className="tabs__list">
             <button type="button" className="tabs__tab" data-force="focus">
-              Questions
+              Past classes
             </button>
           </div>
         </State>

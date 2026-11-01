@@ -444,6 +444,13 @@ describe("docs: the 2026-11-01 second sweep", () => {
     const kit = read("src/blocks/kit.tsx");
     const at = kit.indexOf("export function Tabs");
     expect(kit.slice(kit.lastIndexOf("\n\n", at), at)).not.toMatch(/professor view/i);
+    // sweep2-docs-check2-1: reviewers copy from the #/ui gallery, so its kit Tabs demo (and the
+    // tab state samples under it) use design.md's example too, not #/host's Now / Questions / Teams.
+    const ui = read("src/pages/UIKit.tsx");
+    const tabsAt = ui.indexOf("<Tabs");
+    const demo = ui.slice(tabsAt, ui.indexOf("<Segmented", tabsAt));
+    expect(demo).toContain('label="Attendance"');
+    expect(demo).not.toMatch(/Professor view|"now"|\bNow\b|\bQuestions\b|\bTeams\b/);
   });
 
   it("sweep2-docs-fixcheck-1 a convex/ comment that tells someone to add a host says to ask Sam and points at README step 4", () => {
@@ -461,12 +468,23 @@ describe("docs: the 2026-11-01 second sweep", () => {
         .join(" ");
       for (const para of comments.split("\u0000"))
         for (const sentence of para.split(/(?<=\.)\s+(?=[A-Z])/))
-          if (/\badd(s|ing|ed)?\b[^.]{0,80}\bhost\b/i.test(sentence)) {
+          // Also any sentence naming DEV_HOSTS with a form of "add", passive included ("a lead's own
+          // dev backend gets added there"), so the old wording can't come back unseen.
+          if (/\badd(s|ing|ed)?\b[^.]{0,80}\bhost\b/i.test(sentence) || (sentence.includes("DEV_HOSTS") && /\badd(s|ing|ed)?\b/i.test(sentence))) {
             seen++;
             expect([file, sentence, /\basks? Sam\b|\bSam (also )?adds\b/i.test(sentence) && sentence.includes("README step 4")]).toEqual([file, sentence, true]);
           }
     }
     expect(seen).toBeGreaterThan(3);
+    // The devGrant entry in staff.ts's header is what a lead reads before running devGrant.
+    const staff = read("convex/staff.ts");
+    const grantAt = staff.indexOf("//   staff:devGrant");
+    const grant = staff.slice(grantAt, staff.indexOf("//   staff:devRevoke", grantAt));
+    expect(grantAt).toBeGreaterThan(-1);
+    expect(grant).toMatch(/ask\s+(\/\/\s+)?Sam/);
+    expect(grant).toContain("README step 4");
+    expect(grant).toContain("convex/auth.config.ts");
+    expect(grant).not.toMatch(/gets\s+(\/\/\s+)?added/);
   });
 
   it("sweep2-docs-check-1 live TEAM.md says only a student's point change carries a reason, as #/host sends it", () => {

@@ -66,10 +66,10 @@
 //
 // For the CLI (internal: npx convex run, never from a page):
 //   staff:devGrant '{"email":"prof1@test.local","role":"professor"}'   a role for a test email; dev backends only
-//       Only @test.local emails, and only on the dev backends in DEV_HOSTS (convex/checkin/prof.ts;
-//       for a lead's own dev backend, ask Sam to add its host, README step 4). A typed sign-in with that email holds the
-//       role for 2 hours (run devGrant again to start the 2 hours again); then dropDevGrant
-//       removes the row. The typed signing key is public, so anyone can sign in as a test email
+//       Only @test.local emails, and only on the dev backends in DEV_HOSTS (convex/checkin/prof.ts
+//       and convex/auth.config.ts; for a lead's own dev backend, ask Sam to add its host to both,
+//       README step 4). A typed sign-in with that email holds the role for 2 hours (run devGrant
+//       again to start the 2 hours again); then dropDevGrant removes the row. The typed signing key is public, so anyone can sign in as a test email
 //       on dev while its role lasts: keep real student data off dev.
 //   staff:devRevoke                                                     removes every test-email role, and every iPad a test sign-in paired, now; run it after a browser check
 //   staff:importHostEmails                                             every HOST_EMAILS address without a role (and not in ADMIN_EMAILS) becomes a professor; safe to run again
