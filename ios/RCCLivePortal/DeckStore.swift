@@ -121,7 +121,7 @@ enum Feed: Hashable {
 final class Resubscriber {
     nonisolated static let defaultDelay: Duration = .seconds(3)
 
-    private let delay: Duration
+    let delay: Duration
     private var pending: [Feed: (wait: Task<Void, Never>, run: @MainActor () -> Void)] = [:]
 
     init(delay: Duration = Resubscriber.defaultDelay) {
@@ -155,6 +155,32 @@ final class Resubscriber {
     }
 }
 
+/// Where DeckStore's three feeds and the connection state come from: a ConvexClient in the
+/// app. RetryTests passes a fake, so it can end a feed and check that DeckStore sends it
+/// through its Resubscriber, without opening a connection.
+protocol DeckSource {
+    func current(channel: String) -> AnyPublisher<DeckStore.CurrentAnswer, ClientError>
+    func slides(channel: String) -> AnyPublisher<[Slide], ClientError>
+    func lateFeed(channel: String) -> AnyPublisher<[LateArrival], ClientError>
+    func connection() -> AnyPublisher<WebSocketState, Never>
+}
+
+extension ConvexClient: DeckSource {
+    func current(channel: String) -> AnyPublisher<DeckStore.CurrentAnswer, ClientError> {
+        subscribe(to: "deck:current", with: ["channel": channel], yielding: DeckStore.CurrentAnswer.self)
+    }
+
+    func slides(channel: String) -> AnyPublisher<[Slide], ClientError> {
+        subscribe(to: "deck:slides", with: ["channel": channel], yielding: [Slide].self)
+    }
+
+    func lateFeed(channel: String) -> AnyPublisher<[LateArrival], ClientError> {
+        subscribe(to: "checkin/attendance:lateFeed", with: ["channel": channel], yielding: [LateArrival].self)
+    }
+
+    func connection() -> AnyPublisher<WebSocketState, Never> { watchWebSocketState() }
+}
+
 /// Reads the deck from Convex. Read only: this app never calls a mutation, so nothing a
 /// student does on their phone reaches the professor's deck.
 @MainActor
@@ -164,8 +190,9 @@ final class DeckStore {
     /// subscribeCurrent decodes with this type, and DecodingTests decodes "null" through it.
     typealias CurrentAnswer = LiveSlide?
 
-    /// How many stores this process has made. The app makes none while RCCLivePortalTests run
-    /// (ScreenTests checks it), so a test run opens no connection.
+    /// How many stores this process has made that connect to a backend (`init(config:)`).
+    /// The app makes none while RCCLivePortalTests run (ScreenTests checks it), so a test run
+    /// opens no connection. RetryTests' stores use a fake source and aren't counted.
     private(set) static var made = 0
 
     /// nil when the channel has no slide yet, and before the first answer.
@@ -176,17 +203,25 @@ final class DeckStore {
     let late = LateBanner()
 
     let config: Config
-    @ObservationIgnored private let client: ConvexClient
+    /// Every feed that ends waits here before it subscribes again (RetryTests reads it).
+    @ObservationIgnored let retries: Resubscriber
+    @ObservationIgnored private let source: DeckSource
     @ObservationIgnored private var bag = Set<AnyCancellable>()
     @ObservationIgnored private var currentSub: AnyCancellable?
     @ObservationIgnored private var slidesSub: AnyCancellable?
     @ObservationIgnored private var offlineTimer: Task<Void, Never>?
-    @ObservationIgnored private let retries = Resubscriber()
 
-    init(config: Config) {
-        Self.made += 1
+    /// The app's store: connects to `config.deploymentURL`.
+    convenience init(config: Config) {
+        DeckStore.made += 1
+        self.init(config: config, source: ConvexClient(deploymentUrl: config.deploymentURL))
+    }
+
+    /// `retries` nil means the 3-second Resubscriber the app uses.
+    init(config: Config, source: DeckSource, retries: Resubscriber? = nil) {
         self.config = config
-        self.client = ConvexClient(deploymentUrl: config.deploymentURL)
+        self.source = source
+        self.retries = retries ?? Resubscriber()
         subscribeCurrent()
         subscribeSlides()
         subscribeLate()
@@ -204,8 +239,7 @@ final class DeckStore {
     }
 
     private func subscribeCurrent() {
-        currentSub = client
-            .subscribe(to: "deck:current", with: ["channel": config.channel], yielding: CurrentAnswer.self)
+        currentSub = source.current(channel: config.channel)
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { [weak self] _ in
@@ -230,8 +264,7 @@ final class DeckStore {
     }
 
     private func subscribeSlides() {
-        slidesSub = client
-            .subscribe(to: "deck:slides", with: ["channel": config.channel], yielding: [Slide].self)
+        slidesSub = source.slides(channel: config.channel)
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { [weak self] _ in
@@ -246,7 +279,7 @@ final class DeckStore {
     }
 
     private func subscribeLate() {
-        late.start(client: client, channel: config.channel) { [weak self] in
+        late.start(feed: source.lateFeed(channel: config.channel)) { [weak self] in
             self?.retries.later(.lateFeed) { [weak self] in self?.subscribeLate() }
         }
     }
@@ -263,7 +296,7 @@ final class DeckStore {
     private func watchConnection() {
         // The first connect attempt may never report a state, so start counting at launch.
         startOfflineTimer()
-        client.watchWebSocketState()
+        source.connection()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] state in
                 MainActor.assumeIsolated {

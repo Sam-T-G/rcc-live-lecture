@@ -114,12 +114,11 @@ final class LateBanner {
         self.hold = hold
     }
 
-    /// Subscribes to lateFeed on `channel`, the deck's channel. `ended` runs when the
+    /// Listens to lateFeed on the deck's channel (DeckSource.lateFeed). `ended` runs when the
     /// subscription ends; DeckStore subscribes again from there, with the same 3-second wait
     /// as the slides (Resubscriber).
-    func start(client: ConvexClient, channel: String, ended: @escaping @MainActor () -> Void) {
-        sub = client
-            .subscribe(to: "checkin/attendance:lateFeed", with: ["channel": channel], yielding: [LateArrival].self)
+    func start(feed: AnyPublisher<[LateArrival], ClientError>, ended: @escaping @MainActor () -> Void) {
+        sub = feed
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { _ in
