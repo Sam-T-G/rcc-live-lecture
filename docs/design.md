@@ -169,7 +169,7 @@ Pick one of 2 to 5 short options. Real radio buttons, so arrow keys and screen r
 </Banner>
 ```
 
-Tones `info`, `success`, `warn`, `error`. An error banner is announced at once (`role="alert"`); the others when they change (`role="status"`). `BannerStack` pins banners to the bottom of the screen above the iPhone home bar (the late banner). Inside a banner, links, `.muted` words and outlined or quiet buttons take the banner's ink; a filled `<a className="btn">` keeps its own words.
+Tones `info`, `success`, `warn`, `error`. An error banner is announced at once (`role="alert"`); the others when they change (`role="status"`). `BannerStack` pins banners to the bottom of the screen above the iPhone home bar (the sign-in warning, `SignInEnding`). While it shows, the page pads its bottom by the stack's height so the last button scrolls up above it, and the late banner sits above it (`src/blocks/stackSpace.ts`). Inside a banner, links, `.muted` words and outlined or quiet buttons take the banner's ink; a filled `<a className="btn">` keeps its own words.
 
 ### Stat
 

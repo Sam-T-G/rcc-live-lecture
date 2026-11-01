@@ -178,7 +178,13 @@
   .banner :is(.btn--secondary, .btn--quiet) { color: inherit; }
   .banner .btn--secondary { box-shadow: inset 0 0 0 var(--rcc-hairline) currentColor; }
   /* <BannerStack>: banners pinned to the bottom of the screen, above the
-     iPhone home bar. Taps pass through the gaps. */
+     iPhone home bar. Taps pass through the gaps. While a stack shows,
+     --banner-stack-space is how far its top sits above the bottom of the
+     screen (src/blocks/stackSpace.ts): the page pads its bottom by that much,
+     so its last button scrolls up above the banners, and a focused control
+     scrolls into view above them too. */
+  html { scroll-padding-bottom: var(--banner-stack-space, 0px); }
+  body { padding-bottom: var(--banner-stack-space, 0px); }
   .banner-stack {
     position: fixed;
     inset: auto var(--rcc-space-4) calc(var(--rcc-space-4) + env(safe-area-inset-bottom, 0px));

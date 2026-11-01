@@ -2,8 +2,9 @@
 // src/styles/kit.css, the tokens in src/styles/tokens.css. docs/design.md shows each part with an
 // example, and #/ui shows every part in every state, light and dark. The older parts (Screen,
 // Card, Big, Status, Todo) stay in src/blocks/ui.tsx.
-import { useEffect, useId, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode } from "react";
 import { Status } from "./ui";
+import { pinnedSpace, setStackSpace } from "./stackSpace";
 
 export type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
 
@@ -211,9 +212,31 @@ export function Banner({
   );
 }
 
-// Banners pinned to the bottom of every screen (the late banner), above the iPhone home bar.
+// Banners pinned to the bottom of every screen (the sign-in warning, SignInEnding), above the
+// iPhone home bar. While it shows, the page keeps room under its last line for it and the late
+// banner sits above it (stackSpace.ts).
 export function BannerStack({ children }: { children: ReactNode }) {
-  return <div className="banner-stack">{children}</div>;
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const measure = () => setStackSpace(root, el, pinnedSpace(el.getBoundingClientRect(), window.innerHeight, getComputedStyle(el).position));
+    measure();
+    const seen = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
+    seen?.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      seen?.disconnect();
+      window.removeEventListener("resize", measure);
+      setStackSpace(root, el, undefined);
+    };
+  }, []);
+  return (
+    <div ref={ref} className="banner-stack">
+      {children}
+    </div>
+  );
 }
 
 // A number with what it counts under it, for a row of counts on a laptop page. <Big> (ui.tsx)

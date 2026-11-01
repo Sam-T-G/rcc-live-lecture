@@ -36,7 +36,10 @@
    Never speaker notes (aside.notes), .notice text, or data-beat items not shown yet.
    When a site can't be reached (no network, a typo'd deployment name), only that site gets
    the same send again: 0.3 s later, then 0.6, 1.2 and 2.4 s and so on up to every 9.6 s, until
-   it answers or the slide changes. Sites that took the send get nothing more, so a dead site
+   it answers, the slide changes, or 2 minutes have passed since the first send. After 2 minutes
+   the press is old: the professor may have ended the class since, and a late press would open a
+   new one (convex/deck.ts), so that site waits for the next slide. Sites that took the send get
+   nothing more, so a dead site
    never makes the others reopen a class the professor ended.
    Presenter, mirror, remote and run-sheet windows (?view=) never send. Decks load this file
    from the live site, so a change here reaches them only after Sam deploys. */
@@ -132,6 +135,8 @@
 
   var last = '';
   var latest = null; // the body of the last send
+  var latestAt = 0; // when `latest` first went out (Date.now())
+  var RETRY_MS = 120000; // a failed send is tried again for 2 minutes after it first went out
   // Sites whose fetch of `latest` failed: { wait: checks until the next try, gap: checks between
   // tries (1, 2, 4 ... 32), busy: a try is on its way }.
   var retry = {};
@@ -153,6 +158,7 @@
     if (!st) return;
     var sig = st.i + ':' + st.b;
     if (sig === last) {
+      if (Date.now() - latestAt > RETRY_MS) { retry = {}; return; }
       Object.keys(retry).forEach(function (site) {
         var r = retry[site];
         if (r.busy || --r.wait > 0) return;
@@ -173,6 +179,7 @@
     body.run = run.id;
     body.seq = run.seq;
     latest = body;
+    latestAt = Date.now();
     retry = {};
     sites.forEach(function (site) { send(site, body); });
   }

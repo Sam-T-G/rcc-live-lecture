@@ -24,11 +24,12 @@ const newTab = (storage = new Map<string, string>()): Tab => ({ storage, sent: [
 // "reload" (the browser's reload), as performance.getEntriesByType("navigation") reports it, and
 // whether the deck sits in an iframe (the stage, #/checkin/stage).
 // `down` lists the sites whose fetch rejects, as a typo'd deployment name or a DNS failure does.
-type Load = { how?: "navigate" | "reload"; framed?: boolean; down?: Set<string> };
+// `now` stands in for the tab's clock (Date.now), for a test that runs the deck for an hour.
+type Load = { how?: "navigate" | "reload"; framed?: boolean; down?: Set<string>; now?: () => number };
 
 // Loads the deck at `href` in `tab`: runs the bridge the way its script tag does. `go` moves the
 // deck and runs the bridge's next 300 ms check; `check` runs that check without moving.
-function open(tab: Tab, href: string, { how = "navigate", framed = false, down = new Set<string>() }: Load = {}) {
+function open(tab: Tab, href: string, { how = "navigate", framed = false, down = new Set<string>(), now = () => Date.now() }: Load = {}) {
   const url = new URL(href);
   const location = { href: url.href, pathname: url.pathname, search: url.search, hash: url.hash };
   const history = {
@@ -59,6 +60,11 @@ function open(tab: Tab, href: string, { how = "navigate", framed = false, down =
     window: win,
     performance: { getEntriesByType: (type: string) => (type === "navigation" ? [{ type: how }] : []) },
     crypto: globalThis.crypto,
+    Date: class extends Date {
+      static now() {
+        return now();
+      }
+    },
     fetch: (to: string, init: { body: string }) => {
       tab.sent.push({ to, body: JSON.parse(init.body) });
       if (down.has(new URL(to).hostname.split(".")[0])) return Promise.reject(new TypeError("Failed to fetch"));
@@ -278,5 +284,41 @@ describe("public/deck-bridge.js", () => {
       await settle();
     }
     expect(tab.sent.map((s) => s.body.index)).toEqual([0, 1, 1]);
+  });
+
+  it("sweep1-core-fixcheck-2 a failed send stops being tried 2 minutes after it first went out, so a site back an hour later never gets the old slide", async () => {
+    const tab = newTab();
+    vi.spyOn(console, "warn").mockImplementation(() => {}); // "deck-bridge: offline" on each failed send
+    const down = new Set(["broken-site-999"]);
+    let t = Date.UTC(2026, 10, 1, 10);
+    const deck = open(tab, `${DECK}?bridge=gdg.${KEY}&bridge-site=broken-site-999`, { down, now: () => t });
+    deck.check(); // slide 0 goes out and fails
+    await settle();
+    const tries: number[] = [];
+    for (let k = 0; k < 12_000; k++) {
+      t += 300; // an hour of 300 ms checks with the deck parked on slide 0
+      const before = tab.sent.length;
+      deck.check();
+      if (tab.sent.length > before) {
+        tries.push(t);
+        await settle(); // only a send has a then/catch to run
+      }
+    }
+    expect(tries.length).toBeGreaterThan(3); // it did try again for a while
+    expect(tries.at(-1)! - tries[0]).toBeLessThanOrEqual(2 * 60_000);
+
+    down.clear(); // the site comes back
+    const sent = tab.sent.length;
+    for (let k = 0; k < 200; k++) {
+      t += 300;
+      const before = tab.sent.length;
+      deck.check();
+      if (tab.sent.length > before) await settle();
+    }
+    expect(tab.sent).toHaveLength(sent); // the old slide never lands
+
+    deck.go(1); // the next slide goes out as usual
+    await settle();
+    expect(tab.sent.map((s) => s.body.index).slice(-2)).toEqual([0, 1]);
   });
 });

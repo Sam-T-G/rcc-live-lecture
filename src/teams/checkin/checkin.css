@@ -15,7 +15,8 @@ button.quiet { background: transparent; color: var(--accent); box-shadow: inset 
 .scanner__names { list-style: none; padding: 0; margin: 16px 0 0; font-size: 1.3rem; }
 .scanner__names li { padding: 4px 0; border-bottom: 1px solid var(--line); }
 @media (max-width: 720px) { .scanner { grid-template-columns: 1fr; } }
-.late { position: fixed; left: 16px; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 50; pointer-events: none; }
+/* Above the sign-in warning (<BannerStack>, src/blocks/stackSpace.ts) while that shows. */
+.late { position: fixed; left: 16px; right: 16px; bottom: max(16px, calc(var(--banner-stack-space, 0px) + 8px)); display: flex; flex-direction: column; gap: 8px; z-index: 50; pointer-events: none; }
 .late__item { margin: 0 auto; max-width: 640px; width: 100%; padding: 14px 18px; border-radius: var(--radius); background: var(--error); color: var(--surface); font-size: 1.25rem; font-weight: 700; text-align: center; box-shadow: 0 6px 24px rgb(0 0 0 / 0.25); animation: late-in 300ms ease-out; }
 .late__grace { width: 4em; }
 @keyframes late-in { from { transform: translateY(24px); opacity: 0; } }
