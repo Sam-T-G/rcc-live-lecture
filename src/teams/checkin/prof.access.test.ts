@@ -33,6 +33,7 @@ vi.mock("../../blocks/auth", () => ({
 }));
 
 const DEVICE = "rcc-live:door-device";
+const ENDED = "Your sign-in ended. On your own phone, sign in again on #/admin, then open #/checkin/kiosk there.";
 const TOKEN = "0123456789abcdef".repeat(4);
 let store: Map<string, string>;
 
@@ -139,7 +140,7 @@ describe("ROLES the door iPad opens the scanner only for a paired iPad or a scan
     results["staff:deviceStatus"] = { status: "none" };
     signedIn.ended = true;
     const html = words(kiosk());
-    expect(html).toContain("Your sign-in ended. Sign in again on #/admin, then open #/checkin/kiosk.");
+    expect(html).toContain(ENDED);
     expect(html).not.toContain("Pair this iPad"); // the pairing screen's title
     expect(html).toContain("Show a pairing code"); // for a door iPad, one tap away
     expect(html).not.toContain("[scanner");
@@ -149,6 +150,97 @@ describe("ROLES the door iPad opens the scanner only for a paired iPad or a scan
     signedIn.ended = false;
     expect(words(kiosk())).toContain("Pair this iPad");
     expect(requestPairing).toHaveBeenCalledTimes(1);
+  });
+
+  // sweep1-checkin-fixcheck-9: the screen can't tell the scanner's own phone from the door iPad
+  // (a scanner can sign in on the unpaired iPad), so it says where to sign in again and that
+  // nobody signs in to Google on the iPad.
+  it("sweep1-checkin-fixcheck-9 the sign-in-ended screen says to sign in again on your own phone, and that nobody signs in to Google on this iPad", () => {
+    store.set(DEVICE, TOKEN);
+    results["staff:me"] = null;
+    results["staff:deviceStatus"] = { status: "none" };
+    signedIn.ended = true;
+    const html = words(kiosk());
+    expect(html).toContain("Your sign-in ended. On your own phone, sign in again on #/admin, then open #/checkin/kiosk there.");
+    expect(html).toContain("Nobody signs in to Google on this iPad.");
+    expect(html).toContain("Show a pairing code");
+    expect(html).not.toContain("Sign in again on #/admin, then open #/checkin/kiosk.");
+  });
+
+  // sweep1-checkin-check-2 (b): a pairing code still open when the sign-in ends.
+  it("sweep1-checkin-check-2 a sign-in that ends while a pairing code is open shows the sign-in-ended screen, not the old code", () => {
+    effects.run = true;
+    store.set(DEVICE, TOKEN);
+    results["staff:me"] = null;
+    results["staff:deviceStatus"] = { status: "waiting", code: "632861", expiresAt: Date.now() + 9 * 60_000 };
+    signedIn.ended = true;
+    const html = words(kiosk());
+    expect(html).toContain(ENDED);
+    expect(html).toContain("Show a pairing code");
+    expect(html).not.toContain("632 861");
+    expect(html).not.toContain("Pair this iPad");
+    expect(requestPairing).not.toHaveBeenCalled();
+  });
+
+  // sweep1-checkin-check-2 (a): the sign-in ran out while the tab was closed or asleep, so the
+  // reload has no `ended`. The device remembers when its scanner sign-in ends (no email).
+  it("sweep1-checkin-check-2 a reload after a scanner's sign-in ran out on this device shows the sign-in-ended screen and asks for no code", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.UTC(2026, 10, 5, 17, 0));
+      effects.run = true;
+      store.set(DEVICE, TOKEN);
+      results["staff:deviceStatus"] = { status: "none" };
+      signIn({ iss: "https://accounts.google.com", email: "door@example.edu", email_verified: true });
+      signedIn.user!.exp = Date.UTC(2026, 10, 5, 17, 40);
+      results["staff:me"] = staff("door@example.edu", "scanner");
+      expect(kiosk()).toContain("[scanner, device none]");
+      expect([...store.values()].join(" ")).not.toContain("door@example.edu");
+
+      // 9:45: the sign-in ran out while the tab slept, and the page reloads signed out.
+      vi.setSystemTime(Date.UTC(2026, 10, 5, 17, 45));
+      signedIn.user = null;
+      results["staff:me"] = null;
+      let html = words(kiosk());
+      expect(html).toContain(ENDED);
+      expect(html).toContain("Show a pairing code");
+      expect(html).not.toContain("Pair this iPad");
+      expect(requestPairing).not.toHaveBeenCalled();
+      // Still there on the next reload, and with an old code open.
+      results["staff:deviceStatus"] = { status: "waiting", code: "632861", expiresAt: Date.now() + 9 * 60_000 };
+      html = words(kiosk());
+      expect(html).toContain(ENDED);
+      expect(html).not.toContain("632 861");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sweep1-checkin-check-2 a scanner who signed out before their sign-in ran out gets the pairing screen, and the device forgets the sign-in", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.UTC(2026, 10, 5, 17, 0));
+      effects.run = true;
+      store.set(DEVICE, TOKEN);
+      results["staff:deviceStatus"] = { status: "none" };
+      signIn({ iss: "https://accounts.google.com", email: "door@example.edu", email_verified: true });
+      signedIn.user!.exp = Date.UTC(2026, 10, 5, 17, 40);
+      results["staff:me"] = staff("door@example.edu", "scanner");
+      kiosk();
+      const remembered = store.size;
+
+      // 9:10: Sign out.
+      vi.setSystemTime(Date.UTC(2026, 10, 5, 17, 10));
+      signedIn.user = null;
+      results["staff:me"] = null;
+      expect(words(kiosk())).toContain("Pair this iPad");
+      expect(store.size).toBe(remembered - 1);
+      // Hours later, a reload still gets the pairing screen.
+      vi.setSystemTime(Date.UTC(2026, 10, 5, 22, 0));
+      expect(words(kiosk())).toContain("Pair this iPad");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("sweep1-checkin-2 the pairing screen says a scanner's sign-in ends within the hour, and a paired iPad scans all class", () => {

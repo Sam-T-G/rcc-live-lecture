@@ -180,7 +180,7 @@ describe("#/checkin/quiz, asking", () => {
   });
 
   it("F17.1 checkin-frontend-17 a double click on 'Ask the room' asks once; the button stays busy until the server answers", async () => {
-    typeIn(professor, "Question", "What does a capacitor store?");
+    typeIn(professor, "Quiz text", "What does a capacitor store?");
     typeIn(professor, "Choice A", "Charge");
     typeIn(professor, "Choice B", "Current");
     expect(press(professor(), "Ask the room")).toBe("submitted");
@@ -198,7 +198,7 @@ describe("#/checkin/quiz, asking", () => {
 
   it("F17.1 checkin-frontend-17 a double click on 'Start the vote' starts one vote", () => {
     (button(professor(), "Vote").el.props.onClick as () => void)();
-    typeIn(professor, "Question", "What should we cover next?");
+    typeIn(professor, "Vote text", "What should we cover next?");
     typeIn(professor, "Choice A", "Capacitors");
     typeIn(professor, "Choice B", "Magnets");
     expect(press(professor(), "Start the vote")).toBe("submitted");
@@ -208,7 +208,7 @@ describe("#/checkin/quiz, asking", () => {
   });
 
   it("F17.1 checkin-frontend-16 'Right' on a blank choice says 'Type the right answer’s choice.' and asks nothing; on a filled choice under a blank one it goes out as that choice", () => {
-    typeIn(professor, "Question", "What does a capacitor store?");
+    typeIn(professor, "Quiz text", "What does a capacitor store?");
     typeIn(professor, "Choice A", "Charge");
     typeIn(professor, "Choice B", "Current");
     markRight(professor, 2); // C, left blank
@@ -223,15 +223,54 @@ describe("#/checkin/quiz, asking", () => {
     expect(sent("checkin/quiz:ask")[0].args).toMatchObject({ choices: ["Charge", "Current"], correct: 1 });
   });
 
-  it("F17.1 a blank question says 'Type a question.' on the page, never the browser's own message, and asks nothing", () => {
+  it("F17.1 sweep1-checkin-check-1 a blank quiz says 'Type the quiz text.' on the page, never the browser's own message, and asks nothing", () => {
     typeIn(professor, "Choice A", "Charge");
     typeIn(professor, "Choice B", "Current");
     expect(press(professor(), "Ask the room")).toBe("submitted");
-    expect(alertText(professor())).toBe("Type a question.");
-    typeIn(professor, "Question", "   ");
+    expect(alertText(professor())).toBe("Type the quiz text.");
+    typeIn(professor, "Quiz text", "   ");
     expect(press(professor(), "Ask the room")).toBe("submitted");
-    expect(alertText(professor())).toBe("Type a question.");
+    expect(alertText(professor())).toBe("Type the quiz text.");
     expect(sent("checkin/quiz:ask")).toHaveLength(0);
+  });
+
+  it("sweep1-checkin-check-1 a blank vote says 'Type the vote text.' and starts nothing", () => {
+    (button(professor(), "Vote").el.props.onClick as () => void)();
+    typeIn(professor, "Choice A", "Capacitors");
+    typeIn(professor, "Choice B", "Magnets");
+    typeIn(professor, "Vote text", "  ");
+    expect(press(professor(), "Start the vote")).toBe("submitted");
+    expect(alertText(professor())).toBe("Type the vote text.");
+    expect(sent("checkin/quiz:ask")).toHaveLength(0);
+  });
+});
+
+// sweep1-checkin-check-1 / sweep1-checkin-fixcheck-7: one word per thing (PLAN.md COPY): on a
+// professor page a poll is a quiz or a vote, never a "question"; "question" is for students' posts.
+describe("sweep1-checkin-fixcheck-7 #/checkin/quiz calls a poll a quiz or a vote", () => {
+  const past = [{ id: "p0", kind: "quiz", question: "What does a capacitor store?", answered: 9, rightPct: 67 }];
+
+  it("sweep1-checkin-fixcheck-7 the form, quiz and vote, with its error, says no 'question'", () => {
+    server.results = { "checkin/quiz:current": null, "checkin/quiz:history": past };
+    press(professor(), "Ask the room");
+    const quiz = professor();
+    expect(alertText(quiz)).toBeTruthy();
+    expect(words(quiz)).not.toMatch(/question/i);
+    (button(professor(), "Vote").el.props.onClick as () => void)();
+    press(professor(), "Start the vote");
+    const vote = professor();
+    expect(alertText(vote)).toBeTruthy();
+    expect(words(vote)).not.toMatch(/question/i);
+  });
+
+  it("sweep1-checkin-fixcheck-7 the open card and the ended card say no 'question'", () => {
+    const stats = { counts: [6, 2, 1], answered: 9, checkedIn: 12, correct: 0, rightPct: 67, medianSec: 8 };
+    server.results = { "checkin/quiz:current": open("p1"), "checkin/quiz:stats": stats, "checkin/quiz:history": past };
+    expect(words(professor())).not.toMatch(/question/i);
+    server.results["checkin/quiz:current"] = { ...open("p1"), open: false };
+    const ended = words(professor());
+    expect(ended).toContain("Ask another");
+    expect(ended).not.toMatch(/question/i);
   });
 });
 

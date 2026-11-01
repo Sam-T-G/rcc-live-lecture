@@ -12,15 +12,16 @@
 //     no ?deck= the page says to add one; an address that can't load says "That deck link didn't
 //     work."
 //   bridge: handed to the deck, whose deck-bridge.js then sends each slide to the phones. As soon
-//     as the page has the key and a ?deck= that loads (until then the key stays in the link, so
-//     adding ?deck= later still works), it saves the key in this tab's sessionStorage and the address bar shows
-//     ?bridge=saved instead, so the key never shows on the projector and a reload still hands it
-//     to the deck. A new tab needs the link with the key again: a ?bridge=saved link opened in a
-//     tab that saved no key (a bookmark, a copied address bar) shows "Phones aren't getting these
-//     slides." at the top of the stage. The saved key goes only to a deck on the origin of the
-//     ?deck= it came with: a ?bridge=saved link to a deck anywhere else gets no key and the same
-//     line, since the key in a deck's address reaches that site. Taking ?bridge=saved out of the link stops the slides
-//     going to the phones. When the link has more than one ?bridge=, the last key counts.
+//     as the page has the key, it saves the key in this tab's sessionStorage and the address bar
+//     shows ?bridge=saved instead, so the key never shows on the projector and a reload still
+//     hands it to the deck. A new tab needs the link with the key again: a ?bridge=saved link
+//     opened in a tab that saved no key (a bookmark, a copied address bar) shows "Phones aren't
+//     getting these slides." at the top of the stage. The saved key goes only to a deck on the
+//     origin of the ?deck= it came with: a ?bridge=saved link to a deck anywhere else gets no key
+//     and the same line, since the key in a deck's address reaches that site. A key whose link had
+//     no ?deck= that loads waits in the tab and goes to the first ?deck= that loads there, then
+//     only to that deck's origin. Taking ?bridge=saved out of the link stops the slides going to
+//     the phones. When the link has more than one ?bridge=, the last key counts.
 //   bridge-site: handed to the deck too, so it sends to that Convex backend instead of the one its
 //     script tag names (prod, for the published decks). Checks on Sam's dev backend always pass
 //     bridge-site=quaint-swan-637.
@@ -41,7 +42,7 @@ import { CHANNEL } from "../../blocks/deck";
 import { Projector } from "../../blocks/kit";
 import { ErrorBoundary } from "../../blocks/ui";
 import LateBanner from "./LateBanner";
-import { SAVED, bridgeIn, deckAddress, frameSrc, keyFor, savedBridge, takeBridge } from "./stageLink";
+import { SAVED, bindTo, bridgeIn, deckAddress, frameSrc, keyFor, savedBridge, takeBridge } from "./stageLink";
 
 const LETTERS = ["A", "B", "C", "D"];
 
@@ -50,8 +51,8 @@ export default function Stage() {
   const link = (params.get("deck") ?? "").trim();
   const deck = link ? deckAddress(link, location.protocol === "https:") : null;
   const inLink = bridgeIn(params);
-  const bridge = useBridge(inLink, deck);
-  const lost = inLink === SAVED && !bridge;
+  const { bridge, waiting } = useBridge(inLink, deck);
+  const lost = inLink === SAVED && !bridge && !waiting;
   const frame = useRef<HTMLIFrameElement>(null);
   const [shown, setShown] = useState(true);
 
@@ -110,9 +111,12 @@ export default function Stage() {
 }
 
 // The bridge value for the deck: the one in the link, or, when the link says ?bridge=saved, this
-// tab's saved key if the deck is on the origin the key came with (keyFor). takeBridge() swaps a key
-// in the address bar for "saved" once the page has it, and again after every hash change, since
-// the full link can be pasted in again.
+// tab's saved key if the deck is on the origin the key came with (keyFor). A key waiting for a
+// deck (saved from a link with no ?deck= that loads) goes to this deck (bindTo); takeBridge saves
+// it with this deck's origin in the effect. takeBridge() swaps a key in the address bar for
+// "saved" once the page has it, and again after every hash change, since the full link can be
+// pasted in again. `waiting`: the key is saved and no deck loads yet, so the stage only asks for
+// ?deck=.
 function useBridge(inLink: string | null, deck: URL | null) {
   const [saved, setSaved] = useState(savedBridge);
   useEffect(() => {
@@ -123,7 +127,8 @@ function useBridge(inLink: string | null, deck: URL | null) {
     window.addEventListener("hashchange", take);
     return () => window.removeEventListener("hashchange", take);
   }, []);
-  return inLink === SAVED ? keyFor(saved, deck) : inLink;
+  if (inLink !== SAVED) return { bridge: inLink, waiting: false };
+  return { bridge: keyFor(bindTo(saved, deck), deck), waiting: !deck && saved?.origin === null };
 }
 
 function Count() {

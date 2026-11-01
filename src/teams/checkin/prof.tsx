@@ -215,9 +215,41 @@ function subscribeSignedOut(l: () => void) {
   return () => signedOutListeners.delete(l);
 }
 
+// When the scanner sign-in on this device ends (ms, the token's expiry less SIGN_IN_DROP_MS), kept
+// while a scanner is signed in here, so a reload after it ran out (the tab closed or asleep, so
+// auth's `ended` is off) still says "Your sign-in ended." instead of asking for a pairing code.
+// No email. Cleared when nobody is signed in before that time (a sign-out), when someone who
+// isn't a scanner signs in, and on Show a pairing code. In localStorage, so it outlasts the tab.
+const SCANNER_ENDS = "rcc-live:kiosk-scanner-ends";
+const scannerListeners = new Set<() => void>();
+let scannerEndsInMemory: string | null = null; // when localStorage is off: until a reload
+function readScannerEnds(): string | null {
+  try {
+    return localStorage.getItem(SCANNER_ENDS);
+  } catch {
+    return scannerEndsInMemory;
+  }
+}
+function saveScannerEnds(at: number | null) {
+  const value = at === null ? null : String(at);
+  if (readScannerEnds() === value) return;
+  scannerEndsInMemory = value;
+  try {
+    if (value) localStorage.setItem(SCANNER_ENDS, value);
+    else localStorage.removeItem(SCANNER_ENDS);
+  } catch {
+    /* localStorage is off: kept in memory */
+  }
+  scannerListeners.forEach((l) => l());
+}
+function subscribeScannerEnds(l: () => void) {
+  scannerListeners.add(l);
+  return () => scannerListeners.delete(l);
+}
+
 export function DoorGate({ children }: { children: (device: string | undefined) => ReactNode }) {
   const me = useStaff();
-  const { signOut, ended } = useGoogleUser();
+  const { user, signOut, ended } = useGoogleUser();
   const [pairAnyway, setPairAnyway] = useState(false);
   const token = useDeviceToken();
   const status = useQuery(api.staff.deviceStatus, token ? { token } : "skip");
@@ -240,6 +272,14 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
     saveSignedOut(leaving);
     signOut();
   }, [leaving, signOut]);
+  const scannerEnds = Number(useSyncExternalStore(subscribeScannerEnds, readScannerEnds, readScannerEnds) ?? NaN);
+  const exp = user?.exp;
+  const ranOut = me === null && scannerEnds <= Date.now();
+  useEffect(() => {
+    if (paired) saveScannerEnds(null);
+    else if (me?.role === "scanner" && typeof exp === "number") saveScannerEnds(exp - SIGN_IN_DROP_MS);
+    else if (me || (me === null && !ranOut)) saveScannerEnds(null);
+  }, [paired, me, exp, ranOut]);
 
   if (paired && left)
     return (
@@ -268,14 +308,26 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
         <Status kind="loading">Checking this iPad…</Status>
       </Screen>
     );
-  // A scanner's sign-in ran out here (most likely on their own phone: Google's renewal never runs
-  // on this route). They sign in again; the pairing code is one tap away for a door iPad.
-  if (ended && me === null && status.status === "none" && !pairAnyway)
+  // A sign-in ran out here: on this page (`ended`), or a scanner's on this device before a reload
+  // (ranOut). Google's renewal never runs on this route. This can be the scanner's own phone or
+  // the door iPad (a scanner can sign in on an unpaired one), so it says to sign in on your own
+  // phone, and the pairing code is one tap away for a door iPad. It shows over an open pairing
+  // code too (status "waiting").
+  if ((ended || ranOut) && me === null && !pairAnyway)
     return (
       <Screen title="Check-in kiosk" wide>
-        <p>Your sign-in ended. Sign in again on #/admin, then open #/checkin/kiosk.</p>
+        <p>Your sign-in ended. On your own phone, sign in again on #/admin, then open #/checkin/kiosk there.</p>
+        <p className="muted">Nobody signs in to Google on this iPad. Google keeps the account in Safari, and anyone in line could sign in with it.</p>
         <p>
-          <Button variant="secondary" onClick={() => setPairAnyway(true)}>Show a pairing code</Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              saveScannerEnds(null);
+              setPairAnyway(true);
+            }}
+          >
+            Show a pairing code
+          </Button>
         </p>
       </Screen>
     );

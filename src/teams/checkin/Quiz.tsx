@@ -1,6 +1,7 @@
 // Live quiz and vote. Two parts:
-//   <Professor />: #/checkin/quiz, for professors and admins (StaffGate). Ask a question, watch
-//     answers come in, end it, see the results.
+//   <Professor />: #/checkin/quiz, for professors and admins (StaffGate). Start a quiz or a vote,
+//     watch answers come in, end it, see the results. On screen a poll is a quiz or a vote, never
+//     a "question" (that word is for students' posts; Quiz.press.test.ts checks it).
 //   <QuizCard />: the student's side, on #/checkin/student after check-in and on #/live. Anyone
 //     can read the open question and its choices; only a checked-in student gets answer buttons.
 //     Signed out it says "Sign in and check in to answer.", signed in "Check in to answer." (on a
@@ -106,11 +107,11 @@ function AskForm({ onDone }: { onDone: () => void }) {
   function send(e: FormEvent) {
     e.preventDefault();
     // The page checks these two and says what's wrong (noValidate turns off the browser's own
-    // message for the required question); the server checks the question again, and the number
-    // of choices.
+    // message for the required text); the server checks the text again, and the number of
+    // choices. On screen the text is "Quiz text" or "Vote text": "question" is for students' posts.
     const right = kind === "quiz" ? correct : null;
     if (!question.trim()) {
-      setErr("Type a question.");
+      setErr(`Type the ${kind} text.`);
       return;
     }
     if (right !== null && !choices[right].trim()) {
@@ -143,7 +144,7 @@ function AskForm({ onDone }: { onDone: () => void }) {
           : "Vote: no right answer. Students can change their pick until you end it."}
       </p>
       <label className="ask__q">
-        Question
+        {kind === "quiz" ? "Quiz text" : "Vote text"}
         <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={kind === "quiz" ? "What does a capacitor store?" : "What should we cover next?"} required />
       </label>
       {choices.map((c, i) => (

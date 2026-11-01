@@ -236,33 +236,51 @@ describe("#/checkin/stage", () => {
     }
   });
 
-  it("sweep1-checkin-4 a link with no deck saves no key, so a later ?bridge=saved link to a deck gets none", () => {
-    vi.stubGlobal("sessionStorage", stubStorage());
-    stubHistory();
-    at("#/checkin/stage?bridge=gdg.k1");
-    expect(takeBridge()).toBe("gdg.k1");
-    expect(frame(open(`#/checkin/stage?bridge=saved&deck=${DECK}`))?.searchParams.has("bridge")).toBe(false);
-  });
-
-  it("sweep1-checkin-fixcheck-3 a key in a link with no deck (or one that doesn't load) stays in the link; adding ?deck= as the stage says hands the key to that deck", () => {
+  // sweep1-checkin-fixcheck-8 (replaces the sweep1-checkin-4 no-deck test and the fixcheck-3 test,
+  // which left the key in the address bar on the projector): a key in a link with no deck, or a
+  // deck that doesn't load, leaves the address bar at once and waits in this tab for a deck. The
+  // first ?deck= that loads gets it (fixcheck-3: adding ?deck= as the stage says still works), and
+  // from then on only a deck on that origin does (sweep1-checkin-4).
+  it("sweep1-checkin-fixcheck-8 a key in a link with no deck leaves the address bar at once; the first deck that loads in this tab gets it, then only decks on that origin", () => {
+    const LINE = "Phones aren't getting these slides. Open this page from the full link again.";
     const store = stubStorage();
     vi.stubGlobal("sessionStorage", store);
     const replace = stubHistory();
     for (const hash of ["#/checkin/stage?bridge=gdg.k1", "#/checkin/stage?bridge=gdg.k1&deck=decks/week9/"]) {
       at(hash);
       expect(takeBridge(), hash).toBe("gdg.k1");
-      expect(replace, hash).not.toHaveBeenCalled();
-      expect(location.hash, hash).toContain("bridge=gdg.k1");
+      expect(location.hash, hash).not.toContain("gdg.k1");
+      expect(location.hash, hash).toContain("bridge=saved");
     }
-    expect(store.values()).toEqual([]);
-    expect(words(open("#/checkin/stage?bridge=gdg.k1"))).toContain("Add ?deck=<your deck's address> to this page's link.");
+    expect(replace).toHaveBeenCalledTimes(2);
+    expect(store.values()).toEqual([JSON.stringify({ key: "gdg.k1", origin: null })]);
 
-    // The professor adds the deck to the link: the key goes to that deck, and only to its origin.
-    at(`#/checkin/stage?bridge=gdg.k1&deck=${DECK}`);
+    // The stage says to add a deck, with no "phones aren't getting" line: the key is waiting.
+    let html = open("#/checkin/stage?bridge=saved");
+    expect(words(html)).toContain("Add ?deck=<your deck's address> to this page's link.");
+    expect(words(html)).not.toContain(LINE);
+    html = open("#/checkin/stage?bridge=saved&deck=decks/week9/");
+    expect(words(html)).toContain("That deck link didn't work.");
+    expect(words(html)).not.toContain(LINE);
+    expect(html).not.toContain("gdg.k1");
+
+    // The professor adds the deck: its first draw already hands the key to the deck, and the
+    // hash change saves the key with that deck's origin.
+    html = open(`#/checkin/stage?bridge=saved&deck=${DECK}`);
+    expect(frame(html)?.searchParams.get("bridge")).toBe("gdg.k1");
+    expect(words(html)).not.toContain(LINE);
+    at(`#/checkin/stage?bridge=saved&deck=${DECK}`);
     expect(takeBridge()).toBe("gdg.k1");
     expect(store.values()).toEqual([JSON.stringify({ key: "gdg.k1", origin: "https://deck.example.com" })]);
+
+    // After that, a deck on another origin gets none.
+    at("#/checkin/stage?bridge=saved&deck=https://other.example.net/d/");
+    expect(takeBridge()).toBeNull();
+    expect(store.values()).toEqual([JSON.stringify({ key: "gdg.k1", origin: "https://deck.example.com" })]);
+    html = open("#/checkin/stage?bridge=saved&deck=https://other.example.net/d/");
+    expect(frame(html)?.searchParams.has("bridge")).toBe(false);
+    expect(words(html)).toContain(LINE);
     expect(frame(open(`#/checkin/stage?bridge=saved&deck=${DECK}`))?.searchParams.get("bridge")).toBe("gdg.k1");
-    expect(frame(open("#/checkin/stage?bridge=saved&deck=https://other.example.net/d/"))?.searchParams.has("bridge")).toBe(false);
   });
 
   it("F38.6 a new tab with ?bridge=saved has no key, so it hands the deck none (never the word 'saved')", () => {

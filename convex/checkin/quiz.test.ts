@@ -88,9 +88,10 @@ const sentBody = (fetchMock: { mock: { calls: unknown[][] } }, n = 0) =>
 const quiet = () => vi.spyOn(console, "error").mockImplementation(() => {});
 
 describe("F17 the professor asks, ends and sees the numbers", () => {
-  it("F17.1 'Type a question.' for spaces, 'Give 2 to 4 choices.' for 1 and 5 choices", async () => {
+  it("F17.1 sweep1-checkin-check-1 'Type the quiz text.' or 'Type the vote text.' for spaces, 'Give 2 to 4 choices.' for 1 and 5 choices", async () => {
     const t = setup();
-    expect(await said(ask(t, "quiz", "   ", ["A", "B"]))).toBe("Type a question.");
+    expect(await said(ask(t, "quiz", "   ", ["A", "B"]))).toBe("Type the quiz text.");
+    expect(await said(ask(t, "vote", "", ["A", "B"]))).toBe("Type the vote text.");
     expect(await said(ask(t, "quiz", "Which one is a vowel?", ["A"]))).toBe("Give 2 to 4 choices.");
     expect(await said(ask(t, "vote", "Pick a color", ["Red", "Blue", "Yellow", "Green", "Orange"]))).toBe("Give 2 to 4 choices.");
     expect(await current(t)).toBeNull();

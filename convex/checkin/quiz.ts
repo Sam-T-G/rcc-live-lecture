@@ -168,7 +168,7 @@ export const ask = mutation({
   handler: async (ctx, { channel, kind, question, choices, correct, index, aiDraft }) => {
     await requireProf(ctx);
     const q = question.trim();
-    if (!q) throw new ConvexError("Type a question.");
+    if (!q) throw new ConvexError(`Type the ${kind} text.`);
     // Blank boxes drop out, and the right answer follows its own box: with B blank and C marked
     // right, the stored choices are A, C, D and C is still the right one.
     const kept = choices.map((text, box) => ({ text: text.trim(), box })).filter((c) => c.text);
