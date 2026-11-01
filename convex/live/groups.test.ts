@@ -493,8 +493,9 @@ describe("F28 the professor's point changes", () => {
     expect([await teamOf(ss[2]), await teamOf(ss[5])]).toEqual([0, 1]);
     expect(await changeTotals(t)).toEqual({ board: 2, log: 2 });
     expect((await board(t)).teams.map((g) => [g.label, g.members, g.changes])).toEqual([
-      ["Blue", 3, 1], // 1 / 3 a student
-      ["Red", 4, 1], // 1 / 4
+      // 1 / 4 and 1 / 3 a student both show 0.3, so they tie and list by team number.
+      ["Red", 4, 1],
+      ["Blue", 3, 1],
     ]);
     const log = await admin(t).query(api.live.groups.pointLog, { channel: CH });
     expect(log.map((c) => [c.name, c.team?.label, c.delta, c.reason]).sort()).toEqual([
