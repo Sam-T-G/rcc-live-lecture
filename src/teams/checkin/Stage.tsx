@@ -1,9 +1,11 @@
 // #/checkin/stage: the projector screen. The professor's deck fills the screen. The check-in card
 // (the kit's .stage-card, 600 stage px wide on the right of the 96 frame, the frame's full height)
 // shows the check-in QR (it opens #/checkin/student) and how many students have checked in. The
-// newest quiz or vote shows in a panel that takes the left column: the question, "N answered" and
-// the choices while it's open, then a bar per choice once it ends, with "✓ right answer" on the
-// right one; the card steps down to the sunken rung while it shows and keeps its box. × hides the
+// newest quiz or vote shows in a panel that takes the left column while it's open: the question,
+// "N answered" and the choices, each after its A to D letter tile. Once it ends, the panel is the
+// card's width at the bottom of the left column, with a bar per choice and "✓ right answer" on the
+// right one, so the deck shows around it for the rest of class (quiz.current keeps returning the
+// ended poll); the card steps down to the sunken rung while it shows and keeps its box. × hides the
 // card (and the quiz panel with it) and "Show check-in" brings it back. The bottom-left lane holds
 // the late banner (LateBanner.tsx: a student's first name when they check in late, unless they
 // turned that off on their pass) and the notes for the presenter: no ?deck=, a deck link that
@@ -177,8 +179,8 @@ function Count() {
 
 // The newest quiz or vote: the question, then how many answered and the choices while it's open,
 // then a bar per choice once it ends. It sits in the card's markup, so × hides it with the card;
-// stage.css draws it as its own panel in the left column (the field while it's open, the raised
-// rung once it ends), the same box in both. "No quiz or vote yet." is there for screen readers
+// stage.css draws it as its own panel in the left column (the field and the column's full height
+// while it's open, the raised rung and the card's width once it ends). "No quiz or vote yet." is there for screen readers
 // only: the stage shows the deck until a question opens.
 function Poll() {
   const poll = useQuery(api.checkin.quiz.current, { channel: CHANNEL });
@@ -195,7 +197,7 @@ function Poll() {
           <ul className="stage__choices">
             {poll.choices.map((c, i) => (
               <li key={i} className="stage__choice">
-                <span className="stage__label">{LETTERS[i]} {c}</span>
+                <span className="stage__label"><span className="letter">{LETTERS[i]}</span> {c}</span>
               </li>
             ))}
           </ul>
@@ -209,7 +211,7 @@ function Poll() {
               return (
                 <li key={i} className={right ? "stage__bar stage__bar--right" : "stage__bar"}>
                   <span className="stage__fill" style={{ width: total ? `${(100 * n) / total}%` : 0 }} />
-                  <span className="stage__label">{LETTERS[i]} {c}</span>
+                  <span className="stage__label"><span className="letter">{LETTERS[i]}</span> {c}</span>
                   <b>{n}</b>
                   {right && <span className="stage__right">✓ right answer</span>}
                 </li>

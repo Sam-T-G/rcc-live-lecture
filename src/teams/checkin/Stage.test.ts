@@ -108,7 +108,24 @@ describe("#/checkin/stage", () => {
       results: { counts: [0, 1, 0, 0], correct: 1 },
     };
     const html = renderToStaticMarkup(createElement(Stage));
-    expect(html.match(/<span class="stage__label">[A-D] [^<]+<\/span><b>\d+<\/b>/g)).toHaveLength(4);
+    expect(html.match(/<span class="stage__label"><span class="letter">[A-D]<\/span> [^<]+<\/span><b>\d+<\/b>/g)).toHaveLength(4);
+  });
+
+  it("open and ended rows start with the kit's letter tile, the same A to D the phones show (DS-PROJECTOR-design-3)", () => {
+    const tiles = (html: string) => [...html.matchAll(/<span class="stage__label"><span class="letter">([A-D])<\/span> /g)].map((m) => m[1]);
+    results["checkin/quiz:current"] = { question: "Pick one", choices: ["useMemo", "useEffect", "useRef"], open: true, answered: 2 };
+    expect(tiles(renderToStaticMarkup(createElement(Stage)))).toEqual(["A", "B", "C"]);
+    results["checkin/quiz:current"] = {
+      question: "Pick one",
+      choices: ["useMemo", "useEffect", "useRef", "useId"],
+      open: false,
+      answered: 3,
+      results: { counts: [1, 2, 0, 0], correct: 1 },
+    };
+    const html = renderToStaticMarkup(createElement(Stage));
+    expect(tiles(html)).toEqual(["A", "B", "C", "D"]);
+    // The words read the same with the tags taken out.
+    expect(words(html)).toContain("A useMemo");
   });
 
   it("F38.1 a deck address typed without https:// loads with https:// added (rt-17)", () => {

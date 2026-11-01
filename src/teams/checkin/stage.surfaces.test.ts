@@ -111,8 +111,8 @@ describe("projector (#/checkin/stage and #/live/leaderboard at 1920 x 1080)", ()
 
   it("with an ended quiz's bars on screen, the card and the quiz panel fit the stage (DCHK-1)", () => {
     // The bars sit in the quiz panel, out of the card's flow, so they can't push the card or the QR.
-    // The panel's top and bottom sit on the frame, so a 125-character question and four long
-    // choices stop at a line count with "..." and the rows share the height that's left. The
+    // The open panel's top and bottom sit on the frame and the ended one stops at the frame's
+    // height, so a 125-character question and four long choices stop at a line count with "...". The
     // browser checker measures the card and the panel themselves.
     expect(value(stage, ".stage__poll", "position")).toBe("fixed");
     expect(value(stage, ".stage__poll", "top")).toBe("var(--p-margin)");
@@ -135,6 +135,20 @@ describe("projector (#/checkin/stage and #/live/leaderboard at 1920 x 1080)", ()
     const panel = Number(/calc\((\d+) \* var\(--stage-u\)\)/.exec(value(stage, ".stage__poll", "width") ?? "")?.[1]);
     const card = Number(/calc\((\d+) \*/.exec(readFileSync(new URL("../../styles/tokens.css", import.meta.url), "utf8").match(/--p-card:[^;]+/)?.[0] ?? "")?.[1]);
     expect(96 + panel + 48 + card + 96).toBe(1920);
+  });
+
+  it("once a quiz or vote ends, its results take no more of the deck than the card does (DS-PROJECTOR-check-1, -design-1)", () => {
+    // checkin.quiz.current keeps returning the ended poll until the next one, so the ended panel
+    // stays up for the rest of class. Only the open panel takes the left column's full height; the
+    // ended one is the card's width, sits on the frame's bottom (or above the lane) and is only as
+    // tall as its rows, so the deck shows above it and between it and the card.
+    const ENDED = ".stage__poll:has(.stage__bars)";
+    expect(value(stage, ENDED, "width")).toBe("var(--p-card)");
+    expect(value(stage, ENDED, "top")).toBe("auto");
+    expect(value(stage, ENDED, "max-height")).toBe("calc(888 * var(--stage-u))");
+    // The open panel keeps the full left column.
+    expect(value(stage, ".stage__poll", "top")).toBe("var(--p-margin)");
+    expect(value(stage, ".stage__poll", "width")).toBe("calc(1080 * var(--stage-u))");
   });
 
   it("the late banner and the presenter notes sit in the bottom-left lane, above the quiz panel", () => {

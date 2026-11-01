@@ -84,11 +84,14 @@ body.stage-body { margin: 0; overflow: hidden; }
 
 /* ------------------------------------------------------------------ the quiz panel
    Drawn from the card's markup, so × hides it with the card, as its own panel in the left column
-   beside the card: 1080 wide, the frame's full height, the same box open and ended, with one ruled
-   row per choice (6 stage px rules, no fill, no radius) sharing the height under the question.
-   Open: the field, the screen's one green mass, with "N answered" at 240 as its first thing
-   between the question and the choices. Ended: the raised rung with a bar per choice, and the
-   right answer's row is the first thing. */
+   beside the card, with one ruled row per choice (6 stage px rules, no fill, no radius).
+   Open: the field, the screen's one green mass, 1080 wide and the frame's full height, with
+   "N answered" at 240 as its first thing between the question and the choices, which share the
+   height under it. Ended: the raised rung with a bar per choice, and the right answer's row is the
+   first thing. checkin.quiz.current keeps returning the ended poll until the next one opens, so
+   the ended panel stays up for the rest of class: it is the card's width (600) and only as tall as
+   its rows, on the frame's bottom (or above the lane), so the deck shows above it and beside it
+   (DS-PROJECTOR-check-1). */
 .stage__poll {
   position: fixed;
   top: var(--p-margin);
@@ -108,7 +111,11 @@ body.stage-body { margin: 0; overflow: hidden; }
 /* Ended, on the raised rung: a 4 stage px --line-strong ring keeps its edge on a white slide. The
    bars take the count line's room too, so a 3-line question and four 2-line choices still fit. */
 .stage__poll:has(.stage__bars) {
+  top: auto;
+  width: var(--p-card);
+  max-height: calc(888 * var(--stage-u));
   grid-template-rows: min-content minmax(min-content, 1fr);
+  row-gap: calc(16 * var(--stage-u));
   background: var(--raised);
   color: var(--text);
   box-shadow: inset 0 0 0 var(--p-ring) var(--line-strong);
@@ -153,7 +160,8 @@ body.stage-body { margin: 0; overflow: hidden; }
 /* The rows share what the question and the count line leave, never less than their words need.
    Open: the choice at 48 on the field, one line. Ended, at 40: the choice and its count on the
    first line, the track on the second; the track is the row's ::before and the fill (its width
-   set inline by Stage.tsx) lies on it. */
+   set inline by Stage.tsx) lies on it. In the 600-wide ended panel, "✓ right answer" takes its
+   own line under the right choice's words, so the words keep the row's width. */
 .stage__choices,
 .stage__bars { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-rows: minmax(min-content, 1fr); }
 .stage__choice {
@@ -166,10 +174,16 @@ body.stage-body { margin: 0; overflow: hidden; }
   line-height: 1.2;
 }
 .stage__bars { font-size: var(--p-small); }
+/* The ended panel is only as tall as its rows, so each bar row takes its own height (a 1fr row
+   would take the tallest row's, the right answer's with its extra line). */
+.stage__poll:has(.stage__bars) .stage__bars { grid-auto-rows: auto; }
+/* Tighter rows keep a 3-line question and four 2-line choices inside the frame at 600 wide; the
+   right answer's row keeps its room inside its ring. */
+.stage__poll:has(.stage__bars) .stage__bar:not(.stage__bar--right) { padding-block: calc(4 * var(--stage-u)); row-gap: calc(8 * var(--stage-u)); }
 .stage__bar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-areas: "label tag n" "track track track";
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "label n" "track track";
   align-content: center;
   align-items: baseline;
   column-gap: calc(24 * var(--stage-u));
@@ -194,6 +208,22 @@ body.stage-body { margin: 0; overflow: hidden; }
 .stage__choice > .stage__label { -webkit-line-clamp: 1; line-clamp: 1; }
 .stage__bar > b { grid-area: n; text-align: end; font-weight: var(--w-loud); font-variant-numeric: tabular-nums lining-nums; }
 .stage__right { grid-area: tag; font-weight: var(--w-loud); white-space: nowrap; }
+.stage__bar--right { grid-template-areas: "label n" "tag tag" "track track"; }
+/* The letter tile (the kit's .letter, the same A to D the phones show) at the front of each row's
+   words, at stage size: 64 on the open rows at 48, 56 on the bars at 40. */
+.stage__label > .letter {
+  display: inline-grid;
+  vertical-align: middle;
+  width: calc(64 * var(--stage-u));
+  height: calc(64 * var(--stage-u));
+  margin-block: calc(-6 * var(--stage-u));
+  border-radius: calc(8 * var(--stage-u));
+  font-size: inherit;
+  line-height: 1;
+}
+.stage__choice > .stage__label > .letter { background: var(--field-letter); color: var(--on-field-tile); }
+.stage__bar > .stage__label > .letter { width: calc(56 * var(--stage-u)); height: calc(56 * var(--stage-u)); background: var(--on-raised); color: var(--text); }
+.stage__bar--right > .stage__label > .letter { background: var(--st-in-mark); color: var(--on-accent); }
 /* The right answer: the st-in fill inside a 6 stage px ring in its mark (the projector's rule
    width), reaching 20 past the text column so the words keep their edge, with "✓ right answer"
    on its first line and a green fill, so it shows even when nobody picked it. The rules above
@@ -297,6 +327,12 @@ body.stage-body { margin: 0; overflow: hidden; }
 .stage__card > .stage-card:has(> .row + .stage__hint) .stage__poll {
   bottom: calc(var(--p-margin) + 144 * var(--stage-u));
   min-height: min-content;
+}
+/* The ended panel's top follows its rows, so it stops at the frame's top: 888 less the 144 the
+   lane or the count's error takes. */
+.stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card .stage__poll:has(.stage__bars),
+.stage__card > .stage-card:has(> .row + .stage__hint) .stage__poll:has(.stage__bars) {
+  max-height: calc(744 * var(--stage-u));
 }
 /* With the panel shortened, its rows drop their inner padding (the 6 rules still part them) and
    the question stops at 2 lines, so the question, the count and four choices fit above one late
