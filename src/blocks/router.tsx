@@ -1,4 +1,4 @@
-// Block: routing. Hash URLs (#/kiosk/ABC) so GitHub Pages serves every page from one file.
+// Block: routing. Hash URLs (#/checkin/stage?deck=a) so GitHub Pages serves every page from one file.
 // Add a page in src/pages/index.ts; read its parts with useRoute() and the part after "?" with
 // useHashParams().
 import { useEffect, useMemo, useState, type ReactNode } from "react";
