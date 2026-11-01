@@ -107,6 +107,33 @@ describe("F22 questions beside the slide", () => {
     await expect(t.mutation(api.live.questions.ask, { channel: CH, index: 3, text: "Hello", anonymous: true })).rejects.toThrow("Sign in first.");
   });
 
+  it("sweep2-live-3 a post of only invisible characters is refused; invisible characters are dropped, blank lines don't repeat, and a post has at most 10 lines", async () => {
+    const t = setup();
+    const [s] = await room(t, 1);
+    const ask = async (text: string) => {
+      await s.mutation(api.live.questions.ask, { channel: CH, index: 3, text, anonymous: true });
+      vi.setSystemTime(Date.now() + 6_000);
+    };
+    // Zero-width space, Hangul fillers, a blank Braille pattern, a word joiner, line breaks and tabs.
+    for (const blank of ["\u200B", "\u3164\u3164", "\u2800 \u2060", "\n\n\t\n", "\u115F\u1160\uFFA0"])
+      await expect(ask(blank), JSON.stringify(blank)).rejects.toThrow("Write something first.");
+    expect(await list(t)).toEqual([]);
+
+    await ask(`a${"\n".repeat(278)}b`);
+    await ask("Why\u200B is\u202E this\u3164 O(n)?");
+    await ask("Line 1\r\n\r\n\r\nLine 2\n \n\t\nLine 3");
+    await ask(Array.from({ length: 14 }, (_, i) => `L${i + 1}`).join("\n"));
+    await ask("Family: 👨\u200D👩\u200D👧");
+    const texts = (await list(t)).sort((a, b) => a.at - b.at).map((q) => q.text);
+    expect(texts).toEqual([
+      "a\n\nb",
+      "Why is this O(n)?",
+      "Line 1\n\nLine 2\n\nLine 3",
+      "L1\nL2\nL3\nL4\nL5\nL6\nL7\nL8\nL9\nL10 L11 L12 L13 L14",
+      "Family: 👨\u200D👩\u200D👧", // the emoji joiner stays
+    ]);
+  });
+
   it("F22.3 upvote toggles, your own is refused, votes equals questionVotes rows", async () => {
     const t = setup();
     const [author, b, c] = await room(t, 3);
@@ -381,7 +408,7 @@ describe("F30 the professor's Questions tab on #/host", () => {
     expect(await one(p, q)).toMatchObject({ answer: "In Convex, on its servers.", shared: false });
   });
 
-  it("setStatus 'new' clears status, 'dismissed' unsets shared; a missing question -> 'That question is gone.'", async () => {
+  it("sweep2-ledger-2 setStatus 'new' clears status, 'dismissed' only sorts the professor's list (D12 g) and keeps a shared answer on the phones; a missing question -> 'That question is gone.'", async () => {
     const t = setup();
     const [s] = await room(t, 1);
     await post(s, "Is the database live?");
@@ -395,9 +422,12 @@ describe("F30 the professor's Questions tab on #/host", () => {
     await p.mutation(api.live.questions.answer, { question: q, text: "It updates live." });
     await p.mutation(api.live.questions.share, { question: q, shared: true });
     await p.mutation(api.live.questions.setStatus, { question: q, status: "dismissed" });
-    expect(await one(p, q)).toMatchObject({ status: "dismissed", shared: false, answer: "It updates live." });
-    // Dismiss only sorts the professor's list: the room still sees the question, without the answer.
-    expect((await list(s)).map((x) => [x.text, x.answer])).toEqual([["Is the database live?", null]]);
+    expect(await one(p, q)).toMatchObject({ status: "dismissed", shared: true, answer: "It updates live." });
+    // Dismiss only sorts the professor's list: the room still sees the question and its shared answer.
+    expect((await list(s)).map((x) => [x.text, x.answer])).toEqual([["Is the database live?", "It updates live."]]);
+    // Bring back leaves it shared too.
+    await p.mutation(api.live.questions.setStatus, { question: q, status: "new" });
+    expect(await one(p, q)).toMatchObject({ status: "new", shared: true });
     await p.mutation(api.live.questions.remove, { question: q });
     await expect(p.mutation(api.live.questions.setStatus, { question: q, status: "keep" })).rejects.toThrow("That question is gone.");
     await expect(p.mutation(api.live.questions.answer, { question: q, text: "Yes." })).rejects.toThrow("That question is gone.");

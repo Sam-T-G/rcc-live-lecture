@@ -27,12 +27,20 @@ function errorText(e: unknown) {
 
 const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
+// The box around the sign-in for a signed-out student. "Sign in to tap I'm lost" under the slide
+// (Page.tsx) scrolls it to the top of the screen.
+export const SIGN_IN_ID = "live-signin";
+
 // `index` is the slide on the student's screen, null before the deck sends a slide, or undefined
 // while the page is still loading the deck (the card then says "Loading questions…", no form).
 export default function Questions({ index }: { index: number | null | undefined }) {
   const { user } = useGoogleUser();
   const [scope, setScope] = useState<Scope>("slide");
   const [text, setText] = useState("");
+  // The slide on screen when the student typed the first character. A phone that follows live
+  // moves on while the student types, so the post goes on the slide they started on, and the form
+  // says which. Sending the post or emptying the box lets go of it.
+  const [draftAt, setDraftAt] = useState<number | null>(null);
   const [anonymous, setAnonymous] = useState(true);
   const [onlyProfessor, setOnlyProfessor] = useState(false);
   const [sending, setSending] = useState(false);
@@ -52,14 +60,23 @@ export default function Questions({ index }: { index: number | null | undefined 
   );
   const rows = noSlide ? [] : fetched;
 
+  // The slide this post goes on.
+  const target = draftAt ?? index;
+
+  function onType(value: string) {
+    setText(value);
+    setDraftAt(value === "" ? null : (draftAt ?? (typeof index === "number" ? index : null)));
+  }
+
   async function send(e: FormEvent) {
     e.preventDefault();
-    if (index === null || index === undefined || sending) return;
+    if (target === null || target === undefined || sending) return;
     setSending(true);
     setError("");
     try {
-      await ask({ channel: CHANNEL, index, text, anonymous, private: onlyProfessor });
+      await ask({ channel: CHANNEL, index: target, text, anonymous, private: onlyProfessor });
       setText("");
+      setDraftAt(null);
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -81,10 +98,10 @@ export default function Questions({ index }: { index: number | null | undefined 
       <Segmented label="Show questions from" hideLabel block options={SCOPES} value={scope} onChange={setScope} />
 
       {!user ? (
-        <>
+        <div id={SIGN_IN_ID}>
           <p className="muted">Sign in to post and upvote.</p>
           <StudentSignIn />
-        </>
+        </div>
       ) : loading ? null : index === null ? (
         <p className="muted">You can ask once the slides start.</p>
       ) : (
@@ -94,8 +111,9 @@ export default function Questions({ index }: { index: number | null | undefined 
             maxLength={MAX_LENGTH}
             placeholder="Ask a question or leave a comment"
             aria-label="Your question or comment"
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => onType(e.target.value)}
           />
+          {typeof target === "number" && <p className="muted">Your post goes on slide {target + 1}.</p>}
           <label>
             <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
             Post anonymously
@@ -104,8 +122,10 @@ export default function Questions({ index }: { index: number | null | undefined 
             <input type="checkbox" checked={onlyProfessor} onChange={(e) => setOnlyProfessor(e.target.checked)} />
             Only the professor sees it
           </label>
-          {/* Sam's decision D12 (f): "Group by topic with AI" sends private texts too, never names. */}
-          {onlyProfessor && <p className="muted">The professor’s AI tool can read the words to sort questions by topic. It never gets your name.</p>}
+          {/* Sam's decision D12 (f): "Group by topic with AI" on #/host sends private texts to Gemini too, never names. */}
+          {onlyProfessor && (
+            <p className="muted">If the professor groups questions by topic with AI, your question’s text goes to Google’s Gemini without your name.</p>
+          )}
           <div className="live-ask__foot">
             <span className="live-ask__count">
               {text.length}/{MAX_LENGTH}

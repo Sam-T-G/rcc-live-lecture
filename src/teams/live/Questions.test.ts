@@ -75,7 +75,7 @@ describe("#/live Questions card", () => {
     const html = card(3);
     expect(html).toMatch(/<label><input type="checkbox"\/>Only the professor sees it<\/label>/);
     // The AI note shows only once the box is ticked (Questions.ask.test.ts).
-    expect(html).not.toContain("AI tool");
+    expect(html).not.toContain("Gemini");
     expect(html.match(/>Private</g)).toHaveLength(1);
     const own = html.slice(html.indexOf("Slide 4 lost me"), html.indexOf("Can you zoom in?"));
     expect(own).not.toBe("");
@@ -95,5 +95,7 @@ describe("#/live Questions card", () => {
     expect(html).toContain("Sign in to post and upvote.");
     expect(html).toContain("[sign in]");
     expect(html).not.toContain("<form");
+    // sweep2-live-2: the sign-in sits in its own box, which "Sign in to tap I'm lost" scrolls to.
+    expect(html).toContain('<div id="live-signin"><p class="muted">Sign in to post and upvote.</p>[sign in]</div>');
   });
 });

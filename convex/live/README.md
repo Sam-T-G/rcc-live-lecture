@@ -4,7 +4,7 @@ The Live slides team's server functions, called as `api.live.<file>.<function>`.
 
 #/host's Points tab calls `groups.ts`, its Questions tab `questions.ts`, and its header `read.ts`; see [src/teams/host/TEAM.md](../../src/teams/host/TEAM.md).
 
-`channel` is the deck channel (`"gdg"`). Every read is for the current class only (`lib.lectureWindow`), so between classes every list is empty and every count is 0.
+`channel` is the deck channel (`"gdg"`). Every read is for the current class only (`lib.lectureWindow`), so between classes every list is empty and every count is 0, except `groups.results` and the saved extra credit in `groups.roster`, which cover every class, so the professor can download the extra credit CSV after End class.
 
 Who may call:
 

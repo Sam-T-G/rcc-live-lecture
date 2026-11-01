@@ -84,6 +84,37 @@ describe("the team leaderboard", () => {
     expect(html).toContain("After 3 quizzes with a right answer. Teams rank by points per student: 1st place gets 5 extra credit, 2nd gets 3, 3rd gets 1.");
   });
 
+  it("sweep2-tests-10 F24.4 says 'Teams are final.' once the teams lock, and when they lock before that", () => {
+    results["live/groups:status"] = { size: 4, locked: true, locksAt: null };
+    for (const html of [card(), big()]) {
+      expect(html).toContain('<p class="muted">Teams are final.</p>');
+      expect(html).not.toContain("still forming");
+    }
+    const locksAt = Date.UTC(2026, 10, 5, 21, 35);
+    const time = new Date(locksAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    results["live/groups:status"] = { size: 4, locked: false, locksAt };
+    for (const html of [card(), big()]) {
+      expect(html).toContain(`<p class="muted">Teams are still forming. They lock at ${time}.</p>`);
+      expect(html).not.toContain("Teams are final.");
+    }
+  });
+
+  it("sweep2-tests-10 F24.6 a student whose team is 5th sees it marked '(you)' above the fold on the phone card, and again in the fold", () => {
+    const names = ["Red", "Blue", "Yellow", "Green", "Orange"];
+    results["live/groups:leaderboard"] = {
+      questions: 2,
+      teams: names.map((n, i) => team(i, n, { correct: 5 - i, points: 5 - i, perStudent: (5 - i) / 3, rank: i + 1, ec: [5, 3, 1, 0, 0][i] })),
+    };
+    results["live/groups:mine"] = { team: 4, color: "orange", label: "Orange" };
+    const [above, fold] = card().split("<details>");
+    expect([...above.matchAll(/board__name">([^<]*)</g)].map((m) => m[1])).toEqual(["Red", "Blue", "Yellow", "Orange (you)"]);
+    expect(above).toContain('<li class="board__row group--orange board__row--mine">');
+    expect(fold).toContain('board__name">Orange (you)<');
+    // On a top-3 team there's no extra row.
+    results["live/groups:mine"] = { team: 1, color: "blue", label: "Blue" };
+    expect([...card().split("<details>")[0].matchAll(/board__name">([^<]*)</g)].map((m) => m[1])).toEqual(["Red", "Blue (you)", "Yellow"]);
+  });
+
   it("sweep1-live-4 the count names what it counts: quizzes with a right answer", () => {
     results["live/groups:leaderboard"] = { questions: 1, teams: [team(0, "Red", { ec: 5 })] };
     expect(card()).toContain("After 1 quiz with a right answer.");

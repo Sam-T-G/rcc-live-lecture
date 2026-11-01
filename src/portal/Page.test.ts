@@ -1,17 +1,18 @@
 // @vitest-environment node
 // #/portal (PORTAL), rendered to HTML with made-up query results (no backend). LateBanner is
 // swapped for a stand-in that prints its name, so these tests check only where the page mounts
-// it; its feed and its lines are Check-in's (LateBanner.tsx). Paging (swipe, the arrow keys,
-// ← Back and Next →) and the "The professor is on slide N now." notice need a browser, and so
-// does the ErrorBoundary around the banner (React's server render doesn't run boundaries): the
-// PORTAL browser checks cover them (F35).
+// it; its feed and its lines are Check-in's (LateBanner.tsx). The paging rules (where ← Back,
+// Next →, the arrow keys and a swipe go, and when the phone follows live again) are tested in
+// paging.test.ts; the words a paged-back phone shows are tested here by opening <Slides> paged
+// back. A real swipe or key press and the ErrorBoundary around the banner (React's server render
+// doesn't run boundaries) need a browser: the PORTAL browser checks cover them (F35).
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parse } from "../styles/cssRules";
-import PortalPage from "./Page";
+import PortalPage, { Slides } from "./Page";
 
 const css = parse(readFileSync(new URL("./portal.css", import.meta.url), "utf8"));
 const tsx = readFileSync(new URL("./Page.tsx", import.meta.url), "utf8");
@@ -90,6 +91,29 @@ describe("#/portal", () => {
     expect(html).toContain(">← Back</button>");
     expect(html).toContain(">Next →</button>");
     expect(html).toContain("Slide title 3");
+  });
+
+  it("sweep2-tests-4 F35.3 a phone paged back says where the professor is once they move on, and follows live when the deck stops listing its slide", () => {
+    const at = (server: Record<string, unknown>, viewing: number, liveAtBrowse: number) => {
+      for (const k of Object.keys(results)) delete results[k];
+      Object.assign(results, server);
+      return renderToStaticMarkup(createElement(Slides, { channel: "gdg", start: { viewing, liveAtBrowse } }));
+    };
+    const ON_SLIDE_6 = { "deck:current": { ...slide(5), count: 10 }, "deck:slides": [0, 1, 2, 3, 4, 5].map(slide) };
+    // Left slide 6 for slide 2, and the professor is still on 6: Back to live, no notice.
+    let html = at(ON_SLIDE_6, 1, 5);
+    expect(html).toContain("Slide 2 of 10");
+    expect(html).toContain("Slide title 2");
+    expect(html).toContain('<button type="button" class="portal__tolive">Back to live</button>');
+    expect(html).not.toContain("The professor is on slide");
+    // Left slide 5, and the professor moved on to 6: the notice, with its own Back to live.
+    html = at(ON_SLIDE_6, 1, 4);
+    expect(html).toContain('<div class="portal__notice" role="status"><span>The professor is on slide 6 now.</span>');
+    expect(html).not.toContain("portal__tolive");
+    // Another deck tab took over and deck.slides no longer lists slide 2: the phone is live.
+    html = at({ "deck:current": { ...slide(7), count: 10 }, "deck:slides": [slide(7)] }, 1, 5);
+    expect(html).toContain("Slide 8 of 10");
+    expect(html).toContain("portal__tag--live");
   });
 
   it("PORTAL-check-1: the late banner sits in .portal-late inside .portal-room, which sets --late-room (0px until a banner shows) for the page's bottom padding; room2 has no .portal-late", () => {

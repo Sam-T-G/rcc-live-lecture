@@ -70,6 +70,7 @@ vi.mock("../checkin/Quiz", () => ({ QuizCard: () => "[quiz card]" }));
 vi.mock("../checkin/LateBanner", () => ({ default: () => "[late banner]" }));
 vi.mock("./PastQuestions", () => ({ default: () => "[past quizzes and votes]" }));
 vi.mock("./Questions", () => ({
+  SIGN_IN_ID: "live-signin",
   default: ({ index }: { index: unknown }) => {
     calls.questions.push(index);
     return "[questions]";
@@ -329,6 +330,36 @@ describe("#/live, the student phone", () => {
     const html = open("#/live");
     expect(lostSlot(html)).toBe("Sign in to tap I’m lost");
     expect(html).not.toContain("lost__button");
+  });
+
+  it("sweep2-live-2 'Sign in to tap I’m lost' scrolls the sign-in box in the Questions card to the top of the screen, and puts the cursor in its first field when it has one", () => {
+    deckOn(2);
+    open("#/live");
+    const press = calls.buttons.find((b) => String((b as { children?: unknown }).children).includes("Sign in to tap"));
+    expect(press).toBeDefined();
+    const looked: string[] = [];
+    const scrolled: unknown[] = [];
+    const focused: unknown[] = [];
+    // The live site's sign-in box: Google's button, no typed form.
+    let field: object | null = null;
+    vi.stubGlobal("document", {
+      getElementById: (id: string) => {
+        looked.push(id);
+        return {
+          scrollIntoView: (o: unknown) => scrolled.push(o),
+          querySelector: () => field,
+        };
+      },
+    });
+    press!.onClick!();
+    expect(looked).toEqual(["live-signin"]);
+    expect(scrolled).toEqual([{ block: "start" }]);
+    expect(focused).toEqual([]);
+    // A dev build adds the typed form under Google's button: the cursor goes in its first field.
+    field = { focus: (o: unknown) => focused.push(o) };
+    press!.onClick!();
+    expect(focused).toEqual([{ preventScroll: true }]);
+    vi.unstubAllGlobals();
   });
 
   it("no I'm lost slot while the check-in state loads, and none before the slides start", () => {

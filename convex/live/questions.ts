@@ -25,7 +25,9 @@
 //       The student needs a check-in in this class ("Check in first."). index is the slide on
 //       their screen: the deck's current slide, a slide before it, or a slide the deck showed
 //       earlier in this class ("That slide hasn't been shown yet."). text: 1 to 280 characters
-//       after trimming ("Write something first.", "280 characters at most."). One post per
+//       after lib.cleanText (invisible characters dropped, no two blank lines in a row, at most
+//       10 lines), with at least one letter, digit, punctuation mark or symbol ("Write something
+//       first.", "280 characters at most."). One post per
 //       person every 5 seconds ("Wait 5 seconds before posting again."). By name, the name is
 //       lib.cleanName(the name on the student's check-in in this class, the one the professor saw
 //       at the scan), so signing in again under another name doesn't change it; the sign-in's name
@@ -41,8 +43,9 @@
 //   api.live.questions.forHost   { channel } -> [{ _id, index, text, name, private, votes, at,
 //       topic, cluster, status, answer, shared }], newest first, at most 500         professor
 //   api.live.questions.setStatus { question, status: "new" | "keep" | "dismissed" } -> null  professor
-//       The professor's own sorting: the room still sees a dismissed question (Delete is how a
-//       question leaves the room). Dismissing stops sharing its answer.
+//       The professor's own sorting (Sam's decision D12 g): the room still sees a dismissed
+//       question, and its answer too once shared (Delete is how a question leaves the room;
+//       Stop sharing, after Bring back, takes the answer off the phones).
 //   api.live.questions.answer    { question, text } -> null                                 professor
 //       Trimmed, 1000 characters at most. Saving keeps the question and never shares the
 //       answer; an empty answer removes it and stops sharing it.
@@ -61,10 +64,11 @@ import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { action, internalMutation, mutation, query, type MutationCtx } from "../_generated/server";
 import { gemini } from "../ai";
-import { checkedIn, cleanName, deckFrom, lectureWindow, requireUser } from "../lib";
+import { checkedIn, cleanName, cleanText, deckFrom, lectureWindow, requireUser } from "../lib";
 import { isProf, requireProf, staffRole } from "../checkin/prof";
 
 const MAX_LENGTH = 280; // a question or comment, in characters
+const MAX_LINES = 10; // a question or comment, in lines
 const MIN_GAP_MS = 5000; // one post per person every 5 seconds
 const ANSWER_MAX = 1000; // the professor's typed answer, in characters
 const LIST_MAX = 200; // the most questions list returns
@@ -195,7 +199,7 @@ export const ask = mutation({
       .first();
     if (!checkin) throw new ConvexError("Check in first.");
     if (!(await shownThisClass(ctx, channel, index))) throw new ConvexError("That slide hasn't been shown yet.");
-    const clean = text.trim();
+    const clean = cleanText(text, MAX_LINES);
     if (!clean) throw new ConvexError("Write something first.");
     if (clean.length > MAX_LENGTH) throw new ConvexError(`${MAX_LENGTH} characters at most.`);
     const last = await ctx.db
@@ -311,8 +315,8 @@ export const setStatus = mutation({
   returns: v.null(),
   handler: async (ctx, { question, status }) => {
     await hostRow(ctx, question);
+    // Only the professor's list changes (D12 g): a shared answer stays on the phones.
     if (status === "new") await ctx.db.patch("questions", question, { status: undefined });
-    else if (status === "dismissed") await ctx.db.patch("questions", question, { status, shared: undefined });
     else await ctx.db.patch("questions", question, { status });
     return null;
   },

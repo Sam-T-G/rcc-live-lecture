@@ -236,6 +236,29 @@ export function cleanName(raw: string | null | undefined, fallback = "Student") 
   return VISIBLE.test(name) ? name : fallback;
 }
 
+// Text a student posts for every phone to read (a question on #/live, live/questions.ask), which
+// shows with its line breaks kept: the characters HIDDEN lists are dropped from each line (a tab
+// counts as a space), a line left with only spaces is blank, two blank lines in a row become one,
+// blank lines at the start and end go, and past `maxLines` lines the rest join the last line with
+// spaces. "" when no letter, digit, punctuation mark or symbol is left, so a post can't show as a
+// blank question or push the list down with hundreds of empty lines.
+export function cleanText(raw: string, maxLines: number) {
+  const lines: string[] = [];
+  for (const line of raw.split(/\r\n|[\r\n\u2028\u2029]/)) {
+    const kept = line.replace(/\t/g, " ").replace(HIDDEN, "").trimEnd();
+    const blank = kept.trim() === "";
+    if (blank && (lines.length === 0 || lines[lines.length - 1] === "")) continue;
+    lines.push(blank ? "" : kept);
+  }
+  while (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+  if (lines.length > maxLines) {
+    const rest = lines.splice(maxLines - 1);
+    lines.push(rest.map((l) => l.trim()).filter(Boolean).join(" "));
+  }
+  const text = lines.join("\n").trim();
+  return VISIBLE.test(text) ? text : "";
+}
+
 // Whether cleanName(raw) is the part of an email address before the "@": the name was typed as
 // one email-looking word ("jdoe1234@gmail.com" -> "jdoe1234"). Shared screens show such a name
 // as "Someone" (checkin.attendance.lateFeed), since it can be the student's personal address.

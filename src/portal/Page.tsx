@@ -16,6 +16,7 @@ import { Link, useHashParams, useRoute } from "../blocks/router";
 import { ErrorBoundary, Screen, Status } from "../blocks/ui";
 import LateBanner from "../teams/checkin/LateBanner";
 import { scrollToBottom, watchLateRoom } from "./lateRoom";
+import { FOLLOW, open as openSlide, pages, place, settle, swipe, type Browse } from "./paging";
 import "./portal.css";
 
 export default function PortalPage() {
@@ -72,7 +73,7 @@ function Portal() {
   }, [lateRoom]);
   return (
     <div className="portal-room" style={{ "--late-room": `${lateRoom}px` } as CSSProperties}>
-      <Slides channel={channel} />
+      <Slides key={channel} channel={channel} />
       {withBanner && (
         <div className="portal-late" ref={late}>
           <ErrorBoundary label="The late banner">
@@ -84,56 +85,28 @@ function Portal() {
   );
 }
 
-type Shown = { index: number; title: string; lines: string[] };
-
-function Slides({ channel }: { channel: string }) {
+// `start` opens the page paged back (Page.test.ts checks the words that way); the page itself
+// starts on the live slide. Portal keys Slides by channel, so a new channel starts over on the
+// live slide. The paging rules are in paging.ts.
+export function Slides({ channel, start = FOLLOW }: { channel: string; start?: Browse }) {
   const live = useDeckSlide(channel);
   const shown = useQuery(api.deck.slides, { channel });
 
-  // null: follow the live slide. A number: the student paged to that slide.
-  const [viewing, setViewing] = useState<number | null>(null);
-  // The live slide when the student started browsing, to tell when the professor moves on.
-  const [liveAtBrowse, setLiveAtBrowse] = useState<number | null>(null);
-
-  // A new channel starts over on the live slide.
-  useEffect(() => {
-    setViewing(null);
-    setLiveAtBrowse(null);
-  }, [channel]);
-
+  const [browse, setBrowse] = useState<Browse>(start);
   const liveIndex = live ? live.index : null;
-
-  // If the professor lands on (or goes back past) the slide the student is reading, the
-  // student is live again.
-  useEffect(() => {
-    if (viewing !== null && liveIndex !== null && viewing >= liveIndex) {
-      setViewing(null);
-      setLiveAtBrowse(null);
-    }
-  }, [viewing, liveIndex]);
-
-  // Slides a student can open: every slide shown so far, up to the live one, plus the live one.
-  const byIndex = new Map<number, Shown>();
-  for (const s of shown ?? []) if (liveIndex !== null && s.index <= liveIndex) byIndex.set(s.index, s);
-  if (live) byIndex.set(live.index, live); // the live slide as it is on screen right now
-  const order = [...byIndex.keys()].sort((a, b) => a - b);
-
-  const following = viewing === null || viewing === liveIndex || !byIndex.has(viewing);
-  const at = following ? liveIndex : viewing;
-  const pos = at === null ? -1 : order.indexOf(at);
-  const prev = pos > 0 ? order[pos - 1] : null;
-  const next = pos >= 0 && pos < order.length - 1 ? order[pos + 1] : null;
-  const moved = !following && liveAtBrowse !== null && liveIndex !== liveAtBrowse;
+  const byIndex = pages(shown, live);
+  // Follow live again when the professor lands on (or goes back past) the slide the student is
+  // reading, or when it's no longer one they can open (paging.settle). Set during render, React's
+  // way to adjust state when what it depends on changes, so the phone never shows the old slide
+  // first. Not while either query loads: byIndex would be missing slides the student can open.
+  if (live !== undefined && shown !== undefined) {
+    const settled = settle(browse, liveIndex, byIndex);
+    if (settled !== browse) setBrowse(settled);
+  }
+  const { following, at, prev, next, moved } = place(byIndex, liveIndex, browse);
 
   function open(index: number | null) {
-    if (index === null) return;
-    if (index === liveIndex) {
-      setViewing(null);
-      setLiveAtBrowse(null);
-    } else {
-      if (following) setLiveAtBrowse(liveIndex);
-      setViewing(index);
-    }
+    setBrowse((b) => openSlide(b, index, liveIndex, following));
   }
   const openRef = useRef(open);
   openRef.current = open;
@@ -160,14 +133,12 @@ function Slides({ channel }: { channel: string }) {
     touch.current = e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null;
   }
   function onTouchEnd(e: TouchEvent) {
-    const start = touch.current;
+    const from = touch.current;
     touch.current = null;
-    if (!start) return;
+    if (!from) return;
     const t = e.changedTouches[0];
-    const dx = t.clientX - start.x;
-    const dy = t.clientY - start.y;
-    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    open(dx < 0 ? next : prev);
+    const way = swipe(t.clientX - from.x, t.clientY - from.y);
+    if (way) open(way === "next" ? next : prev);
   }
 
   if (live === undefined || shown === undefined) {

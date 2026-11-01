@@ -11,8 +11,12 @@
 // form. The lock re-deals everyone in check-in order so every team has 3 or 4 (as near the
 // professor's choice as the class size allows; under 6 students, one team). After the lock a late
 // arrival joins the smallest team: up to 4, then up to 5 once every team has 4, and only when
-// every team has 5 does a new team open, with a number no team in this class has had, so it never
-// starts with an old team's points.
+// every team has 5 does a new team open, numbered one past every team a student in this class is
+// on now (students who left included) or that has a point change in this class (nextTeam), so it
+// never starts with an old team's points. A team the lock emptied can open again this way under
+// its old color: it starts from 0, because the lock gave its changes to its students
+// (splitChanges). Example: 6 students dealt Red, Blue, Yellow; the lock makes 2 teams of 3, which
+// empties Yellow; once Red and Blue have 5 each, student 11 opens Yellow again.
 //
 // Points. A team's points are its members' right answers on quizzes the professor ended in this
 // class (an open quiz counts for nothing, so the board can't give the answer away, and a vote
@@ -32,6 +36,8 @@
 //
 // Classes. Every read here is for the current class (lib.lectureWindow): the groups rows, the
 // class's groupSettings row, check-ins, quizzes and point changes made since the class started.
+// The exceptions are saved extra credit: results reads every class's groupResults (or one
+// class's), and roster's running total adds up every class, so the CSV works between classes.
 // A student is on a team only while they have a check-in in this class, so a check-in the
 // professor removes earns nothing. End day saves each team member's extra credit (groupResults)
 // and ends the class, so the next class deals fresh teams and starts from 0 points. A class that
@@ -230,8 +236,10 @@ async function classChanges(ctx: Ctx, channel: string, start: number): Promise<D
     .collect();
 }
 
-// The number a new team gets after the lock: one past every team dealt in this class (students
-// who left included) or given a change, so a new team never starts with an emptied team's points.
+// The number a new team gets after the lock: one past every team a student in this class is on
+// now (students who left included) or that has a point change in this class, so a new team never
+// starts with an emptied team's points. A team the lock emptied isn't on that list once its
+// changes went to its students (splitChanges), so it can come back under its old color, from 0.
 async function nextTeam(ctx: Ctx, channel: string, start: number, groups: Map<string, Doc<"groups">>) {
   const used = [...[...groups.values()].map((g) => g.team), ...(await classChanges(ctx, channel, start)).map((c) => c.team ?? -1)];
   return used.reduce((m, t) => Math.max(m, t), -1) + 1;

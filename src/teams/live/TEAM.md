@@ -37,7 +37,7 @@ The agent reads this before every change. Where it disagrees with the Status sec
   - `past.ts`: `past` (anyone).
   - `questions.ts`: `list` (anyone); `ask`, `vote` (checked in); `remove` (the author, a professor or admin); `forHost`, `setStatus`, `answer`, `share`, `organize` (professor or admin); `applyTopics` (internal).
   - `groups.ts`: `status`, `leaderboard`, `mine` (anyone); `join` (signed in, deals only checked-in students); `setSize`, `roster`, `adjust`, `removePoints`, `pointLog`, `endDay`, `results` (professor or admin); `lock` (internal). `checkin.pass.scan` calls `ensureGroup`, and the class close calls `saveExtraCredit`.
-- Tables: writes `lost`, `questions`, `questionVotes`, `groups`, `groupSettings`, `groupPoints`, `groupResults`. Reads `checkins`, `polls` and `pollAnswers` (Check-in's quiz), `deckChannels` and `deckSlides` (the deck), and `lectures` (the class window, `lib.lectureWindow`): every read is for the current class only.
+- Tables: writes `lost`, `questions`, `questionVotes`, `groups`, `groupSettings`, `groupPoints`, `groupResults`. Reads `checkins`, `polls` and `pollAnswers` (Check-in's quiz), `deckChannels` and `deckSlides` (the deck), and `lectures` (the class window, `lib.lectureWindow`): every read is for the current class only, except the saved extra credit (`groups.results` and `groups.roster`'s running total), which covers every class.
 - Channel: `CHANNEL` from `src/blocks/deck.ts` (`"gdg"`).
 
 ## Tests

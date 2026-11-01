@@ -3,11 +3,16 @@
 // (no backend).
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import PastQuestions from "./PastQuestions";
 
-const past = vi.hoisted(() => ({ rows: undefined as unknown }));
+const past = vi.hoisted(() => ({ rows: undefined as unknown, user: null as unknown }));
 vi.mock("convex/react", () => ({ useQuery: () => past.rows }));
+vi.mock("../../blocks/auth", () => ({ useGoogleUser: () => ({ user: past.user }) }));
+
+beforeEach(() => {
+  past.user = { name: "Sample student 1", email: "student1@example.edu" };
+});
 
 type Row = {
   id: string;
@@ -74,5 +79,19 @@ describe("Past quizzes and votes on #/live", () => {
       "Vote 1 · No answer",
       "Quiz 1 · You got it right",
     ]);
+  });
+
+  it("sweep2-live-4 signed out (the sign-in ran out, or Sign out), the card says to sign in to see your answers and never says 'No answer'", () => {
+    past.user = null;
+    // live.past sends mine: null to a signed-out reader, even for a quiz this student answered.
+    const page = html([row(2, { kind: "vote", correct: null, mine: null }), row(1, { mine: null })]);
+    expect(verdicts(page)).toEqual(["Vote 1", "Quiz 1"]);
+    expect(page).toContain('<p class="muted">Sign in to see your answers.</p>');
+    expect(page).not.toContain("No answer");
+    expect(page).not.toContain("your pick");
+    // The right answer still shows: it's the same for everyone.
+    expect(page).toContain("✓ right answer");
+    // No rows: nothing to sign in for.
+    expect(html([])).not.toContain("Sign in to see your answers.");
   });
 });
