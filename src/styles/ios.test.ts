@@ -3,7 +3,8 @@
 // uses the hex values in the color table. This test reads the Swift sources and tokens.css from
 // disk and fails when:
 // - a color in Palette (ios/RCCLivePortal/Palette.swift) differs from its token, light or dark;
-// - a screen uses a system color (red, orange, blue, the unset AccentColor) instead of Palette:
+// - a screen uses a system color (SwiftUI's .red or .gray, UIKit's .systemBackground or .label,
+//   the unset AccentColor) instead of Palette:
 //   docs/design.md says no blue, and red only for something that failed;
 // - the deck screen's body drops `.tint(Palette.accent.color)`, so its arrows go back to the
 //   unset AccentColor's system blue (sweep1-ios-fixcheck-1);
@@ -62,6 +63,15 @@ const palette = [...(SWIFT["Palette.swift"] ?? "").matchAll(ENTRY)].map(([, name
   dark: `#${d.toLowerCase()}`,
 }));
 
+// A system color where a color goes, after `Color.`, `UIColor.` or a bare `.`: SwiftUI's named
+// colors (`.red`, `.gray`, `.teal`, `.accentColor`) and UIKit's (`.systemOrange`,
+// `.secondarySystemBackground`, `.label`, `.secondaryLabel`, `.separator`), as in
+// `.tint(showNotice ? .red : .accentColor)`, `Color(uiColor: .systemRed)` or `Color.gray`.
+// `.system(size:)` fonts and `.foregroundStyle(.secondary)` don't match.
+const SYSTEM_NAMES =
+  "red|orange|yellow|green|mint|teal|cyan|blue|indigo|purple|pink|brown|gray|accentColor|system\\w+|(?:secondary|tertiary|quaternary)[A-Z]\\w*|label|separator|opaqueSeparator|placeholderText|link|lightGray|darkGray|lightText|darkText";
+const SYSTEM_COLOR = new RegExp(`\\b(?:Color|UIColor)\\s*\\.\\s*(?:${SYSTEM_NAMES})\\b|(?<![\\w)\\]])\\.(?:${SYSTEM_NAMES})\\b`, "g");
+
 describe("iOS app colors and layout follow docs/design.md", () => {
   it("Palette has the tokens the deck screen draws, each with tokens.css's light and dark hex", () => {
     const needed = ["--accent", "--accent-text", "--warn", "--warn-text", "--line-strong", "--error", "--surface"];
@@ -74,17 +84,44 @@ describe("iOS app colors and layout follow docs/design.md", () => {
   });
 
   it("no screen uses a system color or the unset AccentColor", () => {
-    // `Color.red`, `UIColor.systemOrange`, and a bare `.red`, `.accentColor` or `.systemX` where a
-    // color goes (`.tint(showNotice ? .red : .accentColor)`, `Color(.systemOrange)`,
-    // `Color(uiColor: .systemRed)`, `Color(.systemBackground)`). `.system(size:)` fonts don't match.
-    const system =
-      /\b(?:Color|UIColor)\s*\.\s*(?:red|orange|blue|yellow|green|pink|purple|accentColor|system\w+)\b|(?<![\w)\]])\.(?:red|orange|blue|yellow|green|pink|purple|accentColor|system\w+)\b/g;
     const hits = Object.entries(SWIFT).flatMap(([file, src]) =>
       code(src)
         .split("\n")
-        .flatMap((line, i) => [...line.matchAll(system)].map((m) => `${file}:${i + 1} ${m[0]}`)),
+        .flatMap((line, i) => [...line.matchAll(SYSTEM_COLOR)].map((m) => `${file}:${i + 1} ${m[0]}`)),
     );
     expect(hits).toEqual([]);
+  });
+
+  it("the system-color check catches the system colors SwiftUI and UIKit name, and passes fonts and Palette", () => {
+    // DeckView no longer uses a system color, so the check above passes with a narrower pattern
+    // too. These fixed lines fail the test when the pattern stops seeing one (sweep2-core-fixcheck-1).
+    const caught = [
+      "Color(.systemOrange)",
+      "Color(uiColor: .systemRed)",
+      "Color(.systemBackground)",
+      "Color(.secondarySystemBackground)",
+      "Color(.label)",
+      "Color(uiColor: .secondaryLabel)",
+      ".foregroundStyle(Color(.separator))",
+      "UIColor.systemBlue",
+      "Color.gray",
+      "Color.accentColor",
+      ".tint(.teal)",
+      ".foregroundStyle(.red)",
+      ".tint(showNotice ? .red : .accentColor)",
+    ];
+    const passed = [
+      ".font(.system(size: 12))",
+      ".font(.system(.title, design: .rounded))",
+      ".foregroundStyle(.secondary)",
+      ".tint(Palette.accent.color)",
+      ".background(Palette.surface.color)",
+      ".labelStyle(.titleOnly)",
+      "Text(Words.live).font(.title)",
+    ];
+    const hit = (line: string) => [...line.matchAll(SYSTEM_COLOR)].length > 0;
+    expect(caught.filter((l) => !hit(l))).toEqual([]);
+    expect(passed.filter(hit)).toEqual([]);
   });
 
   it("the deck screen tints its arrows with Palette's green, so they aren't the unset AccentColor's blue", () => {

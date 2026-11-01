@@ -71,4 +71,12 @@ describe("sweep2-blocks-4 F41 before the app's file runs", () => {
     expect(root).toContain('<p class="status status--loading" role="status">Loading…</p>');
     expect(html).toMatch(/<noscript>[\s\S]*Turn on JavaScript[\s\S]*<\/noscript>/);
   });
+
+  it("with JavaScript off, Loading… is hidden, so the page shows only the Turn on JavaScript line", () => {
+    // Nothing replaces #root when scripts can't run, so a noscript style in head hides it
+    // (sweep2-core-fixcheck-2).
+    const head = /<head>([\s\S]*?)<\/head>/.exec(html)?.[1] ?? "";
+    const styles = [...head.matchAll(/<noscript>\s*<style>([\s\S]*?)<\/style>\s*<\/noscript>/g)].map((m) => m[1]).join("\n");
+    expect(styles).toMatch(/#root\s*\{\s*display\s*:\s*none\s*;?\s*\}/);
+  });
 });
