@@ -713,4 +713,38 @@ describe("LX-convex-1 a class opened by saving the next morning's start takes no
     await s1.mutation(api.live.questions.ask, { channel: CH, index: 0, text: QUESTION, anonymous: false });
     expect(await s1.mutation(api.live.lost.toggle, { channel: CH, index: 0 })).toBe(true);
   });
+
+  // sweep1-server-fixcheck-1 (second round): Monday 18:00 saved at 17:50 opens the class, the
+  // deck shows slide 8 at 18:20, nobody checks in and nobody ends the class. At 21:32 the
+  // professor saves Tuesday 9:00 into the same open class. Slide 8 was pressed after Monday's
+  // start was saved, not after Tuesday's, so Tuesday's phones wait for Tuesday's slides.
+  it("a start moved to the next morning in a class nobody checked in to drops the evening's slides", async () => {
+    const t = setup();
+    const prof = await professor(t);
+    const s1 = student(t, 1);
+    const setStart = (startsAt: number) => prof.mutation(api.checkin.attendance.setClassStart, { channel: CH, startsAt, graceMin: 5 });
+    vi.setSystemTime(MON_6PM - 10 * MIN);
+    await setStart(MON_6PM);
+    const monday = await openClass(t);
+    vi.setSystemTime(MON_6PM + 20 * MIN);
+    await slide(t, CH, 7, { title: "Monday wrap-up" });
+    vi.setSystemTime(MON_6PM + 3.5 * HOUR + 2 * MIN);
+    await setStart(TUE_9AM);
+    expect(await openClass(t)).toBe(monday);
+    const read = async () => ({
+      deck: (await s1.query(api.deck.current, { channel: CH }))?.title ?? null,
+      slides: (await s1.query(api.deck.slides, { channel: CH })).map((s) => s.title),
+    });
+    // Tuesday 8:20: a student checks in and the professor asks a quiz before the deck sends.
+    vi.setSystemTime(TUE_9AM - 40 * MIN);
+    await checkIn(t, s1);
+    expect(await read()).toEqual({ deck: null, slides: [] });
+    await expect(s1.mutation(api.live.lost.toggle, { channel: CH, index: 7 })).rejects.toThrow("That slide hasn't been shown yet.");
+    const poll = await prof.mutation(api.checkin.quiz.ask, { channel: CH, kind: "quiz", question: QUIZ, choices: ["A", "B"] });
+    expect((await t.run((ctx) => ctx.db.get(poll)))?.index).toBeUndefined();
+    // 8:25: the deck's first press on Tuesday shows.
+    vi.setSystemTime(TUE_9AM - 35 * MIN);
+    await slide(t, CH, 0, { title: "Tuesday" });
+    expect(await read()).toEqual({ deck: "Tuesday", slides: ["Tuesday"] });
+  });
 });

@@ -164,6 +164,8 @@ export async function ensureLecture(ctx: MutationCtx, channel: string): Promise<
 // class with no start), then Tuesday 9:00 saved at 21:32, and Tuesday's phones wait for Tuesday's
 // slides. A press made after a start was saved always counts, so moving the start later mid-class
 // (9:00 saved at 8:10, title slide at 8:20, start moved to 9:10 at 8:30) keeps the title slide.
+// Moving it more than 45 minutes later (Monday 18:00 to Tuesday 9:00) saves startSavedAt again
+// (attendance.setClassStart), so the presses before that move don't count.
 // A class from before startSavedAt existed cuts at 45 minutes before its start.
 export function slidesFrom(lecture: Doc<"lectures">) {
   const start = lectureStart(lecture);
