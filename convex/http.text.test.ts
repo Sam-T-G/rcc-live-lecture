@@ -42,6 +42,17 @@ describe("POST /deck text", () => {
     expect(await t.query(api.deck.current, { channel: CH })).toMatchObject({ title: `Hi ${EMOJI}`, lines: [EMOJI] });
   });
 
+  it("DECK-fixcheck-3 a run with a lone surrogate isn't passed on: the press counts, with no run or seq", async () => {
+    const t = setup();
+    for (const run of ["tab-1\uD83D", "ta\uDE00b-1"]) {
+      const r = await post(t, JSON.stringify({ key: BRIDGE, channel: CH, index: 1, beat: 0, count: 5, title: "Trees", lines: [], run, seq: 7 }));
+      expect(r.status).toBe(200);
+      const rows = await t.run((ctx) => ctx.db.query("deckChannels").take(5));
+      expect(rows).toHaveLength(1);
+      expect([rows[0].run, rows[0].seq]).toEqual([undefined, undefined]);
+    }
+  });
+
   it("DECK-convex-2 when deck.set fails, the answer is a 500 with the CORS headers, so the deck reads the status instead of a blocked request", async () => {
     const t = setup();
     // Two rows for one channel make deck.set's .unique() throw: a stand-in for any write that fails.

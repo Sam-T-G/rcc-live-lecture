@@ -83,12 +83,22 @@ const shownShape = v.object({
 
 // Every slide the deck has shown in this class, in slide order. Slides not shown yet are left
 // out, so a phone can page back but never ahead of the professor, and so are slides shown only
-// in an earlier class.
+// in an earlier class, and slides only another deck tab pressed (below).
 export const slides = query({
   args: { channel: v.string() },
   returns: v.array(shownShape),
   handler: async (ctx, { channel }) => {
     const start = await deckStart(ctx, channel);
+    // The tab that sent the live slide. When another deck opens mid-class (deck B at its slide 4
+    // after deck A's slides 1 to 6), only the slides B has pressed count, so page-back from B's
+    // slide 4 never shows A's slide 3. A deck reopened in a new tab starts over the same way: it
+    // shows the slides that tab presses, each at its fullest press (set). With no run on the live
+    // slide (an older bridge), every slide from this class counts.
+    const live = await ctx.db
+      .query("deckChannels")
+      .withIndex("by_channel", (q) => q.eq("channel", channel))
+      .unique();
+    const run = live && live.at >= start ? live.run : undefined;
     // One row per slide number, so this reads every row on the channel. A replaced row keeps its
     // first _creationTime, so this drops the rows whose `at` (when the row last changed) is before
     // the class started.
@@ -96,7 +106,9 @@ export const slides = query({
       .query("deckSlides")
       .withIndex("by_channel_and_index", (q) => q.eq("channel", channel))
       .take(SLIDE_MAX + 1);
-    return rows.filter((r) => r.at >= start).map(({ index, beat, title, lines, at }) => ({ index, beat, title, lines, at }));
+    return rows
+      .filter((r) => r.at >= start && (run === undefined || r.run === run))
+      .map(({ index, beat, title, lines, at }) => ({ index, beat, title, lines, at }));
   },
 });
 
@@ -149,27 +161,46 @@ export const set = internalMutation({
     // slide shows it from its first press, which must not hide lines the room has already seen.
     // The stored row stays only when this press is an earlier press of that same slide (fullerPress).
     // A row from an earlier class, or a different slide at this number (another deck shown in the
-    // same class, or the slide edited since), is replaced whatever its presses, so page-back never
-    // shows a slide that isn't the one the room saw. A late press counts here too.
+    // same class, or the slide edited since), is replaced whatever its presses. Each row keeps the
+    // run of the tab that last pressed that slide, and `slides` shows only the live tab's rows, so
+    // a slide number the live deck never pressed doesn't show another deck's slide either. A late
+    // press counts here too.
     const shown = await ctx.db
       .query("deckSlides")
       .withIndex("by_channel_and_index", (q) => q.eq("channel", a.channel).eq("index", a.index))
       .unique();
-    const slide = { channel: a.channel, index: a.index, beat: a.beat, title: a.title, lines: a.lines, at };
+    const run = a.run !== undefined && a.seq !== undefined ? { run: a.run } : {};
+    const slide = { channel: a.channel, index: a.index, beat: a.beat, title: a.title, lines: a.lines, at, ...run };
     if (!shown) await ctx.db.insert("deckSlides", slide);
     else if (shown.at < start || !fullerPress(shown, a)) await ctx.db.replace("deckSlides", shown._id, slide);
+    else if (run.run !== undefined && shown.run !== run.run) await ctx.db.patch("deckSlides", shown._id, run);
     return null;
   },
 });
 
+// A press sends at most 12 lines (POST /deck cuts the rest), so a slide with more shows only its first 12.
+const MAX_LINES = 12;
+
 // True when `stored` is a later press of the same slide as `press`: same heading, more presses,
-// and every line of `press` is in `stored`, in the same order. A press reveals lines and never
-// takes them away, so an earlier press of a slide shows some of the lines of a later one. Any other
-// slide at that number (another deck, or the slide edited) fails this. deckSlides keeps no `run`,
-// so a deck reopened in a new tab still counts as the same slide.
+// and every line of `press` is part of a line of `stored` (partOf), in the same order. A press
+// reveals text and never takes it away, so an earlier press of a slide shows some of the lines of
+// a later one, and a line with a beat inside it shows less of that line. When `stored` has 12
+// lines, the lines it reveals can push others past the 12th, so `press` may end with lines
+// `stored` cut off, after at least one that matched. Any other slide at that number (another
+// deck, or the slide edited) fails this. A deck reopened in a new tab still counts as the same slide.
 function fullerPress(stored: { beat: number; title: string; lines: string[] }, press: { beat: number; title: string; lines: string[] }) {
   if (press.beat >= stored.beat || press.title !== stored.title) return false;
   let i = 0;
-  for (const line of stored.lines) if (i < press.lines.length && press.lines[i] === line) i++;
-  return i === press.lines.length;
+  for (const line of stored.lines) if (i < press.lines.length && partOf(press.lines[i], line)) i++;
+  return i === press.lines.length || (i > 0 && stored.lines.length >= MAX_LINES);
+}
+
+// True when `line` is `full` with some words left out: the same words in the same order. A beat
+// inside a line (a detail that shows on a later press) adds words to that line.
+function partOf(line: string, full: string) {
+  if (line === full) return true;
+  const want = line.split(" ");
+  let i = 0;
+  for (const word of full.split(" ")) if (i < want.length && want[i] === word) i++;
+  return i === want.length;
 }

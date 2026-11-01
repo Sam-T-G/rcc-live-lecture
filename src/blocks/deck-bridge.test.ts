@@ -189,6 +189,25 @@ describe("public/deck-bridge.js", () => {
     expect(tab.sent).toHaveLength(2);
   });
 
+  it("DECK-fixcheck-2 in an iframe the bridge saves no key, so a reload of the iframe straight after a keyed load sends nothing", () => {
+    const tab = newTab();
+    const deck = new URL(DECK);
+    open(tab, frameSrc(deck, `gdg.${KEY}`, "quaint-swan-637"), { framed: true }).check();
+    expect(tab.sent).toHaveLength(1);
+    expect([...tab.storage.keys()].filter((k) => k.endsWith(":link"))).toEqual([]);
+    // No load in between: only the iframe guard keeps this reload from reading a saved key.
+    open(tab, frameSrc(deck, null, null), { how: "reload", framed: true }).check();
+    expect(tab.sent).toHaveLength(1);
+
+    // The deck opened with the key in this tab first (so it saved it), then the tab went to the
+    // stage, whose iframe shares the deck's sessionStorage: the iframe still never reads that key.
+    const top = newTab();
+    open(top, `${DECK}?bridge=gdg.${KEY}`).check();
+    expect([...top.storage.keys()].filter((k) => k.endsWith(":link"))).toHaveLength(1);
+    open(top, frameSrc(deck, null, null), { how: "reload", framed: true }).check();
+    expect(top.sent).toHaveLength(1);
+  });
+
   it("DECK-spec-1 &bridge-site= without ?bridge= sends nothing, even in a tab that saved a key, and stays in the address bar", () => {
     const tab = newTab();
     open(tab, `${DECK}?bridge=gdg.${KEY}`).check();

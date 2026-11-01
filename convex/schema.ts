@@ -35,6 +35,7 @@ export default defineSchema({
     title: v.string(),
     lines: v.array(v.string()),
     at: v.number(),
+    run: v.optional(v.string()), // the deck tab (deckChannels.run) that last pressed this slide; missing on old rows and from an older bridge
   }).index("by_channel_and_index", ["channel", "index"]),
 
   // Block: lab. One row per press of the lab page's "ping" button, to prove live sync.
