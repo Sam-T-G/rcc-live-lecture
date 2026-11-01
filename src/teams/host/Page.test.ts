@@ -14,6 +14,37 @@ import { Missing } from "./Missing";
 import HostPage, { Dashboard, tabKey, type Tab } from "./Page";
 import QA from "./QA";
 
+// sweep2-host-fixcheck-1: a stand-in for useState and useRef, on only while `hooks.on`, so a test
+// can call Dashboard as a plain function, press a key on a tab button and call Dashboard again
+// with the state the press left (the same idea as AskRoom.submit.test.ts). Off, both are React's.
+const hooks = vi.hoisted(() => ({ on: false, slots: [] as unknown[], at: 0 }));
+vi.mock("react", async (orig) => {
+  const R = await orig<typeof import("react")>();
+  // React's own hooks, under names the hooks lint rule doesn't read as a call inside a component.
+  const reactState = R.useState as (init: unknown) => unknown;
+  const reactRef = R.useRef as (init: unknown) => unknown;
+  const slot = (make: () => unknown) => {
+    const i = hooks.at++;
+    if (!(i in hooks.slots)) hooks.slots[i] = make();
+    return i;
+  };
+  return {
+    ...R,
+    useState: (init: unknown) => {
+      if (!hooks.on) return reactState(init);
+      const i = slot(() => (typeof init === "function" ? (init as () => unknown)() : init));
+      const set = (next: unknown) => {
+        hooks.slots[i] = typeof next === "function" ? (next as (v: unknown) => unknown)(hooks.slots[i]) : next;
+      };
+      return [hooks.slots[i], set];
+    },
+    useRef: (init: unknown) => {
+      if (!hooks.on) return reactRef(init);
+      return hooks.slots[slot(() => ({ current: init }))];
+    },
+  };
+});
+
 // A query's made-up result, or a function of its args that gives the result.
 const results: Record<string, unknown> = {};
 vi.mock("convex/react", () => ({
@@ -38,6 +69,7 @@ vi.mock("../../blocks/ui", async (importOriginal) => {
 });
 
 beforeEach(() => {
+  hooks.on = false;
   for (const k of Object.keys(results)) delete results[k];
   vi.stubGlobal("location", { hash: "#/host" });
 });
@@ -96,11 +128,18 @@ function placeOf(node: ReactNode, target: unknown, path: string[] = []): string[
   if (typeof component === "function" && !component.prototype?.isReactComponent) return placeOf(component(props), target, here);
   return placeOf(props.children, target, here);
 }
+type TabButton = {
+  id?: string;
+  tabIndex?: number;
+  "aria-selected"?: boolean;
+  onKeyDown?: unknown;
+  ref?: (el: { focus: () => void } | null) => void;
+};
 // The props of every role="tab" button in a tree of elements, in order (components aren't run).
-function buttonsIn(node: ReactNode): { tabIndex?: number; onKeyDown?: unknown }[] {
+function buttonsIn(node: ReactNode): TabButton[] {
   if (Array.isArray(node)) return node.flatMap((n) => buttonsIn(n as ReactNode));
   if (!isValidElement(node)) return [];
-  const props = node.props as { role?: string; children?: ReactNode; tabIndex?: number; onKeyDown?: unknown };
+  const props = node.props as TabButton & { role?: string; children?: ReactNode };
   if (node.type === "button" && props.role === "tab") return [props];
   return buttonsIn(props.children);
 }
@@ -240,6 +279,40 @@ describe("#/host", () => {
       [0, "function"],
       [-1, "function"],
     ]);
+  });
+
+  it("sweep2-host-2 pressing Right, Left, Home or End on a tab button opens that tab and moves focus to it", () => {
+    // Dashboard runs as a plain function with the hook stand-in on, so the tab a key press sets is
+    // there on the next call. Each button gets a stand-in element through its ref, which records
+    // focus().
+    hooks.on = true;
+    hooks.slots = [];
+    const focused: string[] = [];
+    function render() {
+      hooks.at = 0;
+      const tabs = buttonsIn(Dashboard({ first: "Now" }));
+      for (const b of tabs) b.ref?.({ focus: () => focused.push(b.id ?? "?") });
+      return tabs;
+    }
+    const open = (tabs: TabButton[]) => tabs.filter((b) => b["aria-selected"]).map((b) => [b.id, b.tabIndex]);
+    function press(key: string, at: number) {
+      const prevented = vi.fn();
+      focused.length = 0;
+      (render()[at].onKeyDown as (e: unknown) => void)({ key, preventDefault: prevented });
+      const tabs = render();
+      return { open: open(tabs), focused: [...focused], prevented: prevented.mock.calls.length, tabIndex: tabs.map((b) => b.tabIndex) };
+    }
+    expect(open(render())).toEqual([["host-tab-Now", 0]]);
+
+    // `focused` holds the press's focus() calls only: render() hands out refs and never focuses.
+    expect(press("ArrowRight", 0)).toEqual({ open: [["host-tab-Points", 0]], focused: ["host-tab-Points"], prevented: 1, tabIndex: [-1, 0, -1] });
+    expect(press("ArrowRight", 1)).toEqual({ open: [["host-tab-Questions", 0]], focused: ["host-tab-Questions"], prevented: 1, tabIndex: [-1, -1, 0] });
+    expect(press("ArrowRight", 2)).toEqual({ open: [["host-tab-Now", 0]], focused: ["host-tab-Now"], prevented: 1, tabIndex: [0, -1, -1] });
+    expect(press("ArrowLeft", 0)).toEqual({ open: [["host-tab-Questions", 0]], focused: ["host-tab-Questions"], prevented: 1, tabIndex: [-1, -1, 0] });
+    expect(press("Home", 2)).toEqual({ open: [["host-tab-Now", 0]], focused: ["host-tab-Now"], prevented: 1, tabIndex: [0, -1, -1] });
+    expect(press("End", 0)).toEqual({ open: [["host-tab-Questions", 0]], focused: ["host-tab-Questions"], prevented: 1, tabIndex: [-1, -1, 0] });
+    // Any other key changes nothing and leaves the browser's own handling alone.
+    expect(press("Enter", 2)).toEqual({ open: [["host-tab-Questions", 0]], focused: [], prevented: 0, tabIndex: [-1, -1, 0] });
   });
 
   it("#/host/<other> shows 'No page at #/host/<other>'", () => {
