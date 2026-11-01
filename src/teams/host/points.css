@@ -1,41 +1,46 @@
-/* #/host Points (Boards.tsx). Its own classes only: host.css styles the bare buttons under
-   .host-root, and every button here is the kit's Button, which keeps its own look. */
-
-/* Teams, Point changes and End of class on the left, Students on the right from 1000px; one
-   column below that. Cards keep host.css's 16px bottom margin, so the rows need no gap. */
-.points { display: grid; column-gap: var(--rcc-space-4); align-items: start; }
-@media (min-width: 1000px) {
-  .points { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
-}
+/* #/host Points (Boards.tsx), on the kit's desk: Teams is the focal card with Students under it on
+   the page, and the aside holds Point changes and End of class. Colors, space and type are the
+   tokens in src/styles/tokens.css; the card, wells, tables, buttons and the team chip are the
+   kit's (src/styles/kit.css), and this sheet places them. */
+.points__main { display: grid; gap: var(--s8); align-content: start; min-width: 0; }
 .points__side { min-width: 0; }
 
-/* Team size and when the teams lock, on one line when they fit. */
-.points-size { margin-bottom: var(--rcc-space-3); }
+/* Teams: the lock line under the heading, team size in the heading row's slot. */
 .points-size__lock { margin: 0; }
+.points-size > .seg-field { margin: 0; }
+/* One team per row in the well: its place, its chip over its numbers, then −1 and +1 in a fixed
+   column on every row. */
+.points-teams { list-style: none; margin: 0; --rcols: 88px minmax(0, 1fr) auto; }
+.points-team { align-items: center; padding-block: var(--s1); }
+.points-team__place { display: flex; }
+/* The team's chip and name over its numbers: every row the same two lines. */
+.points-team__main { display: grid; gap: 2px; min-width: 0; }
+.points-team__head { margin: 0; font-size: var(--t-body); line-height: 1.3; }
+.points-team__line { margin: 0; font-size: var(--t-small); line-height: var(--lh-small); color: var(--muted); }
+.points-act { display: flex; gap: var(--s2); justify-content: flex-end; white-space: nowrap; }
 
-/* One team: its chip and place, then its numbers; +1 and -1 at the end. */
-.points-teams { list-style: none; margin: 0; padding: 0; }
-.points-team {
-  display: flex;
-  align-items: center;
-  gap: var(--rcc-space-3);
-  padding-block: var(--rcc-space-3);
-  border-bottom: var(--rcc-hairline) solid var(--line);
-}
-.points-team:last-child { border-bottom: 0; }
-.points-team__main { flex: 1; min-width: 0; }
-.points-team__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rcc-space-2); margin: 0; }
-.points-team__line { margin: var(--rcc-space-1) 0 0; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--muted); }
-.points-act { display: flex; gap: var(--rcc-space-2); justify-content: flex-end; white-space: nowrap; }
+/* Students: the team filter as text options (the chosen one underlined), the reason, the table. */
+.points-students > .field { margin: 0; max-width: 40rem; }
+.points-filter { row-gap: 0; }
+.points-filter > .seg__item { white-space: nowrap; }
+.points-filter .team { font-weight: inherit; }
+/* The table in its well: numbers right-aligned under right-aligned heads, the place in 700. */
+.points-table td { vertical-align: middle; font-size: var(--t-body); }
+.points-table td:first-child { font-weight: var(--w-loud); font-variant-numeric: tabular-nums lining-nums; }
+.points-table :is(th, td):is(:nth-child(4), :nth-child(5), :nth-child(6)) { text-align: right; }
+.points-table :is(th, td):last-child { width: 1%; }
 
-/* The team filter over the student list: the chosen one is filled. */
-.points-filter { display: flex; flex-wrap: wrap; gap: var(--rcc-space-2); margin-bottom: var(--rcc-space-3); }
-.points-filter .btn[aria-pressed="true"] { background-color: var(--accent-soft); color: var(--accent-soft-text); }
-.points-table td { vertical-align: middle; }
+/* Point changes: one row each in the well, the change, who, then why and when, then Undo. */
+.points-log { list-style: none; margin: 0; --rcols: 40px minmax(0, 1fr) auto; }
+.points-log__row { column-gap: var(--s3); padding-block: var(--s2); font-size: var(--t-body); }
+.points-log__delta { font-size: var(--n-sm); font-weight: var(--w-loud); font-variant-numeric: tabular-nums lining-nums; text-align: right; }
+.points-log__what { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--s2); min-width: 0; }
+.points-log__name { font-weight: var(--w-head); }
+.points-log__why { flex-basis: 100%; font-size: var(--t-small); line-height: var(--lh-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The line in the waiting well: one sentence, top-aligned. */
+.points__side .side-wait > .status { padding-block: 0; font-size: var(--t-small); }
 
-/* Point changes: the change, who and why, then Undo. */
-.points-log__row { display: flex; align-items: center; gap: var(--rcc-space-3); }
-.points-log__delta { min-width: 2.5em; font-weight: var(--rcc-weight-strong); font-variant-numeric: tabular-nums; }
-.points-log__what { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--rcc-space-2); }
-.points-log__name { font-weight: var(--rcc-weight-strong); }
-.points-log__why { flex-basis: 100%; font-size: var(--fs-small); line-height: var(--lh-small); }
+/* End of class: End class and the CSV download on one row. */
+.points-end__acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.points-end__acts > .confirm { flex-basis: 100%; }
+.points-end > .banner { margin: 0; }

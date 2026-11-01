@@ -1,52 +1,94 @@
-/* Professor view only. Colors come from the shared tokens in src/styles/tokens.css.
-   Everything sits under .host-root so the shared button and card styles stay untouched. The
-   tab bar is the kit's (.tabs__list, .tabs__tab in src/styles/kit.css). */
+/* Professor view (#/host): the shell. Sizes and colors are the tokens in src/styles/tokens.css
+   (--page-margin, --page-max, --aside-w, --bar-h); every part is the kit's (src/styles/kit.css)
+   and this sheet only places them: the app bar with the tabs, the slide track band under it,
+   then the desk (the one focal card and the 400 aside, flat on the page). Tab panels swap at
+   once, with no fade (their .host-fade wrapper has no rule). No rule here reaches a kit button
+   or tab: each one names the host's own classes. */
 .host-root {
-  --soft: color-mix(in srgb, var(--text) 5%, transparent);
-  --ease: cubic-bezier(0.2, 0, 0, 1);
+  /* The page's side margin: 48 on a laptop (32 under 1366), never more than a phone's. */
+  --host-margin: min(var(--page-margin), var(--rcc-page-margin));
+  /* Where the content starts: the margin, or what centers --page-max in a wider window. */
+  --host-gutter: max(var(--host-margin), calc((100% - var(--page-max)) / 2));
 }
-.host-root .panel { border-radius: 16px; padding: 20px 22px; margin: 0 0 16px; }
-.host-root h2 { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; }
-.host-root h3 { font-size: 1.05rem; margin: 14px 0 6px; }
 
-/* Buttons: quiet by default. This sheet isn't in a cascade layer, so these rules would beat the
-   kit's whatever the selector: they skip kit buttons and tabs (.btn, .tabs__tab). :where() keeps
-   each selector's specificity as it was. */
-.host-root button:where(:not(.btn, .tabs__tab)) { background: transparent; color: var(--text); border: 1px solid var(--line-strong); border-radius: 999px; min-height: 36px; padding: 4px 14px; font-weight: 500; transition: background 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.1s var(--ease); }
-.host-root button:where(:not(.btn, .tabs__tab)):hover:not(:disabled) { background: var(--soft); border-color: var(--muted); }
-.host-root button:where(:not(.btn, .tabs__tab)):active:not(:disabled) { transform: scale(0.97); }
-.host-root button:where(:not(.btn, .tabs__tab)):focus-visible, .host-root input:focus-visible, .host-root textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.host-root .row { gap: 8px; }
-.host-root input, .host-root textarea { background: transparent; border-radius: 10px; }
-.host-root textarea { font: inherit; color: var(--text); border: 1px solid var(--line-strong); padding: 10px 12px; }
+/* ---------------------------------------------------------------- the app bar */
+/* The kit's sticky bar: the page's name on the card text line (x 80 at 1440), the tabs, and
+   Attendance on the page margin. Attendance leaves the page, so it is --muted, never green. */
+.host-bar { padding-inline: var(--host-gutter); gap: var(--s6); }
+.host-bar > h1 { margin: 0; padding-inline-start: var(--s8); font-size: var(--t-body); line-height: 1.3; letter-spacing: 0;
+  font-weight: var(--w-head); white-space: nowrap; }
+.host-links { margin: 0 0 0 auto; }
+.host-links a { display: inline-flex; align-items: center; min-height: var(--btn-sm); color: var(--muted); font-size: var(--t-small);
+  font-weight: var(--w-head); text-decoration: none; white-space: nowrap; }
+.host-links a:is(:hover, :focus-visible) { color: var(--text); text-decoration: underline; text-decoration-thickness: 1px; }
 
-/* Header */
-.host-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-.host-head h2 { font-size: 1.9rem; font-weight: 600; letter-spacing: -0.01em; text-transform: none; color: var(--text); margin: 2px 0 0; }
-.host-head p { margin: 0; }
-.host-head .host-links { margin-top: 10px; font-weight: 500; }
-.host-counts { display: flex; gap: 36px; }
-.host-head .big__value { font-size: 3.2rem; font-weight: 500; letter-spacing: -0.03em; transition: color 0.2s; }
-.host-head .big__label { font-size: 0.85rem; }
-.host-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); align-items: start; }
-.host-grid > * { min-width: 0; }
-.host-fade { animation: host-in 0.25s var(--ease); }
-@keyframes host-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+/* ------------------------------------------------------------ the slide track */
+/* The kit's band and track: the slide and its title start on the card text line, the lane ends on
+   the card's text edge, and "38 checked in" ends on the page margin with the aside. The lane keeps
+   its slides' width, so in a narrow window the title shrinks first. */
+.host-track { padding-inline: calc(var(--host-gutter) + var(--s8)) var(--host-gutter);
+  grid-template-columns: minmax(0, 260px) minmax(auto, 1fr) calc(var(--aside-w) + var(--s6)); }
+.host-track .track__where > p { margin: 0; }
+.host-track .track__where > h2 { margin: 0; font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.3; letter-spacing: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.host-track .track__where > .status { padding-block: 0; }
+.host-track .track__room { justify-self: end; }
+/* The room count: the numeral at --n-md and its words on one baseline, in --text (green is the
+   focal card's one action). */
+.host-track .big { flex-direction: row; align-items: baseline; gap: .28em; white-space: nowrap; }
+.host-track .big__value { font-size: var(--n-md); color: var(--text); letter-spacing: -0.02em; }
+.host-track .big__label { font-size: var(--t-body); font-weight: var(--w-head); color: var(--text); }
+/* While the count loads: a still block 40 wide at the numeral's x-height, on the words' baseline. */
+.host-track .big__value .skel--num { width: 40px; height: 16px; vertical-align: 0.1em; }
 
-/* A team from live.groups: the dot takes --group from its .group--<color> class (live.css) */
-.team-chip { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text); }
-.team-chip::before { content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--group, currentColor); }
+/* --------------------------------------------------------------- the page */
+.host-page { max-width: calc(var(--page-max) + 2 * var(--host-margin)); margin-inline: auto;
+  padding: var(--s6) var(--host-margin) var(--s12); }
+/* Each tab is the kit's desk: the main column and the aside, each ending at its content. */
+.host-desk { align-items: start; }
+.host-desk > * { min-width: 0; }
+/* The focal card's heading row holds its size in every state, with or without an action. */
+.host-head { min-height: 56px; }
+.host-head .hline__t { align-self: start; margin: 0; flex-wrap: wrap; line-height: 1.3; letter-spacing: 0; }
+.host-head .facts { margin: 0; }
+.host-head .hline__end { flex-wrap: wrap; justify-content: flex-end; }
 
-/* The "Group by topic with AI" switch. Off: an outlined track with a knob in the outline color,
-   both 3:1 on the card. On: the knob in --accent-text on an --accent track. */
-.host-switch { display: inline-flex; gap: 10px; align-items: center; margin: 0 0 8px; color: var(--text); cursor: pointer; }
-.host-switch input { position: absolute; opacity: 0; width: 0; }
-.host-switch__track { box-sizing: border-box; width: 38px; height: 22px; border-radius: 999px; border: 2px solid var(--line-strong); background: var(--surface); position: relative; transition: background 0.2s var(--ease), border-color 0.2s var(--ease); }
-.host-switch__track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--line-strong); transition: transform 0.2s var(--ease), background 0.2s var(--ease); }
+/* The aside: flat on the page, no fill and no shadow; its first heading sits on the focal card's
+   heading line (the card's own padding). */
+.host-side { display: grid; gap: var(--s8); align-content: start; min-width: 0; padding-top: var(--s6); }
+/* A section on the page: its heading, then its well or table. */
+.host-sec { display: grid; gap: var(--s3); align-content: start; min-width: 0; }
+.host-sec > h2, .host-sec__head > h2 { margin: 0; font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.3; letter-spacing: 0; }
+/* A heading with an action: the heading keeps the focal card's heading line, the action centers on it. */
+.host-sec__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--s2) var(--s3); }
+.host-sec__head > .btn { margin-block: calc(-1 * var(--s2)); }
+.host-sec > p { margin: 0; }
+
+/* -------------------------------------------- "Group by topic with AI" (QA.tsx) */
+/* A switch for one setting that applies at once, drawn as the kit's .switch: off, a 2px
+   --line-strong track and knob on the card (3:1); on, the knob in --accent-text on --accent. */
+.host-switch { display: inline-flex; gap: var(--s3); align-items: center; min-height: var(--btn-sm); margin: 0; color: var(--text);
+  font-size: var(--t-label); font-weight: var(--w-head); white-space: nowrap; cursor: pointer; }
+.host-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.host-switch__track { box-sizing: border-box; position: relative; flex: none; width: 44px; height: 24px; border-radius: var(--r-full); border: 2px solid var(--line-strong); background: var(--surface); transition: background-color var(--fx) var(--ease), border-color var(--fx) var(--ease); }
+.host-switch__track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--line-strong); transition: transform var(--sp-fast) var(--ease-sp), background-color var(--fx) var(--ease); }
 .host-switch input:checked + .host-switch__track { background: var(--accent); border-color: var(--accent); }
-.host-switch input:checked + .host-switch__track::after { background: var(--accent-text); transform: translateX(16px); }
-.host-switch input:focus-visible + .host-switch__track { outline: 2px solid var(--accent); outline-offset: 2px; }
-.host-root .status { padding: 8px 0; }
-@media (prefers-reduced-motion: reduce) {
-  .host-root * { transition: none !important; animation: none !important; }
+.host-switch input:checked + .host-switch__track::after { background: var(--accent-text); transform: translateX(20px); }
+.host-switch input:focus-visible + .host-switch__track { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-off); }
+.host-switch:has(input:disabled) { cursor: progress; }
+
+/* A window narrower than a laptop's: the room count takes only its own width, and under 800 the
+   band scrolls on its own, so the page never scrolls sideways. */
+@media (max-width: 1100px) {
+  .host-track { grid-template-columns: minmax(0, 260px) minmax(auto, 1fr) auto; }
+}
+@media (max-width: 800px) {
+  .host-track { overflow-x: auto; }
+}
+
+/* ---------------------------------------------------------- 1280 x 800 */
+/* One step tighter on a short window, so the live view fits with no scroll. */
+@media (max-height: 820px) {
+  .host-page { padding-top: var(--s4); }
+  .host-side { gap: var(--s6); }
 }

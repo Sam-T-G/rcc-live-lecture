@@ -1,15 +1,22 @@
-/* #/host: the "Lost by slide" line at the bottom of the header card (Page.tsx LostBySlide). One
-   wrapping row of "Slide 3: 4" entries under a label; fixed-width digits, so the entries don't
-   shift when a count changes. */
-.host-lost {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--rcc-space-2) var(--rcc-space-6);
-  margin: var(--rcc-space-4) 0 0;
-  padding-top: var(--rcc-space-3);
-  border-top: var(--rcc-hairline) solid var(--line);
-  font-variant-numeric: tabular-nums;
-}
-.host-lost__label { font-weight: var(--rcc-weight-strong); }
-.host-lost__slide { white-space: nowrap; }
+/* #/host: the "Lost by slide" lane in the slide track (Page.tsx LostBySlide), on the kit's
+   .track__lane (src/styles/kit.css): the label on the counts' line, then one column per slide
+   with its count, its segment and its number. The label column is wide enough for "Lost by
+   slide", and each slide keeps 28px, so a two-digit count never runs into the next one. */
+.host-lane { --lane-label: 104px; min-width: 0; }
+.track__lane.host-lane { grid-template-columns: var(--lane-label) repeat(var(--slides, 12), minmax(0, 1fr));
+  min-width: calc(var(--lane-label) + var(--slides, 12) * (28px + var(--s1))); }
+
+/* The words: the label on the counts' baseline, and the loading or empty line beside it. While
+   the lane draws the counts, the "Slide 3: 4" list is there for screen readers only. */
+.host-lost { grid-row: 1; grid-column: 1 / -1; display: flex; align-items: last baseline; column-gap: var(--s1); margin: 0; min-width: 0; }
+@supports not (align-items: last baseline) { .host-lost { align-items: flex-end; } }
+.host-lost__label { flex: 0 0 var(--lane-label); font-size: var(--t-small); font-weight: var(--w-head); line-height: 20px; color: var(--muted); }
+.host-lost__line { min-width: 0; font-size: var(--t-body); line-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.host-lost__slide { font-size: var(--t-body); line-height: 24px; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+
+/* A deck too long for the lane, or no slide from the deck yet: the line as words in the lane's
+   slot, wrapping; the band grows to hold every slide that has taps. */
+.host-lane--words { align-self: end; padding-bottom: 2px; }
+.host-lane--words .host-lost { flex-wrap: wrap; column-gap: var(--s5); }
+.host-lane--words .host-lost__label { flex: none; }
+.host-track:has(> .host-lane--words) { height: auto; min-height: 88px; }

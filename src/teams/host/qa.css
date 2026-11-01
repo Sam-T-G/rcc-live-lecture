@@ -1,26 +1,46 @@
-/* #/host Questions (QA.tsx). Tokens: src/styles/tokens.css. The "Group by topic with AI" switch
-   (.host-switch) and .host-grid are in host.css. */
+/* #/host Questions (QA.tsx): the focal card "Questions from students" with its rows ruled straight
+   on the card, and "Shared with students" as the aside, flat on the page. Tokens:
+   src/styles/tokens.css; the card, heading row, chips, buttons, the confirm box and the answer
+   are the kit's (src/styles/kit.css). The "Group by topic with AI" switch is in host.css. */
+.qa__group { align-items: center; gap: var(--s4); }
+
+/* One question per row: its words, then its facts (upvotes first) and state chips, the answer,
+   and its actions on every row, a 1px rule between rows. */
 .qa-list { list-style: none; margin: 0; padding: 0; }
-.qa-q { padding-block: var(--rcc-space-4); border-top: var(--rcc-hairline) solid var(--line); }
-.qa-list > .qa-q:first-child { border-top: 0; }
-.qa-q__text { margin: 0; font-weight: var(--rcc-weight-strong); white-space: pre-wrap; }
-/* A dismissed question stays readable: its words go grey, and its "Dismissed" badge says why. */
-.qa-q--dismissed .qa-q__text { color: var(--muted); font-weight: var(--rcc-weight-body); }
-.qa-q__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rcc-space-2) var(--rcc-space-3); margin: var(--rcc-space-2) 0 0; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--muted); }
-/* The professor's answer, under the question, marked by a green rule (as students see it). */
-.qa-q__answer { margin: var(--rcc-space-3) 0 0; padding-inline-start: var(--rcc-space-3); border-inline-start: 3px solid var(--accent); white-space: pre-wrap; }
-.qa-q__editor { margin-top: var(--rcc-space-3); }
-.qa-q__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rcc-space-1) var(--rcc-space-2); margin-top: var(--rcc-space-2); }
-/* The first button's words line up with the question above: a small quiet button has 16px inside its edge. */
-.qa-q__actions > .btn:first-child { margin-inline-start: calc(-1 * var(--rcc-space-4)); }
-/* Delete's question, in place: the kit's confirm box look, on one line. */
-.qa-q__confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--rcc-space-2); padding: var(--rcc-space-2) var(--rcc-space-3); border-radius: var(--rcc-radius-sm); background: var(--fill); box-shadow: inset 0 0 0 var(--rcc-hairline) var(--line-strong); }
-.qa-q__ask { font-weight: var(--rcc-weight-strong); }
+.qa-q { display: grid; gap: var(--s2); padding-block: var(--s4); border-top: 1px solid var(--line); }
+.qa-list > .qa-q:first-child { border-top: 0; padding-top: 0; }
+.qa-q__text { margin: 0; font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A dismissed question stays readable: its words go quiet, and its "Dismissed" chip says why. */
+.qa-q--dismissed .qa-q__text { color: var(--muted); font-weight: var(--w-body); }
+.qa-q__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); }
+.qa-q__facts { margin: 0; font-size: var(--t-small); line-height: var(--lh-small); color: var(--muted); }
+/* The upvotes lead the facts: the count students care about, in --text 700. */
+.qa-q__facts > :first-child { color: var(--text); font-weight: var(--w-loud); font-variant-numeric: tabular-nums lining-nums; }
+/* The professor's answer under the question, on the kit's .answer well. A shared one is a single
+   line here: it shows in full in the aside. */
+.qa-q__answer { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.qa-q__answer--shared { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qa-q__editor { display: grid; gap: var(--s2); }
+.qa-q__editor > .field { margin: 0; }
+.qa-q__editor-acts { display: flex; flex-wrap: wrap; gap: var(--s2); }
+/* Row actions: the kit's 32 ghosts in one row; the first one's words line up with the question. */
+.qa-q__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); margin-inline-start: calc(-1 * var(--s3)); }
+/* Delete sits apart from the others and opens the kit's confirm box in its place. */
+.qa-q__delete { margin-inline-start: var(--s2); }
+.qa-q__confirm { flex: 0 1 100%; max-width: 30rem; margin: var(--s1) 0 0 var(--s3); }
 
-.qa-topic { margin-top: var(--rcc-space-6); }
-.qa-topic > h3 { display: flex; align-items: center; gap: var(--rcc-space-2); }
-.qa-cluster { margin-top: var(--rcc-space-2); padding-inline-start: var(--rcc-space-4); border-inline-start: 2px solid var(--line); }
-.qa-cluster__label { margin: var(--rcc-space-2) 0 0; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--muted); }
+/* Grouped by topic: each topic's heading with its count, then its groups. */
+.qa-topic { display: grid; gap: var(--s2); margin-top: var(--s2); }
+.qa-topic + .qa-topic { margin-top: var(--s4); }
+.qa-topic > h3 { margin: 0; font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.3; }
+.qa-cluster { display: grid; gap: var(--s1); }
+.qa-cluster__label { margin: var(--s2) 0 0; font-size: var(--t-small); line-height: var(--lh-small); color: var(--muted); }
+.qa-cluster > .qa-list > .qa-q:first-child { padding-top: var(--s2); }
 
-.qa-shared__q { margin: 0; font-weight: var(--rcc-weight-strong); white-space: pre-wrap; }
-.qa-shared__a { margin: var(--rcc-space-1) 0 0; white-space: pre-wrap; }
+/* Shared with students: each question over its answer, a 1px rule between them. */
+.qa-shared__list { list-style: none; margin: 0; padding: 0; }
+.qa-shared__list > li { display: grid; gap: var(--s1); padding-block: var(--s3); border-top: 1px solid var(--line); }
+.qa-shared__list > li:first-child { border-top: 0; padding-top: 0; }
+.qa-shared__q { margin: 0; font-size: var(--t-body); font-weight: var(--w-head); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.qa-shared__a { margin: 0; font-size: var(--t-small); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.qa-shared > .status { padding-block: 0; }

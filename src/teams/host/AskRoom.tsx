@@ -3,13 +3,17 @@
 // shows on every phone, on #/checkin/quiz and on the stage. While it's open the bars and "N of M
 // answered" move as students answer; after End, each choice's %, the right answer (or the vote's
 // top pick), % right and the median time show too.
-import { useId, useState, type FormEvent } from "react";
+//   It is the tab's focal card (the kit's .hcard): its heading row holds "Ask the room", the
+// question's state word and facts, and the card's actions in one slot at the right in every state
+// (Draft with AI and Write my own, then End while a question is open). The hero slot under it
+// holds one number: how many answered while open, % right once a quiz with a right answer ends.
+import { useId, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Card, Status } from "../../blocks/ui";
-import { Badge, Button, Field, Segmented, Stat } from "../../blocks/kit";
+import { Status } from "../../blocks/ui";
+import { Button, Field, Icon, Segmented } from "../../blocks/kit";
 import { CHANNEL } from "../../blocks/deck";
 import { NO_CLASS, errorText, useNoClass } from "./Team";
 import "./ask.css";
@@ -33,6 +37,7 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
   const [error, setError] = useState("");
   const pollOpen = !!current?.open;
   const noClass = useNoClass();
+  const loading = current === undefined;
 
   async function draft() {
     setDrafting(true);
@@ -85,13 +90,37 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
     }
   }
 
-  return (
-    <Card title="Ask the room">
-      {current === undefined && <Status kind="loading">Loading the quiz or vote...</Status>}
-      {current === null && !form && <Status kind="empty">{noClass ? NO_CLASS : "No quiz or vote in this class yet."}</Status>}
-      {current && <Running key={current.id} poll={current} writing={!!form} />}
+  // Draft with AI and Write my own, in the heading row's action slot. With no question in this
+  // class Draft with AI is the card's one green button; once there is one, End (while it's open)
+  // or the % right (once it ends) is the green thing, so both are outlines. They wait, disabled,
+  // while the class's question loads, and step aside while a new question is being written.
+  const start = form ? null : (
+    <>
+      <Button variant={current ? "outline" : "primary"} size="lg" busy={drafting} disabled={loading} onClick={draft}>
+        Draft with AI
+      </Button>
+      <Button variant="outline" size="lg" onClick={writeOwn} disabled={loading || drafting}>
+        Write my own
+      </Button>
+    </>
+  );
 
-      {form ? (
+  return (
+    <section className={form && !current ? "hcard ask ask--draft" : "hcard ask"}>
+      {current ? <Running key={current.id} poll={current} writing={!!form} actions={start} /> : <Head actions={start} />}
+      {loading && (
+        <div className="ask__load">
+          <Status kind="loading">Loading the quiz or vote...</Status>
+          <div className="skel-lines" aria-hidden="true">
+            <span className="skel" />
+            <span className="skel" />
+            <span className="skel" />
+          </div>
+        </div>
+      )}
+      {current === null && !form && <Status kind="empty">{noClass ? NO_CLASS : "No quiz or vote in this class yet."}</Status>}
+
+      {form && (
         <QuestionForm
           form={form}
           slide={form.index ?? slideIndex}
@@ -104,26 +133,41 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
             setError("");
           }}
         />
-      ) : (
-        <div className="row">
-          <Button variant={pollOpen ? "secondary" : "primary"} busy={drafting} onClick={draft}>
-            Draft with AI
-          </Button>
-          <Button variant="secondary" onClick={writeOwn} disabled={drafting}>
-            Write my own
-          </Button>
-        </div>
       )}
       {error && <Status kind="error">{error}</Status>}
-    </Card>
+    </section>
+  );
+}
+
+// The card's heading row: "Ask the room" with the question's state word beside it, its facts
+// (Quiz or Vote, AI draft, the slide) under it, and the action slot at the right. The row keeps its
+// height whether or not the slot has anything in it.
+function Head({ state, facts = [], actions }: { state?: "open" | "ended"; facts?: string[]; actions?: ReactNode }) {
+  return (
+    <div className="hline host-head ask__head">
+      <h2 className="hline__t">
+        Ask the room
+        {state && <span className={`stateword stateword--${state}`}>{state === "open" ? "Open" : "Ended"}</span>}
+      </h2>
+      {facts.length > 0 && (
+        <p className="facts facts-list">
+          {facts.map((f) => (
+            <span key={f}>{f}</span>
+          ))}
+        </p>
+      )}
+      {actions && <div className="hline__end">{actions}</div>}
+    </div>
   );
 }
 
 type Poll = NonNullable<FunctionReturnType<typeof api.checkin.quiz.current>>;
+type Stats = NonNullable<FunctionReturnType<typeof api.checkin.quiz.stats>>;
 
 // The question in this class now: open or ended, with its bars and numbers. While the next
 // question is being written (`writing`), its Open button is the main one, so End steps back.
-function Running({ poll, writing }: { poll: Poll; writing: boolean }) {
+// `actions` (Draft with AI and Write my own) go in the heading row's slot before End.
+function Running({ poll, writing, actions }: { poll: Poll; writing: boolean; actions: ReactNode }) {
   const stats = useQuery(api.checkin.quiz.stats, { poll: poll.id });
   const end = useMutation(api.checkin.quiz.end);
   const [ending, setEnding] = useState(false);
@@ -137,7 +181,11 @@ function Running({ poll, writing }: { poll: Poll; writing: boolean }) {
   const right = ended ? stats.correct : null;
   const most = Math.max(...counts);
   const top = (i: number) => ended && right === null && answered > 0 && counts[i] === most;
-  const pct = (i: number) => (answered ? Math.round((counts[i] / answered) * 100) : 0);
+  // While it's open, the choice most students picked so far fills in ink; nothing is green yet.
+  const lead = (i: number) => poll.open && answered > 0 && counts[i] === most;
+  const share = (i: number) => (answered ? counts[i] / answered : 0);
+  const pct = (i: number) => Math.round(share(i) * 100);
+  const facts = [vote ? "Vote" : "Quiz", ...(stats?.aiDraft ? ["AI draft"] : []), ...(stats && stats.index !== null ? [`Slide ${stats.index + 1}`] : [])];
 
   async function endIt(id: Id<"polls">) {
     setEnding(true);
@@ -152,50 +200,121 @@ function Running({ poll, writing }: { poll: Poll; writing: boolean }) {
   }
 
   return (
-    <div className="ask-poll">
-      <div className="row">
-        <Badge tone={poll.open ? "live" : "neutral"}>{poll.open ? "Open" : "Ended"}</Badge>
-        <Badge>{vote ? "Vote" : "Quiz"}</Badge>
-        {stats && stats.index !== null && <Badge>Slide {stats.index + 1}</Badge>}
-        {stats?.aiDraft && <Badge tone="accent">AI draft</Badge>}
-      </div>
+    <>
+      <Head
+        state={poll.open ? "open" : "ended"}
+        facts={facts}
+        actions={
+          <>
+            {actions}
+            {poll.open && (
+              <Button variant={writing ? "secondary" : "primary"} size="lg" busy={ending} onClick={() => endIt(poll.id)}>
+                {vote ? "End the vote" : "End the quiz"}
+              </Button>
+            )}
+          </>
+        }
+      />
+      <Tally open={poll.open} stats={stats} />
       <h3 className="ask-poll__q">{poll.question}</h3>
-      <ul className="ask-bars">
-        {poll.choices.map((c, i) => (
-          <li key={i} className={i === right || top(i) ? "ask-bar ask-bar--right" : "ask-bar"}>
-            <b className="ask-bar__letter">{LETTERS[i]}</b>
-            <span className="ask-bar__text">
-              {c}
-              {i === right && <span className="ask-bar__mark"> · right answer</span>}
-              {top(i) && <span className="ask-bar__mark"> · top pick</span>}
-            </span>
-            <span className="ask-bar__n">
-              {counts[i]}
-              {ended && ` · ${pct(i)}%`}
-            </span>
-            <span className="ask-bar__track" aria-hidden="true">
-              <span className="ask-bar__fill" style={{ width: `${answered ? (counts[i] / answered) * 100 : 0}%` }} />
-            </span>
-          </li>
-        ))}
+      <ul className="ruled rbars ask-bars">
+        {poll.choices.map((c, i) => {
+          const cls = ["ruled__row", i === right && "is-right", (top(i) || lead(i)) && "is-lead", (i === right || top(i)) && "ask-bar--right"];
+          return (
+            <li key={i} className={cls.filter(Boolean).join(" ")}>
+              <span className="letter">{LETTERS[i]}</span>
+              <span className="rbar__text">
+                <span className="rbar__label">
+                  <span className="ask-bar__text">{c}</span>
+                  {i === right && (
+                    <span className="rbar__tag">
+                      <Icon name="check" />
+                      <span className="sr-only"> · </span>right answer
+                    </span>
+                  )}
+                  {top(i) && (
+                    <span className="rbar__tag ask-bar__top">
+                      <span className="sr-only"> · </span>top pick
+                    </span>
+                  )}
+                </span>
+                <span className="rbar__track">
+                  <span className="rbar__fill" style={{ "--f": share(i) } as CSSProperties} />
+                </span>
+              </span>
+              <span className="rbar__n">
+                <span>{counts[i]}</span>
+                {ended && (
+                  <>
+                    <span className="sr-only"> · </span>
+                    <span className="rbar__pct">{pct(i)}%</span>
+                  </>
+                )}
+              </span>
+            </li>
+          );
+        })}
       </ul>
-      <div className="ask-stats">
-        <Stat value={stats ? `${stats.answered} of ${stats.checkedIn}` : "-"} label="answered" accent />
-        {!poll.open && stats && stats.rightPct !== null && <Stat value={`${stats.rightPct}%`} label="got it right" />}
-        {!poll.open && stats && stats.medianSec !== null && <Stat value={`${stats.medianSec} s`} label="median time to answer" />}
-      </div>
-      {poll.open && (
-        <Button variant={writing ? "secondary" : "primary"} busy={ending} onClick={() => endIt(poll.id)}>
-          {vote ? "End the vote" : "End the quiz"}
-        </Button>
-      )}
       {error && <Status kind="error">{error}</Status>}
+    </>
+  );
+}
+
+// The hero slot: one number at the hero size, the same slot in every state. While the question is
+// open (and after a vote, or a quiz with no right answer, ends) it is how many answered, "of 38"
+// beside it; once a quiz with a right answer ends it is the % that got it right, in green (the
+// card's one green thing then), with how many answered and the median time in a line under it.
+// No stats yet (or none for a question that's gone): a still block in the number's place.
+function Tally({ open, stats }: { open: boolean; stats: Stats | null | undefined }) {
+  if (!stats)
+    return (
+      <div className="tally ask__tally">
+        <span className="tally__lead n-hero">
+          <span className="skel skel--num" aria-hidden="true" />
+        </span>
+        <span className="tally__of">answered</span>
+      </div>
+    );
+  const median = !open && stats.medianSec !== null;
+  if (!open && stats.rightPct !== null)
+    return (
+      <div className="tally tally--accent ask__tally">
+        <span className="tally__lead n-hero">
+          {stats.rightPct}
+          <span className="num__unit">%</span>
+        </span>
+        <span className="tally__of">got it right</span>
+        <p className="tally__line">
+          <b>{stats.answered}</b> of <b>{stats.checkedIn}</b> answered
+          {median && (
+            <>
+              {" · "}median time to answer <b>{stats.medianSec}</b> s
+            </>
+          )}
+        </p>
+      </div>
+    );
+  return (
+    <div className="tally ask__tally">
+      <span className="sr-only">{`${stats.answered} of ${stats.checkedIn} answered`}</span>
+      <span className="tally__lead n-hero" aria-hidden="true">
+        {stats.answered}
+      </span>
+      <span className="tally__of" aria-hidden="true">
+        of {stats.checkedIn} answered
+      </span>
+      {median && (
+        <p className="tally__line">
+          median time to answer <b>{stats.medianSec}</b> s
+        </p>
+      )}
     </div>
   );
 }
 
 // The question being written: quiz or vote, the question, up to 4 choices and, on a quiz, the
-// right answer. Exported for AskRoom.test.ts.
+// right answer, picked in one column of radios that ends with "No right answer". Exported for
+// AskRoom.test.ts.
 export function QuestionForm({
   form,
   slide,
@@ -216,10 +335,11 @@ export function QuestionForm({
   const radio = useId();
   const quiz = form.kind === "quiz";
   const setChoice = (i: number, text: string) => onChange({ ...form, choices: form.choices.map((c, j) => (j === i ? text : c)) });
+  const facts = [...(form.aiDraft ? ["AI draft"] : []), ...(slide !== null ? [`Slide ${slide + 1}`] : [])];
 
   return (
     <form className="ask-form" onSubmit={onSubmit}>
-      <div className="row ask-form__top">
+      <div className="ask-form__top">
         <Segmented<Kind>
           label="Quiz or vote"
           hideLabel
@@ -230,14 +350,26 @@ export function QuestionForm({
             { value: "vote", label: "Vote" },
           ]}
         />
-        {form.aiDraft && <Badge tone="accent">AI draft</Badge>}
-        {slide !== null && <Badge>Slide {slide + 1}</Badge>}
+        <p className="ask-form__rule">
+          {quiz ? (
+            <>
+              <Icon name="lock" />
+              <span>Students can't change their answer.</span>
+            </>
+          ) : (
+            "No right answer. Students can change their pick until you end it."
+          )}
+        </p>
+        {facts.length > 0 && (
+          <p className="facts facts-list ask-form__facts">
+            {facts.map((f) => (
+              <span key={f}>{f}</span>
+            ))}
+          </p>
+        )}
       </div>
-      <p className="muted ask-form__rule">
-        {quiz ? "Students can't change their answer." : "No right answer. Students can change their pick until you end it."}
-      </p>
       <Field label="Question">
-        {(f) => <input {...f} value={form.question} onChange={(e) => onChange({ ...form, question: e.target.value })} />}
+        {(f) => <input {...f} className="input ask-form__ask" value={form.question} onChange={(e) => onChange({ ...form, question: e.target.value })} />}
       </Field>
       <div className={quiz ? "ask-choices" : "ask-choices ask-choices--vote"}>
         <span className="ask-choices__head" aria-hidden="true" />
@@ -256,22 +388,23 @@ export function QuestionForm({
             onRight={() => onChange({ ...form, correct: i })}
           />
         ))}
+        {quiz && (
+          <label className="ask-choices__none">
+            <span>No right answer</span>
+            <input type="radio" className="radio" name={radio} checked={form.correct === null} onChange={() => onChange({ ...form, correct: null })} />
+          </label>
+        )}
       </div>
-      <div className="row">
-        <Button type="submit" busy={opening}>
+      <div className="ask-form__acts">
+        <Button type="submit" size="lg" busy={opening}>
           {quiz ? "Ask the room" : "Start the vote"}
         </Button>
-        {quiz && form.correct !== null && (
-          <Button variant="quiet" onClick={() => onChange({ ...form, correct: null })}>
-            No right answer
-          </Button>
-        )}
-        <Button variant="quiet" onClick={onCancel}>
+        <Button variant="plain" size="lg" onClick={onCancel}>
           Cancel
         </Button>
       </div>
       {pollOpen && (
-        <p className="muted ask-form__rule">
+        <p className="ask-form__rule">
           {quiz ? "Asking this quiz ends the quiz or vote that's open now." : "Starting this vote ends the quiz or vote that's open now."}
         </p>
       )}
@@ -300,11 +433,13 @@ function ChoiceRow({
 }) {
   return (
     <>
-      <b className="ask-choices__letter">{letter}</b>
-      <input value={text} onChange={(e) => onText(e.target.value)} placeholder={needed ? "Choice (needed)" : "Choice (optional)"} aria-label={`Choice ${letter}`} />
+      <span className={quiz && right ? "letter ask-choices__letter is-right" : "letter ask-choices__letter"} aria-hidden="true">
+        {letter}
+      </span>
+      <input className="input" value={text} onChange={(e) => onText(e.target.value)} placeholder={needed ? "Choice (needed)" : "Choice (optional)"} aria-label={`Choice ${letter}`} />
       {quiz && (
         <label className="ask-choices__right">
-          <input type="radio" name={radio} checked={right} onChange={onRight} aria-label={`${letter} is the right answer`} />
+          <input type="radio" className="radio" name={radio} checked={right} onChange={onRight} aria-label={`${letter} is the right answer`} />
         </label>
       )}
     </>

@@ -149,6 +149,19 @@ export const scenarios: Scenario[] = [
     fixtures: { ...live, ...fx(api.live.read.lostCount, 0), ...fx(api.live.read.lostBySlide, []) },
   }),
   host({
+    id: "host-now-long-deck",
+    title: "HO-04 A 30-slide deck: Lost by slide as words (the lane draws up to 14 slides)",
+    fixtures: {
+      ...live,
+      ...fx(api.deck.current, { ...C.slide, index: 17, count: 30 }),
+      ...fx(api.live.read.lostBySlide, [
+        { index: 2, count: 2 },
+        { index: 9, count: 5 },
+        { index: 17, count: 3 },
+      ]),
+    },
+  }),
+  host({
     id: "host-now-cards-loading",
     title: "HO-10 HO-20 Header in, question cards loading",
     expect: "loading",
@@ -326,7 +339,7 @@ export const scenarios: Scenario[] = [
     title: "HO-34 Point changes with Undo",
     fixtures: live,
     clicks: [TAB.points],
-    scrollTo: 'section.panel:has-text("Point changes")',
+    scrollTo: "section.points-changes",
   }),
   host({
     id: "host-points-end-confirm",
@@ -343,14 +356,14 @@ export const scenarios: Scenario[] = [
       ...fx(api.live.groups.endDay, "Green came 1st with 11 points, 2.8 per student. Saved extra credit for 11 students. The next class starts from 0 points."),
     },
     clicks: [TAB.points, 'button:has-text("End class")', '.confirm button:has-text("End class")'],
-    scrollTo: 'section.panel:has-text("End of class")',
+    scrollTo: "section.points-end",
   }),
   host({
     id: "host-points-download-empty",
     title: "HO-35 Download with no extra credit saved yet",
     fixtures: { ...live, ...fx(api.live.groups.results, { page: [], isDone: true, continueCursor: "" }) },
     clicks: [TAB.points, 'button:has-text("Download extra credit (CSV)")'],
-    scrollTo: 'section.panel:has-text("End of class")',
+    scrollTo: "section.points-end",
   }),
   host({
     id: "host-points-change-error",

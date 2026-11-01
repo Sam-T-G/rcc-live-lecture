@@ -6,13 +6,16 @@
 // "Group by topic with AI" sends Gemini the texts of questions that aren't dismissed, private ones
 // too (D12 f), never names, and sorts the list into topics. The server's rules are in
 // convex/live/questions.ts.
+//   Laid out on the kit's desk: "Questions from students" is the tab's focal card, its rows
+// ruled straight on the card with their actions on every row; "Shared with students" is the
+// aside, flat on the page, where each shared answer shows in full.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { CHANNEL } from "../../blocks/deck";
-import { Badge, Button, EmptyState, Field } from "../../blocks/kit";
-import { Card, Status } from "../../blocks/ui";
+import { Badge, Button, EmptyState, Field, StateChip } from "../../blocks/kit";
+import { Status } from "../../blocks/ui";
 import { errorText } from "./Team";
 import "./qa.css";
 
@@ -73,30 +76,36 @@ export function Question({ q, open = false }: { q: Item; open?: boolean }) {
   return (
     <li className={dismissed ? "qa-q qa-q--dismissed" : "qa-q"}>
       <p className="qa-q__text">{q.text}</p>
-      <p className="qa-q__meta">
-        <Badge>Slide {q.index + 1}</Badge>
+      <div className="qa-q__meta">
+        <p className="facts-list qa-q__facts">
+          <span>{upvotes(q.votes)}</span>
+          <span>Slide {q.index + 1}</span>
+          <span>{q.name ?? "Anonymous"}</span>
+        </p>
         {q.private && <Badge tone="warn">Private</Badge>}
-        {q.status === "keep" && <Badge>Kept</Badge>}
-        {dismissed && <Badge>Dismissed</Badge>}
-        {shared && <Badge tone="accent">Shared with students</Badge>}
-        <span>{upvotes(q.votes)}</span>
-        <span>{q.name ?? "Anonymous"}</span>
-      </p>
+        {q.status === "keep" && <StateChip tone="neutral" glyph="check">Kept</StateChip>}
+        {dismissed && <StateChip tone="wait">Dismissed</StateChip>}
+        {shared && (
+          <StateChip tone="in" glyph="eye">
+            Shared with students
+          </StateChip>
+        )}
+      </div>
       {q.answer !== null && !typing && (
-        <p className="qa-q__answer">
+        <p className={shared ? "answer qa-q__answer qa-q__answer--shared" : "answer qa-q__answer"}>
           <strong>Your answer:</strong> {q.answer}
         </p>
       )}
       {typing && (
         <form className="qa-q__editor" onSubmit={save}>
           <Field label="Your answer" hint={answerHint(q)}>
-            {(f) => <textarea {...f} rows={3} maxLength={ANSWER_MAX} value={text} onChange={(e) => setText(e.target.value)} />}
+            {(f) => <textarea {...f} className="textarea" rows={3} maxLength={ANSWER_MAX} value={text} onChange={(e) => setText(e.target.value)} />}
           </Field>
-          <div className="row">
+          <div className="qa-q__editor-acts">
             <Button type="submit" small busy={busy === "save"}>
               Save answer
             </Button>
-            <Button variant="secondary" small disabled={busy === "save"} onClick={() => setTyping(false)}>
+            <Button variant="plain" small disabled={busy === "save"} onClick={() => setTyping(false)}>
               Cancel
             </Button>
           </div>
@@ -104,27 +113,27 @@ export function Question({ q, open = false }: { q: Item; open?: boolean }) {
       )}
       <div className="qa-q__actions">
         {dismissed ? (
-          <Button variant="quiet" small busy={busy === "back"} onClick={() => mark("back", "new")}>
+          <Button variant="ghost" size="sm" busy={busy === "back"} onClick={() => mark("back", "new")}>
             Bring back
           </Button>
         ) : (
           <>
             {q.status !== "keep" && (
-              <Button variant="quiet" small busy={busy === "keep"} onClick={() => mark("keep", "keep")}>
+              <Button variant="ghost" size="sm" busy={busy === "keep"} onClick={() => mark("keep", "keep")}>
                 Keep
               </Button>
             )}
             {!typing && (
-              <Button variant="quiet" small onClick={edit}>
+              <Button variant="ghost" size="sm" onClick={edit}>
                 {q.answer === null ? "Type answer" : "Edit answer"}
               </Button>
             )}
             {q.answer !== null && !q.private && (
-              <Button variant="quiet" small busy={busy === "share"} onClick={() => void run("share", () => share({ question: q._id, shared: !shared }))}>
+              <Button variant="ghost" size="sm" busy={busy === "share"} onClick={() => void run("share", () => share({ question: q._id, shared: !shared }))}>
                 {shared ? "Stop sharing" : "Share the answer"}
               </Button>
             )}
-            <Button variant="quiet" small busy={busy === "dismiss"} onClick={() => mark("dismiss", "dismissed")}>
+            <Button variant="ghost" size="sm" busy={busy === "dismiss"} onClick={() => mark("dismiss", "dismissed")}>
               Dismiss
             </Button>
           </>
@@ -137,8 +146,9 @@ export function Question({ q, open = false }: { q: Item; open?: boolean }) {
 }
 
 // Delete asks first, in place, because it takes the question off every phone and can't be
-// undone. Cancel or Escape goes back. When the delete fails, the question stays open with the
-// error under it, so the professor can try again.
+// undone: the kit's confirm box rises where the buttons were, its question after the warning
+// glyph, Delete the one red fill. Cancel or Escape goes back. When the delete fails, the question
+// stays open with the error under it, so the professor can try again.
 function DeleteQuestion({ busy, onDelete }: { busy: boolean; onDelete: () => Promise<boolean> }) {
   const [asking, setAsking] = useState(false);
   const opener = useRef<HTMLButtonElement>(null);
@@ -156,27 +166,29 @@ function DeleteQuestion({ busy, onDelete }: { busy: boolean; onDelete: () => Pro
 
   if (!asking)
     return (
-      <Button ref={opener} variant="quiet" small onClick={() => show(true)}>
+      <Button ref={opener} variant="ghost" size="sm" className="btn--danger-quiet qa-q__delete" onClick={() => show(true)}>
         Delete
       </Button>
     );
   return (
-    <span
-      className="qa-q__confirm"
+    <div
+      className="confirm qa-q__confirm"
       role="group"
       aria-label="Delete this question"
       onKeyDown={(e) => {
         if (e.key === "Escape" && !busy) show(false);
       }}
     >
-      <span className="qa-q__ask">Delete this question from every phone?</span>
-      <Button variant="danger" small busy={busy} onClick={() => void onDelete()}>
-        Delete
-      </Button>
-      <Button ref={cancel} variant="secondary" small disabled={busy} onClick={() => show(false)}>
-        Cancel
-      </Button>
-    </span>
+      <p className="confirm__question">Delete this question from every phone?</p>
+      <div className="confirm__actions">
+        <Button variant="danger" small busy={busy} onClick={() => void onDelete()}>
+          Delete
+        </Button>
+        <Button ref={cancel} variant="secondary" small disabled={busy} onClick={() => show(false)}>
+          Cancel
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -237,15 +249,18 @@ export default function QA() {
   }
 
   return (
-    <div className="host-grid">
-      <Card title="Questions from students">
-        <div className="row">
-          <label className="host-switch">
-            <input type="checkbox" checked={sorted} disabled={busy} onChange={(e) => void toggle(e.target.checked)} />
-            <span className="host-switch__track" />
-            Group by topic with AI
-          </label>
-          {busy && <span className="muted">Grouping…</span>}
+    <div className="desk host-desk">
+      <section className="hcard qa">
+        <div className="hline host-head">
+          <h2 className="hline__t">Questions from students</h2>
+          <div className="hline__end qa__group">
+            {busy && <span className="muted">Grouping…</span>}
+            <label className="host-switch">
+              <input type="checkbox" checked={sorted} disabled={busy} onChange={(e) => void toggle(e.target.checked)} />
+              <span className="host-switch__track" />
+              Group by topic with AI
+            </label>
+          </div>
         </div>
         {error && <Status kind="error">{error}</Status>}
         {items === undefined ? (
@@ -262,7 +277,8 @@ export default function QA() {
           grouped(items).map((t) => (
             <section key={t.key} className="qa-topic">
               <h3>
-                {t.topic} <Badge>{t.count}</Badge>
+                {t.topic}
+                <span className="headn">{t.count}</span>
               </h3>
               {t.groups.map((g) => (
                 <div key={g.key} className="qa-cluster">
@@ -277,10 +293,11 @@ export default function QA() {
             </section>
           ))
         )}
-      </Card>
-      <Card title="Shared with students">
+      </section>
+      <section className="host-side host-sec qa-shared">
+        <h2>Shared with students</h2>
         <Shared items={items} />
-      </Card>
+      </section>
     </div>
   );
 }
@@ -292,7 +309,7 @@ function Shared({ items }: { items: Item[] | undefined }) {
   const shared = items.filter((q) => q.shared && !q.private);
   if (shared.length === 0) return <Status kind="empty">No answers shared yet.</Status>;
   return (
-    <ul className="list">
+    <ul className="qa-shared__list">
       {shared.map((q) => (
         <li key={q._id}>
           <p className="qa-shared__q">{q.text}</p>

@@ -1,10 +1,12 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { CHANNEL } from "../../blocks/deck";
+import { TeamChip as KitTeamChip } from "../../blocks/kit";
 
-// A team from live.groups (describe(): { team, color, label }) as a colored dot and its label.
+// A team from live.groups (describe(): { team, color, label }) as the kit's team chip: the one 16
+// color square and its written name, the same part the phone and the stage draw.
 export function TeamChip({ color, label }: { color: string; label: string }) {
-  return <span className={"team-chip group--" + color}>{label}</span>;
+  return <KitTeamChip color={color} label={label} />;
 }
 
 // What an empty list on the Now and Points tabs says between classes (after End class or the

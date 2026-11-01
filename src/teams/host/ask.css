@@ -1,50 +1,79 @@
-/* The Now tab's "Ask the room" (AskRoom.tsx) and "Who got it wrong" (Missing.tsx) cards. Colors,
-   space and type come from the tokens in src/styles/tokens.css; buttons, badges, fields, the
-   Quiz/Vote switch and the numbers are the kit's (src/blocks/kit.tsx). host.css styles the cards
-   around these (and its `.host-root h3` margin), so the heading rules here name their parent too. */
+/* The Now tab: "Ask the room" (AskRoom.tsx), the tab's focal card (the kit's .hcard), and "Who
+   got it wrong" (Missing.tsx), its aside. Colors, space and type are the tokens in
+   src/styles/tokens.css; the card, heading row, hero count, bars, buttons, fields and tables are
+   the kit's (src/styles/kit.css), and this sheet places them. */
 
-/* The question in this class now */
-.ask-poll { display: flex; flex-direction: column; gap: var(--rcc-space-3); margin-bottom: var(--rcc-space-4); }
-.ask-poll > .ask-poll__q { margin: 0; overflow-wrap: anywhere; }
+/* ------------------------------------------------------------ Ask the room */
+/* The empty card: its sentence in --text at the card-title size, under the heading row. */
+.ask > .status--empty { padding-block: 0; font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.4; color: var(--text); }
+.ask > .status--error { margin-block: 0; }
+/* Loading: the step named, then three still blocks where the question will be. */
+.ask__load { display: grid; gap: var(--s2); }
+.ask__load > .status { padding-block: 0; }
+.ask__load .skel-lines { font-size: var(--t-body); }
 
-/* One bar per choice: the letter, the choice and its count, with the bar under them. */
-.ask-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--rcc-space-3); }
-.ask-bar {
-  display: grid;
-  grid-template-columns: 1.75rem minmax(0, 1fr) auto;
-  grid-template-areas: "letter text n" ". track track";
-  column-gap: var(--rcc-space-2);
-  row-gap: var(--rcc-space-1);
-  align-items: baseline;
-}
-.ask-bar__letter { grid-area: letter; }
-.ask-bar__text { grid-area: text; overflow-wrap: anywhere; }
-.ask-bar__n { grid-area: n; font-variant-numeric: tabular-nums lining-nums; font-weight: var(--rcc-weight-strong); }
-.ask-bar__track { grid-area: track; display: block; height: 0.625rem; border-radius: var(--rcc-radius-full); background: var(--fill); overflow: hidden; }
-.ask-bar__fill { display: block; height: 100%; border-radius: var(--rcc-radius-full); background: var(--muted); transition: width var(--rcc-dur-default-spatial) var(--rcc-ease-standard); }
-.ask-bar--right .ask-bar__fill { background: var(--accent); }
-.ask-bar--right .ask-bar__text { font-weight: var(--rcc-weight-strong); }
-.ask-bar__mark { color: var(--accent); }
+/* The hero slot: one number at --n-hero on the words' baseline, the same slot open and ended. */
+.ask__tally { margin: 0; }
+.ask__tally > .tally__line { margin: 0; }
+/* The question: the kit's question role (24 / 700). */
+.ask-poll__q { margin: 0; font-size: var(--t-h2); font-weight: var(--w-loud); line-height: 1.25; letter-spacing: 0; text-wrap: balance;
+  overflow-wrap: anywhere; }
 
-/* Answered of checked in, then % right and the median time once it has ended. */
-.ask-stats { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--rcc-space-3) var(--rcc-space-8); }
+/* The bars: the kit's ruled chart on the card (letter, words over the track, count then %). */
+.ask-bars { list-style: none; margin: 0; padding: 0; }
+.ask-bar__text { min-width: 0; overflow-wrap: anywhere; }
+/* "top pick" on a vote: plain words on the label line; green stays on a quiz's right answer. */
+.ask-bar__top { color: var(--text); }
 
-/* The question being written */
-.ask-form { display: flex; flex-direction: column; gap: var(--rcc-space-3); }
+/* -------------------------------------------------------- the question form */
+.ask-form { display: grid; gap: var(--s3); align-content: start; }
 .ask-form > .field { margin-bottom: 0; }
-.ask-form__top > .seg-field { margin-bottom: 0; }
-.ask-form__rule { margin: 0; font-size: var(--fs-small); line-height: var(--lh-small); }
+/* Quiz or Vote, the rule it sets, and the draft's facts, on one line. */
+.ask-form__top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s5); }
+.ask-form__top > .seg-field { margin: 0; }
+.ask-form__facts { margin: 0 0 0 auto; font-size: var(--t-small); color: var(--muted); }
+.ask-form__rule { display: flex; align-items: flex-start; gap: var(--s2); margin: 0; font-size: var(--t-small); line-height: var(--lh-small); color: var(--muted); }
+.ask-form__rule > .icon { width: 1.1em; height: 1.1em; margin-top: .25em; }
+/* The question field reads as the card's subject: the card-title size. */
+.ask-form__ask { min-height: 48px; font-size: var(--t-h3); font-weight: var(--w-head); }
 
-/* Choices: the letter, the box and, on a quiz, the "Right answer" column. */
-.ask-choices { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) 7.5rem; column-gap: var(--rcc-space-3); row-gap: var(--rcc-space-2); align-items: center; }
-.ask-choices--vote { grid-template-columns: 1.75rem minmax(0, 1fr); }
-.ask-choices__head { font-size: var(--fs-label); line-height: var(--lh-label); font-weight: var(--rcc-weight-strong); color: var(--muted); }
-.ask-choices__head--right, .ask-choices__letter { text-align: center; }
-.ask-choices__right { justify-content: center; }
+/* Choices: the letter tile, the field and one 112 "Right answer" column of radios, which ends with
+   "No right answer" as its fifth row. */
+.ask-choices { display: grid; grid-template-columns: 44px minmax(0, 1fr) 112px; column-gap: var(--s3); row-gap: var(--s2); align-items: center; }
+.ask-choices--vote { grid-template-columns: 44px minmax(0, 1fr); }
+.ask-choices__head { align-self: end; font-size: var(--t-label); line-height: var(--lh-label); font-weight: var(--w-head); color: var(--text); }
+.ask-choices__head--right { font-size: var(--t-small); color: var(--muted); text-align: center; }
+/* Letter tiles inside the raised card step up on --on-raised; the right answer's fills green. */
+.ask-choices__letter { background: var(--on-raised); }
+.ask-choices__letter.is-right { background: var(--accent); color: var(--on-accent); }
+.ask-choices__right { justify-content: center; margin: 0; }
+.ask-choices__none { grid-column: 2 / -1; display: grid; grid-template-columns: minmax(0, 1fr) 112px; column-gap: var(--s3); align-items: center;
+  min-height: var(--tap); margin: 0; padding-top: var(--s2); border-top: 1px solid var(--line); font-size: var(--t-body); font-weight: var(--w-head);
+  cursor: pointer; }
+.ask-choices__none > span { text-align: end; }
+.ask-choices__none > .radio { justify-self: center; }
 
-/* Who got it wrong */
-.ask-missing__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--rcc-space-3); }
-.ask-missing__head > .ask-missing__q { margin: 0; overflow-wrap: anywhere; }
-.ask-missing__sum { margin: var(--rcc-space-1) 0 var(--rcc-space-3); font-size: var(--fs-small); line-height: var(--lh-small); }
-.ask-missing__ai { margin-top: var(--rcc-space-3); }
-.ask-note { white-space: pre-wrap; margin: var(--rcc-space-3) 0 0; padding: var(--rcc-space-3) var(--rcc-space-4); border-radius: var(--rcc-radius-md); background: var(--fill); color: var(--text); }
+.ask-form__acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+/* A new question with none in the class yet: Ask the room and Cancel sit in the heading row's
+   empty action slot, where Draft with AI was, so they show at 1280 x 800 without a scroll. They
+   stay last in the form, after its fields, for the keyboard. */
+@media (min-width: 720px) {
+  .ask--draft { position: relative; }
+  .ask--draft .ask-form__acts { position: absolute; top: var(--s6); right: var(--s8); }
+}
+
+/* ------------------------------------------------------ Who got it wrong */
+.ask-wrong__q { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--s3); font-size: var(--t-body); font-weight: var(--w-head); line-height: 1.4;
+  overflow-wrap: anywhere; }
+.ask-wrong__sum { font-size: var(--t-body); line-height: 1.5; color: var(--muted); }
+/* The well before anyone is listed: the table's head over one row with the line that says why. */
+.ask-wrong__wait { --rcols: 34% 33% minmax(0, 1fr); }
+.ask-wrong__wait > .ruled__row--empty { display: block; padding-block: var(--s2); }
+.ask-wrong__wait .status { padding-block: 0; font-size: var(--t-body); line-height: 1.5; }
+/* The table in its well, columns fixed to the aside: a long name ends in an ellipsis. */
+.ask-wrong__table { table-layout: fixed; }
+.ask-wrong__table th:first-child { width: 34%; }
+.ask-wrong__table th:nth-child(2) { width: 33%; }
+.ask-wrong__table td { overflow: hidden; text-overflow: ellipsis; font-size: var(--t-body); }
+/* The AI's note: the kit's answer well, under the table. */
+.ask-note { margin: 0; font-size: var(--t-body); line-height: 1.5; white-space: pre-wrap; }

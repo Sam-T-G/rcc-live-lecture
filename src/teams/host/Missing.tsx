@@ -1,13 +1,16 @@
-// The Now tab's "Who got it wrong" card, on Check-in's polls (checkin.quiz.missing): the newest quiz
-// with a right answer in this class, and each student who picked a wrong choice, with their team and
-// their pick. "Ask the AI" gets 2 or 3 sentences on which wrong choice most people picked and what
-// to explain again (checkin.quiz.feedback); no names go to the AI. It shows only once someone got
-// it wrong: with no wrong choice picked, the AI would name one nobody picked.
-import { useState } from "react";
+// The Now tab's "Who got it wrong" section, on Check-in's polls (checkin.quiz.missing): the newest
+// quiz with a right answer in this class, and each student who picked a wrong choice, with their
+// team and their pick. "Ask the AI" gets 2 or 3 sentences on which wrong choice most people picked
+// and what to explain again (checkin.quiz.feedback); no names go to the AI. It shows only once
+// someone got it wrong: with no wrong choice picked, the AI would name one nobody picked.
+//   It is the tab's aside: flat on the page beside the Ask the room card, the table in its sunken
+// well. Before there is anyone to list, the well holds the table's head over one line that says
+// why, so the slot reads as the table it becomes and ends at its content.
+import { useState, type ReactNode } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Card, Status } from "../../blocks/ui";
-import { Badge, Button } from "../../blocks/kit";
+import { Status } from "../../blocks/ui";
+import { Button } from "../../blocks/kit";
 import { CHANNEL } from "../../blocks/deck";
 import { TeamChip, errorText } from "./Team";
 import "./ask.css";
@@ -37,56 +40,82 @@ export function Missing() {
     }
   }
 
+  const wrong = data?.kind === "quiz" ? data.wrong : [];
   return (
-    <Card title="Who got it wrong">
-      {data === undefined && <Status kind="loading">Loading the answers...</Status>}
-      {data === null && <Status kind="empty">No quiz with a right answer yet.</Status>}
-      {data?.kind === "vote" && <Status kind="empty">“{data.question}” is a vote, so it has no right answer.</Status>}
+    <section className="host-side host-sec ask-wrong">
+      <div className="host-sec__head">
+        <h2>Who got it wrong</h2>
+        {wrong.length > 0 && (
+          <Button variant="outline" busy={asking} onClick={askAI}>
+            Ask the AI
+          </Button>
+        )}
+      </div>
+      {data === undefined && (
+        <Waiting>
+          <Status kind="loading">Loading the answers...</Status>
+        </Waiting>
+      )}
+      {data === null && (
+        <Waiting>
+          <Status kind="empty">No quiz with a right answer yet.</Status>
+        </Waiting>
+      )}
+      {data?.kind === "vote" && (
+        <Waiting>
+          <Status kind="empty">“{data.question}” is a vote, so it has no right answer.</Status>
+        </Waiting>
+      )}
       {data?.kind === "quiz" && (
         <>
-          <div className="ask-missing__head">
-            <h3 className="ask-missing__q">{data.question}</h3>
-            <Badge tone={data.open ? "live" : "neutral"}>{data.open ? "Open" : "Ended"}</Badge>
-          </div>
-          <p className="muted ask-missing__sum">
+          <p className="ask-wrong__q">
+            <span>{data.question}</span> <span className={data.open ? "stateword stateword--open" : "stateword stateword--ended"}>{data.open ? "Open" : "Ended"}</span>
+          </p>
+          <p className="ask-wrong__sum">
             {data.answered} answered{data.wrong.length > 0 && `, ${data.wrong.length} wrong`}. Right answer: {data.choices[data.correct]}.
           </p>
           {data.wrong.length === 0 ? (
-            <Status kind="empty">Nobody got it wrong yet.</Status>
+            <Waiting>
+              <Status kind="empty">Nobody got it wrong yet.</Status>
+            </Waiting>
           ) : (
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Team</th>
-                    <th>Picked</th>
+            <table className="table ask-wrong__table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Team</th>
+                  <th>Picked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.wrong.map((w, i) => (
+                  <tr key={i}>
+                    <td>{w.name}</td>
+                    <td>{w.team ? <TeamChip color={w.team.color} label={w.team.label} /> : <span className="muted">No team</span>}</td>
+                    <td>{w.picked}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {data.wrong.map((w, i) => (
-                    <tr key={i}>
-                      <td>{w.name}</td>
-                      <td>{w.team ? <TeamChip color={w.team.color} label={w.team.label} /> : <span className="muted">No team</span>}</td>
-                      <td>{w.picked}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           )}
-          {data.wrong.length > 0 && (
-            <>
-              <div className="row ask-missing__ai">
-                <Button variant="secondary" small busy={asking} onClick={askAI}>
-                  Ask the AI
-                </Button>
-              </div>
-              {note && (note.failed ? <Status kind="error">{note.text}</Status> : <p className="ask-note">{note.text}</p>)}
-            </>
-          )}
+          {note && (note.failed ? <Status kind="error">{note.text}</Status> : <p className="answer ask-note">{note.text}</p>)}
         </>
       )}
-    </Card>
+    </section>
+  );
+}
+
+// The table's well before there is anyone to list: its head (Name, Team, Picked) over one row
+// holding the line that says why, so the slot keeps the table's shape and ends at its content.
+function Waiting({ children }: { children: ReactNode }) {
+  return (
+    <div className="ruled ruled--well ask-wrong__wait">
+      <div className="ruled__head" aria-hidden="true">
+        <span>Name</span>
+        <span>Team</span>
+        <span>Picked</span>
+      </div>
+      <div className="ruled__row ruled__row--empty">{children}</div>
+    </div>
   );
 }
