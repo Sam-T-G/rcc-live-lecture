@@ -344,7 +344,7 @@ describe("dev seed", () => {
     const t = setup();
     await expect(fill(t)).rejects.toThrow(
       "dev/seed:fill adds made-up students, so it runs only on the dev backends in DEV_HOSTS, and brave-otter-456.convex.cloud isn't one, so it added nothing. " +
-        "If it's your own dev backend (never prod), add its host to DEV_HOSTS in convex/checkin/prof.ts and in convex/auth.config.ts (README step 5).",
+        "If it's your own dev backend (never prod), add its host to DEV_HOSTS in convex/checkin/prof.ts and in convex/auth.config.ts (README step 4).",
     );
   });
 

@@ -42,7 +42,7 @@ Professors and admins on the staff list, through `<StaffGate>` (`src/teams/check
 - Shows names and emails: the Points tab's student list and the extra credit CSV (class end time, name, email, team, place, team points, extra credit). The CSV is for the instructor of record; never commit one.
 - Sends to Gemini: the slide text (draft a quiz), the quiz, its choices, counts and team labels ("Ask the AI"), and the texts of questions that aren't dismissed, private ones too ("Group by topic with AI"). Never a name or email.
 - The old professor view's tables (`quizQuestions`, `answers`, `hostRooms`, `pointEvents`, `studentQuestions`) stay defined in `convex/schema.ts` for prod's rows; nothing reads or writes them.
-- On your own dev backend these tables start empty: fill them with `npx convex run dev/seed:fill '{"channel":"gdg"}'` after adding your deployment's host to `DEV_HOSTS` in `convex/checkin/prof.ts` and `convex/auth.config.ts` (README step 5).
+- On your own dev backend these tables start empty: fill them with `npx convex run dev/seed:fill '{"channel":"gdg"}'` after adding your deployment's host to `DEV_HOSTS` in `convex/checkin/prof.ts` and `convex/auth.config.ts` (README step 4).
 
 ## Tests
 

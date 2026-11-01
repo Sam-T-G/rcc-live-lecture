@@ -120,7 +120,7 @@ const shown = useQuery(api.deck.slides, { channel: CHANNEL });   // [{ index, be
 
 `index` is 0-based. Use `slide.index` as the key for anything per slide (questions, "I'm lost"). `api.deck.current` (what `useDeckSlide` reads) is the slide the deck is on; `api.deck.slides` is every slide the deck has shown in this class, each at its fullest press, so a phone can page back but never ahead (#/live and #/portal do; `src/teams/live/Page.tsx` has the follow rule). Both return only this class's rows: before the deck's first press in a class, and after End class, `current` is null and `slides` is empty, so a page shows its waiting line instead of last class's slide. When a second deck tab starts sending mid-class, `slides` lists only that tab's slides. The iOS app decodes both answers field by field, so never add, rename or remove a field (docs/contracts.md).
 
-**Reading, on the server:** call the same rule `convex/deck.ts` uses, never a bare read of `deckChannels` or `deckSlides`. Their rows are replaced on every press and keep the first press's `_creationTime`, so compare each row's `at` with the class window's start (`lectureWindow`, below), the way `current` and `slides` do. `convex/live/lost.ts` (`shownThisClass`) checks that a slide index was shown in this class this way.
+**Reading, on the server:** call the same rule `convex/deck.ts` uses, never a bare read of `deckChannels` or `deckSlides`. Their rows are replaced on every press and keep the first press's `_creationTime`, so keep a row only when its `at` is at or after `deckFrom(ctx, channel)` from `convex/lib.ts` (or `slidesFrom(lecture)` in a mutation that already has the class), the cutoff `current` and `slides` use. It differs from `lectureWindow`'s `start` (below): before a channel's first class it is 12 hours ago, after a class ends it is the time it ended, and in a class with a saved start it also drops presses made before the start was saved, unless they come within 45 minutes of that start. `shownThisClass` in `convex/live/lost.ts` and `convex/live/questions.ts` checks that a slide index was shown in this class this way.
 
 ## Classes
 
@@ -275,7 +275,7 @@ Module-only styles go in the module's folder (`src/teams/<team>/*.css`), built f
 
 ## Shared data between teams
 
-Every table, who writes and reads it, and the functions one module calls in another: [docs/contracts.md](docs/contracts.md). Sample data for your own backend: `npx convex run dev/seed:fill '{"channel":"gdg"}'` (and `dev/seed:clear`). fill runs only on the dev backends in `DEV_HOSTS`, so first add your deployment's host to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 5), which also turns on typed test sign-ins and test roles there. The lecture's channel is `CHANNEL` from `src/blocks/deck.ts`.
+Every table, who writes and reads it, and the functions one module calls in another: [docs/contracts.md](docs/contracts.md). Sample data for your own backend: `npx convex run dev/seed:fill '{"channel":"gdg"}'` (and `dev/seed:clear`). fill runs only on the dev backends in `DEV_HOSTS`, so first add your deployment's host to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 4), which also turns on typed test sign-ins and test roles there. The lecture's channel is `CHANNEL` from `src/blocks/deck.ts`.
 
 ## Tests
 

@@ -17,7 +17,7 @@ What the professor and Sam do on a day the app runs in class, on the live site <
    https://sam-t-g.github.io/rcc-live-lecture/#/checkin/stage?deck=<the deck's address>&bridge=gdg.<DECK_BRIDGE_KEY>
    ```
 
-   Sam sends the bridge key privately. Paste the link in a tab the room can't see: the stage saves the key in that tab and the address bar shows `?bridge=saved` from then on. A new tab needs the link with the key again; without it the stage says "Phones aren't getting these slides." Use the browser's own full screen. Anyone with the key can send slide text to every phone, so never show it, the link or a terminal with it on the projector.
+   Sam sends the bridge key privately. Paste the link in a tab the room can't see: the stage saves the key in that tab and the address bar shows `?bridge=saved` from then on. A new tab needs the full link with the key again: a link that says `?bridge=saved`, opened in a new tab, shows "Phones aren't getting these slides.", and a link with no `?bridge=` at all sends the phones nothing and shows no warning. Use the browser's own full screen. Anyone with the key can send slide text to every phone, so never show it, the link or a terminal with it on the projector.
 3. **Door iPad:** open #/checkin/kiosk and tap Start check-in.
 4. **Students:** the QR on the stage opens #/checkin/student. They sign in with Google and hold up the pass at the door or the lectern.
 
@@ -26,7 +26,7 @@ What the professor and Sam do on a day the app runs in class, on the live site <
 - **Slides:** the arrow keys in the stage move the deck and every phone. Students on #/live or #/portal can page back without moving the projector.
 - **Scanning:** the door iPad scans passes; the laptop on #/checkin/teacher scans too (Start scanning), or the professor types the code from a student's phone. A wrong check-in has a Remove button on the teacher page.
 - **#/host** has three tabs. **Now:** ask the room (write a question or let the AI draft one from the slide), end it to show the results, then "Who got it wrong" with an AI note. **Points:** teams of 3 or 4, bonuses and deductions with a reason, Undo. **Questions:** students' questions, sorted by upvotes; type an answer, share it, or group them by topic with AI.
-- **What stays private:** emails and full names show only on the professor's laptop (#/host, #/checkin/teacher). The projector shows first names at most (the late banner) and team colors, never emails. Keep #/host and the teacher page off the projector.
+- **What stays private:** emails and full names show only on the professor's laptop (#/host, #/checkin/teacher). The projector shows first names at most (the late banner) and team colors, never emails. The door iPad shows each scanned student's name (the name they signed in with) for 3 seconds after the scan, never the email, so everyone at the door can read it. Keep #/host and the teacher page off the projector.
 
 ## Ending class
 

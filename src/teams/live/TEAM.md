@@ -14,7 +14,7 @@ The agent reads this before every change. Where it disagrees with the Status sec
 - End class (#/host Points or #/checkin/teacher) saves each student's extra credit and ends the class. The professor downloads it as a CSV.
 - Past quizzes and votes: once the professor ends one, the student sees the question, the counts, the right answer (quizzes) and their own pick.
 
-**Not doing:** showing who answered what or who tapped I'm lost: every board shows counts and totals only.
+**Not doing:** showing students or shared screens who answered what, or showing anyone who tapped I'm lost: phones and the projector show counts and totals only, and the professor sees I'm lost as counts too. Professors do see each student's answers: "Who got it wrong" on #/host Now lists each student who picked a wrong choice, with their pick, and the roster (`live.groups.roster`) lists each student's right answers and points.
 
 ## What it sees
 

@@ -54,7 +54,7 @@ Professor view doesn't run. Check-in adds the count of who's here to its kiosk (
 |---|---|
 | Google sign-in says the origin isn't allowed | The origin is missing from the OAuth client (Sam's checklist). Until it's fixed, build the screens signed out; the deploy uses `https://sam-t-g.github.io`. |
 | A team's page shows no slide | Is the deck open with `&bridge-site=` naming that lead's deployment? Is the key the same? Press an arrow key once. |
-| Professor view shows zeros | Expected on a lead's own backend before the merge: `npx convex run dev/seed:fill '{"channel":"gdg"}'`. If fill says the host isn't in `DEV_HOSTS`, add it to both `DEV_HOSTS` lists first (README step 5). |
+| Professor view shows zeros | Expected on a lead's own backend before the merge: `npx convex run dev/seed:fill '{"channel":"gdg"}'`. If fill says the host isn't in `DEV_HOSTS`, add it to both `DEV_HOSTS` lists first (README step 4). |
 | `/freeze` stops on a conflict | Usually `convex/schema.ts` or `src/index.css`. Keep both teams' lines, build, push. |
 | `scripts/deploy.sh` fails | Read the first error. If it's one team's code, revert that team's last commit on main and deploy again; demo that team from its laptop. |
 | No time to deploy | Demo each team from its lead's laptop. Phones can't reach a laptop, so the phone parts show on the laptop screen. |

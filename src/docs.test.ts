@@ -7,7 +7,7 @@
 // "Current" docs describe the app as it is and are checked for routes, functions and retired
 // words. "History" docs (the 10-29 meeting and its handoffs) start with a "> **History." line
 // and are only checked for what must never be in any doc: secrets printed, members' names.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { pages } from "./pages/index";
 
@@ -239,5 +239,89 @@ describe("docs: README, direction, runbook, commands, history", () => {
     const teamsReadme = read("src/teams/README.md");
     expect(teamsReadme).toContain("src/portal/");
     expect(teamsReadme).toContain("ios/");
+  });
+});
+
+describe("docs: the 2026-10-31 docs fix check", () => {
+  const blocks = read("BLOCKS.md");
+  const contracts = read("docs/contracts.md");
+
+  it("sweep1-docs-fixcheck-1 deck rows are read with lib.deckFrom/slidesFrom, not lectureWindow's start", () => {
+    const rule = blocks.split("\n").find((l) => l.startsWith("**Reading, on the server:**")) ?? "";
+    expect(rule).toContain("deckFrom(ctx, channel)");
+    expect(rule).toContain("slidesFrom(lecture)");
+    expect(rule).not.toMatch(/`at` with the class window's start \(`lectureWindow`/);
+    const perClass = contracts.split("\n").find((l) => l.includes("every per-class read")) ?? "";
+    expect(perClass).toContain("deckFrom");
+  });
+
+  it("sweep1-docs-fixcheck-2 every 'README step N' points at the step it means", () => {
+    const readme = read("README.md");
+    const setup = readme.slice(readme.indexOf("## Set up a laptop"));
+    const step = (n: string) => setup.split("\n").find((l) => l.startsWith(`${n}. `)) ?? "";
+    const files = ["BLOCKS.md", "docs/contracts.md", "src/teams/host/TEAM.md", "docs/meeting-1029.md", "convex/dev/seed.ts", "convex/dev/seed.test.ts", "convex/checkin/prof.ts"];
+    let seen = 0;
+    for (const path of files)
+      for (const m of doc(path).matchAll(/README step\s+(\d+)/g)) {
+        seen++;
+        const before = doc(path).slice(Math.max(0, m.index - 300), m.index);
+        const about = before.includes("DEV_HOSTS") ? "DEV_HOSTS" : "npx convex dev";
+        expect([path, m[0], step(m[1]).includes(about)]).toEqual([path, m[0], true]);
+      }
+    expect(seen).toBeGreaterThan(5);
+  });
+
+  it("sweep1-docs-fixcheck-3 each table's row names every convex file that queries it (dev/seed aside)", () => {
+    const rows = contracts.split("\n");
+    const files = (dir: string): string[] =>
+      readdirSync(new URL(dir, root), { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? (e.name === "_generated" || e.name === "dev" ? [] : files(`${dir}${e.name}/`)) : [`${dir}${e.name}`],
+      );
+    for (const file of files("convex/").filter((f) => f.endsWith(".ts") && !f.includes(".test.") && !f.includes("test.helpers"))) {
+      const rel = file.slice("convex/".length, -".ts".length);
+      const base = rel.split("/").pop() ?? rel;
+      for (const m of read(file).matchAll(/\.query\("(\w+)"\)/g)) {
+        const row = rows.find((l) => l.startsWith(`| \`${m[1]}\``)) ?? "";
+        const named = row.includes(`${rel}.ts`) || row.includes(rel.replace(/\//g, ".")) || row.includes(`\`${base}.ts\``);
+        expect([m[1], rel, named]).toEqual([m[1], rel, true]);
+      }
+    }
+  });
+
+  it("sweep1-docs-fixcheck-4 AGENTS.md says the old key env vars are removed by hand, not by importHostEmails", () => {
+    const line = lines("AGENTS.md").find((l) => /removes the `PROFESSOR[_]KEY`/.test(l)) ?? "";
+    expect(line).not.toContain("(importHostEmails)");
+    expect(line).toMatch(/by hand/);
+  });
+
+  it('sweep1-docs-fixcheck-5 every "End the ..." button a current doc quotes is on a screen', () => {
+    const screens = ["src/teams/host/AskRoom.tsx", "src/teams/checkin/Quiz.tsx"].map(read).join("\n");
+    for (const path of CURRENT)
+      for (const m of doc(path).matchAll(/"(End the \w+)"/g)) expect([path, m[1], screens.includes(m[1])]).toEqual([path, m[1], true]);
+  });
+
+  it("sweep1-docs-fixcheck-6 Live's 'Not doing' line leaves professors' per-student views in", () => {
+    const line = lines("src/teams/live/TEAM.md").find((l) => l.startsWith("**Not doing:**")) ?? "";
+    expect(line).not.toMatch(/every board shows counts and totals only/);
+    expect(line).toContain("Who got it wrong");
+    expect(line).toContain("roster");
+  });
+
+  it("sweep1-docs-fixcheck-7 the privacy rules name the door iPad, which shows the scanned student's name", () => {
+    const rules = [
+      ["docs/runbook.md", "**What stays private:**"],
+      ["AGENTS.md", "Who sees names:"],
+      ["docs/contracts.md", "**Privacy:**"],
+    ];
+    for (const [path, start] of rules) {
+      const line = lines(path).find((l) => l.includes(start)) ?? "";
+      expect([path, line.includes("door iPad")]).toEqual([path, true]);
+    }
+  });
+
+  it("sweep1-docs-check-1 the runbook says a stage link with no ?bridge= sends nothing and shows no warning", () => {
+    const line = lines("docs/runbook.md").find((l) => l.includes("Phones aren't getting these slides.")) ?? "";
+    expect(line).toContain("?bridge=saved");
+    expect(line).toMatch(/no `\?bridge=`[^.]*no warning/);
   });
 });

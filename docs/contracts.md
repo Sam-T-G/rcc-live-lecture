@@ -2,7 +2,7 @@
 
 The app is one Convex backend shared by three modules: Check-in (`convex/checkin/`, `src/teams/checkin/`), Live slides (`convex/live/`, `src/teams/live/`) and Professor view (`src/teams/host/`, which reads and writes through the other two and has no tables or server code of its own). The shared blocks (deck, access, classes, lab) own the rest. This file lists every table in `convex/schema.ts`, who writes and reads it, the functions one module calls in another, and the answers other clients decode. Each function's full spec (args, what it returns, its refusals) is in the header comment of its file.
 
-Every class runs on one deck channel, `"gdg"`: use `CHANNEL` from `src/blocks/deck.ts`. A row belongs to the class whose window holds its `_creationTime`, so every per-class read starts at `lectureWindow`'s `start` (BLOCKS.md, "Classes").
+Every class runs on one deck channel, `"gdg"`: use `CHANNEL` from `src/blocks/deck.ts`. A row belongs to the class whose window holds its `_creationTime`, so every per-class read starts at `lectureWindow`'s `start` (BLOCKS.md, "Classes"). The exception is `deckChannels` and `deckSlides`: their rows keep the first press's `_creationTime`, so a read keeps a row whose `at` is at or after `lib.deckFrom(ctx, channel)` (or `lib.slidesFrom(lecture)` in a mutation), the cutoff `deck.current`, `deck.slides` and `shownThisClass` in `live/lost.ts` and `live/questions.ts` use (BLOCKS.md, "Deck bridge").
 
 ## Tables
 
@@ -16,10 +16,10 @@ Every class runs on one deck channel, `"gdg"`: use `CHANNEL` from `src/blocks/de
 | `devices` | access | `staff.approvePairing`, `staff.unpair`; `checkin.pass.scan` (last used) | `requireScanner` in `checkin/prof.ts`; `staff.devices` |
 | `pairings` | access | `staff.requestPairing`, `approvePairing`, `dropPairing` | `staff.deviceStatus` |
 | `kiosks` | Check-in | nothing: unused since the student passes replaced the kiosk QR; kept because prod may hold rows | nothing |
-| `checkins` | Check-in | `checkin.pass.scan`; `checkin.attendance.removeCheckin` deletes one | `checkin/read.ts`, `attendance.ts`, `pass.ts`, `quiz.ts`; `lib.checkedIn`; `live/groups.ts` (who is on a team); `live/questions.ts` (the name on a post by name) |
+| `checkins` | Check-in | `checkin.pass.scan`; `checkin.attendance.removeCheckin` deletes one | `checkin/read.ts`, `attendance.ts`, `pass.ts`, `quiz.ts`; `lib.checkedIn`; `live/groups.ts` (who is on a team); `live/questions.ts` (the name on a post by name); `live/read.ts` (`lostCount` and `lostBySlide` count only checked-in students) |
 | `passes` | Check-in | `checkin.pass.refresh`, `scan`; `checkin.attendance.setHideLate` | `checkin/pass.ts`; `checkin.attendance.lateFeed` (who turned the banner off) |
 | `classStarts` | Check-in | `checkin.attendance.setClassStart` | `lib.lectureWindow` only before a channel's first class; `lateFeed` (when the start was saved) |
-| `lectures` | classes block | `lib.ensureLecture`, `lib.endLecture`, `lectures.close`, `lectures.endEarlier`; `setClassStart` (start and grace) | `lib.lectureWindow`, so every per-class read; `checkin.attendance.sheet` and `lectures` (past classes) |
+| `lectures` | classes block | `lib.ensureLecture`, `lib.endLecture`, `lectures.close`, `lectures.endEarlier`; `setClassStart` (start and grace) | `lib.lectureWindow`, so every per-class read; `lib.deckFrom` (the deck's cutoff); `checkin/pass.ts` (the channels of the last 20 classes, so a page that sends another channel can't rename a checked-in student); `checkin.attendance.sheet` and `lectures` (past classes) |
 | `polls` | Check-in | `checkin.quiz.ask`, `end`; `checkin.attendance.removeCheckin` recounts an ended one | `checkin/quiz.ts`; `live.past.past`; `live/groups.ts` (scores) |
 | `pollAnswers` | Check-in | `checkin.quiz.answer`; `checkin.attendance.removeCheckin` deletes that student's answers in the class | `checkin/quiz.ts` (`stats`, `missing`); `live.past.past` (the caller's own pick); `live/groups.ts` (right answers) |
 | `lost` | Live slides | `live.lost.toggle` | `live/read.ts`: `lostCount`, `lostBySlide`, `mine` (#/host header, #/live) |
@@ -83,11 +83,11 @@ Shared screen code:
 - **Keep these working.** The module that owns a table owns the functions above that read it. Add fields freely; before renaming or removing one, change every reader in the same commit.
 - **iOS decodes three answers field by field:** `deck.current`, `deck.slides` and `checkin.attendance.lateFeed`. The app in `ios/` reads them the same way `src/portal/` does, and `npm test` and CI don't build Swift. A change to what any of them returns means running `ios/scripts/test.sh` and changing `ios/RCCLivePortal/` in the same commit; until a new app ships, phones with the old one break, so add a new query instead of changing these.
 - **Keys:** a person is `identity.tokenIdentifier` (stored as `user`); a slide is its 0-based `index`.
-- **Privacy:** no query returns `user`, which holds a typed sign-in's email. Shared screens (the projector, the late banner, the team board) and anything anyone can read show a first name at most: `lateFeed` returns first names, and a question posted by name shows that student's name to the room. Full names and emails go only to professors and admins (`checkin.read.names`, `checkin.attendance.sheet`, `live.groups.roster`, `live.groups.results`). Only question text, slide text, choices, counts and team labels go to Gemini, never a name.
+- **Privacy:** no query returns `user`, which holds a typed sign-in's email. Shared screens (the projector, the late banner, the team board) and anything anyone can read show a first name at most: `lateFeed` returns first names, and a question posted by name shows that student's name to the room. Full names and emails go only to professors and admins (`checkin.read.names`, `checkin.attendance.sheet`, `live.groups.roster`, `live.groups.results`), with one exception: `checkin.pass.scan` returns the scanned student's sign-in name to every scanner, so the door iPad shows it for 3 seconds (the email comes back as "" to a paired iPad or the scanner role). Only question text, slide text, choices, counts and team labels go to Gemini, never a name.
 
 ## Test data on a dev backend
 
-fill runs only on the dev backends in `DEV_HOSTS`. To use it on your own deployment, add its host (`<name>.convex.cloud`) to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 5); that also turns on typed test sign-ins and test roles there. Then:
+fill runs only on the dev backends in `DEV_HOSTS`. To use it on your own deployment, add its host (`<name>.convex.cloud`) to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 4); that also turns on typed test sign-ins and test roles there. Then:
 
 ```sh
 npx convex run dev/seed:fill '{"channel":"gdg"}'    # sample check-ins, lost taps, a quiz and questions
