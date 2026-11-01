@@ -126,10 +126,19 @@ struct DeckScreen: Equatable {
             main = .loading
         }
     }
+
+    /// True when the slides are on screen.
+    var showsDeck: Bool {
+        if case .deck = main { return true }
+        return false
+    }
 }
 
 struct DeckView: View {
     let store: DeckStore
+    /// Has VoiceOver read a line out: the slide count when the screen moves with the deck, and
+    /// the notice when the deck moves on without it. AnnounceTests passes its own to hear them.
+    var announce: @MainActor (String) -> Void = DeckView.readOut
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.verticalSizeClass) private var verticalSize
@@ -137,27 +146,39 @@ struct DeckView: View {
     @State private var follow = Follow()
     @State private var pendingStart: Int?
 
+    static func readOut(_ line: String) {
+        AccessibilityNotification.Announcement(line).post()
+    }
+
     /// The largest text size for everything on the deck screen but the slide: the bar, the slide
     /// count, the notice, Back to live and the arrows. At AX5 they took all but 57 of iPhone 17's
-    /// 402 pt in landscape and 110 of 874 in portrait, with a late card (sweep2-ios-2). Capped
-    /// here, the slide keeps at least a third of the height at every size (LayoutTests). The
-    /// slide itself keeps every size, and VoiceOver reads the full words either way.
+    /// 402 pt in landscape and 110 of 874 in portrait, with a late card (sweep2-ios-2). With the
+    /// connection bar up as well, a cap of AX2 still left the slide 280 of 874 pt in portrait at
+    /// AX3 to AX5 (sweep2-ios-fixcheck-1), so portrait stops at AX1 and the late card at AX2
+    /// (LateBannerView.largestType). With these caps, and the bar in the header row in landscape,
+    /// the slide keeps at least a third of the height at every size in the worst case: 366 of 874
+    /// and 148 of 402 at AX5 (LayoutTests). The slide itself keeps every size, and VoiceOver reads
+    /// the full words either way.
     static func largestType(verticalSize: UserInterfaceSizeClass?) -> DynamicTypeSize {
-        verticalSize == .compact ? .xxxLarge : .accessibility2
+        verticalSize == .compact ? .xxxLarge : .accessibility1
     }
 
     private var largest: DynamicTypeSize { DeckView.largestType(verticalSize: verticalSize) }
+    /// An iPhone in landscape: about 360 pt of height for everything.
+    private var compact: Bool { verticalSize == .compact }
 
     var body: some View {
         let screen = DeckScreen(live: store.live, load: store.load)
         VStack(spacing: 0) {
-            if let problem = screen.bar {
+            // In landscape the deck screen shows the bar in its header row instead: a full-width
+            // bar there took 43 pt and left the slide 112 of 402 pt (sweep2-ios-fixcheck-1).
+            if let problem = screen.bar, !(compact && screen.showsDeck) {
                 NoticeBar(problem: problem)
                     .dynamicTypeSize(...largest)
             }
             switch screen.main {
             case .deck(let live):
-                deck(live: live)
+                deck(live: live, bar: compact ? screen.bar : nil)
             case .message(let text):
                 CenterMessage(text: text)
             case .loading:
@@ -183,12 +204,12 @@ struct DeckView: View {
             guard let newLive else { return }
             if applyPendingStart() { return }
             // The first slide that comes in isn't read out, as a page's first render isn't.
-            followDeck(live: newLive, pages: store.pages.map(\.index), announce: oldLive != nil && oldLive != newLive)
+            followDeck(live: newLive, pages: store.pages.map(\.index), aloud: oldLive != nil && oldLive != newLive)
         }
         .onChange(of: store.pages.map(\.index)) { _, pages in
             if applyPendingStart() { return }
             guard let live = store.live?.slide.index else { return }
-            followDeck(live: live, pages: pages, announce: true)
+            followDeck(live: live, pages: pages, aloud: true)
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: showNotice)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.load.problem)
@@ -197,18 +218,23 @@ struct DeckView: View {
     private var notice: String? { follow.notice(live: store.live?.slide.index) }
     private var showNotice: Bool { notice != nil }
 
+    /// `bar`: the connection problem to show in the header row (landscape only), or nil.
     @ViewBuilder
-    private func deck(live: LiveSlide) -> some View {
+    private func deck(live: LiveSlide, bar: Problem?) -> some View {
         let pages = store.pages
         let onLive = follow.selection == live.slide.index
         let position = pages.firstIndex(where: { $0.index == follow.selection })
 
-        HStack {
+        HStack(spacing: 12) {
             Text(Words.slideOf(follow.selection + 1, count: DeckView.count(live)))
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
-            Spacer()
+                .fixedSize()
+            Spacer(minLength: 0)
+            if let bar {
+                NoticeBar(problem: bar, inRow: true)
+            }
             if onLive {
                 LiveBadge()
             }
@@ -220,6 +246,10 @@ struct DeckView: View {
         TabView(selection: Binding(
             get: { follow.selection },
             set: { index in
+                // The deck went back before the slide on screen, so that page is gone and the
+                // TabView picked a neighbour on its own. That's no swipe: followDeck moves to the
+                // live slide and reads it out. Taken as a swipe, VoiceOver said nothing (AnnounceTests).
+                guard store.pages.contains(where: { $0.index == follow.selection }) else { return }
                 if let liveIndex = store.live?.slide.index { follow.open(index, live: liveIndex) }
             }
         )) {
@@ -278,9 +308,7 @@ struct DeckView: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(.bar)
         .onChange(of: showNotice) { _, shown in
-            if shown, let notice {
-                AccessibilityNotification.Announcement(notice).post()
-            }
+            if shown, let notice { announce(notice) }
         }
     }
 
@@ -288,15 +316,15 @@ struct DeckView: View {
     static func count(_ live: LiveSlide) -> Int { max(live.count, live.slide.index + 1) }
 
     /// The deck moved to `live` or its shown slides changed: follow it by Follow's rules, and
-    /// when the screen moved with it and `announce`, VoiceOver reads the new "Slide N of M".
-    private func followDeck(live: Int, pages: [Int], announce: Bool) {
+    /// when the screen moved with it and `aloud`, VoiceOver reads the new "Slide N of M".
+    private func followDeck(live: Int, pages: [Int], aloud: Bool) {
         let before = follow.selection
         var after = follow
         after.deckMoved(live: live, pages: pages)
         move { $0.deckMoved(live: live, pages: pages) }
-        guard announce, let current = store.live,
+        guard aloud, let current = store.live,
               let line = after.announcement(from: before, count: DeckView.count(current)) else { return }
-        AccessibilityNotification.Announcement(line).post()
+        announce(line)
     }
 
     /// Changes `follow` with the page-turn animation, or with none when Reduce Motion is on.
@@ -380,21 +408,34 @@ struct LiveBadge: View {
     }
 }
 
-/// The bar over the last slide while the slides aren't coming in.
+/// The bar over the last slide while the slides aren't coming in. `inRow`: a one-line tag in
+/// the deck's header row, next to the slide count, which the deck screen uses in landscape.
 struct NoticeBar: View {
     let problem: Problem
+    var inRow = false
 
     var body: some View {
-        Label(Words.line(for: problem), systemImage: problem == .offline ? "wifi.slash" : "exclamationmark.triangle")
+        let label = Label(Words.line(for: problem), systemImage: problem == .offline ? "wifi.slash" : "exclamationmark.triangle")
             .font(.subheadline.weight(.semibold))
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 16)
             .foregroundStyle(Palette.warnText.color)
-            .background(Palette.warn.color)
-            // A tinted fill that marks a state gets a --line-strong edge (docs/design.md).
-            .overlay(alignment: .bottom) { Palette.lineStrong.color.frame(height: 1) }
+        if inRow {
+            label
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .padding(.vertical, 4)
+                .padding(.horizontal, 10)
+                .background(Capsule().fill(Palette.warn.color))
+                // A tinted fill that marks a state gets a --line-strong edge (docs/design.md).
+                .overlay(Capsule().strokeBorder(Palette.lineStrong.color, lineWidth: 1))
+        } else {
+            label
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .background(Palette.warn.color)
+                .overlay(alignment: .bottom) { Palette.lineStrong.color.frame(height: 1) }
+        }
     }
 }
 

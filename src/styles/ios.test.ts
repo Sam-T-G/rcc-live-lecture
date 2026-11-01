@@ -123,15 +123,31 @@ describe("iOS app words match the web's", () => {
   const deck = SWIFT["DeckView.swift"] ?? "";
   // Swift's "\(n) min late" and JS's `${n} min late`, with every slot written as {}.
   const slots = (s: string) => s.replace(/\\\([^)]*\)/g, "{}").replace(/\$\{[^}]*\}/g, "{}");
+  // A late line's slots by what they hold, so a line that swaps the name and the minutes
+  // ("🐢 3 just walked in, Ana min late.") fails (sweep2-ios-fixcheck-3). The first closure
+  // parameter is the name and the second the minutes, on both sides.
+  const lateSlots = (s: string, name: string, min: string) =>
+    s
+      .replace(/\\\(\s*(\w+)\s*\)|\$\{\s*(\w+)\s*\}/g, (all, a?: string, b?: string) => {
+        const v = a ?? b;
+        return v === name ? "{name}" : v === min ? "{min}" : all;
+      });
 
-  it("the late banner's five lines are late.ts's LINES, in the same order", () => {
+  it("the late banner's five lines are late.ts's LINES, in the same order, with the name and the minutes in the same slots", () => {
     const swiftBody = /enum LateLines \{[\s\S]*?static let lines[^=]*= \[([\s\S]*?)\n {4}\]/.exec(SWIFT["LateBanner.swift"] ?? "")?.[1];
     expect(swiftBody, "LateLines.lines not found in LateBanner.swift").toBeDefined();
-    const swift = [...swiftBody!.matchAll(/\{\s*n,\s*m\s+in\s+"((?:[^"\\]|\\.)*)"\s*\}/g)].map((m) => slots(m[1]));
+    const swift = [...swiftBody!.matchAll(/\{\s*(\w+),\s*(\w+)\s+in\s+"((?:[^"\\]|\\.)*)"\s*\}/g)].map(([, n, m, s]) => lateSlots(s, n, m));
     const webBody = /const LINES = \[([\s\S]*?)\n\];/.exec(lateTs)?.[1];
     expect(webBody, "LINES not found in late.ts").toBeDefined();
-    const web = [...webBody!.matchAll(/=>\s*`([^`]*)`/g)].map((m) => slots(m[1]));
+    const web = [...webBody!.matchAll(/\(\s*(\w+)\s*:\s*string\s*,\s*(\w+)\s*:\s*number\s*\)\s*=>\s*`([^`]*)`/g)].map(([, n, m, s]) =>
+      lateSlots(s, n, m),
+    );
     expect(web).toHaveLength(5);
+    expect(swift).toHaveLength(5);
+    for (const line of [...web, ...swift]) {
+      const found = [...line.matchAll(/\{[^}]*\}/g)].map((m) => m[0]).sort();
+      expect(found, `${line}: its slots aren't the name and the minutes, once each`).toEqual(["{min}", "{name}"]);
+    }
     expect(swift).toEqual(web);
   });
 
@@ -146,18 +162,34 @@ describe("iOS app words match the web's", () => {
     }));
     return [...lets, ...funcs];
   };
-  // Lines only the app has: #/portal has no connection bar.
+  // Lines only the app has: #/portal has no connection bar. Words.back and Words.next are the
+  // arrow buttons' words without the arrows; the next test checks them.
   const APP_ONLY = ["cantLoad", "offline"];
+  const ARROWS = ["back", "next"];
   // #/portal's source with each one-line JSX `{expression}` written as {}.
   const portalText = pageTsx.replace(/\{[^{}\n]+\}/g, "{}");
+  // The text between two JSX tags, whitespace collapsed: "Slide {} of {}", "Back to live".
+  // A word has to be a whole text node, so "Live" can't match setLiveAtBrowse and "Loading the
+  // slides…" can't match a longer line (sweep2-ios-fixcheck-3).
+  const textNodes = new Set(
+    [...portalText.matchAll(/<\/?[A-Za-z][^<>]*>([^<>]*)(?=<)/g)].map((m) => m[1].replace(/\s+/g, " ").trim()).filter(Boolean),
+  );
 
-  it("every line in Words is on #/portal, word for word", () => {
+  it("every line in Words is a whole text node on #/portal, word for word", () => {
     const all = words();
     expect(all.map((w) => w.name)).toEqual(
       expect.arrayContaining(["loading", "waiting", "backToLive", "live", "professorOn", "slideOf", "back", "next"]),
     );
-    const missing = all.filter((w) => !APP_ONLY.includes(w.name) && !portalText.includes(w.text)).map((w) => `${w.name}: ${w.text}`);
+    const missing = all
+      .filter((w) => !APP_ONLY.includes(w.name) && !ARROWS.includes(w.name) && !textNodes.has(w.text))
+      .map((w) => `${w.name}: ${w.text}`);
     expect(missing).toEqual([]);
+  });
+
+  it("the Live tag on #/portal says Words.live", () => {
+    const live = words().find((w) => w.name === "live")?.text;
+    expect(live, "Words.live not found").toBeDefined();
+    expect(portalText).toMatch(new RegExp(`className="[^"]*\\bportal__tag--live\\b[^"]*">\\s*${live}\\s*<`));
   });
 
   it("the arrows' VoiceOver labels are Words.back and Words.next, #/portal's button words", () => {
