@@ -40,7 +40,7 @@
 :is(.ph-check, .live-ask label) > input[type="checkbox"]:focus-visible { outline-offset: -8px; }
 
 /* ------------------------------------------------------------------- the pass */
-/* The kit .pass card: the head, the QR on its white plate (280, 256 at 320 wide), the
+/* The kit .pass card: the head, the QR on its white plate (280, 256 at 320 wide, centered), the
    perforation, the name, the code a professor reads out, the note. Every line on the 32 edge. */
 /* One column that can shrink below the QR's 280, so at 320 the QR takes the card's 256 and the
    perforation reaches both edges. */
@@ -49,7 +49,7 @@
 .ph .pass > .perf { border-top-color: var(--line-strong); } /* [kit_request] .perf on the raised pass: the kit's dash is drawn for the green stub */
 /* The square's one column can shrink below the code's drawn 280 (QR's inline width), so at 320 the
    white plate takes the square's 256 and never runs past the card's edge. */
-.pass__qr { width: 280px; max-width: 100%; aspect-ratio: 1; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; }
+.pass__qr { justify-self: center; width: 280px; max-width: 100%; aspect-ratio: 1; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; }
 .pass__qr.qr--wait > .status { padding: var(--s4); }
 .ph .pass__name { font-size: 1.25rem; font-weight: var(--w-head); line-height: 1.3; }
 /* The code: Google Sans Code 40 / 700, tabular. An old code's letters keep their line, hidden, so
