@@ -200,10 +200,10 @@ describe("F8.1 End class on #/checkin/teacher", () => {
   it("when End day refuses, the question box says why and stays open, and the class keeps running; Cancel closes the box", async () => {
     press(page(), "End class");
     press(page(), "End class");
-    sent("live/groups:endDay")[0].reject(new ConvexError("End the open question first."));
+    sent("live/groups:endDay")[0].reject(new ConvexError("End the open quiz or vote first."));
     await settle();
-    expect(alertText(page())).toBe("End the open question first.");
-    expect(statusRow(page())).toBe(`Class started Thu Nov 5, 2:30 PM ${QUESTION} End the open question first. End class Cancel`);
+    expect(alertText(page())).toBe("End the open quiz or vote first.");
+    expect(statusRow(page())).toBe(`Class started Thu Nov 5, 2:30 PM ${QUESTION} End the open quiz or vote first. End class Cancel`);
     expect(banner(page())).toBeUndefined();
 
     expect(press(page(), "Cancel")).toBe("clicked");

@@ -615,7 +615,7 @@ describe("F29 End day", () => {
     await quiz(t, ss, [ss[0], ss[2], ss[1], ss[3], ss[5]]);
     await admin(t).mutation(api.live.groups.adjust, { channel: CH, team: 0, delta: 1 });
     await admin(t).mutation(api.checkin.quiz.ask, { channel: CH, kind: "vote", question: "Pizza or tacos?", choices: ["Pizza", "Tacos"] });
-    await expect(admin(t).mutation(api.live.groups.endDay, { channel: CH })).rejects.toThrow("End the open question first.");
+    await expect(admin(t).mutation(api.live.groups.endDay, { channel: CH })).rejects.toThrow("End the open quiz or vote first.");
     expect(await saved(t)).toEqual([]);
     expect(await classNow(t)).toBe(lecture);
 

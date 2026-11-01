@@ -9,10 +9,10 @@ The agent reads this before every change to #/host. Sam's decisions (AGENTS.md "
 - Header: the slide the deck is on, how many students checked in to this class, how many tapped "I'm lost" on this slide, and "Lost by slide" for every slide with taps this class. A link to Attendance (#/checkin/teacher).
 - **Now** tab: "Ask the room" drafts a quiz from the slide with Gemini or takes one the professor types, then opens it as a quiz or a vote on every phone, on #/checkin/quiz and on the stage. While it's open the bars and "N of M answered" move; after End, each choice's %, the right answer (or the vote's top pick), % right and the median time. "Who got it wrong" lists each student who picked a wrong choice on the newest quiz with a right answer, and "Ask the AI" returns 2 or 3 sentences on what to explain again.
 - **Points** tab: team size (3 or 4), every team with its place, points and extra credit, +1 and -1 per team, every student checked in with their points and +1 and -1 (with an optional reason), the point changes with Undo, End class (saves each student's extra credit and ends the class; it can't be undone and is refused while a quiz or vote is open), and "Download extra credit (CSV)" with every class's saved extra credit.
-- **Questions** tab: every question students posted on #/live in this class, private ones too, with its slide, upvotes and name ("Anonymous" when hidden). Keep or dismiss (sorts this list only), type an answer, share it, or delete the question from every phone. "Group by topic with AI" sorts the list into topics.
+- **Questions** tab: every question students posted on #/live in this class, private ones too, with its slide, upvotes and name ("Anonymous" when hidden). Keep or dismiss (sorts this list only), type an answer, share it (not a private one), or delete the question from every phone. "Group by topic with AI" sorts the list into topics.
 - The three tabs stay mounted, so a half-written quiz, the AI note and the topic grouping survive a tab switch.
 
-Private questions today: sharing one shows the answer on its author's phone only, and "Group by topic with AI" leaves private questions out. Sam's D12 (e) and (f) defaults said the opposite (a private question can't be shared; its text goes to Gemini without a name); which rule stands is waiting on Sam.
+Private questions (Sam's decision D12 e and f): a private question's answer can't be shared, so its row has no share button and `share()` throws "That question is private."; only the professor sees that answer. "Group by topic with AI" sends private question texts too, numbered, never with a name.
 
 ## Who can open it
 
@@ -33,7 +33,7 @@ Professors and admins on the staff list, through `<StaffGate>` (`src/teams/check
 
 - Writes `polls` (ask, end), `groupSettings` (team size), `groupPoints` (point changes and Undo), `groupResults` and `lectures` (End class saves extra credit and ends the class), and `questions` (status, answer, shared, topic, cluster; delete also removes its `questionVotes`). Opening a quiz also opens a class (`lectures`) when none is open.
 - Shows names and emails: the Points tab's student list and the extra credit CSV (class end time, name, email, team, place, team points, extra credit). The CSV is for the instructor of record; never commit one.
-- Sends to Gemini: the slide text (draft a quiz), the quiz, its choices, counts and team labels ("Ask the AI"), and the texts of questions that aren't private or dismissed ("Group by topic with AI"). Never a name or email.
+- Sends to Gemini: the slide text (draft a quiz), the quiz, its choices, counts and team labels ("Ask the AI"), and the texts of questions that aren't dismissed, private ones too ("Group by topic with AI"). Never a name or email.
 - The old professor view's tables (`quizQuestions`, `answers`, `hostRooms`, `pointEvents`, `studentQuestions`) stay defined in `convex/schema.ts` for prod's rows; nothing reads or writes them.
 - On your own dev backend these tables start empty: fill them with `npx convex run dev/seed:fill '{"channel":"gdg"}'` after adding your deployment's host to `DEV_HOSTS` in `convex/checkin/prof.ts` and `convex/auth.config.ts` (README step 5).
 

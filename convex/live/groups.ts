@@ -78,7 +78,7 @@
 //       This class's changes, newest first, at most 200. team: the team's, or the student's
 //       current team; name: the student's name (null for a team change).
 //   api.live.groups.endDay       { channel } -> the line to show
-//       Refused while a quiz or vote is open ("End the open question first."). Saves extra credit
+//       Refused while a quiz or vote is open ("End the open quiz or vote first."). Saves extra credit
 //       and ends the class; "No class is running." when no class is open.
 //   api.live.groups.results      { channel, lecture?, paginationOpts } -> { page: [{ lecture,
 //                                  endedAt, name, email, team, rank, points, ec }], isDone,
@@ -803,7 +803,7 @@ export const endDay = mutation({
     await requireProf(ctx);
     const s = await scoreDay(ctx, channel);
     if (!s.win.lecture) return "No class is running.";
-    if (s.openPoll) throw new ConvexError("End the open question first.");
+    if (s.openPoll) throw new ConvexError("End the open quiz or vote first.");
     const credited = await saveScores(ctx, channel, s, Date.now());
     await endLecture(ctx, channel);
     return endLine(s, credited);
