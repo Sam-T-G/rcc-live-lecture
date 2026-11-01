@@ -64,6 +64,8 @@ vi.mock("react", async (orig) => {
 // The server: checkin.read.count's answer is `count.value` (undefined while it loads), and
 // checkin.pass.scan is `scan`. `asked` lists every query the page ran.
 const count = { value: undefined as number | undefined };
+// checkin.attendance.classStart's answer: this class's saved start, or null.
+const classStart = { value: null as { startsAt: number; graceMin: number } | null };
 const asked: string[] = [];
 const scan = vi.fn(async (args: { channel: string; code: string; device?: string }) => {
   void args;
@@ -72,7 +74,8 @@ const scan = vi.fn(async (args: { channel: string; code: string; device?: string
 vi.mock("convex/react", () => ({
   useQuery: (ref: FunctionReference<"query">) => {
     asked.push(getFunctionName(ref));
-    return getFunctionName(ref) === "checkin/read:count" ? count.value : undefined;
+    const name = getFunctionName(ref);
+    return name === "checkin/read:count" ? count.value : name === "checkin/attendance:classStart" ? classStart.value : undefined;
   },
   useMutation: () => scan,
 }));
@@ -184,6 +187,7 @@ beforeEach(() => {
   hooks.effects = [];
   hooks.cleanups.clear();
   count.value = 7;
+  classStart.value = null;
   asked.length = 0;
   scan.mockReset();
   scan.mockImplementation(async () => ({ name: "Ada Lovelace", email: "", already: false }));
@@ -279,6 +283,19 @@ describe("SCAN the door kiosk: what the line sees", () => {
     // Any other refusal shows as the server words it.
     expect(await typed("No code.")).toBe("No code.");
     expect(words(render())).not.toContain("Ask them");
+  });
+
+  it("LX-check-copy-1 a pass refused for being early says when scanning opens, in the iPad's time zone", async () => {
+    vi.stubEnv("TZ", "America/Los_Angeles");
+    const alert = (el: El) => /<p class="kiosk__error" role="alert">(.*?)<\/p>/.exec(html(el))?.[1];
+    const { EARLY_SCAN } = await import("../../../convex/lib");
+    classStart.value = { startsAt: Date.UTC(2026, 10, 10, 17, 0), graceMin: 5 }; // Tue Nov 10, 9:00 AM Pacific
+    scan.mockRejectedValueOnce(new ConvexError(EARLY_SCAN));
+    const el = render();
+    (input(el).props.ref as { current: unknown }).current = { blur: () => {} };
+    type(el, "abc234");
+    await submit(render());
+    expect(alert(render())).toBe("Scanning opens at 8:15 AM, 45 minutes before class starts.");
   });
 
   it("rt-24 a student types the code on their pass: it checks them in with this iPad's device token, shows 'Checked in' and their name for 3 s, and empties the field", async () => {

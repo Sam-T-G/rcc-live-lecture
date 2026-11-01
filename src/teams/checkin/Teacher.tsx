@@ -34,7 +34,7 @@ import {
   timeOrDay,
   type ClassRow,
 } from "./sheet";
-import { clock, why } from "./util";
+import { clock, scanError, scanOpensAt, why } from "./util";
 
 const MIN = 60_000;
 
@@ -158,8 +158,8 @@ function earlierOnly(classes: ClassRow[] | undefined) {
   return classes.find((c) => c.lecture === "earlier");
 }
 
-// n counts the results, so each one starts LastScan afresh.
-type Result = ({ ok: true; name: string; email: string; already: boolean } | { ok: false; text: string }) & { n: number };
+// n counts the results, so each one starts LastScan afresh; at is when a refusal came back.
+type Result = ({ ok: true; name: string; email: string; already: boolean } | { ok: false; text: string; at: number }) & { n: number };
 
 // The camera and the typed code. A pass the camera reads, or a code typed in, checks that
 // student in to this class.
@@ -180,7 +180,7 @@ function ScanPasses() {
       const r = await scan({ channel: CHANNEL, code });
       setResult((was) => ({ ok: true, ...r, n: (was?.n ?? 0) + 1 }));
     } catch (e) {
-      setResult((was) => ({ ok: false, text: why(e), n: (was?.n ?? 0) + 1 }));
+      setResult((was) => ({ ok: false, text: why(e), at: Date.now(), n: (was?.n ?? 0) + 1 }));
     }
   }
   const sendRef = useRef(send);
@@ -251,25 +251,39 @@ function ScanPasses() {
 // result first shows; when none was, a scan that checked someone in opened one, so it's the first
 // class that opens after. Once that class ends (End class here or on #/host, or the 12-hour close)
 // or another one opens, the result goes, so a name from last class never shows in this one. A
-// refused scan opened nothing, so its error goes as soon as any class opens.
+// refused scan opened nothing, so its error goes as soon as any class opens. A class opened the
+// evening before by saving the next morning's start takes scans from 45 minutes before that start
+// (convex/lib.ts notOpenYet): a scan refused before then says when, and its error goes at that
+// time, re-rendering then as ClassStatus does.
 function LastScan({ result }: { result: Result }) {
   const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
-  const open = classes === undefined ? undefined : (classes.find((c) => c.open)?.lecture ?? null);
+  const openRow = classes?.find((c) => c.open);
+  const open = classes === undefined ? undefined : (openRow?.lecture ?? null);
   // The class this result belongs to: undefined until the list loads, null while none is open.
   const [own, setOwn] = useState<string | null | undefined>(undefined);
+  const opens = scanOpensAt(openRow?.startsAt);
+  const [, rerender] = useState(0);
+  useEffect(() => {
+    const wait = result.ok || opens === null ? 0 : opens - Date.now();
+    if (wait <= 0) return;
+    // setTimeout fires at once for a wait over 2^31 - 1 ms (about 24 days).
+    const t = setTimeout(() => rerender((n) => n + 1), Math.min(wait, 2 ** 31 - 1));
+    return () => clearTimeout(t);
+  }, [result.ok, opens]);
   let mine = own;
   if (open !== undefined && (mine === undefined || (mine === null && open !== null && result.ok))) {
     setOwn(open);
     mine = open;
   }
   if (open !== undefined && open !== mine) return null;
+  if (!result.ok && opens !== null && result.at < opens && Date.now() >= opens) return null;
   return result.ok ? (
     <Card title={result.already ? "Already checked in" : "Checked in"}>
       <p className="pass__name">{result.name}</p>
       <p className="muted">{result.email}</p>
     </Card>
   ) : (
-    <Status kind="error">{result.text}</Status>
+    <Status kind="error">{scanError(result.text, openRow?.startsAt)}</Status>
   );
 }
 

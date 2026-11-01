@@ -62,11 +62,24 @@ export function metersBetween(aLat: number, aLng: number, bLat: number, bLng: nu
 export const LECTURE_MS = 12 * 60 * 60_000;
 
 // How early students check in: back-to-back sections start 60 to 90 minutes apart, and students
-// rarely check in more than 45 minutes before class. checkin.pass.scan refuses a scan earlier than
-// this before the open class's saved start (a class opened the evening before by saving the next
-// morning's start), and attendance.setClassStart takes a start no later than this after the open
-// class's first check-in.
+// rarely check in more than 45 minutes before class. A class opened the evening before by saving
+// the next morning's start takes no scans, deck presses or questions until this long before that
+// start (notOpenYet), and
+// attendance.setClassStart takes a start no later than this after the open class's first check-in.
 export const EARLY_MS = 45 * 60_000;
+
+// What checkin.pass.scan refuses with before then. The pages put the time in front of it
+// (src/teams/checkin/util.ts scanError), since the server doesn't know the professor's time zone.
+export const EARLY_SCAN = "Scanning opens 45 minutes before class starts.";
+
+// Whether the open class still takes no class activity at `now`: it has a saved start more than
+// EARLY_MS away. End class Monday night followed by saving Tuesday 9:00 opens Tuesday's class at
+// once (ensureLecture), so without this a scan, a deck press or a question that evening would land
+// in Tuesday's class: checkin.pass.scan refuses the scan, deck.set drops the press and
+// checkin.quiz.ask refuses the question until 8:15. Call it right after ensureLecture.
+export function notOpenYet(lecture: Doc<"lectures">, now: number) {
+  return lecture.startsAt !== undefined && now < lecture.startsAt - EARLY_MS;
+}
 
 // When a class nobody ends closes itself: 12 hours after it opened, or 12 hours after its saved
 // start time when that is later. A class opened the evening before by saving the next morning's

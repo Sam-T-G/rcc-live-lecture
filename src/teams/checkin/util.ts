@@ -8,3 +8,19 @@ export function why(e: unknown) {
 
 // A time of day in the browser's language, like "2:30 PM".
 export const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+// How early scanning opens before a class's saved start, and the server's refusal before then
+// (EARLY_MS and EARLY_SCAN in convex/lib.ts; util.test.ts checks they match).
+export const EARLY_MS = 45 * 60_000;
+export const EARLY_SCAN = "Scanning opens 45 minutes before class starts.";
+
+// When the class with this saved start takes scans, or null with no saved start.
+export const scanOpensAt = (startsAt: number | null | undefined) => (startsAt == null ? null : startsAt - EARLY_MS);
+
+// A scan refusal for the screen: the early refusal gets the time scanning opens, in the browser's
+// time zone ("Scanning opens at 8:15 AM, 45 minutes before class starts."). The server can't
+// write it, since it doesn't know the professor's time zone.
+export function scanError(text: string, startsAt: number | null | undefined) {
+  const opens = scanOpensAt(startsAt);
+  return text === EARLY_SCAN && opens !== null ? `Scanning opens at ${clock(opens)}, 45 minutes before class starts.` : text;
+}

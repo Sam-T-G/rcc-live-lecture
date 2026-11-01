@@ -29,7 +29,7 @@
 import { mutation, query, type MutationCtx } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
-import { EARLY_MS, checkedIn, cleanName, ensureLecture, lectureStart, nameIsEmail, randomCode, requireUser } from "../lib";
+import { EARLY_SCAN, checkedIn, cleanName, ensureLecture, lectureStart, nameIsEmail, notOpenYet, randomCode, requireUser } from "../lib";
 import { isProf, pairedDevice, requireScanner, staffRole } from "./prof";
 import { ensureGroup } from "../live/groups";
 
@@ -172,8 +172,7 @@ export const scan = mutation({
     // A class opened the evening before by saving the next morning's start takes no scans until
     // EARLY_MS before that start, so a scan that evening doesn't check someone in to the morning's
     // class as on time.
-    if (lecture.startsAt !== undefined && now < lecture.startsAt - EARLY_MS)
-      throw new ConvexError("Scanning opens 45 minutes before class starts.");
+    if (notOpenYet(lecture, now)) throw new ConvexError(EARLY_SCAN);
     const row = await ctx.db
       .query("checkins")
       .withIndex("by_channel_and_user", (q) => q.eq("channel", channel).eq("user", p.user).gte("_creationTime", lectureStart(lecture)))

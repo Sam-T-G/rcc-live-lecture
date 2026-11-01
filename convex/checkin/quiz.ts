@@ -4,8 +4,10 @@
 //
 // Every read is for the current class (lib.lectureWindow): a poll belongs to the class whose
 // window holds its _creationTime. Asking a question opens a class when none is open
-// (lib.ensureLecture), the way a deck press or a pass scan does. Between classes `current` is
-// null, and a poll from an earlier class can't be answered ("That question is gone.").
+// (lib.ensureLecture), the way a deck press or a pass scan does, and is refused more than 45
+// minutes before the open class's saved start (lib.notOpenYet), so a question asked the evening
+// before isn't the next morning's. Between classes `current` is null, and a poll from an earlier
+// class can't be answered ("That question is gone.").
 //
 //   current({ channel })        anyone     the newest poll in this class, or null. Its counts and
 //                                          right answer come back only once it has ended.
@@ -32,7 +34,7 @@ import { ConvexError, v, type Infer } from "convex/values";
 import { api } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { gemini } from "../ai";
-import { checkedIn, cleanName, ensureLecture, lectureStart, lectureWindow, requireUser } from "../lib";
+import { checkedIn, cleanName, ensureLecture, lectureStart, lectureWindow, notOpenYet, requireUser } from "../lib";
 import { describe, teamInfo } from "../live/groups";
 import { requireProf } from "./prof";
 
@@ -180,8 +182,9 @@ export const ask = mutation({
     const cs = kept.map((c) => c.text);
 
     const lecture = await ensureLecture(ctx, channel);
-    const start = lectureStart(lecture);
     const now = Date.now();
+    if (notOpenYet(lecture, now)) throw new ConvexError("Questions open 45 minutes before class starts.");
+    const start = lectureStart(lecture);
     const prev = await newest(ctx, channel);
     if (prev?.open) {
       const same =

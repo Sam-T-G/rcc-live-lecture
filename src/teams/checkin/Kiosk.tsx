@@ -21,7 +21,7 @@ import { CHANNEL } from "../../blocks/deck";
 import { useCamera } from "../../blocks/camera";
 import { makeQrReader } from "./qrRead";
 import { DoorGate } from "./prof";
-import { why } from "./util";
+import { scanError, why } from "./util";
 import "./kiosk.css";
 
 export default function Kiosk() {
@@ -127,6 +127,8 @@ function Count() {
 // device: the paired iPad's token, or undefined when a scanner is signed in.
 export function KioskScanner({ device }: { device: string | undefined }) {
   const scan = useMutation(api.checkin.pass.scan);
+  // This class's saved start, so a scan refused for being early says when scanning opens.
+  const start = useQuery(api.checkin.attendance.classStart, { channel: CHANNEL });
   const cam = useCamera();
   const awake = useWakeLock();
   const [read] = useState(makeQrReader);
@@ -152,7 +154,7 @@ export function KioskScanner({ device }: { device: string | undefined }) {
       const r = await scan({ channel: CHANNEL, code, device });
       setResult({ kind: r.already ? "again" : "ok", text: r.name });
     } catch (e) {
-      setResult({ kind: "error", text: forStudent(why(e), typedIn) });
+      setResult({ kind: "error", text: forStudent(scanError(why(e), start?.startsAt), typedIn) });
     }
   }
   const sendRef = useRef(send);

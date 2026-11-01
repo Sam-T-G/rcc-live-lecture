@@ -264,6 +264,65 @@ describe("F8.1 End class on #/checkin/teacher", () => {
     expect(rejections).toEqual([]);
   });
 
+  it("LX-fixcheck-3 after the card's class ends and a door scan opens the next one, a new scan here shows its card (each result starts LastScan afresh)", async () => {
+    checkIn("abc123");
+    sent("checkin/pass:scan")[0].resolve({ name: "Sample student 1", email: "s1@example.edu", already: false });
+    await settle();
+    expect(scanCard(page())).toBe("Checked in Sample student 1 s1@example.edu");
+    server.results["checkin/attendance:lectures"] = [ended];
+    expect(scanCard(page())).toBeUndefined();
+    // A scan at the door opens next week's class; this page shows nothing from last week.
+    vi.setSystemTime(pst(11, 12, 14, 25));
+    server.results["checkin/attendance:lectures"] = [nextWeek, ended];
+    expect(scanCard(page())).toBeUndefined();
+    checkIn("def456");
+    sent("checkin/pass:scan")[1].resolve({ name: "Sample student 2", email: "s2@example.edu", already: false });
+    await settle();
+    expect(scanCard(page())).toBe("Checked in Sample student 2 s2@example.edu");
+    expect(rejections).toEqual([]);
+  });
+
+  // Tuesday's class opened Monday night: End class at 21:30, then Tuesday 9:00 saved.
+  const tuesday = { lecture: "k3", open: true, startedAt: pst(11, 9, 21, 30), startsAt: pst(11, 10, 9, 0), graceMin: 5, endedAt: null, count: 0 };
+  const EARLY = "Scanning opens 45 minutes before class starts.";
+
+  it("LX-check-copy-1 a scan refused for being early says when scanning opens; LX-fixcheck-2 the refusal goes once scanning opens", async () => {
+    vi.setSystemTime(pst(11, 9, 21, 35));
+    server.results["checkin/attendance:lectures"] = [tuesday];
+    server.results["checkin/attendance:classStart"] = { startsAt: tuesday.startsAt, graceMin: 5 };
+    checkIn("abc123");
+    sent("checkin/pass:scan")[0].reject(new ConvexError(EARLY));
+    await settle();
+    expect(alertText(page())).toBe("Scanning opens at 8:15 AM, 45 minutes before class starts.");
+    vi.setSystemTime(pst(11, 10, 8, 14));
+    expect(alertText(page())).toBe("Scanning opens at 8:15 AM, 45 minutes before class starts.");
+    // 8:15: scanning opens and the refusal goes, through the whole class.
+    vi.setSystemTime(pst(11, 10, 8, 15));
+    expect(alertText(page())).toBeUndefined();
+    vi.setSystemTime(pst(11, 10, 9, 40));
+    server.results["checkin/attendance:lectures"] = [{ ...tuesday, count: 20 }];
+    expect(statusRow(page())).toBe("Class started Tue Nov 10, 9:00 AM End class");
+    expect(alertText(page())).toBeUndefined();
+    expect(rejections).toEqual([]);
+  });
+
+  it("LX-fixcheck-2 any code refused before scanning opens goes at 8:15; one refused after that stays until the next scan", async () => {
+    vi.setSystemTime(pst(11, 9, 21, 35));
+    server.results["checkin/attendance:lectures"] = [tuesday];
+    checkIn("abc123");
+    sent("checkin/pass:scan")[0].reject(new ConvexError("That code is old."));
+    await settle();
+    expect(alertText(page())).toBe("That code is old.");
+    vi.setSystemTime(pst(11, 10, 8, 15));
+    expect(alertText(page())).toBeUndefined();
+    checkIn("def456");
+    sent("checkin/pass:scan")[1].reject(new ConvexError("That code is old."));
+    await settle();
+    vi.setSystemTime(pst(11, 10, 9, 40));
+    expect(alertText(page())).toBe("That code is old.");
+    expect(rejections).toEqual([]);
+  });
+
   it("with no class running, or before the list loads, there is no End class", () => {
     server.results["checkin/attendance:lectures"] = [ended];
     expect(statusRow(page())).toBe("No class running.");

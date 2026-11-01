@@ -6,6 +6,10 @@
 // (beat), the deck's slide count, the heading, and up to 12 lines of the slide's text (the
 // bridge's header comment lists which parts of a slide those come from).
 // - A press opens a class when none is open (lib.ensureLecture), so presenting starts the class.
+//   A press more than 45 minutes before the open class's saved start (lib.notOpenYet: End class
+//   Monday night, then Tuesday 9:00 saved, opens Tuesday's class at once) is dropped, so Tuesday's
+//   phones don't show Monday night's slide as Tuesday's. POST /deck still answers "ok", and the
+//   bridge sends again on the next press.
 // - Each press from the current bridge carries `run`, an id the deck's browser tab stores for it,
 //   and `seq`, a number that goes up with every send from that tab. Two quick arrow presses can
 //   reach the server in either order, so when a press arrives after a newer one from the same
@@ -23,7 +27,7 @@
 // The iOS app decodes both answers field by field, so don't add, rename or remove a field.
 import { ConvexError, v } from "convex/values";
 import { internalMutation, query, type QueryCtx } from "./_generated/server";
-import { ensureLecture, LECTURE_MS, lectureStart, lectureWindow } from "./lib";
+import { ensureLecture, LECTURE_MS, lectureStart, lectureWindow, notOpenYet } from "./lib";
 
 // The biggest slide number and press count a press may carry. deckSlides has one row per slide
 // number on a channel, so a channel never has more than SLIDE_MAX + 1 of them.
@@ -132,8 +136,9 @@ export const set = internalMutation({
     }
     // Presenting starts the class: a press after the last class ended opens a new one.
     const lecture = await ensureLecture(ctx, a.channel);
-    const start = lectureStart(lecture);
     const at = Date.now();
+    if (notOpenYet(lecture, at)) return null;
+    const start = lectureStart(lecture);
 
     const row = await ctx.db
       .query("deckChannels")
