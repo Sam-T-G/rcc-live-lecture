@@ -1,5 +1,6 @@
 // @vitest-environment node
 // The late banner's lines and which arrivals it shows (late.ts, used by LateBanner.tsx).
+// LateBanner.test.ts checks that the banner itself uses newArrivals that way.
 import { describe, expect, it } from "vitest";
 import { lateLine, newArrivals, type Late, type Seen } from "./late";
 

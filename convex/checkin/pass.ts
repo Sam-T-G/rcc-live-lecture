@@ -19,8 +19,13 @@
 // The name on the pass follows the sign-in (cleaned by lib.cleanName, so it's never an email)
 // while the student isn't checked in to the current class: a typo is fixed by signing out and in
 // before the scan. Once they're checked in, another sign-in with the same email can't rename
-// them, and each checkins row keeps the name it was scanned with, so past attendance never
+// them (whatever channel that page sends: checkedInNow), a second scan shows the name on their
+// check-in, and each checkins row keeps the name it was scanned with, so past attendance never
 // changes.
+//
+// Every code is on one pass: refresh draws again when another pass has the code it drew, as its
+// code or as the code before it (freshCode). Rows made before it checked can still share a code,
+// so scan picks the one pass the code still scans for (passFor).
 import { mutation, query, type MutationCtx } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
@@ -32,6 +37,9 @@ const EVERY = 20_000; // a new code once the current one is this old
 const CURRENT_MS = 60_000; // the current code scans until it's this old
 const PREVIOUS_MS = 40_000; // the code before it scans until this long after it was replaced
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no look-alikes, so a teacher can type one
+const DRAWS = 5; // codes freshCode tries before giving up (32^6 codes, so a second try is already rare)
+const MATCHES = 10; // passes scan reads for one code; with unique codes there is at most one
+const RECENT_CLASSES = 20; // classes checkedInNow looks at for the channels students check in on
 
 export const NOT_A_PASS = "That code isn't a pass. Ask them to open their pass again.";
 export const OLD = "That code is old. Ask them to open their pass again.";
@@ -68,9 +76,29 @@ export const mine = query({
   },
 });
 
+// A pass code no pass has now, as its code or as the code before it.
+async function freshCode(ctx: MutationCtx): Promise<string> {
+  for (let i = 0; i < DRAWS; i++) {
+    const code = randomCode(6, LETTERS);
+    const taken =
+      (await ctx.db.query("passes").withIndex("by_code", (q) => q.eq("code", code)).first()) ??
+      (await ctx.db.query("passes").withIndex("by_prevCode", (q) => q.eq("prevCode", code)).first());
+    if (!taken) return code;
+  }
+  throw new ConvexError("Couldn't make a new code. Try again.");
+}
+
+// Whether the student is checked in to the current class on `channel` or on any channel a recent
+// class ran on, so a page that sends another channel can't rename a checked-in student.
+async function checkedInNow(ctx: MutationCtx, channel: string, user: string): Promise<boolean> {
+  const recent = await ctx.db.query("lectures").order("desc").take(RECENT_CLASSES);
+  for (const ch of new Set([channel, ...recent.map((l) => l.channel)])) if (await checkedIn(ctx, ch, user)) return true;
+  return false;
+}
+
 // Makes the pass if it's missing, and a new code once the current one is 20 s old. The pass page
 // calls it with the channel it checks in on. The name follows the sign-in only while the student
-// isn't checked in to that channel's current class; a call without a channel (a page opened
+// isn't checked in to a current class (checkedInNow); a call without a channel (a page opened
 // before the channel was sent) leaves the name as it is.
 export const refresh = mutation({
   args: { channel: v.optional(v.string()) },
@@ -81,16 +109,16 @@ export const refresh = mutation({
     const name = cleanName(me.name);
     const p = await ctx.db.query("passes").withIndex("by_user", (q) => q.eq("user", me.tokenIdentifier)).unique();
     if (!p) {
-      await ctx.db.insert("passes", { user: me.tokenIdentifier, name, email: me.email ?? "", code: randomCode(6, LETTERS), prevCode: "", at: now });
+      await ctx.db.insert("passes", { user: me.tokenIdentifier, name, email: me.email ?? "", code: await freshCode(ctx), prevCode: "", at: now });
       return null;
     }
     const change: { name?: string; code?: string; prevCode?: string; at?: number } = {};
-    if (name !== p.name && channel !== undefined && !(await checkedIn(ctx, channel, me.tokenIdentifier))) change.name = name;
+    if (name !== p.name && channel !== undefined && !(await checkedInNow(ctx, channel, me.tokenIdentifier))) change.name = name;
     if (now - p.at >= EVERY) {
       // The replaced code scans for a while longer as the code before this one, unless it had
       // already run out: then a screenshot of it stays refused.
       change.prevCode = now - p.at <= CURRENT_MS ? p.code : "";
-      change.code = randomCode(6, LETTERS);
+      change.code = await freshCode(ctx);
       change.at = now;
     }
     if (Object.keys(change).length > 0) await ctx.db.patch("passes", p._id, change);
@@ -101,18 +129,18 @@ export const refresh = mutation({
 // The pass a scanned code belongs to, or the reason it doesn't scan: "That code is old." for a
 // pass's code that ran out, "That code isn't a pass." for a code no pass has now (a typo, a code
 // replaced twice, or a pass made on another backend, like a phone on the dev site at a door on
-// the live site).
+// the live site). Passes made before freshCode checked can share a code: the one pass it still
+// scans for wins, and when two still scan it gets "That code isn't a pass.", so the student
+// opens their pass again for a new code.
 async function passFor(ctx: MutationCtx, code: string, now: number): Promise<Doc<"passes">> {
-  const current = await ctx.db.query("passes").withIndex("by_code", (q) => q.eq("code", code)).unique();
-  if (current) {
-    if (now - current.at > CURRENT_MS) throw new ConvexError(OLD);
-    return current;
-  }
-  const before = await ctx.db.query("passes").withIndex("by_prevCode", (q) => q.eq("prevCode", code)).first();
-  if (before) {
-    if (now - before.at >= PREVIOUS_MS) throw new ConvexError(OLD);
-    return before;
-  }
+  const current = await ctx.db.query("passes").withIndex("by_code", (q) => q.eq("code", code)).take(MATCHES);
+  const before = await ctx.db.query("passes").withIndex("by_prevCode", (q) => q.eq("prevCode", code)).take(MATCHES);
+  // By id, since an old pass can hold the same code as its code and as the code before it.
+  const scans = new Map<string, Doc<"passes">>();
+  for (const p of current) if (now - p.at <= CURRENT_MS) scans.set(p._id, p);
+  for (const p of before) if (now - p.at < PREVIOUS_MS) scans.set(p._id, p);
+  if (scans.size === 1) return [...scans.values()][0];
+  if (scans.size === 0 && current.length + before.length > 0) throw new ConvexError(OLD);
   throw new ConvexError(NOT_A_PASS);
 }
 
@@ -138,7 +166,8 @@ export const scan = mutation({
       .query("checkins")
       .withIndex("by_channel_and_user", (q) => q.eq("channel", channel).eq("user", p.user).gte("_creationTime", lectureStart(lecture)))
       .first();
-    const name = cleanName(p.name); // a pass made before names were cleaned can still hold an email
+    // The name on this class's check-in; a pass made before names were cleaned can still hold an email.
+    const name = row ? row.name : cleanName(p.name);
     if (!row) {
       // Minutes late, stored on the row because attendance.sheet and lateFeed read it from here
       // until they work it out when read (package CKA); then this block goes. Late = after the
