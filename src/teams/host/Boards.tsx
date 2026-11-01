@@ -1,5 +1,5 @@
 // #/host Points: the teams students see on their phones (convex/live/groups.ts), every student
-// checked in to this class with their points, the professor's point changes with Undo, End day,
+// checked in to this class with their points, the professor's point changes with Undo, End class,
 // and the saved extra credit as a CSV. Page.tsx puts the page behind StaffGate.
 import { useRef, useState } from "react";
 import { useConvex, useMutation, useQuery } from "convex/react";
@@ -258,26 +258,40 @@ function ChangesCard() {
   );
 }
 
-// End day, and the saved extra credit as a CSV.
+// End class (live.groups.endDay, the same as End class on #/checkin/teacher, with the same name and
+// question), and the saved extra credit as a CSV. The line End day returns shows until the next
+// class opens. Page.tsx keeps this tab mounted, so without that the line about last class would
+// sit under this class's board.
 function EndCard() {
+  const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
   const endDay = useMutation(api.live.groups.endDay);
-  const [message, setMessage] = useState("");
+  // The class open when End class was pressed (null when none was, or the list hadn't loaded),
+  // and the line End day returned.
+  const [ended, setEnded] = useState<{ lecture: string | null; line: string } | null>(null);
+  const open = classes?.find((c) => c.open);
+  let line = ended?.line ?? "";
+  // A class opened since then, so the line was about the class before it.
+  if (ended && open && open.lecture !== ended.lecture) {
+    setEnded(null);
+    line = "";
+  }
   return (
     <Card title="End of class">
       <div className="row">
         <ConfirmButton
-          question="End the day? Each student gets their team's extra credit now, and points start again from 0. This can't be undone."
-          confirm="End day"
+          question="End this class? Each student gets their team's extra credit now. Next class, everyone checks in again and points start from 0. This can't be undone."
+          confirm="End class"
           onConfirm={async () => {
-            setMessage("");
-            setMessage(await endDay({ channel: CHANNEL }));
+            const lecture = open?.lecture ?? null;
+            setEnded(null);
+            setEnded({ lecture, line: await endDay({ channel: CHANNEL }) });
           }}
         >
-          End day
+          End class
         </ConfirmButton>
         <Download />
       </div>
-      {message && <Banner tone="info">{message}</Banner>}
+      {line && <Banner tone="info">{line}</Banner>}
     </Card>
   );
 }
@@ -308,7 +322,7 @@ function Download() {
     try {
       const rows = await allResults((cursor) => convex.query(api.live.groups.results, { channel: CHANNEL, paginationOpts: { numItems: 200, cursor } }));
       if (rows.length === 0) {
-        setNote({ kind: "empty", text: "No extra credit saved yet. End day saves it." });
+        setNote({ kind: "empty", text: "No extra credit saved yet. End class saves it." });
         return;
       }
       saveExtraCredit(extraCreditCsv(rows));

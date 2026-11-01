@@ -29,7 +29,7 @@
 import { mutation, query, type MutationCtx } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
-import { checkedIn, cleanName, ensureLecture, lectureStart, nameIsEmail, randomCode, requireUser } from "../lib";
+import { EARLY_MS, checkedIn, cleanName, ensureLecture, lectureStart, nameIsEmail, randomCode, requireUser } from "../lib";
 import { isProf, pairedDevice, requireScanner, staffRole } from "./prof";
 import { ensureGroup } from "../live/groups";
 
@@ -153,7 +153,8 @@ async function passFor(ctx: MutationCtx, code: string, now: number): Promise<Doc
 // The teacher or the door iPad scans (or types) a pass code. A paired iPad passes its device
 // token as `device`. A scan starts class activity, so it opens a class when none is open
 // (lib.ensureLecture), and checks the student in once per class: a student checked in last class
-// gets a new row in this one. The reply has the student's email only for a professor or admin
+// gets a new row in this one. A scan more than 45 minutes (lib.EARLY_MS) before the open class's
+// saved start is refused. The reply has the student's email only for a professor or admin
 // (the teacher scanner shows it); a paired iPad and the scanner role get "" there, since
 // students' emails are otherwise professor-only.
 export const scan = mutation({
@@ -168,6 +169,11 @@ export const scan = mutation({
     const now = Date.now();
     const p = await passFor(ctx, c, now);
     const lecture = await ensureLecture(ctx, channel);
+    // A class opened the evening before by saving the next morning's start takes no scans until
+    // EARLY_MS before that start, so a scan that evening doesn't check someone in to the morning's
+    // class as on time.
+    if (lecture.startsAt !== undefined && now < lecture.startsAt - EARLY_MS)
+      throw new ConvexError("Scanning opens 45 minutes before class starts.");
     const row = await ctx.db
       .query("checkins")
       .withIndex("by_channel_and_user", (q) => q.eq("channel", channel).eq("user", p.user).gte("_creationTime", lectureStart(lecture)))

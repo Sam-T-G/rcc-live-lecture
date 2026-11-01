@@ -61,6 +61,13 @@ export function metersBetween(aLat: number, aLng: number, bLat: number, bLng: nu
 // A class nobody ended closes this long after it opened (or after its saved start time).
 export const LECTURE_MS = 12 * 60 * 60_000;
 
+// How early students check in: back-to-back sections start 60 to 90 minutes apart, and students
+// rarely check in more than 45 minutes before class. checkin.pass.scan refuses a scan earlier than
+// this before the open class's saved start (a class opened the evening before by saving the next
+// morning's start), and attendance.setClassStart takes a start no later than this after the open
+// class's first check-in.
+export const EARLY_MS = 45 * 60_000;
+
 // When a class nobody ends closes itself: 12 hours after it opened, or 12 hours after its saved
 // start time when that is later. A class opened the evening before by saving the next morning's
 // start then stays open through the morning's class instead of closing in the middle of it.

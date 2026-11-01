@@ -550,3 +550,44 @@ describe("F8 the next class on the same channel starts clean", () => {
     ]);
   });
 });
+
+// LX-convex-1: End class Monday evening, then saving Tuesday's start opens Tuesday's class at once
+// (lib.ensureLecture), and lectureClosesAt keeps it open through Tuesday's class. A scan made that
+// evening would land in Tuesday's class as on time, so Tuesday's pass page would show no QR and
+// the sheet would list a student who may never come. Scans open 45 minutes before the saved start.
+describe("LX-convex-1 a class opened by saving the next morning's start takes no scans until 45 minutes before it", () => {
+  const MON_6PM = at(2026, 11, 9, 18, 0);
+  const TUE_9AM = at(2026, 11, 10, 9, 0);
+  const EARLY = "Scanning opens 45 minutes before class starts.";
+
+  it("Monday 21:35 and Tuesday 8:14 are refused; 8:15 checks in to Tuesday's class, on time", async () => {
+    const t = setup();
+    const prof = await professor(t);
+    const setStart = (startsAt: number) => prof.mutation(api.checkin.attendance.setClassStart, { channel: CH, startsAt, graceMin: 5 });
+    vi.setSystemTime(MON_6PM - 10 * MIN);
+    await setStart(MON_6PM);
+    vi.setSystemTime(MON_6PM + 20 * MIN);
+    await checkIn(t, student(t, 1));
+    // 21:30: End class, then Tuesday 9:00 saved; that opens Tuesday's class now.
+    vi.setSystemTime(MON_6PM + 3.5 * HOUR);
+    await prof.mutation(api.live.groups.endDay, { channel: CH });
+    await setStart(TUE_9AM);
+    const tuesday = await openClass(t);
+    expect(tuesday).not.toBeNull();
+    // 21:35: a straggler's pass is scanned. Refused, and nothing changes.
+    vi.setSystemTime(MON_6PM + 3.5 * HOUR + 5 * MIN);
+    const s2 = student(t, 2);
+    await expect(checkIn(t, s2)).rejects.toThrow(EARLY);
+    expect(await s2.query(api.checkin.read.me, { channel: CH })).toBe(false);
+    expect(await prof.query(api.checkin.attendance.sheet, { channel: CH })).toEqual([]);
+    expect(await openClass(t)).toBe(tuesday);
+    // Tuesday 8:14 is still too early; 8:15 checks in to Tuesday's class, on time.
+    vi.setSystemTime(TUE_9AM - 46 * MIN);
+    await expect(checkIn(t, s2)).rejects.toThrow(EARLY);
+    vi.setSystemTime(TUE_9AM - 45 * MIN);
+    expect(await checkIn(t, s2)).toMatchObject({ name: name(2), already: false });
+    expect(await openClass(t)).toBe(tuesday);
+    expect((await prof.query(api.checkin.attendance.sheet, { channel: CH })).map((r) => [r.name, r.lateMin])).toEqual([[name(2), null]]);
+    expect(await s2.query(api.checkin.read.me, { channel: CH })).toBe(true);
+  });
+});

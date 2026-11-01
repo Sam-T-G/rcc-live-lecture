@@ -41,7 +41,7 @@ import { mutation, query, type QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { ConvexError, v, type Infer } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
-import { cleanName, ensureLecture, lectureStart, lectureWindow, requireUser } from "../lib";
+import { EARLY_MS, cleanName, ensureLecture, lectureStart, lectureWindow, requireUser } from "../lib";
 import { requireProf } from "./prof";
 
 const MIN = 60_000;
@@ -49,10 +49,8 @@ const MIN = 60_000;
 const START_RANGE_MS = 12 * 60 * MIN;
 // Teams lock this long after class starts (convex/live/groups.ts).
 const TEAM_LOCK_MS = 5 * MIN;
-// A start more than this long after the open class's first check-in is the next class's start:
-// back-to-back sections start 60 to 90 minutes apart, and students rarely check in more than 45
-// minutes before class.
-const EARLY_MS = 45 * MIN;
+// A start more than EARLY_MS (lib.ts, 45 minutes) after the open class's first check-in is the next
+// class's start. pass.scan uses the same 45 minutes the other way round.
 // lectures: how many classes it lists at most, how many `lectures` rows it looks through to find
 // them (rows for classes nobody checked in to are skipped), and how many check-ins it reads to
 // count them. A function may read about 16,000 documents; a class of 40 students over a semester

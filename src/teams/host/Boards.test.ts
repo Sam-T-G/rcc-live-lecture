@@ -90,7 +90,7 @@ const texts = (html: string, cls: string) =>
   [...html.matchAll(new RegExp(`<[a-z]+ class="[^"]*\\b${cls}\\b[^"]*"[^>]*>(.*?)</`, "g"))].map((m) => m[1].replace(/<[^>]+>/g, ""));
 
 describe("#/host Points", () => {
-  it("rt-2 F28 the professor sets team size here ('Teams of 3' / 'Teams of 4') and gives +1 or -1 to each team and each student; End day and the CSV are here; 'Mix the teams' and -5 are gone", () => {
+  it("rt-2 F28 the professor sets team size here ('Teams of 3' / 'Teams of 4') and gives +1 or -1 to each team and each student; End class and the CSV are here; 'Mix the teams' and -5 are gone", () => {
     const html = tab();
     expect(html).toContain("Teams of 3");
     expect(html).toContain("Teams of 4");
@@ -98,13 +98,13 @@ describe("#/host Points", () => {
     expect(html).toContain('aria-label="Take 1 point off Blue"');
     expect(html).toContain('aria-label="Give Sample student 4 1 point"');
     expect(html).toContain('aria-label="Take 1 point off Sample student 1"');
-    expect(html).toContain(">End day<");
+    expect(html).toContain(">End class<");
     expect(html).toContain("Download extra credit (CSV)");
     expect(html).not.toContain("Mix the teams");
     expect(html).not.toMatch(/[-−]5</);
   });
 
-  it("UB-risk-4 F28 each control sends its change: +1 and −1 per team and per student, the team size, Undo and End day", async () => {
+  it("UB-risk-4 F28 each control sends its change: +1 and −1 per team and per student, the team size, Undo and End class", async () => {
     tab();
     // Presses a control the way a click would, then lets its change go out.
     const press = async (name: string, value?: unknown) => {
@@ -125,7 +125,7 @@ describe("#/host Points", () => {
     expect(await press("Team size", "4")).toEqual([["live/groups:setSize", { channel: "gdg", size: 4 }]]);
     expect(await press("Undo −1 for Blue")).toEqual([["live/groups:removePoints", { id: "points2" }]]);
     expect(await press("Undo +2 for Sample student 1")).toEqual([["live/groups:removePoints", { id: "points1" }]]);
-    expect(await press("confirm End day")).toEqual([["live/groups:endDay", { channel: "gdg" }]]);
+    expect(await press("confirm End class")).toEqual([["live/groups:endDay", { channel: "gdg" }]]);
   });
 
   it("host-frontend-23 equal totals share a place and say 'tied', for teams and for students", () => {

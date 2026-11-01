@@ -111,6 +111,19 @@ const alertText = (t: Tree[]) => {
   const el = hosts(t).find((h) => h.props.role === "alert");
   return el && words(el);
 };
+// The card the last scan or typed code shows ("Checked in", the name and email).
+const scanCard = (t: Tree[]) => {
+  const el = hosts(t).find((h) => h.type === "section" && h.props.className === "panel" && /^(Already checked in|Checked in) /.test(words(h)));
+  return el && words(el);
+};
+// Types a code in "Code on their phone" and presses Check in (the form's onSubmit).
+function checkIn(code: string) {
+  const form = () => hosts(page()).find((h) => h.type === "form" && h.props.className === "att-code");
+  const input = hosts(form()?.children ?? []).find((h) => h.type === "input");
+  if (!input) throw new Error(`no code field in: ${words(page())}`);
+  (input.props.onChange as (e: unknown) => void)({ target: { value: code } });
+  (form()!.props.onSubmit as (e: unknown) => void)({ preventDefault: () => {} });
+}
 const sent = (name: string) => server.sent.filter((s) => s.name === name);
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
@@ -176,6 +189,11 @@ describe("F8.1 End class on #/checkin/teacher", () => {
     server.results["checkin/attendance:lectures"] = [nextWeek, ended];
     expect(statusRow(page())).toBe("Class started Thu Nov 12, 2:20 PM End class");
     expect(banner(page())).toBeUndefined();
+    // LX-risk-1: next week's class ends some other way (End class on #/host, or the 12-hour close):
+    // the line about the class before it doesn't come back.
+    server.results["checkin/attendance:lectures"] = [{ ...nextWeek, open: false, endedAt: pst(11, 12, 16, 0) }, ended];
+    expect(statusRow(page())).toBe("No class running.");
+    expect(banner(page())).toBeUndefined();
     expect(rejections).toEqual([]);
   });
 
@@ -190,6 +208,59 @@ describe("F8.1 End class on #/checkin/teacher", () => {
 
     expect(press(page(), "Cancel")).toBe("clicked");
     expect(statusRow(page())).toBe("Class started Thu Nov 5, 2:30 PM End class");
+    expect(rejections).toEqual([]);
+  });
+
+  it("LX-check-1 the last scan's card goes when its class ends, and the next class doesn't show it", async () => {
+    checkIn("abc123");
+    expect(sent("checkin/pass:scan").map((s) => s.args)).toEqual([{ channel: "gdg", code: "abc123" }]);
+    sent("checkin/pass:scan")[0].resolve({ name: "Sample student 1", email: "s1@example.edu", already: false });
+    await settle();
+    expect(scanCard(page())).toBe("Checked in Sample student 1 s1@example.edu");
+    press(page(), "End class");
+    press(page(), "End class");
+    sent("live/groups:endDay")[0].resolve(LINE);
+    await settle();
+    // The list can still show the class open for a moment: the card is still this class's.
+    expect(scanCard(page())).toBe("Checked in Sample student 1 s1@example.edu");
+    server.results["checkin/attendance:lectures"] = [ended];
+    expect(statusRow(page())).toBe(`No class running. ${LINE}`);
+    expect(scanCard(page())).toBeUndefined();
+    vi.setSystemTime(pst(11, 12, 14, 25));
+    server.results["checkin/attendance:lectures"] = [nextWeek, ended];
+    expect(scanCard(page())).toBeUndefined();
+    expect(rejections).toEqual([]);
+  });
+
+  it("LX-check-1 a scan with no class running opens one, and its card stays for that class until it ends", async () => {
+    server.results["checkin/attendance:lectures"] = [ended];
+    checkIn("abc123");
+    sent("checkin/pass:scan")[0].resolve({ name: "Sample student 1", email: "s1@example.edu", already: false });
+    await settle();
+    expect(scanCard(page())).toBe("Checked in Sample student 1 s1@example.edu");
+    // The scan opened next week's class.
+    vi.setSystemTime(pst(11, 12, 14, 25));
+    server.results["checkin/attendance:lectures"] = [nextWeek, ended];
+    expect(scanCard(page())).toBe("Checked in Sample student 1 s1@example.edu");
+    // A second code in the same class replaces the card.
+    checkIn("def456");
+    sent("checkin/pass:scan")[1].resolve({ name: "Sample student 2", email: "s2@example.edu", already: true });
+    await settle();
+    expect(scanCard(page())).toBe("Already checked in Sample student 2 s2@example.edu");
+    server.results["checkin/attendance:lectures"] = [{ ...nextWeek, open: false, endedAt: pst(11, 12, 16, 0) }, ended];
+    expect(scanCard(page())).toBeUndefined();
+    expect(rejections).toEqual([]);
+  });
+
+  it("LX-check-1 a refused code with no class running opens nothing, so its error goes when a class opens", async () => {
+    server.results["checkin/attendance:lectures"] = [ended];
+    checkIn("abc123");
+    sent("checkin/pass:scan")[0].reject(new ConvexError("That code is old."));
+    await settle();
+    expect(alertText(page())).toBe("That code is old.");
+    vi.setSystemTime(pst(11, 12, 14, 25));
+    server.results["checkin/attendance:lectures"] = [nextWeek, ended];
+    expect(alertText(page())).toBeUndefined();
     expect(rejections).toEqual([]);
   });
 

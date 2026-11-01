@@ -5,7 +5,8 @@
 // types the code from a student's phone. The page lists who checked in, each with a Remove for a
 // wrong check-in; the professor sets when class starts and how many minutes of grace come before
 // "late"; and downloads attendance as a CSV for this class or any past one. End class, next to the
-// status line, ends the class (the same End day as the Professor view's Points tab).
+// status line, ends the class (the same End class, live.groups.endDay, as the Professor view's
+// Points tab).
 import "./teacher.css";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useConvex, useMutation, useQuery } from "convex/react";
@@ -157,7 +158,8 @@ function earlierOnly(classes: ClassRow[] | undefined) {
   return classes.find((c) => c.lecture === "earlier");
 }
 
-type Result = { ok: true; name: string; email: string; already: boolean } | { ok: false; text: string };
+// n counts the results, so each one starts LastScan afresh.
+type Result = ({ ok: true; name: string; email: string; already: boolean } | { ok: false; text: string }) & { n: number };
 
 // The camera and the typed code. A pass the camera reads, or a code typed in, checks that
 // student in to this class.
@@ -175,9 +177,10 @@ function ScanPasses() {
     if (code === last.current.code && now - last.current.at < 4000) return;
     last.current = { code, at: now };
     try {
-      setResult({ ok: true, ...(await scan({ channel: CHANNEL, code })) });
+      const r = await scan({ channel: CHANNEL, code });
+      setResult((was) => ({ ok: true, ...r, n: (was?.n ?? 0) + 1 }));
     } catch (e) {
-      setResult({ ok: false, text: why(e) });
+      setResult((was) => ({ ok: false, text: why(e), n: (was?.n ?? 0) + 1 }));
     }
   }
   const sendRef = useRef(send);
@@ -235,16 +238,38 @@ function ScanPasses() {
           Check in
         </Button>
       </form>
-      {result &&
-        (result.ok ? (
-          <Card title={result.already ? "Already checked in" : "Checked in"}>
-            <p className="pass__name">{result.name}</p>
-            <p className="muted">{result.email}</p>
-          </Card>
-        ) : (
-          <Status kind="error">{result.text}</Status>
-        ))}
+      {result && (
+        <ErrorBoundary key={result.n} label="The last check-in">
+          <LastScan result={result} />
+        </ErrorBoundary>
+      )}
     </section>
+  );
+}
+
+// The last scan's result, while the class it was for is open. That class is the one open when the
+// result first shows; when none was, a scan that checked someone in opened one, so it's the first
+// class that opens after. Once that class ends (End class here or on #/host, or the 12-hour close)
+// or another one opens, the result goes, so a name from last class never shows in this one. A
+// refused scan opened nothing, so its error goes as soon as any class opens.
+function LastScan({ result }: { result: Result }) {
+  const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
+  const open = classes === undefined ? undefined : (classes.find((c) => c.open)?.lecture ?? null);
+  // The class this result belongs to: undefined until the list loads, null while none is open.
+  const [own, setOwn] = useState<string | null | undefined>(undefined);
+  let mine = own;
+  if (open !== undefined && (mine === undefined || (mine === null && open !== null && result.ok))) {
+    setOwn(open);
+    mine = open;
+  }
+  if (open !== undefined && open !== mine) return null;
+  return result.ok ? (
+    <Card title={result.already ? "Already checked in" : "Checked in"}>
+      <p className="pass__name">{result.name}</p>
+      <p className="muted">{result.email}</p>
+    </Card>
+  ) : (
+    <Status kind="error">{result.text}</Status>
   );
 }
 
