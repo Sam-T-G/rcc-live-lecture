@@ -17,7 +17,8 @@
 //       answer follows its own box. `index` is the slide it goes with: left out, it's the slide the
 //       deck is on in this class (never last class's), or none. The same question asked again
 //       within 5 s is a double tap: it returns the open poll.
-//   end({ poll })               professors
+//   end({ poll })               professors  also saves the final counts on the poll (live.past
+//                                          reads them)
 //   stats({ poll })             professors  counts, answered of checked in (this class), % right,
 //                                          median seconds, the slide and whether the AI drafted it
 //   history({ channel })        professors  this class's questions, newest first
@@ -71,11 +72,20 @@ function classPolls(ctx: Ctx, channel: string, start: number) {
     .order("desc");
 }
 
-async function tally(ctx: Ctx, poll: Id<"polls">, choices: number) {
+// Every answer to a poll and how many picked each choice.
+export async function tally(ctx: Ctx, poll: Id<"polls">, choices: number) {
   const rows = await ctx.db.query("pollAnswers").withIndex("by_poll", (q) => q.eq("poll", poll)).collect();
   const counts = Array.from({ length: choices }, () => 0);
   for (const r of rows) if (r.choice < choices) counts[r.choice]++;
   return { rows, counts };
+}
+
+// Ends an open poll and saves its final counts on the row. Answers stop once it's closed (answer
+// refuses a closed poll), so the saved counts stay right; live.past reads them instead of every
+// answer.
+async function close(ctx: MutationCtx, p: Doc<"polls">, now: number) {
+  const { counts } = await tally(ctx, p._id, p.choices.length);
+  await ctx.db.patch("polls", p._id, { open: false, closedAt: now, counts });
 }
 
 // Percent who picked the right answer, or null with no right answer or no answers.
@@ -181,7 +191,7 @@ export const ask = mutation({
         prev.choices.length === cs.length &&
         prev.choices.every((c, i) => c === cs[i]);
       if (same && prev._creationTime >= start && now - prev.at < SAME_ASK_MS) return prev._id;
-      await ctx.db.patch("polls", prev._id, { open: false, closedAt: now });
+      await close(ctx, prev, now);
     }
     const slide = index !== undefined && Number.isSafeInteger(index) && index >= 0 ? index : await deckSlide(ctx, channel, start);
     return await ctx.db.insert("polls", {
@@ -205,7 +215,7 @@ export const end = mutation({
   handler: async (ctx, { poll }) => {
     await requireProf(ctx);
     const p = await ctx.db.get(poll);
-    if (p?.open) await ctx.db.patch(poll, { open: false, closedAt: Date.now() });
+    if (p?.open) await close(ctx, p, Date.now());
     return null;
   },
 });

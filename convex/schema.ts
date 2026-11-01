@@ -170,6 +170,9 @@ export default defineSchema({
     open: v.boolean(),
     at: v.number(),
     closedAt: v.optional(v.number()),
+    // How many picked each choice, saved when the poll ends (quiz.end, or ask closing it), so
+    // live.past reads one row instead of every answer. Missing on polls ended before it existed.
+    counts: v.optional(v.array(v.number())),
   }).index("by_channel", ["channel"]),
 
   // team: checkin. One answer per student per poll: locked on a quiz, changeable on an open vote.

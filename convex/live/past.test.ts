@@ -1,6 +1,10 @@
 // live/past: the quizzes and votes the professor has ended in this class, for students to look back on.
+import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
+import schema from "../schema";
+import { modules } from "../test.setup";
 import { endLecture, ensureLecture } from "../lib";
 import { admin, at, checkIn, profEnv, setup, typed, type T } from "../test.helpers";
 
@@ -88,5 +92,46 @@ describe("F23 past questions on the phone", () => {
     expect(shown[0].question).toBe("Question 52");
     expect(shown[49].question).toBe("Question 3");
     expect(shown.map((p) => p.id)).not.toContain(last);
+  });
+
+  // UA-convex-1: every phone runs past for itself, so it can't read every answer on every ended
+  // poll. End (and ask, when it closes the open poll) saves the final counts on the poll; past
+  // reads those and only the caller's own answer per poll.
+  it("F23.4 past reads saved counts, not every answer: 10 polls x 40 answers in under 100 reads", async () => {
+    const t = convexTest({ schema, modules, transactionLimits: { documentsRead: 100 } });
+    await openClass(t);
+    const a = student(t, 1);
+    await checkIn(t, a);
+    const polls: Id<"polls">[] = [];
+    for (let i = 0; i < 10; i++) {
+      vi.setSystemTime(T0 + (i + 1) * 60_000);
+      const poll = await ask(t, i % 2 ? "vote" : "quiz", `Question ${i}`, ["A", "B"], i % 2 ? undefined : 0);
+      await t.run(async (ctx) => {
+        for (let n = 0; n < 40; n++) await ctx.db.insert("pollAnswers", { poll, user: `sample|${n}`, choice: n % 4 === 0 ? 1 : 0, at: Date.now() });
+      });
+      await a.mutation(api.checkin.quiz.answer, { poll, choice: 1 });
+      // Even polls end with End; odd ones end when the next ask closes them (the last one by End).
+      if (i % 2 === 0 || i === 9) await admin(t).mutation(api.checkin.quiz.end, { poll });
+      polls.push(poll);
+    }
+    const shown = await a.query(api.live.past.past, { channel: CH });
+    expect(shown).toHaveLength(10);
+    for (const p of shown) {
+      expect(p.counts).toEqual([30, 11]);
+      expect(p.mine).toBe(1);
+    }
+    const saved = await t.run(async (ctx) => Promise.all(polls.map(async (id) => (await ctx.db.get(id))?.counts)));
+    expect(saved).toEqual(polls.map(() => [30, 11]));
+  });
+
+  it("F23.5 a poll ended before counts were saved still shows its counts", async () => {
+    const t = setup();
+    await openClass(t);
+    const poll = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("polls", { channel: CH, question: "Old one", choices: ["A", "B"], kind: "vote", open: false, at: T0, closedAt: T0 });
+      await ctx.db.insert("pollAnswers", { poll: id, user: "sample|1", choice: 1, at: T0 });
+      return id;
+    });
+    expect((await t.query(api.live.past.past, { channel: CH })).map((p) => [p.id, p.counts])).toEqual([[poll, [0, 1]]]);
   });
 });

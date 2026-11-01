@@ -1,7 +1,8 @@
 // The Now tab's "Ask the room" card. The professor drafts a question from the slide with the AI, or
 // writes one, and opens it as a quiz or a vote on Check-in's polls (convex/checkin/quiz.ts), so it
 // shows on every phone, on #/checkin/quiz and on the stage. While it's open the bars and "N of M
-// answered" move as students answer; after End, % right and the median time show too.
+// answered" move as students answer; after End, each choice's %, the right answer (or the vote's
+// top pick), % right and the median time show too.
 import { useId, useState, type FormEvent } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -129,8 +130,13 @@ function Running({ poll, writing }: { poll: Poll; writing: boolean }) {
   const vote = poll.kind === "vote";
   const counts = stats?.counts ?? poll.choices.map(() => 0);
   const answered = stats?.answered ?? poll.answered;
-  // The right answer is marked once the question has ended, as on the phones.
-  const right = !poll.open && stats ? stats.correct : null;
+  const ended = !poll.open && !!stats;
+  // Once the question has ended, as on #/checkin/quiz: the right answer is marked, or on a vote
+  // (or a quiz with no right answer) the choice or choices most students picked.
+  const right = ended ? stats.correct : null;
+  const most = Math.max(...counts);
+  const top = (i: number) => ended && right === null && answered > 0 && counts[i] === most;
+  const pct = (i: number) => (answered ? Math.round((counts[i] / answered) * 100) : 0);
 
   async function endIt(id: Id<"polls">) {
     setEnding(true);
@@ -155,13 +161,17 @@ function Running({ poll, writing }: { poll: Poll; writing: boolean }) {
       <h3 className="ask-poll__q">{poll.question}</h3>
       <ul className="ask-bars">
         {poll.choices.map((c, i) => (
-          <li key={i} className={i === right ? "ask-bar ask-bar--right" : "ask-bar"}>
+          <li key={i} className={i === right || top(i) ? "ask-bar ask-bar--right" : "ask-bar"}>
             <b className="ask-bar__letter">{LETTERS[i]}</b>
             <span className="ask-bar__text">
               {c}
               {i === right && <span className="ask-bar__mark"> · right answer</span>}
+              {top(i) && <span className="ask-bar__mark"> · top pick</span>}
             </span>
-            <span className="ask-bar__n">{counts[i]}</span>
+            <span className="ask-bar__n">
+              {counts[i]}
+              {ended && ` · ${pct(i)}%`}
+            </span>
             <span className="ask-bar__track" aria-hidden="true">
               <span className="ask-bar__fill" style={{ width: `${answered ? (counts[i] / answered) * 100 : 0}%` }} />
             </span>
@@ -184,8 +194,8 @@ function Running({ poll, writing }: { poll: Poll; writing: boolean }) {
 }
 
 // The question being written: quiz or vote, the question, up to 4 choices and, on a quiz, the
-// right answer.
-function QuestionForm({
+// right answer. Exported for AskRoom.test.ts.
+export function QuestionForm({
   form,
   slide,
   pollOpen,
@@ -259,7 +269,11 @@ function QuestionForm({
           Cancel
         </Button>
       </div>
-      {pollOpen && <p className="muted ask-form__rule">Opening this ends the question that's open now.</p>}
+      {pollOpen && (
+        <p className="muted ask-form__rule">
+          {quiz ? "Opening this question ends the question that's open now." : "Starting this vote ends the question that's open now."}
+        </p>
+      )}
     </form>
   );
 }
