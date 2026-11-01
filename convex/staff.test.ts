@@ -822,11 +822,12 @@ describe("ROLES-API-fixcheck pairing floods, test sign-ins leave nothing behind,
     expect(await t.query(api.checkin.pass.canScan, { device: DEVICE_TOKEN })).toBe(true);
   });
 
-  it("ROLES-API-fixcheck-3 devGrant on a dev backend the code doesn't list says to add its host to DEV_HOSTS", async () => {
+  it("ROLES-API-fixcheck-3 sweep2-docs-fixcheck-1 devGrant on a dev backend the code doesn't list says to ask Sam to add its host to both DEV_HOSTS lists", async () => {
     const t = setup();
     vi.stubEnv("CONVEX_CLOUD_URL", "https://happy-lion-42.convex.cloud");
     await expect(t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "professor" })).rejects.toThrow(
-      "staff:devGrant runs only on the dev backends in DEV_HOSTS in convex/checkin/prof.ts, and happy-lion-42.convex.cloud isn't one of them. If it's your own dev backend (never prod), add it there.",
+      "staff:devGrant runs only on the dev backends in DEV_HOSTS in convex/checkin/prof.ts, and happy-lion-42.convex.cloud isn't one of them. " +
+        "If it's your own dev backend (never prod), ask Sam to add its host to DEV_HOSTS in convex/checkin/prof.ts and convex/auth.config.ts (README step 4).",
     );
     vi.stubEnv("CONVEX_CLOUD_URL", undefined);
     await expect(t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "professor" })).rejects.toThrow(

@@ -33,6 +33,8 @@ const CURRENT = [
 const HISTORY = ["docs/meeting-1029.md", "docs/handoff-live-slides.md", "docs/handoff-professor-view.md"];
 const doc = (path: string) => (exists(path) ? read(path) : "");
 const lines = (path: string) => doc(path).split("\n");
+// A line that tells someone to add a host to DEV_HOSTS, in any form of "add" (sweep2-docs-fixcheck-3).
+const ADDS_HOST = /\badd(s|ing|ed)?\b.{0,160}DEV_HOSTS|DEV_HOSTS.{0,160}\badd(s|ing|ed)?\b/i;
 
 // Every route the app has: each page in src/pages/index.ts and the parts the team pages route.
 const checkinParts = [...read("src/teams/checkin/Page.tsx").matchAll(/case "([^"]+)":/g)].map((m) => `checkin/${m[1]}`);
@@ -93,7 +95,7 @@ describe("docs: what no doc may say", () => {
   it("sweep1-docs-12 a line that says to add a host to DEV_HOSTS names both files", () => {
     for (const path of CURRENT)
       for (const l of lines(path))
-        if (/\badd\b.{0,160}DEV_HOSTS|DEV_HOSTS.{0,160}\badd\b/i.test(l))
+        if (ADDS_HOST.test(l))
           expect([path, l, l.includes("convex/auth.config.ts") && l.includes("convex/checkin/prof.ts")]).toEqual([path, l, true]);
   });
 });
@@ -416,9 +418,9 @@ describe("docs: the 2026-11-01 second sweep", () => {
     let seen = 0;
     for (const path of CURRENT)
       for (const l of lines(path))
-        if (/\badd\b.{0,160}DEV_HOSTS|DEV_HOSTS.{0,160}\badd\b/i.test(l)) {
+        if (ADDS_HOST.test(l)) {
           seen++;
-          expect([path, l, /\bask Sam\b|Sam adds/i.test(l)]).toEqual([path, l, true]);
+          expect([path, l, /\basks? Sam\b|\bSam (also )?adds\b/i.test(l)]).toEqual([path, l, true]);
         }
     expect(seen).toBeGreaterThan(4);
     expect(ownerRow("convex/auth.config.ts")).toMatch(/DEV_HOSTS/);
@@ -431,8 +433,49 @@ describe("docs: the 2026-11-01 second sweep", () => {
     expect(CURRENT).toContain("templates/TEAM.md");
   });
 
-  it("sweep2-docs-10 design.md's professor-laptop rule leaves #/host its own kept-mounted tabs", () => {
+  it("sweep2-docs-10 sweep2-docs-fixcheck-2 design.md, AGENTS.md and kit.tsx leave #/host its own kept-mounted tabs", () => {
     expect(line("docs/design.md", "sections as `Tabs`")).toMatch(/#\/host[^.]*mounted/);
+    const design = read("docs/design.md");
+    const from = design.indexOf("### Tabs");
+    const tabs = design.slice(from, design.indexOf("\n### ", from + 5));
+    expect(tabs).toContain("<Tabs label=");
+    expect(tabs).not.toMatch(/Professor view|"now"|<Now \/>|<Questions \/>/);
+    expect(line("AGENTS.md", "Reuse a block or kit part")).toMatch(/#\/host[^.]*mounted/);
+    const kit = read("src/blocks/kit.tsx");
+    const at = kit.indexOf("export function Tabs");
+    expect(kit.slice(kit.lastIndexOf("\n\n", at), at)).not.toMatch(/professor view/i);
+  });
+
+  it("sweep2-docs-fixcheck-1 a convex/ comment that tells someone to add a host says to ask Sam and points at README step 4", () => {
+    const files = (dir: string): string[] =>
+      readdirSync(new URL(dir, root), { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? (e.name === "_generated" ? [] : files(`${dir}${e.name}/`)) : [`${dir}${e.name}`],
+      );
+    let seen = 0;
+    for (const file of files("convex/").filter((f) => f.endsWith(".ts") && !f.includes(".test."))) {
+      // Each run of // lines is one paragraph; check it sentence by sentence.
+      const comments = read(file)
+        .split("\n")
+        .map((l) => l.trim())
+        .map((l) => (l.startsWith("//") ? l.slice(2).trim() : "\u0000"))
+        .join(" ");
+      for (const para of comments.split("\u0000"))
+        for (const sentence of para.split(/(?<=\.)\s+(?=[A-Z])/))
+          if (/\badd(s|ing|ed)?\b[^.]{0,80}\bhost\b/i.test(sentence)) {
+            seen++;
+            expect([file, sentence, /\basks? Sam\b|\bSam (also )?adds\b/i.test(sentence) && sentence.includes("README step 4")]).toEqual([file, sentence, true]);
+          }
+    }
+    expect(seen).toBeGreaterThan(3);
+  });
+
+  it("sweep2-docs-check-1 live TEAM.md says only a student's point change carries a reason, as #/host sends it", () => {
+    const points = line("src/teams/live/TEAM.md", "- **Points:**");
+    expect(points).not.toMatch(/for a team or one student, with its reason/);
+    expect(points).toMatch(/a team's change has none/);
+    const calls = read("src/teams/host/Boards.tsx").match(/adjust\(\{ channel: CHANNEL, team:[^)]*\)/g) ?? [];
+    expect(calls.length).toBe(2);
+    for (const call of calls) expect(call).not.toContain("reason");
   });
 
   it("sweep2-docs-11 no current doc or design.md names an End day button; the button is End class", () => {

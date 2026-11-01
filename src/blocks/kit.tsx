@@ -86,7 +86,7 @@ export function Field({
 
 export type Tab = { id: string; label: ReactNode; panel: ReactNode };
 
-// Tabs over one panel at a time (the professor view's sections). Left and right arrows, Home
+// Tabs over one panel at a time; a closed panel unmounts (#/host keeps its own tab bar for that). Left and right arrows, Home
 // and End move between tabs. Pass `value` and `onChange` to keep the tab in your own state (or
 // in the URL); leave them out and the first tab starts open.
 export function Tabs({ label, tabs, value, onChange }: { label: string; tabs: Tab[]; value?: string; onChange?: (id: string) => void }) {

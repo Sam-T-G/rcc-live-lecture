@@ -24,7 +24,7 @@ The agent reads this before every change. Where it disagrees with the Status sec
 - **Questions:** the text, the slide, and the name from the student's check-in unless they post anonymously (anonymous hides it from the professor too). A private question shows only to its author and the professor, can't be upvoted, and its answer can't be shared, not even with its author (D12 e). The professor's typed answer (up to 1000 characters) stays with the professor until they share it; a shared answer shows under the question on every phone.
 - **AI:** "Group by topic with AI" sends Google's Gemini the text of every question in this class that isn't dismissed, private ones included (D12 f), each with a number in place of the student and never a name. The form on #/live tells a student this when they tick the private box. The topics come back to the professor only.
 - **Teams:** a team number per checked-in student, shown as a color. Phones and the projector show only team colors and totals, never names.
-- **Points:** each change the professor makes, for a team or one student, with its reason (up to 80 characters) and time. Only the professor sees the list.
+- **Points:** each change the professor makes, for a team or one student, and its time. A student's change can carry a reason the professor types (up to 80 characters); a team's change has none. A change without a reason is saved as "Bonus" or "Deduction". Only the professor sees the list.
 - **Extra credit:** End class (`live.groups.endDay`) saves one `groupResults` row per student on a team with their name and email from their check-in, team, rank, points, extra credit and running total. Only the professor reads them, for the CSV.
 - No camera, location or microphone.
 

@@ -140,13 +140,13 @@ The label, then the hint and the error, then the field: the error sits above a p
 ### Tabs
 
 ```tsx
-<Tabs label="Professor view" value={tab} onChange={setTab} tabs={[
-  { id: "now", label: "Now", panel: <Now /> },
-  { id: "questions", label: "Questions", panel: <Questions /> },
+<Tabs label="Attendance" value={tab} onChange={setTab} tabs={[
+  { id: "today", label: "This class", panel: <ThisClass /> },
+  { id: "past", label: "Past classes", panel: <PastClasses /> },
 ]} />
 ```
 
-Left and right arrows, Home and End move between tabs. Only the open panel is rendered. Leave out `value` and `onChange` and the first tab starts open.
+Left and right arrows, Home and End move between tabs. Only the open panel is rendered, so a half-typed form in a closed tab is lost: #/host keeps its own tab bar for that reason (Professor laptop, below). Leave out `value` and `onChange` and the first tab starts open.
 
 ### Segmented
 

@@ -9,7 +9,7 @@
 // with upvotes. The rows belong to that class, so they leave the screens when the class ends.
 // fill adds nothing when the channel has sample students already, refuses while a question is
 // open (the sample quiz would take its place on every phone), and runs only on the dev backends
-// in DEV_HOSTS: add your own dev deployment's host to both lists (README step 4) first.
+// in DEV_HOSTS: ask Sam to add your own dev deployment's host to both lists (README step 4) first.
 // Every sample student's user is "sample:<n>", so clear finds their rows in every table and never
 // touches a real student's (a real user is "<issuer>|<subject>"). clear runs on any backend.
 // Internal: the CLI and the dashboard can run these, the browser can't. Leads only.
@@ -48,9 +48,9 @@ const plural = (n: number, one: string) => `${n} ${n === 1 ? one : one + "s"}`;
 // fill makes up students, so it runs only on the dev backends in DEV_HOSTS (convex/checkin/prof.ts,
 // the list typed test roles use), by the host in CONVEX_CLOUD_URL (Convex sets it in every
 // function). Anything else counts as prod: prod's URL, a custom domain, a deployment that isn't on
-// the list, a URL that can't be read. A lead who runs fill on their own dev deployment adds its
-// host to DEV_HOSTS in both convex/checkin/prof.ts and convex/auth.config.ts first (README step
-// 4; a test fails when the two lists differ), which also lets typed test sign-ins and test roles
+// the list, a URL that can't be read. A lead who runs fill on their own dev deployment first asks
+// Sam to add its host to DEV_HOSTS in both convex/checkin/prof.ts and convex/auth.config.ts (README step 4;
+// a test fails when the two lists differ), which also lets typed test sign-ins and test roles
 // work there.
 function refuseOnProd() {
   const host = cloudHost();
@@ -60,7 +60,7 @@ function refuseOnProd() {
   if (!isDevBackend())
     throw new ConvexError(
       `dev/seed:fill adds made-up students, so it runs only on the dev backends in DEV_HOSTS, and ${host} isn't one, so it added nothing. ` +
-        `If it's your own dev backend (never prod), add its host to DEV_HOSTS in convex/checkin/prof.ts and in convex/auth.config.ts (README step 4).`,
+        `If it's your own dev backend (never prod), ask Sam to add its host to DEV_HOSTS in convex/checkin/prof.ts and convex/auth.config.ts (README step 4).`,
     );
 }
 

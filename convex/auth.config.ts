@@ -15,8 +15,8 @@ import type { AuthConfig } from "convex/server";
 // repo, so anyone can make a token for any email, and prod must never list it. The check fails
 // closed, like isDevBackend in convex/checkin/prof.ts: prod (utmost-ibis-818), a custom domain, any
 // other deployment and a missing CONVEX_CLOUD_URL all get Google alone. To use the typed form on
-// your own dev deployment, add its host here and to DEV_HOSTS in convex/checkin/prof.ts, never
-// prod's; convex/auth.config.test.ts fails when the two lists differ.
+// your own dev deployment, ask Sam to add its host here and to DEV_HOSTS in convex/checkin/prof.ts
+// (README step 4; he commits it), never prod's; convex/auth.config.test.ts fails when the two lists differ.
 const DEV_HOSTS = ["quaint-swan-637.convex.cloud", "sample-dev-123.convex.cloud"];
 
 // Plain string checks, no URL parsing: an address in any other form counts as prod.

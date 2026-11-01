@@ -43,8 +43,8 @@ const TYPED_ISSUER = "https://test-login.rcc-live-lecture.local";
 // The dev backends, by the host in their CONVEX_CLOUD_URL (Convex sets it in every function):
 // this laptop's dev deployment, and the sample one the tests stub (convex/test.helpers.ts
 // DEV_URL), which Convex never hands out. Typed test sign-ins hold roles only on these. A lead's
-// own dev deployment (README step 3) isn't here: add its host to use test roles there. Never
-// add prod's (utmost-ibis-818).
+// own dev deployment isn't in DEV_HOSTS: to use test roles there, ask Sam to add its host here and
+// in convex/auth.config.ts (README step 4). Never prod's (utmost-ibis-818).
 const DEV_HOSTS = ["quaint-swan-637.convex.cloud", "sample-dev-123.convex.cloud"];
 
 // The host in CONVEX_CLOUD_URL, lower case, or null when it is missing or not a URL.

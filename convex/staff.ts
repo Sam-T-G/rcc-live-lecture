@@ -67,7 +67,7 @@
 // For the CLI (internal: npx convex run, never from a page):
 //   staff:devGrant '{"email":"prof1@test.local","role":"professor"}'   a role for a test email; dev backends only
 //       Only @test.local emails, and only on the dev backends in DEV_HOSTS (convex/checkin/prof.ts;
-//       a lead's own dev backend gets added there). A typed sign-in with that email holds the
+//       for a lead's own dev backend, ask Sam to add its host, README step 4). A typed sign-in with that email holds the
 //       role for 2 hours (run devGrant again to start the 2 hours again); then dropDevGrant
 //       removes the row. The typed signing key is public, so anyone can sign in as a test email
 //       on dev while its role lasts: keep real student data off dev.
@@ -480,7 +480,9 @@ export const devGrant = internalMutation({
       const host = cloudHost();
       throw new ConvexError(
         "staff:devGrant runs only on the dev backends in DEV_HOSTS in convex/checkin/prof.ts, and " +
-          (host ? `${host} isn't one of them. If it's your own dev backend (never prod), add it there.` : "this backend isn't one of them."),
+          (host
+            ? `${host} isn't one of them. If it's your own dev backend (never prod), ask Sam to add its host to DEV_HOSTS in convex/checkin/prof.ts and convex/auth.config.ts (README step 4).`
+            : "this backend isn't one of them."),
       );
     }
     const email = cleanEmail(raw);

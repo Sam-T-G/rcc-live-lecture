@@ -339,12 +339,12 @@ describe("dev seed", () => {
     expect(sampleRows(await everyRow(t))).toEqual([]);
   });
 
-  it("UZ-fixcheck-1 fill on a lead's own dev backend says to add its host to both DEV_HOSTS lists, since auth.config.test fails when they differ", async () => {
+  it("UZ-fixcheck-1 sweep2-docs-fixcheck-1 fill on a lead's own dev backend says to ask Sam to add its host to both DEV_HOSTS lists (auth.config.ts is Sam's)", async () => {
     vi.stubEnv("CONVEX_CLOUD_URL", "https://brave-otter-456.convex.cloud");
     const t = setup();
     await expect(fill(t)).rejects.toThrow(
       "dev/seed:fill adds made-up students, so it runs only on the dev backends in DEV_HOSTS, and brave-otter-456.convex.cloud isn't one, so it added nothing. " +
-        "If it's your own dev backend (never prod), add its host to DEV_HOSTS in convex/checkin/prof.ts and in convex/auth.config.ts (README step 4).",
+        "If it's your own dev backend (never prod), ask Sam to add its host to DEV_HOSTS in convex/checkin/prof.ts and convex/auth.config.ts (README step 4).",
     );
   });
 
