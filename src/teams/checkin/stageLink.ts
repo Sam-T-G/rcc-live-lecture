@@ -86,7 +86,8 @@ export function bridgeIn(params: URLSearchParams): string | null {
 }
 
 // The bridge key this tab saved from an earlier link, with the origin of the deck that link named
-// (null when it named none), or null. A value saved by an older version (the key alone) counts as
+// (null in a value an earlier version saved from a link with no deck; keyFor gives that to no
+// deck), or null. A value saved by an older version (the key alone) counts as
 // none, since it has no origin.
 export type Saved = { key: string; origin: string | null };
 export function savedBridge(): Saved | null {
@@ -107,8 +108,8 @@ export function keyFor(saved: Saved | null, deck: URL | null): string | null {
   return saved && saved.origin !== null && deck && deck.origin === saved.origin ? saved.key : null;
 }
 
-// When the address bar has #/checkin/stage?bridge=<channel>.<key>, saves the key in this tab, with
-// the origin of the link's ?deck= (keyFor hands the key only to a deck there), and
+// When the address bar has #/checkin/stage?bridge=<channel>.<key> and a ?deck= that loads, saves
+// the key in this tab, with that deck's origin (keyFor hands the key only to a deck there), and
 // puts ?bridge=saved in the address bar in its place (one ?bridge=, where the first one was), so
 // the key never shows on the projector and a reload still finds it. The key is the last ?bridge=
 // that isn't "saved" or empty (bridgeIn). Returns the key, or null when the link has none. When the browser won't
@@ -121,7 +122,10 @@ export function takeBridge(): string | null {
   const params = new URLSearchParams(at === -1 ? "" : location.hash.slice(at + 1));
   const key = bridgeIn(params);
   if (!key || key === SAVED) return null;
-  const origin = deckAddress(params.get("deck") ?? "", location.protocol === "https:")?.origin ?? null;
+  // With no deck that loads, the key stays in the link: the stage says to add ?deck=, and once the
+  // professor does, the next hash change saves the key with that deck's origin.
+  const origin = deckAddress(params.get("deck") ?? "", location.protocol === "https:")?.origin;
+  if (!origin) return key;
   const value = JSON.stringify({ key, origin });
   try {
     sessionStorage.setItem(STORE, value);

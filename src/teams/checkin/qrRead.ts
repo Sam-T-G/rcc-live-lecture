@@ -18,14 +18,30 @@ export type QrReader = (v: HTMLVideoElement) => Promise<string | null>;
 
 const WIDTH = 640; // jsQR is slow on full frames; 640 px wide still reads a phone held up close
 
+// A jsQR download that fails is tried again on the next frame, since the connection may have
+// dropped for a moment. After a deploy the old jsQR file is gone from the site and every try
+// fails until the page reloads, so from the 3rd failed load in a row the reader rejects with
+// SCANNER_DIDNT_LOAD, and the scanner pages show it (scannerLoadFailed) instead of skipping frames.
+export const SCANNER_DIDNT_LOAD = "The scanner didn't load. Reload this page.";
+const LOAD_TRIES = 3;
+class ScannerLoadError extends Error {}
+export const scannerLoadFailed = (e: unknown) => e instanceof ScannerLoadError;
+
 export function makeQrReader(): QrReader {
   let reader: Promise<QrReader> | null = null;
+  let failed = 0; // failed loads in a row
   return async (v) => {
-    // A jsQR download that fails (the connection dropped) is tried again on the next frame.
-    reader ??= pickReader().catch((e: unknown) => {
-      reader = null;
-      throw e;
-    });
+    reader ??= pickReader().then(
+      (r) => {
+        failed = 0;
+        return r;
+      },
+      (e: unknown) => {
+        reader = null;
+        if (++failed >= LOAD_TRIES) throw new ScannerLoadError(SCANNER_DIDNT_LOAD);
+        throw e;
+      },
+    );
     return (await reader)(v);
   };
 }

@@ -349,3 +349,14 @@ describe("the status line", () => {
     expect(words(page())).toMatch(/Class started Thu Nov 5, 2:12\sPM/);
   });
 });
+
+// sweep1-checkin-fixcheck-4: one word per thing (PLAN.md COPY): a quiz or a vote is never a
+// "question" on professor pages; "question" is for students' posts.
+describe("sweep1-checkin-fixcheck-4 #/checkin/teacher calls a poll a quiz or a vote", () => {
+  it("sweep1-checkin-5 the link to #/checkin/quiz says 'Start a quiz or a vote', and no text on the page says 'question'", () => {
+    const t = page();
+    const link = hosts(t).find((h) => h.el.type === "a" && h.el.props.href === "#/checkin/quiz")?.el;
+    expect(link && words(link)).toBe("Start a quiz or a vote");
+    expect(words(t)).not.toMatch(/question/i);
+  });
+});

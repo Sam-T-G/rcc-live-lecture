@@ -16,7 +16,7 @@ import { Link } from "../../blocks/router";
 import { Card, ErrorBoundary, Screen, Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
 import { useCamera } from "../../blocks/camera";
-import { makeQrReader } from "./qrRead";
+import { makeQrReader, scannerLoadFailed, SCANNER_DIDNT_LOAD } from "./qrRead";
 import { StaffGate } from "./prof";
 import {
   START_RANGE_MS,
@@ -167,6 +167,7 @@ export function ScanPasses() {
   const scan = useMutation(api.checkin.pass.scan);
   const cam = useCamera();
   const [read] = useState(makeQrReader);
+  const [noScanner, setNoScanner] = useState(false); // jsQR's file didn't load (qrRead.ts)
   const [result, setResult] = useState<Result | null>(null);
   const [typed, setTyped] = useState("");
   const last = useRef({ code: "", at: 0 });
@@ -198,9 +199,11 @@ export function ScanPasses() {
       busy = true;
       try {
         const raw = await read(v);
+        setNoScanner(false);
         if (raw && raw.startsWith("RCC-")) await sendRef.current(raw);
-      } catch {
-        /* a frame that fails to read is skipped */
+      } catch (e) {
+        // A frame that fails to read is skipped; a scanner that didn't load says so.
+        if (scannerLoadFailed(e)) setNoScanner(true);
       }
       busy = false;
     }, 250);
@@ -228,6 +231,7 @@ export function ScanPasses() {
         )}
       </p>
       {cam.error && <Status kind="error">{cam.error}</Status>}
+      {cam.on && noScanner && <Status kind="error">{SCANNER_DIDNT_LOAD}</Status>}
       <form className="att-code" onSubmit={sendTyped}>
         <Field label="Code on their phone">
           {(f) => (

@@ -5,7 +5,9 @@
 // What the line at the door sees: how many have checked in, and for 3 s after each scan that one
 // student's name ("Checked in" or "Already checked in") or what went wrong (role=alert). There's
 // no list of names: names go to professors only (contracts.md), and a paired iPad can only scan.
-// A student whose pass the camera can't read types the code on it into "Code on your pass".
+// A student whose pass the camera can't read types the code on it into "Code on your pass". When
+// the QR reader's file won't load (a deploy replaced it), the page says "The scanner didn't load.
+// Reload this page." and asks for the typed code (qrRead.ts).
 // Staying on: Start check-in also asks the browser to keep the screen on (the Screen Wake Lock,
 // in Safari 16.4 and later and in Chrome), so Auto-Lock doesn't put the iPad to sleep between
 // arrivals, and asks again each time the page shows after being hidden. Where the browser can't,
@@ -19,7 +21,7 @@ import { Big, ErrorBoundary, Status } from "../../blocks/ui";
 import { Button, Field } from "../../blocks/kit";
 import { CHANNEL } from "../../blocks/deck";
 import { useCamera } from "../../blocks/camera";
-import { makeQrReader } from "./qrRead";
+import { makeQrReader, scannerLoadFailed, SCANNER_DIDNT_LOAD } from "./qrRead";
 import { DoorGate } from "./prof";
 import { scanError, why } from "./util";
 import "./kiosk.css";
@@ -132,6 +134,7 @@ export function KioskScanner({ device }: { device: string | undefined }) {
   const cam = useCamera();
   const awake = useWakeLock();
   const [read] = useState(makeQrReader);
+  const [noScanner, setNoScanner] = useState(false); // jsQR's file didn't load (qrRead.ts)
   const [result, setResult] = useState<Result | null>(null);
   const last = useRef({ code: "", at: 0 });
   const [starting, setStarting] = useState(false);
@@ -177,8 +180,12 @@ export function KioskScanner({ device }: { device: string | undefined }) {
       busy = true;
       try {
         const raw = await read(v);
+        setNoScanner(false);
         if (raw && raw.startsWith("RCC-")) await sendRef.current(raw);
-      } catch { /* a frame that fails to read is skipped */ }
+      } catch (e) {
+        // A frame that fails to read is skipped; a scanner that didn't load says so.
+        if (scannerLoadFailed(e)) setNoScanner(true);
+      }
       busy = false;
     }, 250);
     return () => clearInterval(t);
@@ -242,6 +249,7 @@ export function KioskScanner({ device }: { device: string | undefined }) {
           )}
         </div>
         {cam.error && <Status kind="error">{cam.error}</Status>}
+        {cam.on && noScanner && <Status kind="error">{SCANNER_DIDNT_LOAD}</Status>}
         {stopped && !cam.on && <Status kind="error">The camera stopped. Tap Start check-in.</Status>}
         {cam.on && <Button variant="secondary" className="kiosk__stop" onClick={end}>Stop camera</Button>}
         {awake.failed && (
@@ -251,7 +259,7 @@ export function KioskScanner({ device }: { device: string | undefined }) {
       <div className="kiosk__right">
         <div className={"kiosk__result" + (result ? " kiosk__result--" + result.kind : "")}>
           <div role="status">
-            {!result && <p className="kiosk__prompt">{cam.on ? "Hold your pass up to the camera" : "Type the code on your pass"}</p>}
+            {!result && <p className="kiosk__prompt">{cam.on && !noScanner ? "Hold your pass up to the camera" : "Type the code on your pass"}</p>}
             {result && result.kind !== "error" && (
               <>
                 <p className="kiosk__label">{result.kind === "ok" ? "Checked in" : "Already checked in"}</p>

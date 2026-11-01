@@ -95,7 +95,7 @@ const reader = vi.fn(async (v: unknown): Promise<string | null> => {
   void v;
   return null;
 });
-vi.mock("./qrRead", () => ({ makeQrReader: () => reader }));
+vi.mock("./qrRead", async (orig) => ({ ...(await orig<typeof import("./qrRead")>()), makeQrReader: () => reader }));
 vi.mock("./prof", () => ({ DoorGate: () => null }));
 
 const { KioskScanner } = await import("./Kiosk");
@@ -249,6 +249,52 @@ describe("SCAN the door kiosk: what the line sees", () => {
     el = render();
     expect(html(el)).not.toContain("That code is old.");
     expect(statusLine(el)).toContain("Hold your pass up to the camera");
+  });
+
+  it("sweep1-checkin-fixcheck-1 a scanner that didn't load (jsQR gone after a deploy) says to reload the page in role=alert and asks for the typed code; it clears once frames read again", async () => {
+    const real = await vi.importActual<typeof import("./qrRead")>("./qrRead");
+    // The real reader, with jsQR's file gone: every frame's load fails.
+    vi.stubGlobal("BarcodeDetector", undefined);
+    vi.doMock("jsqr", () => {
+      throw new TypeError("Failed to fetch dynamically imported module");
+    });
+    const broken = real.makeQrReader();
+    const failed: boolean[] = [];
+    const reads: Promise<unknown>[] = [];
+    reader.mockImplementation((v) => {
+      const p = broken(v as HTMLVideoElement).catch((e: unknown) => {
+        failed.push(real.scannerLoadFailed(e));
+        throw e;
+      });
+      reads.push(p.catch(() => {}));
+      return p;
+    });
+    // One frame, waiting for its failed load to come back before the next one.
+    const frame = async () => {
+      await vi.advanceTimersByTimeAsync(250);
+      await Promise.all(reads);
+      await settle();
+    };
+    cam.on = true;
+    cam.video.current = { readyState: 4 };
+    render();
+    await frame();
+    expect(html(render())).not.toContain("Reload this page"); // one failed load is tried again
+    await frame();
+    await frame();
+    expect(failed).toEqual([false, false, true]); // the real reader gave up on the 3rd load
+    let el = render();
+    expect(html(el)).toContain(`<p class="status status--error" role="alert">The scanner didn&#x27;t load. Reload this page.</p>`);
+    expect(statusLine(el)).toContain("Type the code on your pass");
+    expect(statusLine(el)).not.toContain("Hold your pass up");
+
+    reader.mockImplementation(async () => null);
+    await vi.advanceTimersByTimeAsync(250);
+    await settle();
+    el = render();
+    expect(html(el)).not.toContain("Reload this page");
+    expect(statusLine(el)).toContain("Hold your pass up to the camera");
+    vi.doUnmock("jsqr");
   });
 
   it("sweep1-tests-4 F12.3 a pass held up to the camera is sent once per 4 s, though the camera reads it 4 times a second", async () => {

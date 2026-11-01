@@ -5,6 +5,8 @@
 // effect run after a render when its deps change), the camera block for a fake that is on, and
 // the QR reader for one that sees the same pass on every frame. Each render calls ScanPasses as a
 // plain function.
+import { type ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const hooks = vi.hoisted(() => ({ slots: [] as unknown[], at: 0, effects: [] as (() => void)[], cleanups: new Map<number, () => void>() }));
@@ -53,18 +55,21 @@ const reader = vi.fn(async (v: unknown): Promise<string | null> => {
   void v;
   return "RCC-ABC234";
 });
-vi.mock("./qrRead", () => ({ makeQrReader: () => reader }));
+vi.mock("./qrRead", async (orig) => ({ ...(await orig<typeof import("./qrRead")>()), makeQrReader: () => reader }));
 vi.mock("./prof", () => ({ StaffGate: () => null }));
 
 const { ScanPasses } = await import("./Teacher");
 
 function render() {
   hooks.at = 0;
-  ScanPasses();
+  const el = ScanPasses();
   const run = hooks.effects;
   hooks.effects = [];
   run.forEach((f) => f());
+  return el;
 }
+// What the professor sees: the section's HTML.
+const html = () => renderToStaticMarkup(render() as ReactElement);
 const settle = async () => {
   for (let i = 0; i < 20; i++) await Promise.resolve();
 };
@@ -106,5 +111,40 @@ describe("sweep1-tests-4 the teacher scanner's camera", () => {
     reader.mockResolvedValue("RCC-XYZ789");
     await frames(1);
     expect(scan.mock.calls.map(([a]) => a.code)).toEqual(["RCC-ABC234", "RCC-XYZ789"]);
+  });
+
+  it("sweep1-checkin-fixcheck-1 a scanner that didn't load (jsQR gone after a deploy) says to reload the page in role=alert; it clears once frames read again", async () => {
+    const real = await vi.importActual<typeof import("./qrRead")>("./qrRead");
+    vi.stubGlobal("BarcodeDetector", undefined);
+    vi.doMock("jsqr", () => {
+      throw new TypeError("Failed to fetch dynamically imported module");
+    });
+    const broken = real.makeQrReader();
+    const reads: Promise<unknown>[] = [];
+    reader.mockImplementation((v) => {
+      const p = broken(v as HTMLVideoElement);
+      reads.push(p.catch(() => {}));
+      return p;
+    });
+    // One frame, waiting for its failed load to come back before the next one.
+    const frame = async () => {
+      await vi.advanceTimersByTimeAsync(250);
+      await Promise.all(reads);
+      await settle();
+    };
+    render();
+    await frame();
+    await frame();
+    expect(html()).not.toContain("Reload this page"); // a failed load is tried again
+    await frame();
+    expect(reads).toHaveLength(3);
+    expect(html()).toContain(`<p class="status status--error" role="alert">The scanner didn&#x27;t load. Reload this page.</p>`);
+    expect(scan).not.toHaveBeenCalled();
+
+    reader.mockImplementation(async () => null);
+    await frames(1);
+    expect(html()).not.toContain("Reload this page");
+    vi.doUnmock("jsqr");
+    vi.unstubAllGlobals();
   });
 });

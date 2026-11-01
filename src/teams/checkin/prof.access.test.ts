@@ -11,7 +11,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DoorGate, StaffGate } from "./prof";
 
 const results: Record<string, unknown> = {};
-const signedIn: { user: { token: string; email: string; exp?: number } | null; endsAt: number | null } = { user: null, endsAt: null };
+const signedIn: { user: { token: string; email: string; exp?: number } | null; endsAt: number | null; ended: boolean } = { user: null, endsAt: null, ended: false };
+// staff.requestPairing: the pairing screen asks for a code when it opens.
+const requestPairing = vi.fn(async () => null);
 const effects = vi.hoisted(() => ({ run: false }));
 const signOut = vi.fn();
 vi.mock("react", async (orig) => {
@@ -21,13 +23,13 @@ vi.mock("react", async (orig) => {
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isLoading: false, isAuthenticated: false }),
   useQuery: (ref: FunctionReference<"query">, args: unknown) => (args === "skip" ? undefined : results[getFunctionName(ref)]),
-  useMutation: () => async () => null,
+  useMutation: () => requestPairing,
 }));
 vi.mock("../../blocks/auth", () => ({
   SignInButton: () => "[Google button, typed sign-in under it]",
   GoogleButton: () => "[Google button]",
   SignedInAs: () => (signedIn.user ? `[Signed in as ${signedIn.user.email}, Not you? Sign out]` : null),
-  useGoogleUser: () => ({ user: signedIn.user, endsAt: signedIn.endsAt, signOut }),
+  useGoogleUser: () => ({ user: signedIn.user, endsAt: signedIn.endsAt, ended: signedIn.ended, signOut }),
 }));
 
 const DEVICE = "rcc-live:door-device";
@@ -45,6 +47,8 @@ beforeEach(() => {
   for (const k of Object.keys(results)) delete results[k];
   signedIn.user = null;
   signedIn.endsAt = null;
+  signedIn.ended = false;
+  requestPairing.mockClear();
   effects.run = false;
   signOut.mockClear();
   store = new Map();
@@ -52,6 +56,12 @@ beforeEach(() => {
     getItem: (k: string) => store.get(k) ?? null,
     setItem: (k: string, v: string) => void store.set(k, String(v)),
     removeItem: (k: string) => void store.delete(k),
+  });
+  const session = new Map<string, string>();
+  vi.stubGlobal("sessionStorage", {
+    getItem: (k: string) => session.get(k) ?? null,
+    setItem: (k: string, v: string) => void session.set(k, String(v)),
+    removeItem: (k: string) => void session.delete(k),
   });
 });
 
@@ -118,6 +128,27 @@ describe("ROLES the door iPad opens the scanner only for a paired iPad or a scan
     expect(html).toContain("On your own phone, sign in on #/admin, then open #/checkin/kiosk there.");
     expect(html).toContain("Nobody signs in to Google on this iPad.");
     expect(html).not.toMatch(/professors and admins can sign in here/i);
+  });
+
+  // sweep1-checkin-fixcheck-5: a scanner scanning from their own phone whose sign-in runs out
+  // there would otherwise get the door iPad's pairing screen and a pairing code.
+  it("sweep1-checkin-fixcheck-5 a scanner's sign-in that ended on this page says to sign in again on #/admin, with no pairing code asked for", () => {
+    effects.run = true;
+    store.set(DEVICE, TOKEN);
+    results["staff:me"] = null;
+    results["staff:deviceStatus"] = { status: "none" };
+    signedIn.ended = true;
+    const html = words(kiosk());
+    expect(html).toContain("Your sign-in ended. Sign in again on #/admin, then open #/checkin/kiosk.");
+    expect(html).not.toContain("Pair this iPad"); // the pairing screen's title
+    expect(html).toContain("Show a pairing code"); // for a door iPad, one tap away
+    expect(html).not.toContain("[scanner");
+    expect(requestPairing).not.toHaveBeenCalled();
+
+    // A door iPad that never had a sign-in still asks for its code.
+    signedIn.ended = false;
+    expect(words(kiosk())).toContain("Pair this iPad");
+    expect(requestPairing).toHaveBeenCalledTimes(1);
   });
 
   it("sweep1-checkin-2 the pairing screen says a scanner's sign-in ends within the hour, and a paired iPad scans all class", () => {
@@ -199,6 +230,35 @@ describe("ROLES the door iPad opens the scanner only for a paired iPad or a scan
       effects.run = true;
       kiosk();
       expect(signOut).toHaveBeenCalledTimes(1);
+    });
+  }
+
+  // sweep1-checkin-fixcheck-2: the app's Sign out leaves Google's own sign-in in Safari, so
+  // #/admin on this iPad would offer "Continue as" that professor to anyone in line. The step to
+  // sign out of Google stays on screen after the sign-out, until someone taps Open the scanner.
+  for (const role of ["professor", "admin"] as const) {
+    it(`sweep1-checkin-fixcheck-2 ${role === "admin" ? "an" : "a"} ${role} signed out on a paired iPad is told to sign out of Google in Safari too, and the scanner waits for Open the scanner`, () => {
+      const GOOGLE = "sign out of Google in Safari too (google.com, your picture, Sign out)";
+      store.set(DEVICE, TOKEN);
+      results["staff:deviceStatus"] = { status: "paired", label: "A-210 door" };
+      signIn({ iss: "https://accounts.google.com", email: "prof@example.edu", email_verified: true });
+      results["staff:me"] = staff("prof@example.edu", role);
+      effects.run = true;
+      let html = words(kiosk());
+      expect(signOut).toHaveBeenCalledTimes(1);
+      expect(html).toContain("Signing out prof@example.edu");
+      expect(html).toContain(GOOGLE);
+      expect(html).not.toContain("[scanner");
+
+      // The app's sign-out went through: the Google step is still on screen, not the scanner.
+      signedIn.user = null;
+      results["staff:me"] = null;
+      html = words(kiosk());
+      expect(html).not.toContain("[scanner");
+      expect(html).toContain("Signed out prof@example.edu on this iPad.");
+      expect(html).toContain(GOOGLE);
+      expect(html).toContain("Open the scanner");
+      expect(html).not.toContain("Signing out");
     });
   }
 

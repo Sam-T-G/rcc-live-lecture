@@ -236,12 +236,33 @@ describe("#/checkin/stage", () => {
     }
   });
 
-  it("sweep1-checkin-4 a key saved from a link with no deck goes to no deck", () => {
+  it("sweep1-checkin-4 a link with no deck saves no key, so a later ?bridge=saved link to a deck gets none", () => {
     vi.stubGlobal("sessionStorage", stubStorage());
     stubHistory();
     at("#/checkin/stage?bridge=gdg.k1");
     expect(takeBridge()).toBe("gdg.k1");
     expect(frame(open(`#/checkin/stage?bridge=saved&deck=${DECK}`))?.searchParams.has("bridge")).toBe(false);
+  });
+
+  it("sweep1-checkin-fixcheck-3 a key in a link with no deck (or one that doesn't load) stays in the link; adding ?deck= as the stage says hands the key to that deck", () => {
+    const store = stubStorage();
+    vi.stubGlobal("sessionStorage", store);
+    const replace = stubHistory();
+    for (const hash of ["#/checkin/stage?bridge=gdg.k1", "#/checkin/stage?bridge=gdg.k1&deck=decks/week9/"]) {
+      at(hash);
+      expect(takeBridge(), hash).toBe("gdg.k1");
+      expect(replace, hash).not.toHaveBeenCalled();
+      expect(location.hash, hash).toContain("bridge=gdg.k1");
+    }
+    expect(store.values()).toEqual([]);
+    expect(words(open("#/checkin/stage?bridge=gdg.k1"))).toContain("Add ?deck=<your deck's address> to this page's link.");
+
+    // The professor adds the deck to the link: the key goes to that deck, and only to its origin.
+    at(`#/checkin/stage?bridge=gdg.k1&deck=${DECK}`);
+    expect(takeBridge()).toBe("gdg.k1");
+    expect(store.values()).toEqual([JSON.stringify({ key: "gdg.k1", origin: "https://deck.example.com" })]);
+    expect(frame(open(`#/checkin/stage?bridge=saved&deck=${DECK}`))?.searchParams.get("bridge")).toBe("gdg.k1");
+    expect(frame(open("#/checkin/stage?bridge=saved&deck=https://other.example.net/d/"))?.searchParams.has("bridge")).toBe(false);
   });
 
   it("F38.6 a new tab with ?bridge=saved has no key, so it hands the deck none (never the word 'saved')", () => {

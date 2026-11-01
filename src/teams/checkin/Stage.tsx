@@ -12,7 +12,8 @@
 //     no ?deck= the page says to add one; an address that can't load says "That deck link didn't
 //     work."
 //   bridge: handed to the deck, whose deck-bridge.js then sends each slide to the phones. As soon
-//     as the page has the key it saves it in this tab's sessionStorage and the address bar shows
+//     as the page has the key and a ?deck= that loads (until then the key stays in the link, so
+//     adding ?deck= later still works), it saves the key in this tab's sessionStorage and the address bar shows
 //     ?bridge=saved instead, so the key never shows on the projector and a reload still hands it
 //     to the deck. A new tab needs the link with the key again: a ?bridge=saved link opened in a
 //     tab that saved no key (a bookmark, a copied address bar) shows "Phones aren't getting these

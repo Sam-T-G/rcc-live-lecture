@@ -17,7 +17,8 @@
 //                A professor or admin is never left signed in on a door iPad that anyone in line
 //                can use to open #/admin or the attendance list: on an unpaired iPad they get the
 //                pairing screen with Sign out (and are told to sign out of Google in Safari too),
-//                and on a paired one they are signed out before the scanner opens. Whenever a
+//                and on a paired one they are signed out and told to sign out of Google in Safari
+//                too, and the scanner opens when someone taps Open the scanner. Whenever a
 //                scanner is signed in, the scanner shows who, when the sign-in ends (Google's
 //                renewal never runs on the kiosk route) and a Sign out button.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -187,9 +188,37 @@ function useDeviceToken() {
   return useSyncExternalStore(subscribeDevice, readDeviceToken, readDeviceToken);
 }
 
+// The professor or admin DoorGate signed out on this paired iPad, until someone taps Open the
+// scanner. In sessionStorage, so it lasts through a reload and goes when the tab closes.
+const SIGNED_OUT = "rcc-live:door-signed-out";
+const signedOutListeners = new Set<() => void>();
+let signedOutInMemory: string | null = null; // when sessionStorage is off: until a reload
+function readSignedOut(): string | null {
+  try {
+    return sessionStorage.getItem(SIGNED_OUT);
+  } catch {
+    return signedOutInMemory;
+  }
+}
+function saveSignedOut(email: string | null) {
+  signedOutInMemory = email;
+  try {
+    if (email) sessionStorage.setItem(SIGNED_OUT, email);
+    else sessionStorage.removeItem(SIGNED_OUT);
+  } catch {
+    /* sessionStorage is off: kept in memory */
+  }
+  signedOutListeners.forEach((l) => l());
+}
+function subscribeSignedOut(l: () => void) {
+  signedOutListeners.add(l);
+  return () => signedOutListeners.delete(l);
+}
+
 export function DoorGate({ children }: { children: (device: string | undefined) => ReactNode }) {
   const me = useStaff();
-  const { signOut } = useGoogleUser();
+  const { signOut, ended } = useGoogleUser();
+  const [pairAnyway, setPairAnyway] = useState(false);
   const token = useDeviceToken();
   const status = useQuery(api.staff.deviceStatus, token ? { token } : "skip");
   useEffect(() => {
@@ -198,19 +227,35 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
   // A professor or admin still signed in on a paired iPad (say, after approving its code on its
   // own #/admin) is signed out: the iPad scans with its pairing, and their sign-in would let
   // anyone in line open #/admin or the attendance list.
+  // The app's Sign out leaves Google's own sign-in in Safari, so #/admin on this iPad would offer
+  // "Continue as" them to anyone in line. The step to sign out of Google stays on screen after the
+  // sign-out (kept in sessionStorage, so a reload keeps it) until someone taps Open the scanner.
   const paired = !!token && status?.status === "paired";
   const staffOnPairedIPad = paired && !!me && isProfRole(me.role);
+  const saved = useSyncExternalStore(subscribeSignedOut, readSignedOut, readSignedOut);
+  const leaving = staffOnPairedIPad && me ? me.email : null;
+  const left = leaving ?? saved;
   useEffect(() => {
-    if (staffOnPairedIPad) signOut();
-  }, [staffOnPairedIPad, signOut]);
+    if (!leaving) return;
+    saveSignedOut(leaving);
+    signOut();
+  }, [leaving, signOut]);
 
-  if (staffOnPairedIPad && me)
+  if (paired && left)
     return (
       <Screen title="Check-in kiosk" wide>
-        <Status kind="loading">Signing out {me.email}…</Status>
+        {staffOnPairedIPad ? <Status kind="loading">Signing out {left}…</Status> : <p>Signed out {left} on this iPad.</p>}
         <p>This iPad is paired, so it scans passes with nobody signed in.</p>
         <p>
-          <Button variant="secondary" onClick={signOut}>Sign out</Button>
+          Now sign out of Google in Safari too (google.com, your picture, Sign out): Google keeps its own sign-in, and anyone in line could pick your
+          account from Google&apos;s list on #/admin to sign in as you.
+        </p>
+        <p>
+          {staffOnPairedIPad ? (
+            <Button variant="secondary" onClick={signOut}>Sign out</Button>
+          ) : (
+            <Button onClick={() => saveSignedOut(null)}>Open the scanner</Button>
+          )}
         </p>
       </Screen>
     );
@@ -221,6 +266,17 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
     return (
       <Screen title="Check-in kiosk" wide>
         <Status kind="loading">Checking this iPad…</Status>
+      </Screen>
+    );
+  // A scanner's sign-in ran out here (most likely on their own phone: Google's renewal never runs
+  // on this route). They sign in again; the pairing code is one tap away for a door iPad.
+  if (ended && me === null && status.status === "none" && !pairAnyway)
+    return (
+      <Screen title="Check-in kiosk" wide>
+        <p>Your sign-in ended. Sign in again on #/admin, then open #/checkin/kiosk.</p>
+        <p>
+          <Button variant="secondary" onClick={() => setPairAnyway(true)}>Show a pairing code</Button>
+        </p>
       </Screen>
     );
   return <PairScreen me={me} token={token} status={status} />;
