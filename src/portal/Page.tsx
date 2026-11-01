@@ -8,13 +8,14 @@
 // Test on another channel with #/portal?channel=<name>. The late banner lists check-ins on
 // CHANNEL ("gdg") only, so it stays off on any other channel. #/portal/<part> shows
 // "No page at #/portal/<part>".
-import { useEffect, useRef, useState, type CSSProperties, type TouchEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type TouchEvent } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { CHANNEL, useDeckSlide } from "../blocks/deck";
 import { Link, useHashParams, useRoute } from "../blocks/router";
 import { ErrorBoundary, Screen, Status } from "../blocks/ui";
 import LateBanner from "../teams/checkin/LateBanner";
+import { scrollToBottom, watchLateRoom } from "./lateRoom";
 import "./portal.css";
 
 export default function PortalPage() {
@@ -46,9 +47,12 @@ function Portal() {
   // arrival that lands during the switch as already seen. A failing late feed shows its own
   // error line ("The late banner didn't load.") and leaves the slide up.
   // While a banner shows, the page gets that much more room at the bottom (--late-room, the
-  // banner's height plus its 16px gap), so Back, Next and the two links move up above it.
+  // banner's height plus its 16px gap), so Back, Next and the two links move up above it. On a
+  // page taller than the screen, a student at the bottom is scrolled to the new bottom
+  // (lateRoom.ts says why).
   const late = useRef<HTMLDivElement>(null);
   const [lateRoom, setLateRoom] = useState(0);
+  const keepBottom = useRef(false);
   const withBanner = channel === CHANNEL;
   useEffect(() => {
     const el = late.current;
@@ -56,12 +60,16 @@ function Portal() {
       setLateRoom(0);
       return;
     }
-    const measure = () => setLateRoom(el.offsetHeight > 0 ? el.offsetHeight + 16 : 0);
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    measure();
-    return () => ro.disconnect();
+    return watchLateRoom(el, window, ResizeObserver, (px, bottom) => {
+      keepBottom.current = bottom;
+      setLateRoom(px);
+    });
   }, [withBanner]);
+  useLayoutEffect(() => {
+    if (!keepBottom.current) return;
+    keepBottom.current = false;
+    scrollToBottom(window);
+  }, [lateRoom]);
   return (
     <div className="portal-room" style={{ "--late-room": `${lateRoom}px` } as CSSProperties}>
       <Slides channel={channel} />

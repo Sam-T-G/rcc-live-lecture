@@ -5,11 +5,16 @@
 // ← Back and Next →) and the "The professor is on slide N now." notice need a browser, and so
 // does the ErrorBoundary around the banner (React's server render doesn't run boundaries): the
 // PORTAL browser checks cover them (F35).
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { parse } from "../styles/cssRules";
 import PortalPage from "./Page";
+
+const css = parse(readFileSync(new URL("./portal.css", import.meta.url), "utf8"));
+const tsx = readFileSync(new URL("./Page.tsx", import.meta.url), "utf8");
 
 const results: Record<string, unknown> = {};
 const asked: { name: string; args: unknown }[] = [];
@@ -96,5 +101,27 @@ describe("#/portal", () => {
     const other = open("#/portal?channel=room2", ON_SLIDE_3);
     expect(other.startsWith('<div class="portal-room" style="--late-room:0px">')).toBe(true);
     expect(other).not.toContain("portal-late");
+  });
+
+  // The server render runs no effects, so these two read the files: portal.css must use
+  // --late-room for the bottom padding and pin the banner in .portal-late, and Page.tsx must
+  // measure the banner with lateRoom.ts (its own tests) and scroll when it says to.
+  it("PORTAL-fixcheck-1: portal.css adds --late-room to the slide view's and the loading/waiting page's bottom padding, fixes .portal-late at the bottom and keeps .late static inside it", () => {
+    const decls = (selector: string) => {
+      const found = css.filter((r) => r.at.length === 0 && r.selectors.includes(selector)).flatMap((r) => r.decls);
+      return Object.fromEntries(found);
+    };
+    expect(decls(".portal").padding).toMatch(/^16px 16px calc\(.*var\(--late-room, 0px\)\)$/);
+    expect(decls(".portal-room > .page")["padding-bottom"]).toMatch(/var\(--late-room, 0px\)\)$/);
+    expect(decls(".portal-room").display).toBe("contents");
+    expect(decls(".portal-late")).toMatchObject({ position: "fixed", bottom: "16px" });
+    expect(decls(".portal-late .late").position).toBe("static");
+  });
+
+  it("PORTAL-fixcheck-1: Page.tsx sets --late-room from watchLateRoom on the .portal-late box and scrolls to the bottom when it says so", () => {
+    expect(tsx).toContain("watchLateRoom(el, window, ResizeObserver, (px, bottom) => {");
+    expect(tsx).toMatch(/keepBottom\.current = bottom;\s*setLateRoom\(px\);/);
+    expect(tsx).toMatch(/keepBottom\.current = false;\s*scrollToBottom\(window\);\s*\}, \[lateRoom\]\);/);
+    expect(tsx).toContain('<div className="portal-late" ref={late}>');
   });
 });
