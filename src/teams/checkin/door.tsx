@@ -17,14 +17,14 @@
 //                renewal never runs on the kiosk route) and a Sign out button.
 //   <PairScreen me={me} token={token} status={status} />   the pairing code an unpaired iPad shows.
 // The look is in kiosk.css (Kiosk.tsx imports it): "Checking this iPad…" draws the scanner's
-// frame empty (bar, band, camera window, the typed-code strip disabled), so a paired iPad's
+// frame empty (bar, band, camera window, the typed-code strip's empty slot), so a paired iPad's
 // scanner opens in place; the pairing screen is the bar with its title, the code at 144 in the
 // middle of the page and what scanners and signed-in staff do at its foot.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { SignedInAs, useGoogleUser } from "../../blocks/auth";
-import { Button, Field, Icon } from "../../blocks/kit";
+import { Button, Icon } from "../../blocks/kit";
 import { Big, Status } from "../../blocks/ui";
 import { isProfRole, KioskScreen, NotStaff, useStaff, type StaffMe } from "./prof";
 import { clock, why } from "./util";
@@ -241,7 +241,9 @@ function WhoIsSignedIn({ ends, children }: { ends?: boolean; children: ReactNode
 }
 
 // "Checking this iPad…" while the sign-in and this iPad's pairing load: the scanner's own frame
-// with nothing in it yet and the typed code disabled, so a paired iPad's scanner opens in place.
+// with nothing in it yet, so a paired iPad's scanner opens in place. The typed-code strip keeps
+// its slot at the loaded height (an empty label line over an empty 64 box, hidden), with no words
+// and no controls: the screen says only "Check-in kiosk" and "Checking this iPad…".
 function Checking() {
   return (
     <main className="kiosk door" aria-busy="true">
@@ -254,10 +256,12 @@ function Checking() {
         </div>
         <div className="door__cam camstart camstart--wait kiosk__cam" />
       </div>
-      <form className="door__strip codein kiosk__type" onSubmit={(e) => e.preventDefault()}>
-        <Field label="Code on your pass">{(f) => <input {...f} className="input input--code" disabled />}</Field>
-        <Button type="submit" variant="secondary" disabled>Check in</Button>
-      </form>
+      <div className="door__strip codein kiosk__type kiosk__type--wait" aria-hidden="true">
+        <div className="field">
+          <div className="field__label">{" "}</div>
+          <div className="input input--code" />
+        </div>
+      </div>
     </main>
   );
 }

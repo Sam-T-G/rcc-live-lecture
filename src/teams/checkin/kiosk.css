@@ -22,7 +22,9 @@
 /* The scanner fills the iPad's height and never scrolls. The height is definite, so the camera
    window's row gets what the bar, the band and the strip leave. */
 .kiosk.door { height: 100vh; height: 100dvh; }
-.kiosk__bar { padding-inline: max(var(--k-gutter), env(safe-area-inset-left)) max(var(--k-gutter), env(safe-area-inset-right)); }
+/* The bar paints above the panel under it, so the panel (--raised, white like the bar's --chrome
+   in light) doesn't cover the bar's shadow: the rung stays. */
+.kiosk__bar { position: relative; z-index: 1; padding-inline: max(var(--k-gutter), env(safe-area-inset-left)) max(var(--k-gutter), env(safe-area-inset-right)); }
 .kiosk__bar > h1 { margin: 0; font-size: calc(28 * var(--k-u)); line-height: 1.2; font-weight: var(--w-head); }
 /* The count as the room count: 64 / 700 in a 2ch tabular slot, "checked in" 28 on its baseline,
    both in ink (green stays on Start check-in and Checked in). */
@@ -55,8 +57,8 @@
 .kiosk__prompt--lead { font-size: calc(72 * var(--k-u)); line-height: 1.08; max-width: 11em; }
 
 /* A result's word at 96 with its glyph hanging before it (the check for Checked in, the repeat
-   for Already checked in), then the name at 80 on one line. A refusal is the app's sentence at 56
-   with the x. The words take the panel fill's color. */
+   for Already checked in), then the name at 80, wrapping so a long name shows in full. A refusal
+   is the app's sentence at 56 with the x. The words take the panel fill's color. */
 .kiosk__result--ok { --k-glyph: var(--k-check); }
 .kiosk__result--again { --k-glyph: var(--k-again); }
 .kiosk__result--error { --k-glyph: var(--k-x); }
@@ -66,7 +68,7 @@
 @supports not (height: 1lh) { .kiosk__label::before, .kiosk__error::before { top: .1em; } }
 .kiosk__result--again .kiosk__label::before { background: var(--st-in-mark); }
 .kiosk__label { font-size: var(--k-status); line-height: 1.02; letter-spacing: -0.01em; text-wrap: balance; }
-.kiosk__name { margin: 0; font-size: var(--k-name); line-height: 1.1; font-weight: var(--w-head); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kiosk__name { margin: 0; font-size: var(--k-name); line-height: 1.1; font-weight: var(--w-head); overflow-wrap: anywhere; text-wrap: balance; }
 .kiosk__error { font-size: calc(56 * var(--k-u)); line-height: 1.1; text-wrap: pretty; }
 
 /* A camera that can't read passes (blocked, stopped, the reader didn't load): its line leads the
@@ -105,6 +107,9 @@
 .kiosk__type .field { margin: 0; }
 .kiosk__type .field__label { font-size: calc(24 * var(--k-u)); font-weight: var(--w-head); }
 .kiosk__type .input { text-transform: uppercase; letter-spacing: .1em; }
+/* "Checking this iPad…" (door.tsx Checking): the strip's slot at its loaded height, empty. */
+.kiosk__type--wait > * { visibility: hidden; }
+.kiosk__type--wait .field__label { line-height: var(--lh-label); } /* a label's line, as index.css sets on label */
 
 /* ------------------------------------------------- who is signed in (door.tsx) */
 /* A scanner signed in at the door: the line sits over the bar on the bar's fill, and the two

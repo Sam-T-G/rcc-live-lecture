@@ -207,6 +207,20 @@ export const scenarios: Scenario[] = [
     fixtures: door(scanned("Juniper Example", false)),
   },
   {
+    // DS-KIOSK-risk-2: a long name wraps in the band and shows in full, never cut with an ellipsis.
+    id: "kiosk-scan-ok-long-name",
+    area: "kiosk",
+    route: "checkin/kiosk",
+    role: "door",
+    title: "KI-13 Pass read: Checked in, a long name (Maria Hernandez-Castillo)",
+    now: NOW,
+    clicks: [START],
+    later: settle(1400),
+    qr: "RCC-482913",
+    setup: awake,
+    fixtures: door(scanned("Maria Hernandez-Castillo", false)),
+  },
+  {
     id: "kiosk-scan-already",
     area: "kiosk",
     route: "checkin/kiosk",
