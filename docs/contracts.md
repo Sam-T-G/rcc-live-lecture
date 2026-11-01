@@ -13,7 +13,7 @@ Every class runs on one deck channel, `"gdg"`: use `CHANNEL` from `src/blocks/de
 | `pings` | lab | `lab.ping` | `lab.lastPing`, `lab.pings` |
 | `staff` | access | `staff.add`, `setRole`, `remove`; the CLI's `devGrant`, `dropDevGrant`, `devRevoke`, `importHostEmails` | `staffRole` in `checkin/prof.ts` (every staff check); `staff.people` |
 | `staffEvents` | access | `convex/staff.ts`, one row per add, role change, remove, pair and unpair | `staff.changes` |
-| `devices` | access | `staff.approvePairing`, `staff.unpair`; `checkin.pass.scan` (last used) | `requireScanner` in `checkin/prof.ts`; `staff.devices` |
+| `devices` | access | `staff.approvePairing`, `staff.unpair`; the CLI's `staff:devRevoke` (deletes the iPads a test sign-in paired); `checkin.pass.scan` (last used) | `pairedDevice` and `deviceByHash` in `checkin/prof.ts` (a token's hash), used by `requireScanner` (so `checkin.pass.scan`), `checkin.pass.canScan`, `staff.requestPairing`, `staff.deviceStatus` and `staff.approvePairing`; `staff.devices` |
 | `pairings` | access | `staff.requestPairing`, `approvePairing`, `dropPairing` | `staff.deviceStatus` |
 | `kiosks` | Check-in | nothing: unused since the student passes replaced the kiosk QR; kept because prod may hold rows | nothing |
 | `checkins` | Check-in | `checkin.pass.scan`; `checkin.attendance.removeCheckin` deletes one | `checkin/read.ts`, `attendance.ts`, `pass.ts`, `quiz.ts`; `lib.checkedIn`; `live/groups.ts` (who is on a team); `live/questions.ts` (the name on a post by name); `live/read.ts` (`lostCount` and `lostBySlide` count only checked-in students) |
@@ -46,7 +46,7 @@ Server code (imports between `convex/` folders):
 | `requireProf(ctx)` (`convex/checkin/prof.ts`) | ctx | every professor-only function, in every module | a professor or admin, or it throws |
 | `requireAdmin(ctx)`, `requireScanner(ctx, device?)`, `staffRole(ctx)`, `isProf(role)` | ctx | `convex/staff.ts`, `checkin.pass.scan`, `live.questions.remove` | admins; scanners and paired iPads; the caller's role |
 | `requireUser`, `lectureWindow`, `ensureLecture`, `endLecture`, `notOpenYet`, `checkedIn`, `cleanName` (`convex/lib.ts`) | ctx, channel, ... | every module | sign-in, the class window, and names safe to show (BLOCKS.md) |
-| `ensureGroup(ctx, channel, user)` (`convex/live/groups.ts`) | ctx, channel, user | `checkin.pass.scan`, right after the check-in | puts the student on a team in this class. Keep this call, or students scanned in have no team and their answers don't score |
+| `ensureGroup(ctx, channel, user, fresh)` (`convex/live/groups.ts`) | ctx, channel, user, fresh: true when this scan wrote the check-in (`!row` in `checkin.pass.scan`) | `checkin.pass.scan`, right after the check-in | puts the student on a team in this class. After the lock, `fresh` moves a student scanned back in (after a professor removed their check-in) off a team with nobody else checked in; without it they stay alone there. Keep this call, or students scanned in have no team and their answers don't score |
 | `saveExtraCredit(ctx, channel, endedAt, lecture?)` (`convex/live/groups.ts`) | ctx, channel, endedAt, lecture | `lib.ensureLecture`, `lectures.close` | saves each team member's extra credit to `groupResults` before a class ends without End class |
 | `describe(team)`, `teamInfo` (`convex/live/groups.ts`) | team number | `checkin/quiz.ts` | a team's color and label |
 | `rightOf(poll)`, `tally(ctx, poll, choices)` (`convex/checkin/quiz.ts`) | a poll | `live/past.ts` | the right answer and the counts per choice |
@@ -87,7 +87,7 @@ Shared screen code:
 
 ## Test data on a dev backend
 
-fill runs only on the dev backends in `DEV_HOSTS`. To use it on your own deployment, add its host (`<name>.convex.cloud`) to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 4); that also turns on typed test sign-ins and test roles there. Then:
+fill runs only on the dev backends in `DEV_HOSTS`. To use it on your own deployment, ask Sam to add its host (`<name>.convex.cloud`) to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 4); that also turns on typed test sign-ins and test roles there. Then:
 
 ```sh
 npx convex run dev/seed:fill '{"channel":"gdg"}'    # sample check-ins, lost taps, a quiz and questions

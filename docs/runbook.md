@@ -25,7 +25,7 @@ What the professor and Sam do on a day the app runs in class, on the live site <
 
 - **Slides:** the arrow keys in the stage move the deck and every phone. Students on #/live or #/portal can page back without moving the projector.
 - **Scanning:** the door iPad scans passes; the laptop on #/checkin/teacher scans too (Start scanning), or the professor types the code from a student's phone. A wrong check-in has a Remove button on the teacher page.
-- **#/host** has three tabs. **Now:** ask the room (write a question or let the AI draft one from the slide), end it to show the results, then "Who got it wrong" with an AI note. **Points:** teams of 3 or 4, bonuses and deductions with a reason, Undo. **Questions:** students' questions, sorted by upvotes; type an answer, share it, or group them by topic with AI.
+- **#/host** has three tabs. **Now:** ask the room (write a question or let the AI draft one from the slide), end it to show the results, then "Who got it wrong" with an AI note. **Points:** teams of 3 or 4, +1 and −1 for a team or a student (a student's can carry an optional reason), Undo. **Questions:** students' questions, newest first, each with its upvotes; type an answer, share it, or group them by topic with AI.
 - **What stays private:** emails show only on the professor's laptop (#/host, #/checkin/teacher), and so do full names, except in two places: a question a student posts by name shows their full check-in name to everyone who opens #/live, signed out too, and the door iPad shows each scanned name. The projector shows first names at most (the late banner) and team colors, never emails. The door iPad shows each scanned student's name (the name they signed in with) for 3 seconds after the scan, never the email, so everyone at the door can read it. Keep #/host and the teacher page off the projector.
 
 ## Ending class
@@ -40,6 +40,6 @@ What the professor and Sam do on a day the app runs in class, on the live site <
 | Phones show no slide | Is the stage tab the one opened with the key? Press an arrow key once. "Phones aren't getting these slides." means the tab has no key: open the stage link again. |
 | A page says "Something went wrong." | Reload it. A tab open from before a deploy needs a reload. |
 | The door iPad shows a pairing code again | Someone unpaired it, or its storage was cleared: pair it again on #/admin. |
-| A student's pass says "That code is old." | Their phone slept: they wait for the pass to show a new code, then scan again. |
+| The door iPad or the teacher page says "That code is old." | The student's phone slept: they wait for the pass to show a new code, then scan again. |
 | A professor sees "isn't on the staff list" | An admin adds that Google account on #/admin. |
 | Scanning says it opens 45 minutes before class | The saved start is later than now plus 45 minutes: fix the start on #/checkin/teacher. |

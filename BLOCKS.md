@@ -152,21 +152,29 @@ if (notOpenYet(open, Date.now())) return null;                  // more than 45 
 Server only, inside an action:
 
 ```ts
+import { v } from "convex/values";
 import { action } from "../_generated/server";
 import { geminiText } from "../ai";
+import { requireProf } from "../checkin/prof";
 
 export const explain = action({
   args: { text: v.string() },
   returns: v.string(),
-  handler: async (ctx, { text }) => geminiText(`Explain in two plain sentences:\n\n${text}`),
+  handler: async (ctx, { text }) => {
+    await requireProf(ctx);   // without it anyone, signed out too, can spend the app's Gemini key
+    return await geminiText(`Explain in two plain sentences:\n\n${text}`);
+  },
 });
 ```
+
+- **Who can call it:** an AI action starts with `await requireProf(ctx);` like the one above (`convex/lab.ts` `aiPing` does the same). One a student starts needs a signed-in, checked-in student instead: the action calls an internal query with `ctx.runQuery` that runs `requireUser` and `checkedIn` ("Classes", above) and throws when either fails.
+- **What goes to Gemini:** slide text, question text, counts and team labels, never a name or an email.
 
 Pick a model by tier or by exact ID: `geminiText(prompt)` uses the fast tier, `geminiText(prompt, "smart")` the strong one. For images, audio, or PDFs, and for JSON back:
 
 ```ts
 import { gemini } from "../ai";
-// photo: base64 from the browser (FileReader, or a canvas from the camera), a few MB at most
+// photo: base64 of a file the professor picks (FileReader), such as a slide image, a few MB at most
 const reply = await gemini({
   model: "fast",
   system: "You read lecture slides for students. Plain words, no jargon.",
@@ -175,6 +183,8 @@ const reply = await gemini({
 });
 const { summary, terms } = JSON.parse(reply);
 ```
+
+A camera frame never goes to Gemini or to Convex, because it shows students' faces (AGENTS.md, "Privacy"). A picture for Gemini is a file the professor picks, and a feature that sends one needs Sam's go-ahead and a "What it sees" line in its TEAM.md.
 
 Set up on Sam's dev and on prod (2026-10-29): fast is `gemini-3.8-flash`, smart is `gemini-pro-latest`. Another lead's own dev backend needs `GEMINI_API_KEY`, `GEMINI_MODEL_FAST`, and `GEMINI_MODEL_SMART` set the same way (Sam sends the key privately). `npx convex run ai:models` lists every model the key can call (Flash, Pro, image generation, speech, transcription); `npx convex run ai:tryIt '{"model":"smart","prompt":"...","imageUrl":"https://...","json":true}'` tries one before you build on it. A room of students asking the same thing should share one answer: save the result in a table keyed by slide and check it first.
 
@@ -221,7 +231,7 @@ useVisionLoop(cam.video, runner, cam.on, (seen) => {
 - **The camera** (`useCamera`, in `src/blocks/camera.ts`) starts only from a button press. On a Mac it skips an iPhone (Continuity Camera) and uses the built-in one. The browser names its cameras only after the page has camera permission, so the first time, when the browser's default camera is the iPhone, its camera turns on for about a second before `useCamera` switches to the built-in one. Import it from `camera.ts` unless the page also runs a model, so MediaPipe stays out of that page's bundle.
 - **Privacy:** send counts or labels to Convex, never frames or face data. Say what the camera sees in TEAM.md.
 - **A still picture:** `loadVision(kind, "IMAGE")`, then `run(img)` on a loaded `<img>`.
-- **Gemini** reads pictures too (`gemini()` with an image part, above). Use it when you need words about a picture; use MediaPipe when you need it live, many times a second.
+- **Gemini** reads pictures too (`gemini()` with an image part, above), but only a file the professor picks, never a camera frame. For the camera, use MediaPipe here on the device.
 
 ## Pages and routes
 
@@ -245,7 +255,7 @@ export default function CheckinPage() {
 // pageUrl("checkin/student") is the full URL to put in a check-in QR (src/teams/checkin/Stage.tsx does).
 ```
 
-To hand a page a value, put it after "?" (`#/checkin/stage?deck=a`) and read it with `useHashParams().get("deck")`, never as an extra part of the path. A new sub-page gets three lines: a link in `src/pages/Home.tsx`, its route in the `ROUTES` list in `src/pages/Home.test.ts` (that test fails when a routed part has no Home link), and its "No page" paths in `src/pages/routes.test.ts`. A new page of its own (`#/<name>`) also goes in `src/pages/index.ts`.
+To hand a page a value, put it after "?" (`#/checkin/stage?deck=a`) and read it with `useHashParams().get("deck")`, never as an extra part of the path. A new sub-page gets five lines: a link in `src/pages/Home.tsx`, its route in the `ROUTES` list in `src/pages/Home.test.ts` (that test fails when a routed part has no Home link), its "No page" paths in `src/pages/routes.test.ts`, and a row in the Pages table of `AGENTS.md` and in the page map of `README.md` (`src/docs.test.ts` fails until both name it). The module that adds the route adds the `AGENTS.md` row too: that row is the one part of `AGENTS.md` outside "Sam only". A new page of its own (`#/<name>`) also goes in `src/pages/index.ts`.
 
 ## Look
 
@@ -275,7 +285,7 @@ Module-only styles go in the module's folder (`src/teams/<team>/*.css`), built f
 
 ## Shared data between teams
 
-Every table, who writes and reads it, and the functions one module calls in another: [docs/contracts.md](docs/contracts.md). Sample data for your own backend: `npx convex run dev/seed:fill '{"channel":"gdg"}'` (and `dev/seed:clear`). fill runs only on the dev backends in `DEV_HOSTS`, so first add your deployment's host to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 4), which also turns on typed test sign-ins and test roles there. The lecture's channel is `CHANNEL` from `src/blocks/deck.ts`.
+Every table, who writes and reads it, and the functions one module calls in another: [docs/contracts.md](docs/contracts.md). Sample data for your own backend: `npx convex run dev/seed:fill '{"channel":"gdg"}'` (and `dev/seed:clear`). fill runs only on the dev backends in `DEV_HOSTS`, so first ask Sam to add your deployment's host to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 4), which also turns on typed test sign-ins and test roles there. The lecture's channel is `CHANNEL` from `src/blocks/deck.ts`.
 
 ## Tests
 

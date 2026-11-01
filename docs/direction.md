@@ -32,7 +32,7 @@ Every class runs on the deck channel `gdg`. A class is one `lectures` row: it op
 1. The professor asks on #/host Now or #/checkin/quiz (`checkin.quiz.ask`, a `polls` row; `draftQuestion` asks Gemini for one from the slide text).
 2. `QuizCard` on #/live and #/checkin/student reads `checkin.quiz.current`; a checked-in student answers with `checkin.quiz.answer` (`pollAnswers`).
 3. The professor presses "End the quiz" or "End the vote" (`checkin.quiz.end`), which saves the final counts. Then every phone shows the result, #/host shows `stats` (answered of checked in, percent right, median seconds) and `missing` (who got it wrong, by team, with `feedback` from Gemini), and `live.past.past` lists it under "Past quizzes and votes" on #/live.
-4. `live.groups.leaderboard` adds each team's right answers on ended quizzes and the professor's point changes (`groupPoints`), divides by team size and ranks the teams. #/live, #/live/leaderboard and #/host Points show it.
+4. `live.groups.leaderboard` adds each team's right answers on ended quizzes and the professor's point changes (`groupPoints`), divides by the team's checked-in students and ranks the teams. #/live, #/live/leaderboard and #/host Points show it.
 
 **Questions and I'm lost.** `live.questions.ask` and `vote` write `questions` and `questionVotes`; #/live lists this class's questions and #/host Questions reads `forHost`, where the professor answers and shares. `live.lost.toggle` writes `lost`; #/host reads `live.read.lostCount` and `lostBySlide`.
 

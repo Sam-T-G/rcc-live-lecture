@@ -25,6 +25,7 @@ const CURRENT = [
   "docs/runbook.md",
   "src/teams/README.md",
   ...teams.map((t) => `src/teams/${t}/TEAM.md`),
+  "templates/TEAM.md",
   ...teams.map((t) => `convex/${t}/README.md`),
   ".claude/commands/next.md",
   ".claude/commands/freeze.md",
@@ -352,5 +353,106 @@ describe("docs: the 2026-11-01 docs fix check", () => {
     expect(differs.startsWith("It differs from")).toBe(true);
     expect(differs.split(".")[0] + ".").not.toMatch(/after a class ends it is the time it ended/);
     expect(differs).toMatch(/before a channel's first class it is 12 hours ago/);
+  });
+});
+
+// The 2026-11-01 second docs sweep (these ids are that round's findings).
+describe("docs: the 2026-11-01 second sweep", () => {
+  const blocks = read("BLOCKS.md");
+  const agents = read("AGENTS.md");
+  const section = (text: string, title: string) => text.split(/\n## /).find((s) => s.startsWith(title)) ?? "";
+  const line = (path: string, has: string) => lines(path).find((l) => l.includes(has)) ?? "";
+  const ownerRow = (path: string) => agents.split("\n").find((l) => l.startsWith("|") && l.includes(`\`${path}\``) && l.includes("Sam only")) ?? "";
+
+  it("sweep2-host-8 sweep2-docs-3 the runbook's #/host line gives Questions newest first and the reason only for students", () => {
+    const host = line("docs/runbook.md", "**#/host** has three tabs");
+    expect(host).not.toMatch(/sorted by upvotes|deductions with a reason/);
+    expect(host).toMatch(/Questions:\*\*[^.]*newest first/);
+    expect(host).toMatch(/reason[^.]*student|student[^.]*reason/);
+    // forHost really is newest first, and a team's +1 or −1 sends no reason.
+    expect(read("convex/live/questions.ts")).toMatch(/export const forHost[\s\S]{0,400}\.order\("desc"\)/);
+    expect(read("src/teams/host/Boards.tsx")).toContain("adjust({ channel: CHANNEL, team: g.team, delta: 1 })");
+  });
+
+  it('sweep2-docs-4 the runbook puts "That code is old." on the door iPad or the teacher page, where it shows', () => {
+    const row = line("docs/runbook.md", "That code is old.");
+    expect(row).not.toMatch(/student's pass says/);
+    expect(row).toContain("door iPad");
+    expect(row).toContain("teacher page");
+    expect(read("src/teams/checkin/Kiosk.tsx")).toContain('"That code is old.');
+    expect(read("src/teams/checkin/Student.tsx")).not.toContain("That code is old.");
+  });
+
+  it("sweep2-docs-1 the AI recipe starts with requireProf(ctx), says how a student-facing action is gated and that names stay out of Gemini", () => {
+    const ai = section(blocks, "AI (Gemini)");
+    const from = ai.indexOf("```ts");
+    const recipe = ai.slice(from, ai.indexOf("```", from + 5));
+    expect(recipe).toContain("await requireProf(ctx);");
+    expect(recipe).toContain('import { requireProf } from "../checkin/prof";');
+    for (const w of ["requireUser", "checkedIn", "never a name"]) expect([w, ai.includes(w)]).toEqual([w, true]);
+  });
+
+  it("sweep2-docs-5 the AI recipe never sends a camera frame to Gemini", () => {
+    const ai = section(blocks, "AI (Gemini)");
+    expect(ai).not.toMatch(/canvas from the camera/);
+    expect(ai).toMatch(/camera frame[^.]*never goes to Gemini/);
+    expect(section(blocks, "Vision")).toMatch(/never a camera frame/);
+  });
+
+  it("sweep2-docs-2 a new sub-page's steps name every file the docs test checks, and AGENTS.md lets the module add its Pages row", () => {
+    const routes = section(blocks, "Pages and routes");
+    for (const w of ["src/pages/Home.tsx", "Home.test.ts", "routes.test.ts", "AGENTS.md", "README.md"]) expect([w, routes.includes(w)]).toEqual([w, true]);
+    expect(ownerRow("AGENTS.md")).toMatch(/Pages/);
+  });
+
+  it("sweep2-docs-6 README step 6 says which doctor.sh FIX lines to skip", () => {
+    const readme = read("README.md");
+    const step6 = readme.slice(readme.indexOf("## Set up a laptop")).split("\n").find((l) => l.startsWith("6. ")) ?? "";
+    expect(step6).not.toMatch(/until it says Ready/);
+    for (const w of ["ADMIN_EMAILS", "DECK_BRIDGE_KEY"]) expect([w, step6.includes(w)]).toEqual([w, true]);
+  });
+
+  it("sweep2-docs-7 every line that adds a host to DEV_HOSTS says Sam adds it, and the ownership table says so too", () => {
+    let seen = 0;
+    for (const path of CURRENT)
+      for (const l of lines(path))
+        if (/\badd\b.{0,160}DEV_HOSTS|DEV_HOSTS.{0,160}\badd\b/i.test(l)) {
+          seen++;
+          expect([path, l, /\bask Sam\b|Sam adds/i.test(l)]).toEqual([path, l, true]);
+        }
+    expect(seen).toBeGreaterThan(4);
+    expect(ownerRow("convex/auth.config.ts")).toMatch(/DEV_HOSTS/);
+  });
+
+  it("sweep2-docs-8 templates/TEAM.md has the current sheet's sections, no sprint parts, and is a checked current doc", () => {
+    const t = doc("templates/TEAM.md");
+    for (const h of ["**Goal:**", "## Must do", "**Not doing:**", "## What it sees", "## Where it lives", "## Tests"]) expect([h, t.includes(h)]).toEqual([h, true]);
+    expect(t).not.toMatch(/sprint|\bPM\b|Seats|pitch|demo path/i);
+    expect(CURRENT).toContain("templates/TEAM.md");
+  });
+
+  it("sweep2-docs-10 design.md's professor-laptop rule leaves #/host its own kept-mounted tabs", () => {
+    expect(line("docs/design.md", "sections as `Tabs`")).toMatch(/#\/host[^.]*mounted/);
+  });
+
+  it("sweep2-docs-11 no current doc or design.md names an End day button; the button is End class", () => {
+    for (const path of [...CURRENT, "docs/design.md"]) expect([path, doc(path).match(/\bEnd day\b/)?.[0] ?? null]).toEqual([path, null]);
+  });
+
+  it("sweep2-docs-12 contracts.md gives ensureGroup its fresh arg", () => {
+    expect(read("docs/contracts.md")).toContain("ensureGroup(ctx, channel, user, fresh)");
+    expect(read("convex/live/groups.ts")).toContain("ensureGroup(ctx: MutationCtx, channel: string, user: string, fresh = false)");
+  });
+
+  it("sweep2-docs-13 direction.md divides by the team's checked-in students, not team size", () => {
+    const direction = read("docs/direction.md");
+    expect(direction).not.toMatch(/divides by team size/);
+    expect(direction).toContain("divides by the team's checked-in students");
+  });
+
+  it("sweep2-access-3 the devices row names every function that writes or reads devices", () => {
+    const row = read("docs/contracts.md").split("\n").find((l) => l.startsWith("| `devices`")) ?? "";
+    for (const w of ["staff.approvePairing", "staff.unpair", "staff:devRevoke", "checkin.pass.scan", "requireScanner", "pairedDevice", "deviceByHash", "checkin.pass.canScan", "staff.requestPairing", "staff.deviceStatus", "staff.devices"])
+      expect([w, row.includes(w)]).toEqual([w, true]);
   });
 });

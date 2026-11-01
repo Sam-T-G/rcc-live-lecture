@@ -219,8 +219,8 @@ iPhone Safari at 390 x 844, and 320 wide. One hand, a glance during a lecture. R
 
 1280 to 1440 wide, at the lectern, mid-lecture. Routes: #/host, #/checkin/teacher, #/checkin/quiz, #/admin.
 
-- `Screen wide`. Counts as a row of `Stat`s at the top; sections as `Tabs`.
-- `.btn--small` is fine here. Anything that can't be undone (End class, End day, Remove) is a `ConfirmButton`.
+- `Screen wide`. Counts as a row of `Stat`s at the top; sections as `Tabs`, except on #/host, which keeps its own tabs because its three panels stay mounted (a half-written quiz and the AI note survive a tab switch) and kit `Tabs` renders only the open one.
+- `.btn--small` is fine here. Anything that can't be undone (End class, Remove) is a `ConfirmButton`.
 - Tables go in `.table-scroll`, with numbers in their own column.
 - Keep the page readable at a glance between slides: the counts don't move when new data lands (tabular numbers, fixed slots).
 
