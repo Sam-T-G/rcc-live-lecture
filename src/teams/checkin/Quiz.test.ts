@@ -50,7 +50,7 @@ describe("#/checkin/quiz, ended quiz", () => {
     const stats = html.slice(html.indexOf('class="quiz__stats"'), html.indexOf("Ask another"));
     expect(stats).not.toContain("big__value");
     expect(stats.match(/class="stat__value"/g)).toHaveLength(3);
-    expect(stats).toContain('<span class="stat__value">1 / 12</span><span class="stat__label">answered</span>');
+    expect(stats).toContain('<span class="stat__value">1 of 12</span><span class="stat__label">answered</span>');
     expect(stats).toContain('<span class="stat__value">100%</span><span class="stat__label">got it right</span>');
     expect(stats).toContain('<span class="stat__value">225 s</span><span class="stat__label">median time to answer</span>');
   });

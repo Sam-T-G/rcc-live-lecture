@@ -194,16 +194,16 @@ function Running({ poll, onNew }: { poll: Poll; onNew: () => void }) {
       <h2 className="quiz__q">{poll.question}</h2>
       {poll.open ? (
         <>
-          <Big value={stats ? `${stats.answered} / ${stats.checkedIn}` : "…"} label="checked-in students answered" />
+          <Big value={stats ? `${stats.answered} of ${stats.checkedIn}` : "…"} label="checked-in students answered" />
           <ul className="quiz__list">{poll.choices.map((c, i) => <li key={i}><b>{LETTERS[i]}</b> {c}</li>)}</ul>
-          <p className="row"><Button busy={ending} onClick={stop}>{vote ? "End the vote" : "End the question"}</Button></p>
+          <p className="row"><Button busy={ending} onClick={stop}>{vote ? "End the vote" : "End the quiz"}</Button></p>
           {err && <Status kind="error">{err}</Status>}
         </>
       ) : stats ? (
         <>
           <Bars choices={poll.choices} counts={stats.counts} correct={stats.correct} />
           <div className="quiz__stats">
-            <Stat value={`${stats.answered} / ${stats.checkedIn}`} label="answered" accent />
+            <Stat value={`${stats.answered} of ${stats.checkedIn}`} label="answered" accent />
             {stats.rightPct !== null && <Stat value={stats.rightPct + "%"} label="got it right" />}
             {stats.medianSec !== null && <Stat value={stats.medianSec + " s"} label="median time to answer" />}
           </div>

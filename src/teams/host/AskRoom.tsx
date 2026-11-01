@@ -86,8 +86,8 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
 
   return (
     <Card title="Ask the room">
-      {current === undefined && <Status kind="loading">Loading the question...</Status>}
-      {current === null && !form && <Status kind="empty">No question in this class yet.</Status>}
+      {current === undefined && <Status kind="loading">Loading the quiz or vote...</Status>}
+      {current === null && !form && <Status kind="empty">No quiz or vote in this class yet.</Status>}
       {current && <Running key={current.id} poll={current} writing={!!form} />}
 
       {form ? (
@@ -185,7 +185,7 @@ function Running({ poll, writing }: { poll: Poll; writing: boolean }) {
       </div>
       {poll.open && (
         <Button variant={writing ? "secondary" : "primary"} busy={ending} onClick={() => endIt(poll.id)}>
-          {vote ? "End the vote" : "End the question"}
+          {vote ? "End the vote" : "End the quiz"}
         </Button>
       )}
       {error && <Status kind="error">{error}</Status>}
@@ -258,7 +258,7 @@ export function QuestionForm({
       </div>
       <div className="row">
         <Button type="submit" busy={opening}>
-          {quiz ? "Open question" : "Start the vote"}
+          {quiz ? "Ask the room" : "Start the vote"}
         </Button>
         {quiz && form.correct !== null && (
           <Button variant="quiet" onClick={() => onChange({ ...form, correct: null })}>
@@ -271,7 +271,7 @@ export function QuestionForm({
       </div>
       {pollOpen && (
         <p className="muted ask-form__rule">
-          {quiz ? "Opening this question ends the question that's open now." : "Starting this vote ends the question that's open now."}
+          {quiz ? "Asking this quiz ends the quiz or vote that's open now." : "Starting this vote ends the quiz or vote that's open now."}
         </p>
       )}
     </form>

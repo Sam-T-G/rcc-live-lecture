@@ -107,7 +107,36 @@ describe("#/host Ask the room", () => {
           onCancel: () => {},
         }),
       );
-    expect(form("quiz")).toContain("Opening this question ends the question that&#x27;s open now.");
-    expect(form("vote")).toContain("Starting this vote ends the question that&#x27;s open now.");
+    expect(form("quiz")).toContain("Asking this quiz ends the quiz or vote that&#x27;s open now.");
+    expect(form("vote")).toContain("Starting this vote ends the quiz or vote that&#x27;s open now.");
+  });
+
+  // sweep1-host-4: the Questions tab holds the students' questions, so the Now tab calls the
+  // professor's poll a quiz or a vote, with #/checkin/quiz's button and count words (F42).
+  it("sweep1-host-4 the Now tab says quiz or vote and uses #/checkin/quiz's words", () => {
+    expect(card()).toContain("Loading the quiz or vote...");
+    results["checkin/quiz:current"] = null;
+    expect(card()).toContain("No quiz or vote in this class yet.");
+
+    results["checkin/quiz:current"] = poll({ kind: "quiz", open: true });
+    results["checkin/quiz:stats"] = stats({ answered: 1, checkedIn: 12, medianSec: null });
+    const html = card();
+    expect(html).toContain("1 of 12");
+    expect(html).toContain("End the quiz");
+    expect(html).not.toMatch(/question/i);
+
+    const form = renderToStaticMarkup(
+      createElement(QuestionForm, {
+        form: { kind: "quiz", question: "", choices: ["", "", "", ""], correct: null, index: null, aiDraft: false },
+        slide: null,
+        pollOpen: false,
+        opening: false,
+        onChange: () => {},
+        onSubmit: () => {},
+        onCancel: () => {},
+      }),
+    );
+    expect(form).toContain(">Ask the room<");
+    expect(form).not.toContain("Open question");
   });
 });

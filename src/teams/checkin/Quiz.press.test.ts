@@ -244,11 +244,11 @@ describe("#/checkin/quiz, ending", () => {
     };
   });
 
-  it("F17.4 F41.3 checkin-frontend-17 'End the question' is busy while it ends, a second press sends nothing, and a failed end shows the server's words", async () => {
-    expect(press(professor(), "End the question")).toBe("clicked");
+  it("F17.4 F41.3 checkin-frontend-17 'End the quiz' is busy while it ends, a second press sends nothing, and a failed end shows the server's words", async () => {
+    expect(press(professor(), "End the quiz")).toBe("clicked");
     const busy = professor();
-    expect(button(busy, "End the question").el.props["aria-busy"]).toBe(true);
-    press(busy, "End the question");
+    expect(button(busy, "End the quiz").el.props["aria-busy"]).toBe(true);
+    press(busy, "End the quiz");
     expect(sent("checkin/quiz:end")).toHaveLength(1);
     expect(sent("checkin/quiz:end")[0].args).toEqual({ poll: "p1" });
 
@@ -256,7 +256,7 @@ describe("#/checkin/quiz, ending", () => {
     await settle();
     const after = professor();
     expect(alertText(after)).toBe("Only professors can do that.");
-    expect(button(after, "End the question").el.props["aria-busy"]).toBeUndefined();
+    expect(button(after, "End the quiz").el.props["aria-busy"]).toBeUndefined();
     expect(rejections).toEqual([]);
   });
 });
