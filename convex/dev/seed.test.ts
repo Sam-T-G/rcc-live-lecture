@@ -2,7 +2,7 @@
 // ended quiz with their answers, their questions with upvotes), and removing them again.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../_generated/api";
-import type { TableNames } from "../_generated/dataModel";
+import type { Id, TableNames } from "../_generated/dataModel";
 import schema from "../schema";
 import { DEV_URL, PROD_URL, at, checkIn, professor, profEnv, setup, slide, typed, type T } from "../test.helpers";
 
@@ -138,6 +138,114 @@ describe("dev seed", () => {
     expect(await count(t, "another-channel")).toBe(3);
   });
 
+  it("UZ-risk-1 clear removes only this channel's sample rows: a real student's lost tap, quiz answer and point changes, real polls, and every row on another channel stay as they were", async () => {
+    const t = setup();
+    await slide(t, CH, 2);
+    const student = typed(t, "Student 9", "student9@example.edu");
+    await checkIn(t, student);
+    const prof = await professor(t);
+    // A real quiz the student answered, and a real vote nobody answered, both ended.
+    const quiz = await prof.mutation(api.checkin.quiz.ask, { channel: CH, kind: "quiz", question: "Real quiz?", choices: ["Yes", "No"], correct: 0 });
+    await student.mutation(api.checkin.quiz.answer, { poll: quiz, choice: 0 });
+    await prof.mutation(api.checkin.quiz.end, { poll: quiz });
+    const vote = await prof.mutation(api.checkin.quiz.ask, { channel: CH, kind: "vote", question: "Real vote?", choices: ["A", "B"] });
+    await prof.mutation(api.checkin.quiz.end, { poll: vote });
+    await student.mutation(api.live.lost.toggle, { channel: CH, index: 2 });
+
+    await fill(t);
+    await fill(t, "another-channel", 3);
+    // A point change for the real student and one for their team (Red, team 0).
+    const mine = (await everyRow(t)).checkins.find((r) => r.name === "Student 9");
+    if (!mine) throw new Error("no real check-in");
+    await prof.mutation(api.live.groups.adjust, { channel: CH, checkin: mine._id as Id<"checkins">, delta: 2, reason: "Helped a classmate" });
+    await prof.mutation(api.live.groups.adjust, { channel: CH, team: 0, delta: 1 });
+
+    const before = await everyRow(t);
+    // The rows clear(gdg) may remove: sample students' rows on gdg, their answers on gdg's polls,
+    // and gdg's sample quiz. another-channel has the same sample users, so their rows there count
+    // as kept.
+    const gdgPolls = new Set(before.polls.filter((p) => p.channel === CH).map((p) => p._id));
+    const isGdgSample = (table: string, r: Record<string, unknown>) =>
+      table === "polls"
+        ? r.channel === CH && r.question === QUIZ
+        : typeof r.user === "string" && r.user.startsWith("sample:") && (table === "pollAnswers" ? gdgPolls.has(r.poll as string) : r.channel === CH);
+    const kept = Object.fromEntries(Object.entries(before).map(([table, rows]) => [table, rows.filter((r) => !isGdgSample(table, r))]));
+    // The test means something only when each kind of row clear reads is there to keep.
+    expect(kept.lost.map((r) => [r.channel, r.user === "sample:3"])).toEqual(
+      expect.arrayContaining([
+        [CH, false],
+        ["another-channel", true],
+      ]),
+    );
+    expect(kept.groupPoints.map((r) => [r.user === undefined, r.delta]).sort()).toEqual([
+      [false, 2],
+      [true, 1],
+    ]);
+    expect(kept.polls.map((r) => [r.channel, r.question]).sort()).toEqual(
+      [
+        [CH, "Real quiz?"],
+        [CH, "Real vote?"],
+        ["another-channel", QUIZ],
+      ].sort(),
+    );
+    expect(kept.pollAnswers).toHaveLength(1 + 3);
+
+    await clear(t);
+    expect(await everyRow(t)).toEqual(kept);
+  });
+
+  it("UZ-spec-1 clear after the sample check-ins' team lock fired leaves the class's teams open, so the next real students are dealt Red, Blue, Yellow and lock again 5 minutes after the first of them", async () => {
+    const t = setup();
+    await fill(t);
+    // The lock comes 5 minutes after sample student 1's check-in, 2 minutes from now.
+    vi.advanceTimersByTime(3 * 60_000);
+    await t.finishInProgressScheduledFunctions();
+    expect(await t.query(api.live.groups.status, { channel: CH })).toMatchObject({ locked: true });
+
+    await clear(t);
+    expect(await count(t)).toBe(0);
+    expect(await t.query(api.live.groups.status, { channel: CH })).toEqual({ size: 4, locked: false, locksAt: null });
+
+    const first = Date.now();
+    for (const k of [1, 2, 3]) await checkIn(t, typed(t, "Student " + k, `student${k}@example.edu`));
+    const board = await t.query(api.live.groups.leaderboard, { channel: CH });
+    expect(board.teams.map((g) => [g.label, g.members])).toEqual([
+      ["Red", 1],
+      ["Blue", 1],
+      ["Yellow", 1],
+    ]);
+    expect(await t.query(api.live.groups.status, { channel: CH })).toEqual({ size: 4, locked: false, locksAt: first + 5 * 60_000 });
+    vi.advanceTimersByTime(5 * 60_000);
+    await t.finishInProgressScheduledFunctions();
+    expect(await t.query(api.live.groups.status, { channel: CH })).toMatchObject({ locked: true });
+  });
+
+  it("UZ-convex-2 clear before the sample check-ins' team lock fires: the old lock job finds nobody and the next real check-in queues a fresh lock", async () => {
+    const t = setup();
+    await fill(t);
+    await clear(t);
+    // The job fill queued fires with nobody checked in.
+    vi.advanceTimersByTime(3 * 60_000);
+    await t.finishInProgressScheduledFunctions();
+    expect(await t.query(api.live.groups.status, { channel: CH })).toMatchObject({ locked: false, locksAt: null });
+    const first = Date.now();
+    for (const k of [1, 2, 3]) await checkIn(t, typed(t, "Student " + k, `student${k}@example.edu`));
+    expect((await t.query(api.live.groups.leaderboard, { channel: CH })).teams.map((g) => g.label)).toEqual(["Red", "Blue", "Yellow"]);
+    expect(await t.query(api.live.groups.status, { channel: CH })).toEqual({ size: 4, locked: false, locksAt: first + 5 * 60_000 });
+  });
+
+  it("UZ-spec-1 clear keeps the team lock when a real student is still checked in to the class", async () => {
+    const t = setup();
+    await checkIn(t, typed(t, "Student 9", "student9@example.edu"));
+    await fill(t);
+    vi.advanceTimersByTime(6 * 60_000);
+    await t.finishInProgressScheduledFunctions();
+    expect(await t.query(api.live.groups.status, { channel: CH })).toMatchObject({ locked: true });
+    await clear(t);
+    expect(await count(t)).toBe(1);
+    expect(await t.query(api.live.groups.status, { channel: CH })).toMatchObject({ locked: true });
+  });
+
   it("core-backend-12 fill twice adds nothing the second time", async () => {
     const t = setup();
     await fill(t);
@@ -200,6 +308,11 @@ describe("dev seed", () => {
       ["https://UTMOST-IBIS-818.convex.cloud/", /never runs on prod/],
       [undefined, /can't be read, so it added nothing/],
       ["not a url", /can't be read, so it added nothing/],
+      // UZ-convex-1: a custom domain (prod's could be one) or a deployment that isn't in
+      // DEV_HOSTS (prod could move to one) isn't known to be dev, so fill refuses there too.
+      ["https://api.rcclive.app", /runs only on the dev backends in DEV_HOSTS/],
+      ["https://brave-otter-456.convex.cloud", /runs only on the dev backends in DEV_HOSTS/],
+      ["http://sample-dev-123.convex.cloud", /runs only on the dev backends in DEV_HOSTS/],
     ];
     for (const [url, error] of cases) {
       vi.stubEnv("CONVEX_CLOUD_URL", url);

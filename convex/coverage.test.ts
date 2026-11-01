@@ -52,21 +52,28 @@ async function convexFunctions(): Promise<Fn[]> {
       });
     }
   }
-  // Host-only refs, until no module adds one: a function that runs a host-only function in
-  // another module can make a third module's function host-only in the next round.
+  const refs = hostOnlyRefs(found, MODULE_SOURCES);
+  return found
+    .map((f) => ({ ref: f.ref, hasKey: f.hasKey, guarded: refs.has(f.ref) }))
+    .sort((a, b) => a.ref.localeCompare(b.ref));
+}
+
+// The host-only refs among `found`, given every module's source by file, until no module adds
+// one: every module's scan gets every host-only ref found so far, whichever module it is in, so a
+// function that runs a host-only function in another module is host-only, and can make a third
+// module's function host-only in the next round.
+function hostOnlyRefs(found: { file: string; name: string; ref: string }[], sources: Record<string, string>): Set<string> {
   const refs = new Set<string>();
   for (let grew = true; grew; ) {
     grew = false;
-    const byFile = new Map(Object.keys(MODULE_SOURCES).map((file) => [file, guardedNames(MODULE_SOURCES[file], refs)]));
+    const byFile = new Map(Object.keys(sources).map((file) => [file, guardedNames(sources[file], refs)]));
     for (const f of found) {
       if (refs.has(f.ref) || !byFile.get(f.file)?.has(f.name)) continue;
       refs.add(f.ref);
       grew = true;
     }
   }
-  return found
-    .map((f) => ({ ref: f.ref, hasKey: f.hasKey, guarded: refs.has(f.ref) }))
-    .sort((a, b) => a.ref.localeCompare(b.ref));
+  return refs;
 }
 
 // Every route on the HTTP router, as [path, method].
@@ -384,6 +391,22 @@ describe("F39 every Convex function is tested", async () => {
         refs,
       ),
     ).toEqual(["a", "b"]);
+  });
+
+  it("UZ-risk-2 the module scan carries host-only refs across modules, round after round: module B's action that runs module A's host-only query is host-only, and so is module C's that runs B's", () => {
+    const sources = {
+      "./room/a.ts": `export const list = query({ handler: async (ctx) => { await requireProf(ctx); return []; } });\nexport const open = query({ handler: async () => [] });`,
+      "./room/b.ts": `export const draft = action({ handler: async (ctx) => { await ctx.runQuery(api.room.a.list, {}); } });\nexport const free = action({ handler: async (ctx) => ctx.runQuery(api.room.a.open, {}) });`,
+      "./other/c.ts": `export const wrap = action({ handler: async (ctx) => ctx.runAction(api.room.b.draft, {}) });`,
+    };
+    const found = [
+      { file: "./room/a.ts", name: "list", ref: "api.room.a.list" },
+      { file: "./room/a.ts", name: "open", ref: "api.room.a.open" },
+      { file: "./room/b.ts", name: "draft", ref: "api.room.b.draft" },
+      { file: "./room/b.ts", name: "free", ref: "api.room.b.free" },
+      { file: "./other/c.ts", name: "wrap", ref: "api.other.c.wrap" },
+    ];
+    expect([...hostOnlyRefs(found, sources)].sort()).toEqual(["api.other.c.wrap", "api.room.a.list", "api.room.b.draft"]);
   });
 
   it("F39.3 a function counts only when an awaited authMatrix(HOST_ONLY, ADMIN_ONLY or SCANNER, ...) calls it, and nothing else, as the row's caller", () => {

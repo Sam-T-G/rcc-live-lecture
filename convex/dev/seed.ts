@@ -8,14 +8,16 @@
 // the way a scan deals them, I'm lost taps, an ended quiz with their answers, and their questions
 // with upvotes. The rows belong to that class, so they leave the screens when the class ends.
 // fill adds nothing when the channel has sample students already, refuses while a question is
-// open (the sample quiz would take its place on every phone), and never runs on prod.
+// open (the sample quiz would take its place on every phone), and runs only on the dev backends
+// in DEV_HOSTS (convex/checkin/prof.ts): add your own dev deployment's host there first.
 // Every sample student's user is "sample:<n>", so clear finds their rows in every table and never
 // touches a real student's (a real user is "<issuer>|<subject>"). clear runs on any backend.
 // Internal: the CLI and the dashboard can run these, the browser can't. Leads only.
 import { ConvexError, v } from "convex/values";
+import type { Doc } from "../_generated/dataModel";
 import { internalMutation, type MutationCtx } from "../_generated/server";
-import { cloudHost } from "../checkin/prof";
-import { ensureLecture, lectureStart } from "../lib";
+import { cloudHost, isDevBackend } from "../checkin/prof";
+import { ensureLecture, lectureStart, lectureWindow } from "../lib";
 import { ensureGroup } from "../live/groups";
 
 const SAMPLE = "sample:";
@@ -43,13 +45,20 @@ const sampleUser = (k: number) => SAMPLE + k;
 const isSample = (user: string | undefined) => user !== undefined && user.startsWith(SAMPLE);
 const plural = (n: number, one: string) => `${n} ${n === 1 ? one : one + "s"}`;
 
-// fill makes up students, so it refuses on prod, and on a backend whose CONVEX_CLOUD_URL (Convex
-// sets it in every function) can't be read, since then it can't tell that backend from prod.
+// fill makes up students, so it runs only on the dev backends in DEV_HOSTS (convex/checkin/prof.ts,
+// the list typed test roles use), by the host in CONVEX_CLOUD_URL (Convex sets it in every
+// function). Anything else counts as prod: prod's URL, a custom domain, a deployment that isn't on
+// the list, a URL that can't be read. A lead who runs fill on their own dev deployment adds its
+// host to DEV_HOSTS first.
 function refuseOnProd() {
   const host = cloudHost();
   if (!host)
     throw new ConvexError("dev/seed:fill tells prod from a dev backend by CONVEX_CLOUD_URL, and this backend's can't be read, so it added nothing.");
   if (host.includes(PROD)) throw new ConvexError(`dev/seed:fill adds made-up students, so it never runs on prod (${PROD}).`);
+  if (!isDevBackend())
+    throw new ConvexError(
+      `dev/seed:fill adds made-up students, so it runs only on the dev backends in DEV_HOSTS (convex/checkin/prof.ts), and ${host} isn't one, so it added nothing. Add your dev deployment's host there to use it.`,
+    );
 }
 
 // Whether the channel has a sample student's check-in, team or question, in any class.
@@ -172,6 +181,30 @@ export const fill = internalMutation({
   },
 });
 
+// The sample check-ins dealt teams, so the first of them queued the open class's team lock and
+// marked its groupSettings row `scheduled` (live.groups.queueLock), and once the lock fires the
+// row has `lockedAt`. When clear has just removed sample check-ins from the open class and nobody
+// is left checked in to it, the row goes back to how a class with no check-in has it (its team
+// size only), so the next real check-in is dealt Red, Blue, Yellow and queues a fresh lock. A
+// lock job fill queued that hasn't fired yet finds nobody, or the real students' later lock time,
+// and locks nothing early. A class with a real student still checked in keeps its lock.
+async function reopenTeams(ctx: MutationCtx, channel: string, removed: Doc<"checkins">[]) {
+  const win = await lectureWindow(ctx, channel);
+  if (win.lecture === null || !removed.some((r) => r._creationTime >= win.start)) return;
+  const left = await ctx.db
+    .query("checkins")
+    .withIndex("by_channel", (q) => q.eq("channel", channel).gte("_creationTime", win.start))
+    .first();
+  if (left) return;
+  const set = await ctx.db
+    .query("groupSettings")
+    .withIndex("by_channel", (q) => q.eq("channel", channel).gte("_creationTime", win.start))
+    .order("desc")
+    .first();
+  if (set && (set.lockedAt !== undefined || set.scheduled === true))
+    await ctx.db.patch("groupSettings", set._id, { lockedAt: undefined, scheduled: undefined });
+}
+
 export const clear = internalMutation({
   args: { channel: v.string() },
   returns: v.string(),
@@ -186,6 +219,7 @@ export const clear = internalMutation({
       .withIndex("by_channel_and_user", (q) => q.eq("channel", channel).gte("user", SAMPLE).lt("user", AFTER_SAMPLE))
       .collect();
     for (const r of checkins) await ctx.db.delete("checkins", r._id);
+    await reopenTeams(ctx, channel, checkins);
     const groups = await ctx.db
       .query("groups")
       .withIndex("by_channel_and_user", (q) => q.eq("channel", channel).gte("user", SAMPLE).lt("user", AFTER_SAMPLE))
