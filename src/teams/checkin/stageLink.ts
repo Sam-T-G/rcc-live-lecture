@@ -8,15 +8,20 @@ export const SAVED = "saved";
 // This tab's copy of the bridge key. sessionStorage, so it ends when the tab closes.
 const STORE = "rcc-live:stage-bridge";
 
-// Hosts a browser loads over http even inside an https page, so their decks keep http.
-const LOCAL = ["localhost", "127.0.0.1", "[::1]"];
+// Hosts a browser loads over http even inside an https page (localhost, any name ending in
+// .localhost, 127.x.x.x and [::1]), so their decks keep http. URL writes any IPv4 host as four
+// numbers, so "127.example.com" isn't one.
+function isLocal(host: string): boolean {
+  return host === "localhost" || host.endsWith(".localhost") || /^127(\.\d+){3}$/.test(host) || host === "[::1]";
+}
 
 // The deck's address from ?deck=, or null when it can't load one. "https://" goes in front when the
 // address has no scheme ("slides.example.com/deck"). Only http and https addresses load, and the
-// host has to be localhost, an IPv6 address or a name with a dot between two non-empty parts, so
-// ":::", "decks/week9/", "../decks/week9/" (its host would be "..") and "javascript:..." give null.
-// With `onHttps` (this page is on https, like the live site), an http deck other than localhost,
-// 127.0.0.1 or [::1] gets https instead, since the browser blocks an http frame on an https page.
+// host has to be localhost, an IPv6 address or a name with a dot between two non-empty parts (one
+// trailing dot allowed, as in "slides.example.com."), so ":::", "decks/week9/", "../decks/week9/"
+// (its host would be "..") and "javascript:..." give null. With `onHttps` (this page is on https,
+// like the live site), an http deck on any host but those isLocal lists gets https instead, since
+// the browser blocks an http frame on an https page.
 export function deckAddress(raw: string, onHttps = false): URL | null {
   const text = raw.trim();
   if (!text) return null;
@@ -28,8 +33,8 @@ export function deckAddress(raw: string, onHttps = false): URL | null {
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return null;
   const host = url.hostname;
-  if (host !== "localhost" && !/^[^.]+(\.[^.]+)+$/.test(host) && !host.startsWith("[")) return null;
-  if (onHttps && url.protocol === "http:" && !LOCAL.includes(host)) url.protocol = "https:";
+  if (host !== "localhost" && !/^[^.]+(\.[^.]+)+\.?$/.test(host) && !host.startsWith("[")) return null;
+  if (onHttps && url.protocol === "http:" && !isLocal(host)) url.protocol = "https:";
   return url;
 }
 

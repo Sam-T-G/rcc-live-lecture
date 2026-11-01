@@ -323,17 +323,21 @@ describe("the stage's link (stageLink.ts)", () => {
     expect(deckAddress("HTTPS://Slides.Example.com/Deck")?.href).toBe("https://slides.example.com/Deck");
     expect(deckAddress("http://localhost:8000/deck.html")?.href).toBe("http://localhost:8000/deck.html");
     expect(deckAddress("http://127.0.0.1:8000/")?.href).toBe("http://127.0.0.1:8000/");
-    for (const bad of ["", " ", ":::", "decks/week9/", "./decks/week9/", "../x/", "..", "a..b/deck", ".example.com/deck", "javascript:alert(1)", "javascript://%0aalert(1)", "data:text/html,hi", "ftp://files.example.com/deck", "slides example.com"]) {
+    expect(deckAddress("https://slides.example.com./deck")?.href).toBe("https://slides.example.com./deck");
+    expect(deckAddress("slides.example.com.")?.href).toBe("https://slides.example.com./");
+    for (const bad of ["", " ", ":::", "decks/week9/", "./decks/week9/", "../x/", "..", "a..b/deck", ".example.com/deck", "javascript:alert(1)", "javascript://%0aalert(1)", "data:text/html,hi", "ftp://files.example.com/deck", "slides example.com", "slides.example.com..", "example."]) {
       expect(deckAddress(bad), bad).toBeNull();
     }
   });
 
-  it("F38.1 on an https page an http deck becomes https, except localhost, 127.0.0.1 and [::1] (STAGE-spec-2)", () => {
+  it("F38.1 on an https page an http deck becomes https, except localhost, *.localhost, 127.x.x.x and [::1] (STAGE-spec-2, STAGE-fixcheck-2)", () => {
     expect(deckAddress("http://slides.example.com/deck", true)?.href).toBe("https://slides.example.com/deck");
     expect(deckAddress("http://slides.example.com/deck", false)?.href).toBe("http://slides.example.com/deck");
     expect(deckAddress("http://slides.example.com/deck")?.href).toBe("http://slides.example.com/deck");
-    for (const local of ["http://localhost:8000/deck.html", "http://127.0.0.1:8000/", "http://[::1]:8000/"]) {
+    for (const local of ["http://localhost:8000/deck.html", "http://127.0.0.1:8000/", "http://[::1]:8000/", "http://deck.localhost:5173/", "http://127.0.0.2:8000/"]) {
       expect(deckAddress(local, true)?.href, local).toBe(local);
     }
+    expect(deckAddress("http://127.example.com/deck", true)?.href).toBe("https://127.example.com/deck");
+    expect(deckAddress("http://localhost.example.com/deck", true)?.href).toBe("https://localhost.example.com/deck");
   });
 });
