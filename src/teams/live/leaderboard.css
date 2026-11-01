@@ -1,12 +1,42 @@
-/* Team leaderboard rows (Leaderboard.tsx). live.css draws the rows; these rules place what a row
-   holds: the place beside two lines, the team and its extra credit on the first, and right
-   answers, points per student and students on the second. The projector's board is in
-   stageboard.css. */
+/* The team leaderboard on the phone (Leaderboard.tsx BoardCard): a section on the page (kit
+   .plane), its heading with the lock line, then ruled rows on the page, two lines each: the place,
+   the team's swatch and name, and its extra credit on the first; right answers, points per
+   student and students on the second, from the name's x. live.css draws the rows the projector
+   builds on (stageboard.css); these rules set the phone card's own. */
+.ph .plane { margin-top: 0; padding-inline: var(--s4); }
+.ph-board__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 var(--s3); }
+.ph-board__head > h2 { margin: 0; font-size: var(--t-h3); line-height: 1.3; }
+.ph-board__head > p { margin: 0; font-size: var(--t-small); }
+.ph-board > .status { padding-block: 0; }
+.ph-board > p.muted { margin: 0; font-size: var(--t-small); line-height: var(--lh-small); }
 
-/* The phone card (.board--card), at every width: three columns every row shares (live.css makes
-   each row a subgrid), so the extra credit lines up from row to row. The `ol` makes these rules
-   outrank live.css's `.board:not(.board--big)` ones, which still place a fourth column. */
-ol.board.board--card { grid-template-columns: 2.2em minmax(0, 1fr) auto; }
-ol.board.board--card .board__rank { grid-row: 1 / span 2; }
-ol.board.board--card .board__ec { grid-column: 3; grid-row: 1; }
-ol.board.board--card .board__members { grid-column: 2 / -1; grid-row: 2; }
+/* The phone card (.board--card): three columns every row shares (live.css makes each row a
+   subgrid), so the extra credit lines up from row to row. The `ol` makes these rules outrank
+   live.css's `.board:not(.board--big)` ones, which still place a fourth column. */
+ol.board.board--card { grid-template-columns: 28px minmax(0, 1fr) auto; gap: 0 var(--s3); margin: 0; }
+ol.board.board--card > .board__row { row-gap: 2px; align-items: first baseline; min-height: 64px; padding: var(--s2) 0; border: 0;
+  border-top: 1px solid var(--line); border-radius: 0; outline: 0; }
+ol.board.board--card > .board__row:first-child { border-top: 0; }
+ol.board.board--card .board__rank { grid-row: 1 / span 2; justify-self: end; font-size: var(--n-sm); line-height: 1.3; font-weight: var(--w-loud);
+  font-variant-numeric: tabular-nums lining-nums; }
+ol.board.board--card .board__team { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+ol.board.board--card .board__team > .team__chip { align-self: center; }
+ol.board.board--card .board__name { min-width: 0; font-size: var(--t-body); font-weight: var(--w-head); line-height: 1.3; overflow-wrap: anywhere; }
+ol.board.board--card .board__row--mine .board__name { font-weight: var(--w-loud); }
+ol.board.board--card .board__ec { grid-column: 3; grid-row: 1; color: var(--text); font-size: var(--t-body); line-height: 1.3; font-weight: var(--w-loud);
+  font-variant-numeric: tabular-nums lining-nums; }
+ol.board.board--card .board__ec small { font-size: var(--t-small); }
+ol.board.board--card .board__members { grid-column: 2 / -1; grid-row: 2; padding-inline-start: calc(16px + var(--s2)); font-size: var(--t-small);
+  line-height: var(--lh-small); }
+/* While the scores load: three rows at the real rows' height, a still block for each name and credit. */
+ol.board.board--wait .skel { align-self: center; height: 12px; }
+ol.board.board--wait .board__rank { color: var(--muted); }
+
+/* All N teams: a ruled row that opens, its chevron on the right edge. */
+.ph-board details { border-top: 1px solid var(--line-strong); }
+.ph-board summary { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 48px; padding-block: 0;
+  font-weight: var(--w-head); list-style: none; }
+.ph-board summary::-webkit-details-marker { display: none; }
+.ph-board summary::after { content: ""; flex: none; width: 20px; height: 20px; background: var(--muted); transition: transform var(--fx) var(--ease);
+  -webkit-mask: var(--select-chev) center / contain no-repeat; mask: var(--select-chev) center / contain no-repeat; }
+.ph-board details[open] > summary::after { transform: rotate(180deg); }

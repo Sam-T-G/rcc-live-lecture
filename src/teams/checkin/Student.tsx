@@ -4,11 +4,16 @@
 // the phone comes back to the page, and as the code turns 20 s old (passTiming.ts); a code over
 // 25 s old on screen means those asks stopped getting through, so it shows "Getting a new code…"
 // in place of a QR the door would refuse.
-import { useCallback, useEffect, useState } from "react";
+// Layout (docs/design.md, phone): the app bar names the page, then the pass, the student's ticket,
+// top-anchored under it: the QR on its white plate, the perforation, the name and the code a
+// professor reads out when the camera fails. Checked in, the pass turns into its stub on the green
+// field. The late opt-out and the signed-in line follow the pass. checkin.css draws the frame.
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Link } from "../../blocks/router";
-import { ErrorBoundary, Screen, Status } from "../../blocks/ui";
+import { ErrorBoundary, Status } from "../../blocks/ui";
+import { Icon } from "../../blocks/kit";
 import { QR } from "../../blocks/qr";
 import { CHANNEL } from "../../blocks/deck";
 import { SignedInAs, StudentSignIn, useGoogleUser } from "../../blocks/auth";
@@ -18,14 +23,28 @@ import { QuizCard } from "./Quiz";
 import { askForCodes, codeIsOld, msUntilNewCode } from "./passTiming";
 import { why } from "./util";
 
+// The phone frame for the pass page: the app bar with the page's name, then its body.
+function PassFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="ph" data-surface="phone">
+      <header className="bar ph__bar">
+        <h1 className="bar__title">Your check-in pass</h1>
+      </header>
+      <main className="ph__body">{children}</main>
+    </div>
+  );
+}
+
 export function Student() {
   const { user } = useGoogleUser();
   if (!user)
     return (
-      <Screen title="Your check-in pass">
-        <p>Sign in to get your pass.</p>
-        <StudentSignIn />
-      </Screen>
+      <PassFrame>
+        <section className="pass pass--out">
+          <p>Sign in to get your pass.</p>
+          <StudentSignIn />
+        </section>
+      </PassFrame>
     );
   // The late banner sits beside StudentPass, not inside its screens, so it stays mounted when a
   // scan swaps the pass for "You're checked in.": a remount would count the scan's own late
@@ -81,40 +100,69 @@ export function StudentPass() {
     return () => clearTimeout(timer);
   }, [here, got, ask]);
 
+  // Checked in: the pass's stub on the green field, then the next step, Follow the slides.
   if (here)
     return (
-      <Screen title="You’re checked in.">
+      <PassFrame>
+        <section className="stub">
+          <h2 className="lockup">
+            <Icon name="check" className="icon--d" />
+            You’re checked in.
+          </h2>
+          {pass && <p className="stub__name">{pass.name}</p>}
+        </section>
         <QuizCard />
-        <p><Link to="live">Follow the slides</Link></p>
+        <div className="ph-go">
+          <p><Link to="live">Follow the slides</Link></p>
+        </div>
         <HideLate />
-        <SignedInAs />
-      </Screen>
+        <footer className="ph-foot">
+          <SignedInAs />
+        </footer>
+      </PassFrame>
     );
+  // No pass yet: the pass at its real size, the QR's square naming the step. A failed request
+  // takes the square's place.
   if (!pass)
     return (
-      <Screen title="Your check-in pass">
-        {err ? <Status kind="error">{err}</Status> : <Status kind="loading">Making your pass…</Status>}
-        <SignedInAs />
-      </Screen>
+      <PassFrame>
+        <section className="pass">
+          {err ? (
+            <Status kind="error">{err}</Status>
+          ) : (
+            <div className="pass__qr qr--wait">
+              <Status kind="loading">Making your pass…</Status>
+            </div>
+          )}
+        </section>
+        <footer className="ph-foot">
+          <SignedInAs />
+        </footer>
+      </PassFrame>
     );
-  // A code this page hasn't timed yet has just arrived, so it shows.
+  // A code this page hasn't timed yet has just arrived, so it shows. An old one gives its square
+  // to "Getting a new code…" on the waiting fill, and its letters keep their line, hidden.
   const old = got?.at === pass.at && codeIsOld(got.when, now);
   return (
-    <Screen title="Show this to the professor">
-      <div className="pass">
-        <div className="pass__qr">
+    <PassFrame>
+      <section className="pass">
+        <h2 className="pass__head">Show this to the professor</h2>
+        <div className={old ? "pass__qr qr--wait" : "pass__qr"}>
           {old ? <Status kind="loading">Getting a new code…</Status> : <QR value={"RCC-" + pass.code} size={280} />}
         </div>
+        <hr className="perf" />
         <p className="pass__name">{pass.name}</p>
         <p className={old ? "pass__code pass__code--old" : "pass__code"} aria-hidden={old || undefined}>
           {pass.code}
         </p>
-        <p className="muted">The code changes every 20 seconds. A screenshot stops working within a minute.</p>
+        <p className="pass__note">The code changes every 20 seconds. A screenshot stops working within a minute.</p>
         {err && <Status kind="error">{err}</Status>}
-        <HideLate />
-      </div>
-      <SignedInAs />
-    </Screen>
+      </section>
+      <HideLate />
+      <footer className="ph-foot">
+        <SignedInAs />
+      </footer>
+    </PassFrame>
   );
 }
 
@@ -136,15 +184,15 @@ function useClock(on: boolean) {
 }
 
 // A late check-in puts the student's first name on every class screen (LateBanner.tsx). This
-// turns that off for them.
+// turns that off for them. One ruled row on the page; the whole row is the target.
 export function HideLate() {
   const hide = useQuery(api.checkin.attendance.myHideLate);
   const set = useMutation(api.checkin.attendance.setHideLate);
   const [err, setErr] = useState("");
   if (hide === undefined) return null;
   return (
-    <>
-      <label className="muted">
+    <div className="ph-opt">
+      <label className="ph-check">
         <input
           type="checkbox"
           checked={hide}
@@ -153,6 +201,6 @@ export function HideLate() {
         Don’t show my first name on the class screens when I’m late
       </label>
       {err && <Status kind="error">{err}</Status>}
-    </>
+    </div>
   );
 }

@@ -67,8 +67,8 @@ function portalPage(more: Fixtures = {}): Fixtures {
 const late = [{ afterMs: 500, fixtures: fx(api.checkin.attendance.lateFeed, lateArrival) }];
 
 // The cards beside the slide on #/live, for scrollTo: shots are one viewport tall.
-const QUIZ_CARD = "section.panel:has(.quiz__q)";
-const BOARD_CARD = 'section.panel:has-text("Team leaderboard")';
+const QUIZ_CARD = "section:has(> .quiz__q)";
+const BOARD_CARD = "section.ph-board";
 const PAST_CARD = 'section.panel:has-text("Past quizzes and votes")';
 const QUESTIONS = "#live-questions";
 
@@ -247,7 +247,13 @@ const list: S[] = [
     route: "live",
     role: "signedout",
     title: "PH-24 + PH-41 + PH-61 Signed out, quiz open",
-    fixtures: livePage({ ...fx(api.live.groups.mine, null), ...fx(api.checkin.quiz.current, quizOpen), ...fx(api.checkin.quiz.mine, null) }),
+    // checkin.read.me answers false to a signed-out caller.
+    fixtures: livePage({
+      ...fx(api.checkin.read.me, false),
+      ...fx(api.live.groups.mine, null),
+      ...fx(api.checkin.quiz.current, quizOpen),
+      ...fx(api.checkin.quiz.mine, null),
+    }),
   },
   {
     id: "phone-live-not-checked-in",
@@ -352,6 +358,13 @@ const list: S[] = [
       ...fx(api.live.questions.list, hangs()),
     }),
     fullPage: true,
+    // A whole-page shot draws the sticky action bar where the first screen ends, over the cards.
+    // Here it sits at the page's end, where it comes to rest on a phone.
+    setup: (w) => {
+      const style = w.document.createElement("style");
+      style.textContent = ".ph .ph-actions { position: static; }";
+      w.document.head.append(style);
+    },
   },
   {
     id: "phone-live-teams-forming",

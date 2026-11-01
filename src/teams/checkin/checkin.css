@@ -1,12 +1,85 @@
-/* checkin team styles */
-.pass { display: flex; flex-direction: column; align-items: center; text-align: center; }
-.pass > * { max-width: 100%; }
-.pass__name { font-size: 1.5rem; font-weight: 700; margin: 12px 0 0; }
-.pass__code { font-size: 2rem; letter-spacing: 0.2em; font-family: ui-monospace, monospace; margin: 8px 0; }
-/* The QR's square. "Getting a new code…" takes its place at the same size, and an old code's
-   letters keep their line, so nothing under them moves while a new code loads. */
-.pass__qr { box-sizing: border-box; width: 280px; aspect-ratio: 1; display: grid; place-items: center; }
+/* checkin team styles: the student's phone frame (#/checkin/student; #/live and #/portal use it
+   too), the pass and its stub, the quiz card, and the late banner. The professor's quiz desk
+   (QuizDesk.tsx) still uses .ask__*, .quiz__q, .quiz__list, .quiz__stats and .bars from here, so
+   the phone's rules for those sit under a phone class (.qfield, .qresult). Parts come from the kit
+   (src/styles/kit.css); these rules place them. [kit_request] marks a stand-in for a part the kit
+   doesn't have yet. */
+
+/* ------------------------------------------------------------ the phone frame */
+/* The app bar, then the body: page margin 16, card padding 16, so every text line starts at 32.
+   The page scrolls; the bar stays on top and the action bar (.ph-actions) on the bottom. */
+.ph { --ph-edge: 32px; --ph-gutter: 16px; --page-margin: var(--ph-edge); display: flex; flex-direction: column;
+  min-height: 100vh; min-height: 100svh; }
+.ph > .bar { padding-inline: max(var(--ph-edge), env(safe-area-inset-left, 0px)) max(var(--ph-edge), env(safe-area-inset-right, 0px)); }
+.ph .bar__title { margin: 0; font-size: var(--t-h3); line-height: 1.3; }
+.ph__body { flex: 1 0 auto; display: flex; flex-direction: column; gap: var(--s3); width: 100%; max-width: 40rem; margin-inline: auto;
+  padding: var(--s4) max(var(--ph-gutter), env(safe-area-inset-right, 0px)) var(--s8) max(var(--ph-gutter), env(safe-area-inset-left, 0px)); }
+.ph__body > * { flex-shrink: 0; margin-block: 0; }
+
+/* The signed-in line ends the page, on the 32 edge, its own group under the rest. Sign out is a
+   leaving action, so it takes the neutral words, underlined, never green. */
+.ph-foot { margin-top: var(--s3); padding-inline: var(--s4); }
+.ph-foot > .row { gap: 0 var(--s3); margin: 0; font-size: var(--t-small); }
+.ph-foot .btn--quiet { padding-inline: 0; color: var(--text); font-weight: var(--w-head); text-decoration: underline; text-underline-offset: 3px; }
+
+/* One option on the page (the late opt-out): a ruled row on the 32 edge; the whole row is the target. */
+.ph-opt { padding-inline: var(--s4); border-top: 1px solid var(--line); }
+.ph-opt > .status--error { margin-block: 0 var(--s3); }
+.ph-check { gap: var(--s3); min-height: 48px; margin: 0; padding-block: var(--s1); font-size: var(--t-small); font-weight: var(--w-body);
+  line-height: var(--lh-small); color: var(--text); cursor: pointer; }
+/* [kit_request] a checkbox whose own box is the 44 target (kit .checkrow's input is 24): a transparent
+   10px border around the drawn 24 box, pulled back by a -10px margin so the row keeps its layout.
+   The #/live post form's two boxes (questions.css) use it too. */
+:is(.ph-check, .live-ask label) > input[type="checkbox"] { appearance: none; -webkit-appearance: none; position: relative; flex: none;
+  display: grid; place-items: center; width: 44px; height: 44px; margin: -10px; border: 10px solid transparent; border-radius: 16px;
+  background: var(--raised) padding-box; box-shadow: inset 0 0 0 2px var(--line-strong); cursor: pointer;
+  transition: background-color var(--fx) var(--ease); }
+:is(.ph-check, .live-ask label) > input[type="checkbox"]:checked { background-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+:is(.ph-check, .live-ask label) > input[type="checkbox"]:checked::before { content: ""; width: 6px; height: 12px; margin-top: -3px;
+  border: solid var(--on-accent); border-width: 0 3px 3px 0; transform: rotate(45deg); }
+:is(.ph-check, .live-ask label) > input[type="checkbox"]:focus-visible { outline-offset: -8px; }
+
+/* ------------------------------------------------------------------- the pass */
+/* The kit .pass card: the head, the QR on its white plate (280, 256 at 320 wide), the
+   perforation, the name, the code a professor reads out, the note. Every line on the 32 edge. */
+/* One column that can shrink below the QR's 280, so at 320 the QR takes the card's 256 and the
+   perforation reaches both edges. */
+.ph .pass { grid-template-columns: minmax(0, 1fr); }
+.ph .pass > :is(h2, p, div) { margin: 0; }
+.ph .pass > .perf { border-top-color: var(--line-strong); } /* [kit_request] .perf on the raised pass: the kit's dash is drawn for the green stub */
+/* The square's one column can shrink below the code's drawn 280 (QR's inline width), so at 320 the
+   white plate takes the square's 256 and never runs past the card's edge. */
+.pass__qr { width: 280px; max-width: 100%; aspect-ratio: 1; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; }
+.pass__qr.qr--wait > .status { padding: var(--s4); }
+.ph .pass__name { font-size: 1.25rem; font-weight: var(--w-head); line-height: 1.3; }
+/* The code: Google Sans Code 40 / 700, tabular. An old code's letters keep their line, hidden, so
+   nothing under them moves while a new code loads. */
+.ph .pass__code { font-family: var(--font-code); font-size: 2.5rem; font-weight: var(--w-loud); line-height: 1.1; letter-spacing: .08em;
+  font-variant-numeric: tabular-nums; font-variant-ligatures: none; user-select: all; -webkit-user-select: all; }
 .pass__code--old { visibility: hidden; }
+.ph .pass__note { max-width: 34ch; }
+/* Signed out: the pass holds the sentence as its head and Google's button under it. */
+.pass--out > p { font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.3; }
+.pass--out > div { min-width: 0; }
+.pass--out .status--error { text-wrap: pretty; }
+
+/* ---------------------------------------------------------- the checked-in stub */
+/* The pass becomes its stub: the green field, the check and "You're checked in." at the display
+   size, the name. While a quiz shows under it, the stub steps down to the in state's tint, so the
+   quiz's field is the one full green on the screen. */
+.ph .stub > :is(h2, p) { margin: 0; }
+.ph__body:has(> .qfield) > .stub { background: var(--st-in); color: var(--on-st-in); }
+.ph__body:has(> .qfield) > .stub .lockup > .icon { color: var(--st-in-mark); }
+/* Follow the slides, the next step: a full-width row in --text with a green chevron. */
+.ph-go > p { margin: 0; }
+.ph-go a { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 56px; padding-inline: var(--s4);
+  border-block: 1px solid var(--line); color: var(--text); font-size: var(--t-body); font-weight: var(--w-head); text-decoration: none; }
+.ph-go a:hover { text-decoration: underline; }
+.ph-go + .ph-opt { border-top: 0; }
+.ph-go a::after { content: ""; flex: none; width: 20px; height: 20px; background: var(--accent); transform: rotate(-90deg);
+  -webkit-mask: var(--select-chev) center / contain no-repeat; mask: var(--select-chev) center / contain no-repeat; }
+
+/* ------------------------------------------------------------- the late banner */
 /* Above the sign-in warning (<BannerStack>, src/blocks/stackSpace.ts) while that shows. */
 .late { position: fixed; left: 16px; right: 16px; bottom: max(16px, calc(var(--banner-stack-space, 0px) + 8px)); display: flex; flex-direction: column; gap: 8px; z-index: 50; pointer-events: none; }
 /* Each line: the kit's late strip (kit.css .late__item: --warn, no edge rule), at most 640 wide. */
@@ -19,6 +92,8 @@
 .student-late > .row { pointer-events: auto; padding: 8px 12px; background: var(--surface); border-radius: var(--radius); }
 @keyframes late-in { from { transform: translateY(24px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .late__item { animation: none; } }
+
+/* ----------------------------------------------- the professor's quiz desk (QuizDesk.tsx) */
 .ask__q { display: flex; flex-direction: column; gap: 6px; font-weight: 700; margin: 12px 0; }
 .ask__q input { font-size: 1.2rem; }
 .ask__choice { align-items: center; margin: 6px 0; }
@@ -27,9 +102,6 @@
 .quiz__list { list-style: none; padding: 0; font-size: 1.3rem; line-height: var(--lh-small); }
 .quiz__list li { padding: 6px 0; }
 .quiz__stats { display: flex; flex-wrap: wrap; gap: 32px; margin: 16px 0; }
-.quiz__picks { display: grid; gap: 10px; }
-.quiz__pick { text-align: left; font-size: 1.15rem; padding: 14px 16px; }
-.quiz__pick--mine { outline: 3px solid var(--accent); outline-offset: 2px; }
 .bars { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 10px; }
 .bars__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
 .bars__label { grid-column: 1 / -1; }
@@ -39,3 +111,59 @@
 .bars__row--win .bars__label { font-weight: 700; }
 .bars__num { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .bars__fill { transition: none; } }
+
+/* --------------------------------------------------------- the open quiz (phone) */
+/* The kit's green field: what it is ("Quiz now"), the question, the four tiles, one line under
+   them. One 20 glyph size inside. */
+.qfield > * { margin: 0; }
+.qfield__kind { font-size: var(--t-small); font-weight: var(--w-head); line-height: var(--lh-small); color: var(--on-field); }
+.qfield .quiz__q { margin: 0; font-size: var(--t-h1); font-weight: var(--w-loud); line-height: 1.2; text-wrap: balance; color: var(--on-field); }
+.qfield .choices { display: grid; gap: var(--s2); margin: 0; }
+/* The tiles are the kit .choice. Their letter is a <b> (Quiz.test.ts reads "<b>A</b> Charge"), so
+   [kit_request] it takes the kit .letter's drawing here: 44, radius 4, --field-letter on the field. */
+.choice > b { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--r-xs); background: var(--field-letter);
+  color: var(--on-field-tile); font-size: 1.25rem; font-weight: var(--w-loud); line-height: 1; }
+.choice.is-out > b { background: var(--out-letter); color: var(--on-out-letter); }
+/* Not checked in or signed out: the choices to read, letter and words on the field, no tiles. */
+.qfield .quiz__list { display: grid; gap: var(--s2); padding: 0; font-size: var(--t-choice); font-weight: var(--w-head); line-height: 1.3; }
+.qfield .quiz__list li { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; column-gap: var(--s4); padding: 0 var(--s4); }
+.qfield .quiz__list b { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--r-xs); background: var(--field-letter);
+  color: var(--on-field-tile); font-size: 1.25rem; font-weight: var(--w-loud); }
+/* What to do first, and its button: the white button on the field. */
+.quiz-how { display: grid; gap: var(--s3); justify-items: start; }
+.quiz-how > p { margin: 0; font-size: var(--t-body); font-weight: var(--w-head); color: var(--on-field); }
+/* The line under the tiles: a 20 glyph on the letter column, the words on the label column. */
+.qfield > .qfield__foot { padding-inline: var(--s4); }
+.qfield__foot > span { min-width: 0; }
+/* A failed send: the same line, the warning glyph and the server's words on the field, the glyph
+   on the letter column and the words on the label column. Never a red or pink box on green. */
+.qfield > .status--error { margin: 0 0 0 var(--s4); padding-block: var(--s1); border-inline-width: 60px 0; background: none;
+  color: var(--on-field); font-size: var(--t-small); font-weight: var(--w-head); line-height: var(--lh-small); }
+.qfield > .status--error::before { left: -48px; top: calc(var(--s1) + (1lh - 20px) / 2); width: 20px; height: 20px; background: var(--on-field); }
+@supports not (height: 1lh) { .qfield > .status--error::before { top: var(--s1); } }
+
+/* ------------------------------------------------------------ results (phone) */
+/* The kit's raised card: the head, the verdict with its glyph inline, the question, then the bars
+   as ruled rows: letter, words, count and percent on one line, the track under the words. */
+.qresult > * { margin: 0; }
+.qresult__head { font-size: var(--t-small); font-weight: var(--w-head); line-height: var(--lh-small); color: var(--muted); }
+.qresult__verdict { font-size: var(--t-display); }
+.qresult__verdict.lockup--miss > .icon { color: var(--muted); }
+.qresult .quiz__q { margin: 0; font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.3; }
+.qresult .bars { gap: 0; margin: 0; }
+.qresult .bars__row { grid-template-columns: 44px minmax(0, 1fr) 40px 48px; grid-template-rows: auto auto; column-gap: var(--s3); row-gap: var(--s2);
+  align-items: first baseline; padding-block: var(--s3); border-top: 1px solid var(--line); font-size: var(--t-body); line-height: 1.3; }
+.qresult .bars__row:first-child { border-top: 0; }
+.qresult .bars__label { display: contents; font-weight: var(--w-head); }
+.qresult .bars__label > b { grid-row: 1 / span 2; grid-column: 1; align-self: start; display: grid; place-items: center; width: 44px; height: 44px;
+  border-radius: var(--r-xs); background: var(--on-raised); color: var(--text); font-size: 1.25rem; font-weight: var(--w-loud); }
+.qresult .bars__row--right .bars__label > b { background: var(--accent); color: var(--on-accent); }
+.qresult .bars__track { grid-row: 2; grid-column: 2; align-self: center; height: 12px; border-radius: 2px; background: var(--on-raised); }
+.qresult .bars__fill { border-radius: 0 2px 2px 0; background: var(--bar-rest); }
+.qresult .bars__row--win .bars__fill { background: var(--text); }
+.qresult .bars__row--right .bars__fill { background: var(--accent); }
+.qresult .bars__num { grid-row: 1; grid-column: 3 / -1; display: grid; grid-template-columns: 40px 48px; align-items: baseline; text-align: right; }
+.qresult .bars__count { font-size: var(--n-sm); font-weight: var(--w-loud); line-height: 1.1; }
+.qresult .bars__pct { font-size: var(--t-small); font-weight: var(--w-head); color: var(--muted); }
+.qresult .bars__dot { display: none; }
+@media (max-width: 359px) { .qresult .bars__row, .qresult .bars__num { column-gap: var(--s2); } }

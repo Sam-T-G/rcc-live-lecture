@@ -8,7 +8,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { CHANNEL } from "../../blocks/deck";
 import { useGoogleUser } from "../../blocks/auth";
-import { Card, Status } from "../../blocks/ui";
+import { Status } from "../../blocks/ui";
 import { StageBoard } from "./StageBoard";
 import "./leaderboard.css";
 
@@ -24,7 +24,13 @@ export function GroupBadge() {
     if (user && isAuthenticated && team === null) join({ channel: CHANNEL }).catch((e: unknown) => console.error("Couldn't put this student on a team:", e));
   }, [user, isAuthenticated, team, join]);
   if (!team) return null;
-  return <p className={"group-badge group--" + team.color}>You’re on {team.label}</p>;
+  // The team line (kit .teamline): the team's one 16 swatch and "You're on Green", no pill.
+  return (
+    <p className={"teamline group-badge group--" + team.color}>
+      <span className="team__chip" aria-hidden="true" />
+      You’re on {team.label}
+    </p>
+  );
 }
 
 export type Row = FunctionReturnType<typeof api.live.groups.leaderboard>["teams"][number];
@@ -51,10 +57,19 @@ const credit = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 export function TeamRow({ g, mine, big }: { g: Row; mine: boolean; big?: boolean }) {
   const score = g.changes === 0 ? `${g.correct} right` : plural(g.points, "point");
   const parts = [score, `${g.perStudent.toFixed(1)} per student`, ...(big ? [] : [plural(g.members, "student")])];
+  // The phone card puts the team's swatch before its name (the projector's rows stay as they are).
+  const name = <span className="board__name">{g.label}{mine && " (you)"}</span>;
   return (
     <li className={"board__row group--" + g.color + (mine ? " board__row--mine" : "")}>
       <span className="board__rank">{g.rank}</span>
-      <span className="board__name">{g.label}{mine && " (you)"}</span>
+      {big ? (
+        name
+      ) : (
+        <span className="board__team">
+          <span className="team__chip" aria-hidden="true" />
+          {name}
+        </span>
+      )}
       <span className="board__ec">+{credit(g.ec)} <small>extra credit</small></span>
       <span className={big ? "board__score muted" : "board__members muted"}>{parts.join(" · ")}</span>
     </li>
@@ -91,7 +106,9 @@ export function Leaderboard({ big }: { big?: boolean }) {
 }
 
 // The phone card shows the first 3 rows, and every other team tied for a place that earns extra
-// credit (a 3-way tie for 2nd shows all three). Teams tied with no points stay in the fold.
+// credit (a 3-way tie for 2nd shows all three). Teams tied with no points stay in the fold. It is
+// a section on the page, not a card: its heading with the lock line, then ruled rows, two lines
+// each (live.css, leaderboard.css). While the scores load, three rows hold the rows' place.
 function BoardCard() {
   const { board, me, teams } = useBoard();
   const cls = "board board--card";
@@ -99,10 +116,24 @@ function BoardCard() {
   const rest = teams.filter((g) => !top.includes(g));
   const mineBelow = rest.find((g) => g.team === me?.team);
   return (
-    <Card title="Team leaderboard">
-      <LockNote />
+    <section className="plane ph-board">
+      <div className="ph-board__head">
+        <h2>Team leaderboard</h2>
+        <LockNote />
+      </div>
       {board === undefined ? (
-        <Status kind="loading">Loading the scores…</Status>
+        <>
+          <Status kind="loading">Loading the scores…</Status>
+          <ol className="board board--card board--wait" aria-hidden="true">
+            {[1, 2, 3].map((n) => (
+              <li key={n} className="board__row">
+                <span className="board__rank">{n}</span>
+                <span className="skel skel--w40" />
+                <span className="skel skel--num" />
+              </li>
+            ))}
+          </ol>
+        </>
       ) : teams.length === 0 ? (
         <Status kind="empty">No teams yet. Each student joins a team when they check in.</Status>
       ) : (
@@ -114,7 +145,7 @@ function BoardCard() {
           {rest.length > 0 && (
             <details>
               <summary>All {teams.length} teams</summary>
-              <ol className={cls} style={{ marginTop: 10 }}>
+              <ol className={cls}>
                 {rest.map((g) => <TeamRow key={g.team} g={g} mine={g.team === me?.team} />)}
               </ol>
             </details>
@@ -122,6 +153,6 @@ function BoardCard() {
           <BoardNote questions={board.questions} />
         </>
       )}
-    </Card>
+    </section>
   );
 }

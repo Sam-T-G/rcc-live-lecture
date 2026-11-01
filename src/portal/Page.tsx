@@ -31,9 +31,10 @@ export default function PortalPage() {
   return <Portal />;
 }
 
+// The two links share the row, outlined (2px on the phone), so Back and Next stay the main buttons.
 function Links() {
   return (
-    <div className="portal__links">
+    <div className="portal__links" data-surface="phone">
       <Link to="checkin/student" className="btn btn--secondary">Check in</Link>
       <Link to="live" className="btn btn--secondary">Quiz and questions</Link>
     </div>
@@ -141,10 +142,19 @@ export function Slides({ channel, start = FOLLOW }: { channel: string; start?: B
     if (way) open(way === "next" ? next : prev);
   }
 
+  // Loading and waiting: the slide card at its place, the step named in it (still blocks where the
+  // lines will go while it loads), and the two links.
   if (live === undefined || shown === undefined) {
     return (
       <Screen>
-        <Status kind="loading">Loading the slides…</Status>
+        <section className="livestate portal__wait" aria-busy="true">
+          <Status kind="loading">Loading the slides…</Status>
+          <span className="skel-lines" aria-hidden="true">
+            <span className="skel" />
+            <span className="skel" />
+            <span className="skel" />
+          </span>
+        </section>
         <Links />
       </Screen>
     );
@@ -152,7 +162,9 @@ export function Slides({ channel, start = FOLLOW }: { channel: string; start?: B
   if (live === null || at === null) {
     return (
       <Screen>
-        <Status kind="empty">Waiting for the slides to start.</Status>
+        <section className="livestate portal__wait">
+          <Status kind="empty">Waiting for the slides to start.</Status>
+        </section>
         <Links />
       </Screen>
     );
@@ -160,9 +172,11 @@ export function Slides({ channel, start = FOLLOW }: { channel: string; start?: B
 
   const slide = byIndex.get(at)!;
 
+  // The bar (where the student is, and the Live word or Back to live), the slide card (kit
+  // .livestate), then Back and Next and the two links at the bottom, in the thumb band.
   return (
-    <main className="portal" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-      <header className="portal__bar">
+    <main className="portal" data-surface="phone" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <header className="portal__bar bar bar--static">
         <p className="portal__count" aria-live="polite">
           Slide {at + 1} of {live.count}
         </p>
@@ -184,7 +198,7 @@ export function Slides({ channel, start = FOLLOW }: { channel: string; start?: B
         </div>
       )}
 
-      <article className="portal__slide" key={at}>
+      <article className="portal__slide livestate" key={at}>
         {slide.title && <h1>{slide.title}</h1>}
         {slide.lines.length > 0 && (
           <ul>
@@ -195,16 +209,18 @@ export function Slides({ channel, start = FOLLOW }: { channel: string; start?: B
         )}
       </article>
 
-      <nav className="portal__nav" aria-label="Slides">
-        <button type="button" onClick={() => open(prev)} disabled={prev === null}>
-          ← Back
-        </button>
-        <button type="button" onClick={() => open(next)} disabled={next === null}>
-          Next →
-        </button>
-      </nav>
+      <div className="phone-actions portal__actions">
+        <nav className="portal__nav" aria-label="Slides">
+          <button type="button" className="btn btn--neutral" onClick={() => open(prev)} disabled={prev === null}>
+            ← Back
+          </button>
+          <button type="button" className="btn btn--neutral" onClick={() => open(next)} disabled={next === null}>
+            Next →
+          </button>
+        </nav>
 
-      <Links />
+        <Links />
+      </div>
     </main>
   );
 }

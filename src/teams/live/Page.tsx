@@ -2,13 +2,13 @@
 //   #/live: the slide the professor is on, live. The student can page back through slides this
 //     class has shown without moving the projector; a phone that paged back follows live again
 //     when the professor reaches or goes back past that slide, or when the deck stops listing it
-//     (another deck tab took over), the same rule as #/portal. Under the slide: "I'm lost" for the
-//     slide on screen (convex/live/lost.ts), or, signed out, a button that scrolls the Questions
-//     card's sign-in box to the top of the screen. A signed-in student who isn't checked in
-//     gets the check-in line and a link to #/checkin/student under the title, with or without a
-//     slide up. Beside the slide: the quiz, the team leaderboard, past quizzes and votes, and the
-//     questions board, each in its own ErrorBoundary, so a card whose query fails shows its own
-//     error and the slide stays up.
+//     (another deck tab took over), the same rule as #/portal. In the action bar at the bottom,
+//     between Back and Next: "I'm lost" for the slide on screen (convex/live/lost.ts), or, signed
+//     out, a button that scrolls the Questions card's sign-in box to the top of the screen. A
+//     signed-in student who isn't checked in gets the check-in line and a link to
+//     #/checkin/student under the title, with or without a slide up. Under the slide: the quiz,
+//     the team leaderboard, the questions board, and past quizzes and votes, each in its own
+//     ErrorBoundary, so a card whose query fails shows its own error and the slide stays up.
 //   #/live/leaderboard: the team board on the projector (BoardPage.tsx).
 //   Both show the late banner (first names, for students who didn't opt out). Any other
 //   #/live/<parts>, #/live/leaderboard/<part> included, shows "No page at #/live/<parts>".
@@ -19,7 +19,7 @@ import { SignedInAs, useGoogleUser } from "../../blocks/auth";
 import { CHANNEL, useDeckSlide } from "../../blocks/deck";
 import { Button } from "../../blocks/kit";
 import { Link, useRoute } from "../../blocks/router";
-import { Card, ErrorBoundary, Screen, Status } from "../../blocks/ui";
+import { ErrorBoundary, Screen, Status } from "../../blocks/ui";
 import LateBanner from "../checkin/LateBanner";
 import { SignInEnding, STUDENT_ENDING } from "../checkin/prof";
 import { QuizCard } from "../checkin/Quiz";
@@ -76,64 +76,90 @@ export function LiveSlides({ pin = null }: { pin?: number | null }) {
     else setPinned(after.index);
   }
 
+  // The phone frame (checkin.css .ph): the page's name with who is signed in and their team, the
+  // slide card, then the quiz, the team leaderboard, questions and past quizzes. The action bar at
+  // the bottom holds the late banner, then Back, I'm lost and Next in one row while a slide is up
+  // or loading; empty, it draws nothing (live.css).
   return (
-    <Screen title="Live slides" wide>
-      <SignInEnding line={STUDENT_ENDING} />
-      <SignedInAs />
-      <ErrorBoundary label="Check in">
-        <CheckInFirst />
-      </ErrorBoundary>
-      <ErrorBoundary label="Your team">
-        <GroupBadge />
-      </ErrorBoundary>
-      <div className="live">
-        <Card>
-          {slide === undefined ? (
-            <Status kind="loading">Loading the slides…</Status>
-          ) : slide === null ? (
-            <Status kind="empty">Waiting for the slides to start.</Status>
-          ) : (
-            <>
-              <h2 className="slide__title">{slide.title}</h2>
-              <ul className="slide__lines">
-                {slide.lines.map((l, i) => (
-                  <li key={i}>{l}</li>
-                ))}
-              </ul>
-              <p className="slide__count muted">Slide {slide.index + 1} of {slide.count}</p>
-              <div className="slide__nav">
-                <Button variant="secondary" disabled={!before} onClick={() => before && setPinned(before.index)}>← Back</Button>
-                <Button variant="secondary" disabled={!looking} onClick={next}>Next →</Button>
-                {looking && <Button onClick={() => setPinned(null)}>Back to live</Button>}
-              </div>
-              {looking && live && <p className="slide__live muted">The professor is on slide {live.index + 1} now.</p>}
-              <ErrorBoundary key={slide.index} label="The I’m lost button">
-                <Lost index={slide.index} />
+    <div className="ph ph--live" data-surface="phone">
+      <header className="bar bar--static ph-head">
+        <h1>Live slides</h1>
+        <SignInEnding line={STUDENT_ENDING} />
+        <SignedInAs />
+        <ErrorBoundary label="Your team">
+          <GroupBadge />
+        </ErrorBoundary>
+      </header>
+      <main className="ph__body">
+        <ErrorBoundary label="Check in">
+          <CheckInFirst />
+        </ErrorBoundary>
+        <div className="live">
+          <section className={slide === undefined ? "livestate livestate--load" : "livestate"} aria-busy={slide === undefined || undefined}>
+            {slide === undefined ? (
+              <>
+                <Status kind="loading">Loading the slides…</Status>
+                <span className="skel-lines" aria-hidden="true">
+                  <span className="skel" />
+                  <span className="skel" />
+                  <span className="skel" />
+                </span>
+              </>
+            ) : slide === null ? (
+              <Status kind="empty">Waiting for the slides to start.</Status>
+            ) : (
+              <>
+                <p className="slide__count livestate__where">Slide {slide.index + 1} of {slide.count}</p>
+                <h2 className="slide__title">{slide.title}</h2>
+                <ul className="slide__lines">
+                  {slide.lines.map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
+                {looking && live && <p className="slide__live muted">The professor is on slide {live.index + 1} now.</p>}
+              </>
+            )}
+          </section>
+          <div className="live__side">
+            <ErrorBoundary label="The quiz">
+              <QuizCard />
+            </ErrorBoundary>
+            <ErrorBoundary label="The team leaderboard">
+              <Leaderboard />
+            </ErrorBoundary>
+            <div id={QUESTIONS_ID}>
+              <ErrorBoundary label="Questions">
+                <Questions index={here} />
               </ErrorBoundary>
-            </>
-          )}
-        </Card>
-        <div className="live__side">
-          <ErrorBoundary label="The quiz">
-            <QuizCard />
-          </ErrorBoundary>
-          <ErrorBoundary label="The team leaderboard">
-            <Leaderboard />
-          </ErrorBoundary>
-          <ErrorBoundary label="Past quizzes and votes">
-            <PastQuestions />
-          </ErrorBoundary>
-          <div id={QUESTIONS_ID}>
-            <ErrorBoundary label="Questions">
-              <Questions index={here} />
+            </div>
+            <ErrorBoundary label="Past quizzes and votes">
+              <PastQuestions />
             </ErrorBoundary>
           </div>
         </div>
+      </main>
+      <div className="phone-actions ph-actions">
+        <ErrorBoundary label="The late banner">
+          <LateBanner />
+        </ErrorBoundary>
+        {slide === undefined ? (
+          <>
+            <Button variant="neutral" className="ph-back" disabled>← Back</Button>
+            <Button variant="secondary" className="ph-wait" disabled>I’m lost</Button>
+            <Button variant="neutral" className="ph-next" disabled>Next →</Button>
+          </>
+        ) : slide !== null && (
+          <>
+            <Button variant="neutral" className="ph-back" disabled={!before} onClick={() => before && setPinned(before.index)}>← Back</Button>
+            <ErrorBoundary key={slide.index} label="The I’m lost button">
+              <Lost index={slide.index} />
+            </ErrorBoundary>
+            <Button variant="neutral" className="ph-next" disabled={!looking} onClick={next}>Next →</Button>
+            {looking && <Button className="ph-tolive" onClick={() => setPinned(null)}>Back to live</Button>}
+          </>
+        )}
       </div>
-      <ErrorBoundary label="The late banner">
-        <LateBanner />
-      </ErrorBoundary>
-    </Screen>
+    </div>
   );
 }
 
@@ -169,11 +195,12 @@ function CheckInFirst() {
   );
 }
 
-// Under the slide on screen: "I'm lost" for a checked-in student (pressed while they're counted
-// as lost on it), or "Sign in to tap I'm lost" while signed out ("Your sign-in ended." over "Sign
-// in again to tap I'm lost" when the sign-in ran out on this page). A signed-in student who isn't
-// checked in gets nothing here: CheckInFirst sits above the slide. The professor's #/host shows
-// the count for each slide.
+// For the slide on screen, in the action bar between Back and Next: "I'm lost" for a checked-in
+// student (pressed while they're counted as lost on it), or "Sign in to tap I'm lost" while
+// signed out ("Your sign-in ended." over "Sign in again to tap I'm lost" when the sign-in ran out
+// on this page). A signed-in student who isn't checked in gets nothing here: CheckInFirst sits
+// above the slide. The professor's #/host shows the count for each slide. live.css places the
+// button between Back and Next and its line under the row.
 function Lost({ index }: { index: number }) {
   const { user, ended } = useGoogleUser();
   const checkedIn = useQuery(api.checkin.read.me, user ? { channel: CHANNEL } : "skip");

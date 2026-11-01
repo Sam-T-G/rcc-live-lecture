@@ -1,5 +1,8 @@
-/* #/portal. Colors come from the tokens in src/styles/tokens.css. */
+/* #/portal, laid out like #/live's slide: the bar with where the student is, the slide card (kit
+   .livestate), then Back and Next and the two links at the bottom, in the thumb band. Colors come
+   from the tokens in src/styles/tokens.css; the parts are the kit's. */
 .portal {
+  --page-margin: 32px;
   max-width: 720px;
   min-height: 100dvh;
   margin: 0 auto;
@@ -9,56 +12,51 @@
   gap: 12px;
   touch-action: pan-y;
 }
-.portal__bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
-.portal__count { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
-.portal__tag { font-size: 0.85rem; font-weight: 600; padding: 4px 12px; border-radius: 999px; }
-.portal__tag--live { background: var(--accent); color: var(--accent-text); }
-.portal__tag--live::before {
-  content: "";
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  vertical-align: 1px;
-}
-.portal__tolive { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 8px 14px; }
+/* The kit's bar, edge to edge: "Slide 6 of 12" and the Live word, or Back to live. */
+.portal > .portal__bar { justify-content: space-between; gap: var(--s3); margin: -16px -16px var(--s1); }
+.portal__count { margin: 0; font-size: var(--t-h3); font-weight: var(--w-head); font-variant-numeric: tabular-nums; }
+/* No Live badge: the state is one word in the in state's mark color, no pill, no dot. */
+.portal__tag { font-size: var(--t-small); font-weight: var(--w-head); }
+.portal__tag--live { color: var(--st-in-mark); }
+/* Back to live, in the bar: a text action in --text, never green. */
+.portal__tolive { background-color: transparent; color: var(--text); padding-inline: var(--s2); text-decoration: underline; text-underline-offset: 3px; }
 
+/* The professor moved on: one line on the well, its Back to live at the end. */
 .portal__notice {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 12px;
-  padding: 10px 12px 10px 16px;
-  background: var(--surface);
-  border: 2px solid var(--accent);
-  border-radius: var(--radius);
-  animation: portal-in 200ms ease-out;
+  gap: var(--s2) var(--s3);
+  padding: var(--s2) var(--s2) var(--s2) var(--s4);
+  background: var(--well);
+  color: var(--text);
+  border-radius: var(--r-md);
 }
 
-.portal__slide {
-  flex: 1;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 20px;
-  overflow-wrap: anywhere;
-  animation: portal-in 180ms ease-out;
-}
-.portal__slide h1 { font-size: 1.6rem; line-height: 1.2; margin: 0 0 16px; }
-.portal__slide ul { margin: 0; padding-left: 1.2em; font-size: 1.1rem; }
-.portal__slide li + li { margin-top: 10px; }
+/* The slide: the title at 28 / 500, the lines with their dots on the card's text edge. The card
+   ends at its content. */
+.portal__slide { overflow-wrap: anywhere; }
+.portal__slide > * { margin: 0; }
+.portal__slide h1 { font-size: var(--t-h1); font-weight: var(--w-head); line-height: 1.2; }
+.portal__slide ul { display: grid; gap: var(--s2); padding: 0; list-style: none; font-size: var(--t-body); }
+.portal__slide li { position: relative; padding-inline-start: var(--s6); }
+.portal__slide li::before { content: ""; position: absolute; left: 0; top: .62em; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.portal__wait > * { margin: 0; }
+.portal__wait > .status { padding-block: 0; }
 
+/* The kit's phone action bar on the screen's bottom edge, above the late banner while one shows:
+   Back and Next, the kit's neutral buttons, 56 tall, the two halves of the row, then the two links. */
+.portal > .portal__actions { position: sticky; bottom: var(--late-room, 0px); display: grid; gap: var(--s2);
+  margin: auto -16px calc(-16px - env(safe-area-inset-bottom, 0px)); }
 .portal__nav { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.portal__nav button { min-height: 52px; }
+.portal__nav .btn { min-height: 56px; }
 
-/* "Check in" and "Quiz and questions": outlined (.btn--secondary), so the green Back and Next
-   stay the main buttons. At 320 wide a label wraps to two lines inside its button. */
+/* "Check in" and "Quiz and questions": outlined (.btn--secondary), so Back and Next stay the main
+   buttons. At 320 wide a label wraps to two lines inside its button. */
 .portal__links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rcc-space-3); }
 .page > .portal__links { margin-top: var(--rcc-space-4); }
-.portal__links .btn { padding-inline: var(--rcc-space-3); }
+.portal__links .btn { padding-inline: var(--rcc-space-3); white-space: normal; }
 
 /* The late banner (LateBanner.tsx, its look in checkin.css .late) sits in .portal-late, fixed at
    the bottom, so Page.tsx can measure it and set --late-room on .portal-room: the page's bottom
@@ -68,11 +66,3 @@
 .portal-late { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 50; pointer-events: none; }
 .portal-late .late { position: static; }
 .portal-late > .row { pointer-events: auto; padding: 8px 12px; background: var(--surface); border-radius: var(--radius); }
-
-@keyframes portal-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .portal__slide, .portal__notice { animation: none; }
-}

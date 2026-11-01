@@ -10,7 +10,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { StudentSignIn, useGoogleUser } from "../../blocks/auth";
 import { CHANNEL } from "../../blocks/deck";
 import { Badge, Button, Segmented, type Choice } from "../../blocks/kit";
-import { Card, Status } from "../../blocks/ui";
+import { Status } from "../../blocks/ui";
 import "./questions.css";
 
 const MAX_LENGTH = 280;
@@ -93,9 +93,14 @@ export default function Questions({ index }: { index: number | null | undefined 
     }
   }
 
+  // A section on the page, not a card: the heading, the This slide / All slides switch, the post
+  // form, then the questions as ruled rows with the upvote at the start (questions.css).
   return (
-    <Card title="Questions">
-      <Segmented label="Show questions from" hideLabel block options={SCOPES} value={scope} onChange={setScope} />
+    <section className="plane ph-qa">
+      <h2>Questions</h2>
+      <div className="ph-qa__scope">
+        <Segmented label="Show questions from" hideLabel block options={SCOPES} value={scope} onChange={setScope} />
+      </div>
 
       {!user ? (
         <div id={SIGN_IN_ID}>
@@ -107,6 +112,7 @@ export default function Questions({ index }: { index: number | null | undefined 
       ) : (
         <form className="live-ask" onSubmit={send}>
           <textarea
+            className="textarea"
             value={text}
             maxLength={MAX_LENGTH}
             placeholder="Ask a question or leave a comment"
@@ -166,12 +172,12 @@ export default function Questions({ index }: { index: number | null | undefined 
                   {` · ${clock(r.at)}`}
                 </p>
                 {r.answer !== null && (
-                  <p className="q__answer">
+                  <p className="q__answer answer">
                     <strong>Professor's answer:</strong> {r.answer}
                   </p>
                 )}
                 {r.mine && (
-                  <Button variant="quiet" className="btn--flush" onClick={() => void onRow(r._id, remove({ question: r._id }))}>
+                  <Button variant="danger-quiet" className="q__delete" onClick={() => void onRow(r._id, remove({ question: r._id }))}>
                     Delete
                   </Button>
                 )}
@@ -181,6 +187,6 @@ export default function Questions({ index }: { index: number | null | undefined 
           ))}
         </ul>
       )}
-    </Card>
+    </section>
   );
 }

@@ -1,31 +1,94 @@
-/* Live slides team styles; only used by pages in this folder. */
-.live { display: grid; gap: 16px; }
-@media (min-width: 900px) { .live { grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr); align-items: start; } }
+/* Live slides team styles. #/live sits in the phone frame (checkin.css .ph): the page's name,
+   who is signed in and their team in the bar at the top, then the slide card (kit .livestate,
+   the screen's one raised object), the quiz, the team leaderboard, questions and past quizzes,
+   and the action bar at the bottom (kit .phone-actions) with Back, I'm lost and Next. */
+
+/* ---------------------------------------------------------------- the top bar */
+/* The kit's bar, not sticky here: the page's name with the team line at its end, and the
+   signed-in line under them. */
+.ph-head { flex-wrap: wrap; column-gap: var(--s3); row-gap: 0; padding-block: var(--s2); }
+.ph-head > h1 { flex: 1 1 auto; min-width: 0; margin: 0; font-size: var(--t-h3); line-height: 1.3; }
+.ph-head > .teamline { order: 1; margin: 0; }
+.ph-head > .row { order: 2; flex: 1 1 100%; gap: 0 var(--s3); margin: 0; font-size: var(--t-small); }
+.ph-head .btn--quiet { padding-inline: 0; color: var(--text); font-weight: var(--w-head); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ------------------------------------------------------------------ the body */
+.live { display: grid; gap: var(--s4); align-items: start; }
 .live .panel { margin: 0; }
 .live__side { display: grid; gap: var(--rcc-space-4); align-content: start; }
-.slide__title { margin: 0 0 8px; }
-.slide__lines { margin: 0; padding-left: 1.2em; }
-.slide__count { margin: 12px 0 0; font-size: 0.9rem; }
-.qa__tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-.qa__tabs button[aria-pressed="false"] { background: transparent; color: var(--text); border: 1px solid var(--line-strong); }
-.qa__form textarea { display: block; width: 100%; box-sizing: border-box; min-height: 72px; resize: vertical; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 12px; }
-.qa__row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }
-.qa__row label { display: flex; align-items: center; gap: 8px; margin: 0; }
-.qa__row input[type="checkbox"] { display: inline-block; width: auto; margin: 0; }
-.qa__row .muted { margin-left: auto; font-size: 0.85rem; }
-.qa__list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
-.q { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
-.q__vote { display: flex; flex-direction: column; align-items: center; min-width: 48px; padding: 6px 10px; background: transparent; color: var(--text); border: 1px solid var(--line-strong); border-radius: 10px; }
-.q__vote[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-.q__vote:disabled { opacity: 0.6; cursor: default; }
-.q__text { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
-.q__meta { margin: 4px 0 0; font-size: 0.85rem; color: var(--muted); }
-.q__meta button { min-height: 0; padding: 0 4px; background: transparent; color: var(--muted); text-decoration: underline; font-weight: 400; }
+/* While a poll is open or its results show, the quiz leads, above the slide card: the side
+   column's parts join the body's one column and the quiz goes first, so its top holds still in
+   every quiz state. Nothing in the slide card takes focus, so the tab order is the same. :has()
+   is Safari 15.4+; before it the slide stays first. */
+.live:has(> .live__side > :is(.qfield, .qresult)) > .live__side { display: contents; }
+.live:has(> .live__side > :is(.qfield, .qresult)) > .live__side > :is(.qfield, .qresult) { order: -1; }
 
+/* Signed in, not checked in: a notice in the open state's tint (the kit .notice--warn's drawing;
+   Page.test.ts reads this markup, so the kit part can't wrap it), the warning glyph and the app's
+   sentence, then the Check in link. */
+.ph__body > .live-checkin { display: grid; gap: var(--s3); padding: var(--s3) var(--s4); border-radius: var(--r-md);
+  background: var(--st-open); color: var(--on-st-open); }
+.live-checkin__note { position: relative; margin: 0; padding-inline-start: calc(20px + var(--s3)); font-size: var(--t-small); font-weight: var(--w-head);
+  line-height: var(--lh-small); }
+.live-checkin__note::before { content: ""; position: absolute; left: 0; top: calc((1lh - 20px) / 2); width: 20px; height: 20px; background: var(--st-open-mark);
+  -webkit-mask: var(--warn-glyph) center / contain no-repeat; mask: var(--warn-glyph) center / contain no-repeat; }
+@supports not (height: 1lh) { .live-checkin__note::before { top: 0; } }
+
+/* ------------------------------------------------------------- the slide card */
+/* "Slide 4 of 12" over the title at 28 / 500, then the lines; dots on the card's text edge. */
+.livestate > * { margin: 0; }
+.livestate .slide__count { font-weight: var(--w-head); }
+.slide__title { margin: 0; font-size: var(--t-h1); font-weight: var(--w-head); line-height: 1.2; overflow-wrap: anywhere; }
+.slide__lines { display: grid; gap: var(--s2); margin: 0; padding: 0; list-style: none; font-size: var(--t-body); }
+.slide__lines > li { position: relative; padding-inline-start: var(--s6); overflow-wrap: anywhere; }
+.slide__lines > li::before { content: ""; position: absolute; left: 0; top: .62em; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.slide__live { margin: 0; font-size: var(--t-small); }
+.livestate > .status { padding-block: 0; }
+.livestate--load { min-height: 160px; align-content: start; }
+
+/* ------------------------------------------------------------- the action bar */
+/* The kit's phone action bar, kept on the screen's bottom edge (above the sign-in warning while
+   that shows). One row: Back, the main action, Next; the late banner over the row while it
+   shows; I'm lost's line, Back to live and any error under it. dense lets Next take its place in
+   the row after I'm lost's line. Empty (no slide, no banner), it draws nothing. */
+.ph-actions { position: sticky; bottom: var(--banner-stack-space, 0px); display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-auto-flow: row dense; align-items: center; gap: var(--s2); }
+.ph-actions:empty { display: none; }
+.ph-actions > :is(.late, .row) { grid-column: 1 / -1; }
+.ph-actions > .late { position: static; inset: auto; z-index: auto; }
+.ph-actions > .ph-back { grid-column: 1; }
+.ph-actions > .ph-next { grid-column: 3; }
+.ph-actions > .ph-wait { grid-column: 2; }
+.ph-actions > :is(.ph-back, .ph-next) { padding-inline: var(--s5); }
+/* At 320 the row gives the middle button the room: Back and Next and its own side padding step down. */
+@media (max-width: 359px) {
+  .ph-actions > :is(.ph-back, .ph-next) { padding-inline: var(--s3); }
+  .ph-actions > .lost > .btn, .ph-actions > .ph-wait { padding-inline: var(--s2); }
+}
+.ph-actions > .ph-tolive { grid-column: 1 / -1; min-height: 48px; }
+/* No middle action (not checked in): Back and Next share the row. :has() is Safari 15.4+; before
+   it the middle column stays empty. */
+.ph-actions:not(:has(> .lost, > .ph-wait)) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.ph-actions:not(:has(> .lost, > .ph-wait)) > .ph-next { grid-column: 2; }
+
+/* I'm lost (Page.tsx Lost) sits in the middle of the row and its line under it. Pressed, the
+   button takes the chosen-option look (tokens: --accent-soft-text on --accent-soft, an --accent
+   ring). While the check-in state loads, the empty slot keeps the row's height. */
+.ph-actions > .lost { display: contents; }
+.ph-actions > .lost[aria-busy="true"] { display: block; grid-column: 2; min-height: 56px; }
+.ph-actions > .lost > .btn { grid-column: 2; min-height: 56px; white-space: normal; text-align: center; }
+.ph-actions > .lost > :not(.btn) { grid-column: 1 / -1; }
+.lost__note { margin: 0; padding-inline: var(--s2); font-size: var(--fs-small); color: var(--muted); }
+.ph-actions > .lost > p:not(.lost__note) { margin: 0; padding-inline: var(--s2); font-size: var(--t-small); }
+.ph-actions > .lost > .status { margin: 0; }
+.lost__button[aria-pressed="true"] { background-color: var(--accent-soft); color: var(--accent-soft-text); box-shadow: inset 0 0 0 var(--rcc-hairline) var(--accent); }
+
+/* ------------------------------------------------------- the team leaderboard */
+/* The phone card's rows and the projector board (stageboard.css) both build on these. The phone
+   card (.board--card) sets its own rows in leaderboard.css. Each color also has its name written
+   out, so it never relies on color alone. The team colors (.group--<color>: --group,
+   --group-text) are tokens, set in the kit (kit.css). */
 .board__row--mine { outline: 2px solid var(--accent); }
-/* Team leaderboard. Each color also has its name written out, so it never relies on color alone.
-   The team colors (.group--<color>: --group, --group-text) are tokens, set in the kit (kit.css). */
-.group-badge { display: inline-block; margin: 0 0 12px; padding: 6px 14px; border-radius: 999px; font-weight: 600; background: var(--group); color: var(--group-text); }
 .board { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 10px; }
 .board__row { display: grid; grid-template-columns: 2.2em 1fr auto auto; align-items: center; gap: 4px 14px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); border-left: 10px solid var(--group); }
 .board__rank { font-size: 1.6rem; line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -34,8 +97,8 @@
 .board__ec { color: var(--accent); }
 .board small { font-weight: 400; color: var(--muted); }
 .board__members { grid-column: 2 / -1; font-size: 0.85rem; }
-/* The phone card: every row shares the list's columns (subgrid), so "12 right" and "+5 EC" line
-   up from row to row. */
+/* The phone card: every row shares the list's columns (subgrid), so the extra credit lines up
+   from row to row. */
 .board:not(.board--big) { grid-template-columns: 2.2em minmax(0, 1fr) auto auto; column-gap: 14px; }
 .board:not(.board--big) > .board__row { grid-column: 1 / -1; grid-template-columns: subgrid; }
 .board:not(.board--big) :is(.board__score, .board__ec) { justify-self: end; }
@@ -53,29 +116,20 @@
    Leaderboard.test.ts reads this file for it. */
 .board--many .board__members { display: none; }
 
-/* Past questions */
-.past { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.past > li { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-.past summary { cursor: pointer; display: grid; gap: 2px; }
-.past__q { font-weight: 600; overflow-wrap: anywhere; }
-.past__verdict { font-size: 0.85rem; }
-.past__choices { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
-.past__choice { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); overflow-wrap: anywhere; }
-.past__choice--right { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
-
-/* Paging back through slides */
-.slide__nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.slide__nav button:disabled { opacity: 0.45; cursor: default; }
-.slide__live { margin: 8px 0 0; }
-
-/* I'm lost, under the slide (Page.tsx Lost). The slot keeps a button's height while the check-in
-   state loads, so the cards under it don't jump. Pressed, the button takes the chosen-option look
-   (tokens: --accent-soft-text on --accent-soft, an --accent ring). */
-.lost { display: grid; gap: var(--rcc-space-2); margin-top: var(--rcc-space-4); min-height: var(--rcc-target-min); }
-.lost__note { margin: 0; font-size: var(--fs-small); }
-.lost__button[aria-pressed="true"] { background-color: var(--accent-soft); color: var(--accent-soft-text); box-shadow: inset 0 0 0 var(--rcc-hairline) var(--accent); }
-
-/* "Check in to answer, ask and join a team." and the Check in link, under the title (Page.tsx
-   CheckInFirst), for a signed-in student who isn't checked in, with or without a slide up. */
-.live-checkin { display: grid; gap: var(--rcc-space-2); margin-bottom: var(--rcc-space-4); }
-.live-checkin__note { margin: 0; }
+/* ------------------------------------------------------ past quizzes and votes */
+/* The card's rows are ruled, each one opens to its choices; the summary is the 56 target. */
+.past { list-style: none; margin: 0; padding: 0; display: grid; }
+.past > li { border-top: 1px solid var(--line); }
+.past > li:first-child { border-top: 0; }
+.past summary { display: grid; grid-template-columns: minmax(0, 1fr) 20px; column-gap: var(--s3); row-gap: 2px; align-items: center; min-height: 56px;
+  padding-block: var(--s2); list-style: none; cursor: pointer; }
+.past summary::-webkit-details-marker { display: none; }
+.past summary::after { content: ""; grid-column: 2; grid-row: 1 / span 2; width: 20px; height: 20px; background: var(--muted);
+  -webkit-mask: var(--select-chev) center / contain no-repeat; mask: var(--select-chev) center / contain no-repeat; transition: transform var(--fx) var(--ease); }
+.past details[open] > summary::after { transform: rotate(180deg); }
+.past__q { grid-column: 1; font-weight: var(--w-head); overflow-wrap: anywhere; }
+.past__verdict { grid-column: 1; font-size: var(--t-small); }
+.past__choices { list-style: none; margin: 0 0 var(--s3); padding: 0; display: grid; font-size: var(--t-small); }
+.past__choice { padding: var(--s2) 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.past__choice--right { font-weight: var(--w-head); color: var(--st-in-mark); }
+.past__choice--right .muted { font-weight: var(--w-body); }
