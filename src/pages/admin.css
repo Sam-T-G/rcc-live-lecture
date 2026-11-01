@@ -1,11 +1,13 @@
 /* #/admin (src/pages/Admin.tsx), a laptop page. Tokens and kit parts only (src/styles/tokens.css,
    src/styles/kit.css, docs/design.md "staff"); the bar, the page width and the sign-in screen are
-   the staff pages' (src/teams/checkin/teacher.css). The kit's .desk makes the two columns (one
-   below 900 wide); each section ends at its content. */
+   the staff pages' (src/teams/checkin/teacher.css). The kit's .desk makes the two columns, from
+   1024 wide here (under that the People table's fixed columns leave Email no room beside the
+   400 aside); each section ends at its content. */
+@media (max-width: 1023px) { .desk.admin { grid-template-columns: minmax(0, 1fr); } }
 .admin__main, .admin__side { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s10); align-content: start; min-width: 0; }
 .admin__side { gap: var(--s8); }
 /* A professor's page: Pair a door iPad (first on the page for a keyboard) in the side column. */
-@media (min-width: 901px) {
+@media (min-width: 1024px) {
   .admin--prof > .admin__side { grid-column: 2; grid-row: 1; }
   .admin--prof > .admin__main { grid-column: 1; grid-row: 1; }
 }
@@ -37,9 +39,9 @@
 .admin__locked { display: inline-flex; align-items: center; gap: var(--s2); }
 .admin__when { font-variant-numeric: tabular-nums; }
 .admin__act { position: relative; text-align: right; }
-/* The People table scrolls on its own below 900 wide; with two columns it fits, so a row's
+/* The People table scrolls on its own below 1024 wide; with two columns it fits, so a row's
    question box can rise over the rows around it. */
-@media (min-width: 901px) { .admin-people { overflow: visible; } }
+@media (min-width: 1024px) { .admin-people { overflow: visible; } }
 
 /* Remove and Unpair are ConfirmButtons, whose opener is the kit's danger button. Here it draws as
    the kit's ghost row action with red words: 32 tall, no fill, the --line-strong ring on hover and

@@ -92,6 +92,19 @@ describe("ROLES StaffGate on every professor page", () => {
     }
   });
 
+  // DS-STAFF-risk-1: #/checkin/teacher and #/checkin/quiz pass `bar`, so who is signed in and
+  // Sign out sit in the staff bar, with the page's title as its h1.
+  it("DS-STAFF-risk-1 sweep2-host-1 with `bar`, the staff bar holds the page's h1 and who is signed in, above the page", () => {
+    for (const role of ["professor", "admin"] as const) {
+      results["staff:me"] = staff("prof@example.edu", role);
+      google.user = { name: "Sample professor", email: "prof@example.edu" };
+      const html = renderToStaticMarkup(createElement(StaffGate, { title: "Live quiz", bar: true, children: "[the quiz page]" }));
+      expect(html, role).toMatch(/^<header class="bar staff-bar"><h1>Live quiz<\/h1><div class="bar__end whoami">\[Signed in as, Not you\? Sign out\]<\/div><\/header>/);
+      expect(html.indexOf("[Signed in as"), role).toBeLessThan(html.indexOf("[the quiz page]"));
+      expect(html.match(/<h1>/g), role).toHaveLength(1);
+    }
+  });
+
   it("ROLES a scanner gets no professor page, and is told the role scans passes at the door", () => {
     results["staff:me"] = staff("door@example.edu", "scanner");
     const html = words(page());

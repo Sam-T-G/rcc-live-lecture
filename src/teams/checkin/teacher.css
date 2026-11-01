@@ -51,6 +51,12 @@
 /* The two columns: This class and Past classes; the scanner card and Class start. */
 .att-main, .att-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s10); align-content: start; min-width: 0; }
 .att-side { gap: var(--s6); }
+/* The scanner comes first in the page, so at 900 wide and under (one column: half a screen, or a
+   zoomed laptop) it sits above the lists. With two columns the lists take the first. */
+@media (min-width: 901px) {
+  .att-desk > .att-main { grid-column: 1; grid-row: 1; }
+  .att-desk > .att-side { grid-column: 2; grid-row: 1; }
+}
 
 /* A section on the page: its heading, the action at the end of the heading line, the list in a
    well under it. A part that didn't load (its boundary's line) takes the list's place. */
@@ -62,7 +68,10 @@
 /* The lists: rows in the kit's well (.ruled--well, .reg), the name, the time right-aligned, the row
    action in a fixed column at the end. */
 .att-list, .att-past { margin: 0; list-style: none; }
-.att-list { --rcols: minmax(0, 1fr) 96px 112px; }
+/* This class scrolls inside its well after about 8 rows, so Past classes and its CSVs stay near the
+   first view with a full class checked in. A row's Remove focuses Cancel, which scrolls its box
+   into view inside the list. */
+.att-list { --rcols: minmax(0, 1fr) 96px 112px; max-height: calc(8.5 * var(--row-h) + 2 * var(--s1)); overflow-y: auto; }
 .att-past { --rcols: minmax(0, 1fr) 120px 136px; }
 .att-row__name { min-width: 0; overflow-wrap: anywhere; }
 .att-row__name > .badge { margin-inline-start: var(--s2); }

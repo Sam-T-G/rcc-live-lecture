@@ -110,6 +110,20 @@ describe("ROLES-UI-fixcheck-2 a professor page says when the sign-in ends", () =
     expect(html.indexOf("[Google button]")).toBeLessThan(html.indexOf("[the quiz page]"));
   });
 
+  // DS-STAFF-risk-1: #/checkin/teacher and #/checkin/quiz pass `bar`: the warning is the bar under
+  // the staff bar (Banner `bar`), with Google's button, before the page.
+  it("DS-STAFF-risk-1 ROLES-UI-fixcheck-2 with `bar`, the ending sign-in is a bar under the staff bar, with Google's button, above the page", () => {
+    signIn({ iss: "https://accounts.google.com", email: "prof@example.edu", email_verified: true });
+    signedIn.endsAt = Date.UTC(2026, 10, 5, 22, 41);
+    results["staff:me"] = staff("prof@example.edu", "professor");
+    const html = renderToStaticMarkup(createElement(StaffGate, { title: "Attendance", bar: true, children: "[the attendance page]" }));
+    const time = new Date(signedIn.endsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    expect(html).toMatch(/^<header class="bar staff-bar"><h1>Attendance<\/h1>.*\[Signed in as prof@example\.edu, Not you\? Sign out\].*<\/header><div class="banner banner--warn banner--bar" role="status">/);
+    expect(words(html)).toContain(`Your sign-in ends at ${time}. Sign in with Google again before then to keep this page open.`);
+    expect(html.indexOf("[Google button]")).toBeGreaterThan(html.indexOf("banner--bar"));
+    expect(html.indexOf("[Google button]")).toBeLessThan(html.indexOf("[the attendance page]"));
+  });
+
   it("ROLES-UI-fixcheck-2 shows nothing extra when the sign-in isn't ending", () => {
     signIn({ iss: "https://accounts.google.com", email: "prof@example.edu", email_verified: true });
     results["staff:me"] = staff("prof@example.edu", "admin");

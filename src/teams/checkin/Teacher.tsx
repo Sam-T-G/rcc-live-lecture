@@ -7,9 +7,10 @@
 // "late"; and downloads attendance as a CSV for this class or any past one. End class, next to the
 // status line, ends the class (the same End class, live.groups.endDay, as the Professor view's
 // Points tab).
-// The page: the staff bar (StaffGate), the count line and the status line, then the main column
-// (This class and Past classes, each a list in a well) and the side column (the scanner card, the
-// page's one raised card, and Class start).
+// The page: the staff bar (StaffGate), the count line and the status line, then the side column
+// (the scanner card, the page's one raised card, and Class start) and the main column (This class
+// and Past classes, each a list in a well). The side column comes first in the page, so it stays on
+// top in one column; with two columns teacher.css puts the main column on the left.
 import "./teacher.css";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useConvex, useMutation, useQuery } from "convex/react";
@@ -73,6 +74,12 @@ export function Scanner() {
           </ErrorBoundary>
         </div>
         <div className="desk att-desk">
+          <div className="att-side">
+            <ScanPasses />
+            <ErrorBoundary label="The class start">
+              <ClassStart />
+            </ErrorBoundary>
+          </div>
           <div className="att-main">
             <section className="att-sec">
               <h2>This class</h2>
@@ -83,12 +90,6 @@ export function Scanner() {
             </section>
             <ErrorBoundary label="Past classes">
               <PastClasses />
-            </ErrorBoundary>
-          </div>
-          <div className="att-side">
-            <ScanPasses />
-            <ErrorBoundary label="The class start">
-              <ClassStart />
             </ErrorBoundary>
           </div>
         </div>
@@ -470,16 +471,16 @@ function stillOpen(startsAt: number, first: { name: string; at: number } | undef
   return `This class is still open. Its first check-in, ${first.name} at ${clock(first.at)}, is more than 45 minutes before ${clock(startsAt)}. If ${first.name} is in this class, press Save anyway. If ${clock(startsAt)} is the next class's start, press End class, then save it.`;
 }
 
-// This class's attendance as a CSV, at the end of the This class heading. The late count is the
-// count line's (Counts).
+// This class's attendance as a CSV, and how many were late, at the end of the This class heading.
 export function Download() {
   const sheet = useQuery(api.checkin.attendance.sheet, { channel: CHANNEL });
   const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
   if (sheet === undefined) return null;
   const open = classes?.find((c) => c.open);
   const earlier = earlierOnly(classes);
+  const late = sheet.filter((r) => r.lateMin !== null).length;
   return (
-    <p className="att-sec__act">
+    <p className="row att-sec__act">
       <Button
         variant="secondary"
         small
@@ -488,6 +489,7 @@ export function Download() {
       >
         Download attendance (CSV)
       </Button>
+      <span className="muted">{late} late</span>
     </p>
   );
 }
