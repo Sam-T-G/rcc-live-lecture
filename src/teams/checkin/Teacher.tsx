@@ -4,13 +4,13 @@
 // reader in Chrome on a Mac, jsQR in Safari, Firefox and Chrome on Windows), or the professor
 // types the code from a student's phone. The page lists who checked in, each with a Remove for a
 // wrong check-in; the professor sets when class starts and how many minutes of grace come before
-// "late"; and downloads attendance as a CSV for this class or any past one. End day on the
-// Professor view's Points tab ends the class.
+// "late"; and downloads attendance as a CSV for this class or any past one. End class, next to the
+// status line, ends the class (the same End day as the Professor view's Points tab).
 import "./teacher.css";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Badge, Button, ConfirmButton, Field, Stat } from "../../blocks/kit";
+import { Badge, Banner, Button, ConfirmButton, Field, Stat } from "../../blocks/kit";
 import { Link } from "../../blocks/router";
 import { Card, ErrorBoundary, Screen, Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
@@ -54,7 +54,9 @@ export function Scanner() {
         <ErrorBoundary label="The class status">
           <ClassStatus />
         </ErrorBoundary>
-        <Link to="host">End the class: Professor view, Points</Link>
+        <ErrorBoundary label="The End class button">
+          <EndClass />
+        </ErrorBoundary>
       </div>
       <ErrorBoundary label="The counts">
         <Counts />
@@ -114,6 +116,37 @@ export function ClassStatus() {
   if (classes === undefined) return <span>Loading…</span>;
   if (at === null) return <span>No class running.</span>;
   return <span>{`${at > Date.now() ? "Class starts" : "Class started"} ${dayTime(at)}`}</span>;
+}
+
+// End class, while a class is running: End day (live.groups.endDay) saves each team's extra credit
+// and ends the class, so the next scan, deck press, saved start or quiz opens a new one and every
+// student's phone shows the pass again. It asks first. The line End day returns shows in place of
+// the button until the next class opens. When End day refuses (a quiz or vote is still open), the
+// question box says why and the class stays open.
+export function EndClass() {
+  const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
+  const endDay = useMutation(api.live.groups.endDay);
+  // The class this page ended, and the line End day returned for it.
+  const [ended, setEnded] = useState<{ lecture: string; line: string } | null>(null);
+  const open = classes?.find((c) => c.open);
+  let line = ended?.line ?? null;
+  // A class opened since then, so the line was about the class before it.
+  if (ended && open && open.lecture !== ended.lecture) {
+    setEnded(null);
+    line = null;
+  }
+  // Right after End day the list can still show the class open for a moment; the line shows then.
+  if (open && open.lecture !== ended?.lecture)
+    return (
+      <ConfirmButton
+        question="End this class? Each student gets their team's extra credit now. Next class, everyone checks in again and points start from 0. This can't be undone."
+        confirm="End class"
+        onConfirm={async () => setEnded({ lecture: open.lecture, line: await endDay({ channel: CHANNEL }) })}
+      >
+        End class
+      </ConfirmButton>
+    );
+  return line ? <Banner tone="info">{line}</Banner> : null;
 }
 
 // The check-ins from before the first class ever ("earlier" in lectures) when they are what

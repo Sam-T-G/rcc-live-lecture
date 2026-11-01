@@ -105,7 +105,7 @@ describe("CKA-convex-1 / CKA-risk-3 a start for a later class never lands on the
     const bo = await monday(t);
     expect((await sheet(t)).map((r) => [r.name, r.lateMin])).toEqual([["Bo Sample", 20]]);
     vi.setSystemTime(MON_6PM + 3.5 * HOUR);
-    await expect(setStart(t, TUE_9AM)).rejects.toThrow("This class is still open. Press End day on #/host, then save the next start.");
+    await expect(setStart(t, TUE_9AM)).rejects.toThrow("This class is still open. Press End class, then save the next start.");
     expect((await sheet(t)).map((r) => [r.name, r.lateMin])).toEqual([["Bo Sample", 20]]);
     const [mon] = await lectures(t);
     expect(mon).toMatchObject({ open: true, startsAt: MON_6PM, count: 1 });
@@ -210,7 +210,7 @@ describe("CKA-fixcheck the next section's start never lands on the class still o
     const bo = student(t, "Bo");
     await checkIn(t, bo);
     vi.setSystemTime(NINE + 110 * MIN);
-    await expect(setStart(t, NINE + 2 * HOUR)).rejects.toThrow("This class is still open. Press End day on #/host, then save the next start.");
+    await expect(setStart(t, NINE + 2 * HOUR)).rejects.toThrow("This class is still open. Press End class, then save the next start.");
     expect((await sheet(t)).map((r) => [r.name, r.lateMin])).toEqual([
       ["Ana Sample", null],
       ["Bo Sample", 20],

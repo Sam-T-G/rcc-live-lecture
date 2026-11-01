@@ -75,8 +75,14 @@ describe("F13 the professor's scanner", () => {
     expect(words(page())).not.toContain("Class started");
   });
 
-  it("a link 'End the class: Professor view, Points' opens #/host", () => {
-    expect(page()).toContain('<a href="#/host">End the class: Professor view, Points</a>');
+  it("F8.1 End class sits right after the status line while a class runs; with no class running there is none", () => {
+    expect(page()).toMatch(
+      /<div class="row att-status"><span>Class started Thu Nov 5, 2:30\sPM<\/span><button type="button" class="btn btn--danger"><span class="btn__label">End class<\/span><\/button><\/div>/,
+    );
+    expect(page()).not.toContain('href="#/host"');
+    results["checkin/attendance:lectures"] = [lastWeek];
+    expect(words(page())).toContain("No class running.");
+    expect(words(page())).not.toContain("End class");
   });
 
   it("'professor', never 'teacher', on screen, loaded or loading", () => {
@@ -103,7 +109,7 @@ describe("F14 who checked in to this class", () => {
     // No question shows before a press. That the first press only asks and the second removes is
     // pressed for real in Teacher.press.test.ts (CKA-risk-4): this HTML looks the same either way.
     expect(words(html)).not.toContain("from this class?");
-    expect(html.match(/btn--danger/g)).toHaveLength(2);
+    expect(html.match(/btn--danger"><span class="btn__label">Remove/g)).toHaveLength(2);
     expect(words(html)).toMatch(/2 checked in 1 late/);
   });
 

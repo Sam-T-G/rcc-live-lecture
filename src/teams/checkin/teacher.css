@@ -1,8 +1,10 @@
 /* #/checkin/teacher (Teacher.tsx): attendance on the professor's laptop, 1280 to 1440 wide. The
    two columns and the camera come from .scanner in checkin.css. Tokens only (src/styles/tokens.css). */
 
-/* "Class started Thu Nov 5, 2:28 PM", and the link to End day on the Professor view. */
+/* "Class started Thu Nov 5, 2:28 PM" and End class. End class's question box, and the line End
+   day returns, take the row's full width. */
 .att-status { margin: 0 0 var(--rcc-space-4); }
+.att-status > :is(.confirm, .banner) { flex: 1 1 100%; margin: 0; }
 
 /* The counts row at the top: checked in, late. */
 .att-stats { display: flex; flex-wrap: wrap; gap: var(--rcc-space-8); margin: 0 0 var(--rcc-space-6); }

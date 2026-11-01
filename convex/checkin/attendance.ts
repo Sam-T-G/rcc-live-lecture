@@ -154,8 +154,9 @@ export const classStart = query({
 // come before "late". The time has to be within 12 hours of now. Opens the class when none is open
 // (lib.ensureLecture), so the start belongs to this class only. While the open class has a
 // check-in more than 45 minutes before the new start, the start is the next class's, so it's
-// refused until End day ends this class (a class with no check-ins yet, like one a deck rehearsal
-// opened the evening before, takes it). Unless this class's teams are
+// refused until End day (End class on #/checkin/teacher, or the Points tab on #/host) ends this
+// class (a class with no check-ins yet, like one a deck rehearsal opened the evening before,
+// takes it). Unless this class's teams are
 // locked already, it queues the team lock for 5 minutes after the start: a start moved earlier
 // locks the teams earlier (live.groups.lock checks the time itself, so a lock queued for the old
 // start does nothing extra).
@@ -170,7 +171,7 @@ export const setClassStart = mutation({
     const lecture = await ensureLecture(ctx, channel);
     const first = await checkinsIn(ctx, channel, classSpan(lecture)).first();
     if (first && startsAt > first.at + EARLY_MS)
-      throw new ConvexError("This class is still open. Press End day on #/host, then save the next start.");
+      throw new ConvexError("This class is still open. Press End class, then save the next start.");
     await ctx.db.patch("lectures", lecture._id, { startsAt, graceMin });
     // The channel's legacy classStarts row too, replaced so its _creationTime says when the start
     // was saved. Two things read it: startSavedAt (for lateFeed), and lib.lectureWindow only while
