@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="surface" content="laptop" />
+<title>Professor view, no teams yet</title>
+<!-- #/host Points tab before anyone checks in. HO-30: the same ruled table as the filled state, one row per team with
+     muted en dashes in Place, Right, Per student and Extra credit, then "Each student joins a team when they check in."
+     right under it (host-bespoke-4-8, host-use-4-8). Aside: HO-34 empty in the one inline well, HO-35 nothing saved. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Google+Sans+Code:wght@400..700&display=swap" />
+<link rel="stylesheet" href="../../system/tokens.css" />
+<link rel="stylesheet" href="../../system/kit.css" />
+<link rel="stylesheet" href="host.css" />
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-check" viewBox="0 0 256 256"><polyline points="40 144 96 200 224 72"/></symbol>
+    <symbol id="i-x" viewBox="0 0 256 256"><line x1="200" y1="56" x2="56" y2="200"/><line x1="200" y1="200" x2="56" y2="56"/></symbol>
+    <symbol id="i-up" viewBox="0 0 256 256"><polyline points="48 160 128 80 208 160"/></symbol>
+    <symbol id="i-scan" viewBox="0 0 256 256"><polyline points="176 40 216 40 216 80"/><polyline points="80 216 40 216 40 176"/><polyline points="216 176 216 216 176 216"/><polyline points="40 80 40 40 80 40"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96"/><polyline points="128 72 128 128 184 128"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 256 256"><rect x="40" y="88" width="176" height="128" rx="8"/><path d="M88 88V56a40 40 0 0 1 80 0v32"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 256 256"><polyline points="24 56 24 104 72 104"/><path d="M67.6 192A88 88 0 1 0 65.8 65.8L24 104"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 256 256"><path d="M128 56C48 56 16 128 16 128s32 72 112 72 112-72 112-72-32-72-112-72Z"/><circle cx="128" cy="128" r="40"/></symbol>
+    <symbol id="i-info" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96"/><polyline points="116 120 128 120 128 176 140 176"/><line x1="128" y1="84" x2="128" y2="86"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 256 256"><path d="M128 32 240 216H16Z"/><line x1="128" y1="104" x2="128" y2="144"/><line x1="128" y1="180" x2="128" y2="182"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 256 256"><line x1="40" y1="128" x2="216" y2="128"/><line x1="128" y1="40" x2="128" y2="216"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 256 256"><line x1="40" y1="128" x2="216" y2="128"/></symbol>
+    <symbol id="i-left" viewBox="0 0 256 256"><line x1="216" y1="128" x2="40" y2="128"/><polyline points="112 56 40 128 112 200"/></symbol>
+    <symbol id="i-right" viewBox="0 0 256 256"><line x1="40" y1="128" x2="216" y2="128"/><polyline points="144 56 216 128 144 200"/></symbol>
+    <symbol id="i-ipad" viewBox="0 0 256 256"><rect x="56" y="24" width="144" height="208" rx="16"/><line x1="112" y1="196" x2="144" y2="196"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 256 256"><rect x="40" y="40" width="176" height="176" rx="8"/><polyline points="40 152 84 152 100 176 156 176 172 152 216 152"/></symbol>
+    <symbol id="i-signin" viewBox="0 0 256 256"><polyline points="94 170 136 128 94 86"/><line x1="24" y1="128" x2="136" y2="128"/><path d="M136 40h56a8 8 0 0 1 8 8v160a8 8 0 0 1-8 8h-56"/></symbol>
+    <symbol id="i-download" viewBox="0 0 256 256"><polyline points="80 112 128 160 176 112"/><line x1="128" y1="40" x2="128" y2="160"/><path d="M216 160v48a8 8 0 0 1-8 8H48a8 8 0 0 1-8-8v-48"/></symbol>
+    <symbol id="i-corners" viewBox="0 0 100 75"><path d="M2 16V2h14M84 2h14v14M98 59v14H84M16 73H2V59" fill="none" stroke="currentColor" stroke-width="5" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" style="stroke-width:6px"/></symbol>
+    <symbol id="qr" viewBox="0 0 37 37" shape-rendering="crispEdges"><rect width="37" height="37" fill="currentColor" opacity="0"/><path fill="currentColor" d="M4 4h1v1h-1zM5 4h1v1h-1zM6 4h1v1h-1zM7 4h1v1h-1zM8 4h1v1h-1zM9 4h1v1h-1zM10 4h1v1h-1zM13 4h1v1h-1zM20 4h1v1h-1zM22 4h1v1h-1zM23 4h1v1h-1zM26 4h1v1h-1zM27 4h1v1h-1zM28 4h1v1h-1zM29 4h1v1h-1zM30 4h1v1h-1zM31 4h1v1h-1zM32 4h1v1h-1zM4 5h1v1h-1zM10 5h1v1h-1zM12 5h1v1h-1zM13 5h1v1h-1zM14 5h1v1h-1zM15 5h1v1h-1zM20 5h1v1h-1zM22 5h1v1h-1zM23 5h1v1h-1zM26 5h1v1h-1zM32 5h1v1h-1zM4 6h1v1h-1zM6 6h1v1h-1zM7 6h1v1h-1zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM15 6h1v1h-1zM22 6h1v1h-1zM23 6h1v1h-1zM24 6h1v1h-1zM26 6h1v1h-1zM28 6h1v1h-1zM29 6h1v1h-1zM30 6h1v1h-1zM32 6h1v1h-1zM4 7h1v1h-1zM6 7h1v1h-1zM7 7h1v1h-1zM8 7h1v1h-1zM10 7h1v1h-1zM13 7h1v1h-1zM14 7h1v1h-1zM16 7h1v1h-1zM19 7h1v1h-1zM20 7h1v1h-1zM22 7h1v1h-1zM23 7h1v1h-1zM26 7h1v1h-1zM28 7h1v1h-1zM29 7h1v1h-1zM30 7h1v1h-1zM32 7h1v1h-1zM4 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM8 8h1v1h-1zM10 8h1v1h-1zM13 8h1v1h-1zM16 8h1v1h-1zM18 8h1v1h-1zM19 8h1v1h-1zM22 8h1v1h-1zM23 8h1v1h-1zM24 8h1v1h-1zM26 8h1v1h-1zM28 8h1v1h-1zM29 8h1v1h-1zM30 8h1v1h-1zM32 8h1v1h-1zM4 9h1v1h-1zM10 9h1v1h-1zM12 9h1v1h-1zM14 9h1v1h-1zM15 9h1v1h-1zM20 9h1v1h-1zM21 9h1v1h-1zM22 9h1v1h-1zM26 9h1v1h-1zM32 9h1v1h-1zM4 10h1v1h-1zM5 10h1v1h-1zM6 10h1v1h-1zM7 10h1v1h-1zM8 10h1v1h-1zM9 10h1v1h-1zM10 10h1v1h-1zM12 10h1v1h-1zM14 10h1v1h-1zM16 10h1v1h-1zM18 10h1v1h-1zM20 10h1v1h-1zM22 10h1v1h-1zM24 10h1v1h-1zM26 10h1v1h-1zM27 10h1v1h-1zM28 10h1v1h-1zM29 10h1v1h-1zM30 10h1v1h-1zM31 10h1v1h-1zM32 10h1v1h-1zM12 11h1v1h-1zM13 11h1v1h-1zM15 11h1v1h-1zM16 11h1v1h-1zM19 11h1v1h-1zM20 11h1v1h-1zM22 11h1v1h-1zM23 11h1v1h-1zM4 12h1v1h-1zM6 12h1v1h-1zM9 12h1v1h-1zM10 12h1v1h-1zM11 12h1v1h-1zM13 12h1v1h-1zM14 12h1v1h-1zM15 12h1v1h-1zM17 12h1v1h-1zM18 12h1v1h-1zM19 12h1v1h-1zM20 12h1v1h-1zM22 12h1v1h-1zM28 12h1v1h-1zM29 12h1v1h-1zM30 12h1v1h-1zM31 12h1v1h-1zM9 13h1v1h-1zM13 13h1v1h-1zM14 13h1v1h-1zM18 13h1v1h-1zM19 13h1v1h-1zM20 13h1v1h-1zM21 13h1v1h-1zM22 13h1v1h-1zM25 13h1v1h-1zM27 13h1v1h-1zM28 13h1v1h-1zM4 14h1v1h-1zM6 14h1v1h-1zM8 14h1v1h-1zM9 14h1v1h-1zM10 14h1v1h-1zM12 14h1v1h-1zM14 14h1v1h-1zM15 14h1v1h-1zM17 14h1v1h-1zM20 14h1v1h-1zM22 14h1v1h-1zM25 14h1v1h-1zM29 14h1v1h-1zM31 14h1v1h-1zM32 14h1v1h-1zM6 15h1v1h-1zM8 15h1v1h-1zM9 15h1v1h-1zM11 15h1v1h-1zM12 15h1v1h-1zM16 15h1v1h-1zM17 15h1v1h-1zM19 15h1v1h-1zM20 15h1v1h-1zM21 15h1v1h-1zM22 15h1v1h-1zM25 15h1v1h-1zM27 15h1v1h-1zM29 15h1v1h-1zM31 15h1v1h-1zM32 15h1v1h-1zM4 16h1v1h-1zM6 16h1v1h-1zM8 16h1v1h-1zM9 16h1v1h-1zM10 16h1v1h-1zM11 16h1v1h-1zM12 16h1v1h-1zM13 16h1v1h-1zM14 16h1v1h-1zM16 16h1v1h-1zM17 16h1v1h-1zM18 16h1v1h-1zM19 16h1v1h-1zM20 16h1v1h-1zM25 16h1v1h-1zM26 16h1v1h-1zM29 16h1v1h-1zM30 16h1v1h-1zM4 17h1v1h-1zM5 17h1v1h-1zM6 17h1v1h-1zM7 17h1v1h-1zM8 17h1v1h-1zM16 17h1v1h-1zM25 17h1v1h-1zM27 17h1v1h-1zM4 18h1v1h-1zM6 18h1v1h-1zM8 18h1v1h-1zM10 18h1v1h-1zM11 18h1v1h-1zM14 18h1v1h-1zM15 18h1v1h-1zM16 18h1v1h-1zM18 18h1v1h-1zM19 18h1v1h-1zM20 18h1v1h-1zM21 18h1v1h-1zM25 18h1v1h-1zM29 18h1v1h-1zM32 18h1v1h-1zM4 19h1v1h-1zM5 19h1v1h-1zM6 19h1v1h-1zM7 19h1v1h-1zM8 19h1v1h-1zM19 19h1v1h-1zM20 19h1v1h-1zM21 19h1v1h-1zM24 19h1v1h-1zM25 19h1v1h-1zM30 19h1v1h-1zM31 19h1v1h-1zM32 19h1v1h-1zM6 20h1v1h-1zM8 20h1v1h-1zM9 20h1v1h-1zM10 20h1v1h-1zM11 20h1v1h-1zM14 20h1v1h-1zM15 20h1v1h-1zM16 20h1v1h-1zM19 20h1v1h-1zM20 20h1v1h-1zM21 20h1v1h-1zM23 20h1v1h-1zM26 20h1v1h-1zM9 21h1v1h-1zM11 21h1v1h-1zM16 21h1v1h-1zM18 21h1v1h-1zM21 21h1v1h-1zM24 21h1v1h-1zM26 21h1v1h-1zM27 21h1v1h-1zM28 21h1v1h-1zM31 21h1v1h-1zM6 22h1v1h-1zM7 22h1v1h-1zM8 22h1v1h-1zM9 22h1v1h-1zM10 22h1v1h-1zM12 22h1v1h-1zM13 22h1v1h-1zM14 22h1v1h-1zM20 22h1v1h-1zM22 22h1v1h-1zM23 22h1v1h-1zM24 22h1v1h-1zM26 22h1v1h-1zM27 22h1v1h-1zM28 22h1v1h-1zM29 22h1v1h-1zM4 23h1v1h-1zM6 23h1v1h-1zM7 23h1v1h-1zM8 23h1v1h-1zM11 23h1v1h-1zM16 23h1v1h-1zM17 23h1v1h-1zM18 23h1v1h-1zM19 23h1v1h-1zM20 23h1v1h-1zM21 23h1v1h-1zM23 23h1v1h-1zM24 23h1v1h-1zM25 23h1v1h-1zM27 23h1v1h-1zM28 23h1v1h-1zM29 23h1v1h-1zM32 23h1v1h-1zM4 24h1v1h-1zM6 24h1v1h-1zM7 24h1v1h-1zM10 24h1v1h-1zM11 24h1v1h-1zM17 24h1v1h-1zM19 24h1v1h-1zM20 24h1v1h-1zM23 24h1v1h-1zM24 24h1v1h-1zM25 24h1v1h-1zM26 24h1v1h-1zM27 24h1v1h-1zM28 24h1v1h-1zM29 24h1v1h-1zM30 24h1v1h-1zM12 25h1v1h-1zM18 25h1v1h-1zM19 25h1v1h-1zM21 25h1v1h-1zM22 25h1v1h-1zM23 25h1v1h-1zM24 25h1v1h-1zM28 25h1v1h-1zM29 25h1v1h-1zM4 26h1v1h-1zM5 26h1v1h-1zM6 26h1v1h-1zM7 26h1v1h-1zM8 26h1v1h-1zM9 26h1v1h-1zM10 26h1v1h-1zM14 26h1v1h-1zM17 26h1v1h-1zM18 26h1v1h-1zM19 26h1v1h-1zM21 26h1v1h-1zM24 26h1v1h-1zM26 26h1v1h-1zM28 26h1v1h-1zM29 26h1v1h-1zM30 26h1v1h-1zM31 26h1v1h-1zM32 26h1v1h-1zM4 27h1v1h-1zM10 27h1v1h-1zM12 27h1v1h-1zM13 27h1v1h-1zM14 27h1v1h-1zM16 27h1v1h-1zM17 27h1v1h-1zM19 27h1v1h-1zM24 27h1v1h-1zM28 27h1v1h-1zM29 27h1v1h-1zM4 28h1v1h-1zM6 28h1v1h-1zM7 28h1v1h-1zM8 28h1v1h-1zM10 28h1v1h-1zM14 28h1v1h-1zM15 28h1v1h-1zM16 28h1v1h-1zM17 28h1v1h-1zM18 28h1v1h-1zM20 28h1v1h-1zM23 28h1v1h-1zM24 28h1v1h-1zM25 28h1v1h-1zM26 28h1v1h-1zM27 28h1v1h-1zM28 28h1v1h-1zM30 28h1v1h-1zM31 28h1v1h-1zM4 29h1v1h-1zM6 29h1v1h-1zM7 29h1v1h-1zM8 29h1v1h-1zM10 29h1v1h-1zM16 29h1v1h-1zM17 29h1v1h-1zM18 29h1v1h-1zM20 29h1v1h-1zM21 29h1v1h-1zM23 29h1v1h-1zM27 29h1v1h-1zM28 29h1v1h-1zM30 29h1v1h-1zM31 29h1v1h-1zM32 29h1v1h-1zM4 30h1v1h-1zM6 30h1v1h-1zM7 30h1v1h-1zM8 30h1v1h-1zM10 30h1v1h-1zM12 30h1v1h-1zM13 30h1v1h-1zM16 30h1v1h-1zM17 30h1v1h-1zM18 30h1v1h-1zM19 30h1v1h-1zM23 30h1v1h-1zM25 30h1v1h-1zM26 30h1v1h-1zM28 30h1v1h-1zM29 30h1v1h-1zM31 30h1v1h-1zM32 30h1v1h-1zM4 31h1v1h-1zM10 31h1v1h-1zM12 31h1v1h-1zM13 31h1v1h-1zM14 31h1v1h-1zM15 31h1v1h-1zM16 31h1v1h-1zM17 31h1v1h-1zM21 31h1v1h-1zM22 31h1v1h-1zM24 31h1v1h-1zM25 31h1v1h-1zM29 31h1v1h-1zM30 31h1v1h-1zM32 31h1v1h-1zM4 32h1v1h-1zM5 32h1v1h-1zM6 32h1v1h-1zM7 32h1v1h-1zM8 32h1v1h-1zM9 32h1v1h-1zM10 32h1v1h-1zM15 32h1v1h-1zM17 32h1v1h-1zM22 32h1v1h-1zM24 32h1v1h-1zM25 32h1v1h-1zM26 32h1v1h-1zM27 32h1v1h-1zM28 32h1v1h-1zM31 32h1v1h-1z"/></symbol>
+  </defs>
+  <symbol id="i-more" viewBox="0 0 256 256"><path d="M60 128h0M128 128h0M196 128h0"/></symbol>
+</svg>
+
+<header class="bar host-bar">
+  <h1 class="bar__title">Professor view</h1>
+  <nav class="tabs" role="tablist" aria-label="Professor view">
+    <button class="tabs__tab" role="tab" aria-selected="false">Now</button>
+    <button class="tabs__tab" role="tab" aria-selected="true">Points</button>
+    <button class="tabs__tab" role="tab" aria-selected="false">Questions <span class="tabs__n host-n"></span></button>
+  </nav>
+  <div class="bar__end"><span class="offline-slot" role="status"></span><a class="link link--sm host-att" href="#/checkin/teacher">Attendance<svg class="icon" aria-hidden="true"><use href="#i-right"/></svg></a><div class="whoami"><span title="pat@example.edu">Pat Example</span><button class="btn btn--plain" type="button">Sign out</button></div></div>
+</header>
+
+<main class="page host-page">
+  <section class="track band host-track" aria-label="Slides, I’m lost taps and check-ins">
+    <p class="sr-only">Slide 4 of 12, Capacitors in a circuit. Nobody has tapped I’m lost yet. 0 checked in.</p>
+    <div class="track__where" aria-hidden="true"><span class="track__of">Slide 4 of 12</span><span class="track__title">Capacitors in a circuit</span></div>
+    <div class="track__lane" aria-hidden="true" style="--slides: 12">
+      <span class="track__rl">Lost</span><span class="track__none">Nobody has tapped I’m lost yet.</span>
+      <span></span><span class="track__seg track__seg--past"></span><span class="track__seg track__seg--past"></span><span class="track__seg track__seg--past"></span><span class="track__seg track__seg--now"></span><span class="track__seg"></span><span class="track__seg"></span><span class="track__seg"></span><span class="track__seg"></span><span class="track__seg"></span><span class="track__seg"></span><span class="track__seg"></span><span class="track__seg"></span>
+      <span class="track__rl">Slide</span><span class="track__i">1</span><span class="track__i">2</span><span class="track__i">3</span><span class="track__i track__i--now">4</span><span class="track__i">5</span><span class="track__i">6</span><span class="track__i">7</span><span class="track__i">8</span><span class="track__i">9</span><span class="track__i">10</span><span class="track__i">11</span><span class="track__i">12</span>
+    </div>
+    <div class="track__room roomn" aria-hidden="true"><span class="roomn__n">0</span><span class="roomn__l">checked in</span></div>
+  </section>
+
+  <div class="desk host-desk">
+    <section class="hcard pts" aria-labelledby="pts-t">
+      <div class="hline ask__head">
+        <h2 id="pts-t" class="hline__t">Teams</h2>
+        <p class="facts facts-list"><span>Teams lock at 2:41 PM</span></p>
+        <div class="hline__end"><div class="seg" role="radiogroup" aria-label="Team size">
+            <button class="seg__item" type="button" role="radio" aria-checked="true"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Teams of 3</button>
+            <button class="seg__item" type="button" role="radio" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Teams of 4</button>
+          </div></div>
+      </div>
+      <p class="pts__note">Each student joins a team when they check in.</p>
+      <div class="ruled points pts-list pts-list--empty" role="table" aria-label="Teams">
+        <div class="ruled__head" role="row"><span role="columnheader" class="end">Place</span><span role="columnheader">Team</span><span role="columnheader" class="end">Right</span><span role="columnheader" class="end">Per student</span><span role="columnheader" class="end">Extra credit</span><span role="columnheader"><span class="sr-only">Change points</span></span></div>
+        <div class="ruled__row" role="row"><span role="cell" class="ln pend">–</span><span role="cell"><span class="team"><span class="team__chip team-swatch" style="--c: var(--team-teal)"></span>Teal</span></span><span role="cell" class="ln pend">–</span><span role="cell" class="ln pend">–</span><span role="cell" class="ln pend">–</span><span role="cell"></span></div>
+        <div class="ruled__row" role="row"><span role="cell" class="ln pend">–</span><span role="cell"><span class="team"><span class="team__chip team-swatch" style="--c: var(--team-orange)"></span>Orange</span></span><span role="cell" class="ln pend">–</span><span role="cell" class="ln pend">–</span><span role="cell" class="ln pend">–</span><span role="cell"></span></div>
+        <div class="ruled__row" role="row"><span role="cell" class="ln pend">–</span><span role="cell"><span class="team"><span class="team__chip team-swatch" style="--c: var(--team-purple)"></span>Purple</span></span><span role="cell" class="ln pend">–</span><span role="cell" class="ln pend">–</span><span role="cell" class="ln pend">–</span><span role="cell"></span></div>
+        <div class="ruled__row" role="row"><span role="cell" class="ln pend">–</span><span role="cell"><span class="team"><span class="team__chip team-swatch" style="--c: var(--team-navy)"></span>Navy</span></span><span role="cell" class="ln pend">–</span><span role="cell" class="ln pend">–</span><span role="cell" class="ln pend">–</span><span role="cell"></span></div>
+        <div class="ruled__row" role="row"><span role="cell" class="ln pend">–</span><span role="cell"><span class="team"><span class="team__chip team-swatch" style="--c: var(--team-brown)"></span>Brown</span></span><span role="cell" class="ln pend">–</span><span role="cell" class="ln pend">–</span><span role="cell" class="ln pend">–</span><span role="cell"></span></div>
+        <div class="ruled__row" role="row"><span role="cell" class="ln pend">–</span><span role="cell"><span class="team"><span class="team__chip team-swatch" style="--c: var(--team-pink)"></span>Pink</span></span><span role="cell" class="ln pend">–</span><span role="cell" class="ln pend">–</span><span role="cell" class="ln pend">–</span><span role="cell"></span></div>
+      </div>
+    </section>
+
+    <aside class="side host-side">
+      <section class="side-sec" aria-labelledby="chg-t">
+        <header class="side-sec__head"><h2 id="chg-t" class="card-title">Point changes</h2></header>
+        <p class="state state--inline side__empty">No point changes in this class yet.</p>
+      </section>
+      <section class="side-sec side-sec--end" aria-labelledby="end-t">
+        <header class="side-sec__head"><h2 id="end-t" class="card-title">End of class</h2></header>
+        <p class="side__sum">No extra credit saved yet. End day saves it.</p>
+        <div class="cluster end__acts">
+          <button class="btn btn--outline" type="button">End day</button>
+          <button class="btn btn--outline" type="button" aria-disabled="true" disabled><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download extra credit (CSV)</button>
+        </div>
+      </section>
+    </aside>
+  </div>
+</main>
+</body>
+</html>

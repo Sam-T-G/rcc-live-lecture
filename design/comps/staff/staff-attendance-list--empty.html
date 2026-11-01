@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="surface" content="laptop" />
+<title>Attendance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Google+Sans+Code:wght@400..700&display=swap" />
+<link rel="stylesheet" href="../../system/tokens.css" />
+<link rel="stylesheet" href="../../system/kit.css" />
+<link rel="stylesheet" href="staff.css" />
+<!-- r7-done. #/checkin/teacher, ST-08 empty: class started, no one checked in yet. The count sentence keeps its place and its green with 0; the register keeps its head and shows one muted row with the app's sentence; Past classes offers no download for a class with 0. Round 6: the scanner is the page's one raised surface (kit .focal); the register, Past classes and Class start are ledger sections on the page plane (title, 2px rule, 1px ruled rows). The register scrolls in a window of a whole number of rows with a footer that says so. -->
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-clock" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96"/><polyline points="128 72 128 128 184 128"/></symbol>
+  <symbol id="i-check" viewBox="0 0 256 256"><polyline points="40 144 96 200 224 72"/></symbol>
+  <symbol id="i-x" viewBox="0 0 256 256"><line x1="200" y1="56" x2="56" y2="200"/><line x1="200" y1="200" x2="56" y2="56"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 256 256"><path d="M128 32 240 216H16Z"/><line x1="128" y1="104" x2="128" y2="144"/><line x1="128" y1="180" x2="128" y2="182"/></symbol>
+  <symbol id="i-download" viewBox="0 0 256 256"><polyline points="80 112 128 160 176 112"/><line x1="128" y1="40" x2="128" y2="160"/><path d="M216 160v48a8 8 0 0 1-8 8H48a8 8 0 0 1-8-8v-48"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 256 256"><path d="M208 208H48a16 16 0 0 1-16-16V80a16 16 0 0 1 16-16h32l16-24h64l16 24h32a16 16 0 0 1 16 16v112a16 16 0 0 1-16 16Z"/><circle cx="128" cy="136" r="36"/></symbol>
+</svg>
+
+<header class="bar">
+  <h1 class="sr-only">Attendance</h1>
+  <div class="tabs" role="tablist" aria-label="Staff pages"><a class="tabs__tab" role="tab" href="#checkin/teacher" aria-selected="true">Attendance</a><a class="tabs__tab" role="tab" href="#checkin/quiz" aria-selected="false">Ask a question or start a vote</a><a class="tabs__tab" role="tab" href="#admin" aria-selected="false">Admin</a></div>
+  <p class="whoami">Signed in as Pat Example (pat@example.edu) <button class="btn btn--plain" type="button">Not you? Sign out</button></p>
+</header>
+
+<main class="page staff-main">
+  <div class="desk">
+    <div>
+      <section class="lsec" aria-labelledby="h-class">
+        <p class="tally tally--accent staffhead" aria-label="This class so far"><span class="tally__lead">0</span><span class="tally__w">checked in</span><span class="tally__rest">class started <b>2:28</b> PM</span></p>
+        <div class="lsec__head"><h2 class="card-title" id="h-class">This class</h2></div>
+        <div class="ruled reg" role="table" aria-labelledby="h-class">
+          <div class="ruled__head" role="row"><span role="columnheader">Name</span><span role="columnheader" class="end">Late</span><span role="columnheader" class="end">Checked in</span><span role="columnheader"><span class="sr-only">Actions</span></span></div>
+          <div class="ruled__row ruled__row--empty" role="row"><span role="cell" style="grid-column: 1 / -1">Names show up here as students check in at the door or you scan their pass.</span></div>
+        </div>
+      </section>
+      <section class="lsec" aria-labelledby="h-past">
+        <div class="lsec__head"><h2 class="card-title" id="h-past">Past classes</h2></div>
+        <div class="ruled past" role="table" aria-labelledby="h-past">
+          <div class="ruled__head" role="row"><span role="columnheader">Class</span><span role="columnheader" class="end">Checked in</span><span role="columnheader"><span class="sr-only">Download</span></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Thu Nov 5<span class="note">This class</span></span><span role="cell" class="end reg__time">0</span><span role="cell" class="end"></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Tue Nov 3</span><span role="cell" class="end reg__time">41</span><span role="cell" class="end"><button class="btn btn--ghost" type="button"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download CSV</button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Thu Oct 29</span><span role="cell" class="end reg__time">39</span><span role="cell" class="end"><button class="btn btn--ghost" type="button"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download CSV</button></span></div>
+        </div>
+      </section>
+    </div>
+
+    <aside>
+      <section class="focal task" aria-labelledby="h-scan">
+        <div class="task__head"><h2 class="card-title" id="h-scan">Scan passes</h2></div>
+        <div class="cam cam--idle"><span class="cam__dim" aria-hidden="true"><svg viewBox="0 0 100 100"><polyline points="0 22 0 0 22 0"/><polyline points="78 0 100 0 100 22"/><polyline points="100 78 100 100 78 100"/><polyline points="22 100 0 100 0 78"/></svg></span><div class="cam__msg"><p>Scan a pass or type its code.</p><button class="btn btn--primary" type="button"><svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg>Start scanning</button></div></div>
+        <div class="scanres scanres--none" role="status"><p>No scans yet.</p></div>
+        <form class="codeform" onsubmit="return false">
+          <label class="label" for="code">Code on their phone</label>
+          <div class="joined"><input class="input input--code" id="code" autocomplete="off" spellcheck="false" /><button class="btn btn--raised" type="submit">Check in</button></div>
+        </form>
+      </section>
+
+      <section class="lsec" aria-labelledby="h-start">
+        <div class="lsec__head"><h2 class="card-title" id="h-start">Class start</h2></div>
+        <form class="start-form" onsubmit="return false">
+          <div class="fld stack" style="--gap: var(--s1)"><label class="label" for="starts">Class starts</label><input class="input" id="starts" type="text" inputmode="text" autocomplete="off" value="2:28 PM" aria-describedby="starts-hint" /><span class="sr-only" id="starts-hint">Type a time like 2:28 PM.</span></div>
+          <div class="fld stack" style="--gap: var(--s1)"><label class="label" for="grace">Late after (minutes)</label><input class="input" id="grace" type="number" min="0" max="60" value="7" /></div>
+          <div class="start-form__foot"><p class="small muted">Late after <b class="nowrap" style="color: var(--text)">2:35 PM</b></p><button class="btn btn--outline" type="submit">Save</button></div>
+        </form>
+      </section>
+    </aside>
+  </div>
+</main>
+</body>
+</html>

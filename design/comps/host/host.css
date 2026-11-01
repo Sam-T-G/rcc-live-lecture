@@ -1,0 +1,230 @@
+/* =============================================================================
+   Host area (#/host, professor laptop 1440 x 900 and 1280 x 800): layout and placement only.
+   Every part is a kit signature part (system/kit.css, SIGNATURE.md). Rules marked "kit_request" are
+   stand-ins for parts the kit lacks; phase 2 moves them into kit.css.
+   The comps are generated: edit _build.mjs and run `node _build.mjs`.
+   ============================================================================= */
+
+/* kit_request: DESIGN-SYSTEM.md names a base [hidden] rule that kit.css doesn't have yet */
+[hidden] { display: none !important; }
+
+/* ------------------------------------------------------------ the shell
+   Round 7: kit overrides removed (LESSONS R6-01, R6-07, R6-12 and "Check the work: Overrides"); the band's text starts
+   on x 80 and ends on the page margin; the empty Now card is 280 tall (R6-11).
+   Round 6: the card hugs its content (no 1fr stretch); the side panel sits flat on the page with no rule.
+   Round 5: one console that fills the window. Bar, the slide track as a band on its own surface (sticky one
+   rung under the bar, a 1px rule under it), then the desk, which takes the rest of the window: the raised card
+   and a flat side panel, both down to one bottom line (host-bespoke-4-2). */
+.host-bar .bar__title { margin-right: var(--s4); padding-inline-start: var(--s8); }  /* on the x 80 text line (R6-12) */
+.host-bar .whoami { font-weight: var(--w-body); }
+.host-bar .bar__end { gap: var(--s5); }
+/* the Questions count: a tabular numeral in a fixed 24 slot, so the tab never changes width (host-use-4-12) */
+.host-n { display: inline-block; min-width: 24px; text-align: start; font-variant-numeric: tabular-nums; }
+/* Attendance leaves this screen: secondary text and an arrow, so green marks only the current tab and the one
+   primary button (host-use-5-12) */
+.host-att { color: var(--muted); gap: var(--s1); }
+.host-att:hover { color: var(--text); }
+.host-att .icon { width: 16px; height: 16px; }
+/* loading numerals use the kit's .skel--num (--skel-fill, lighter than its ground in dark, R6-10); the room count's
+   block is 40 wide at the readout's x-height so the "checked in" baseline holds (host-visual-6-6) */
+.track__room .skel--num { width: 40px; height: 16px; vertical-align: 0.1em; }
+
+.host-page { width: 100%; max-width: none; display: grid; grid-template-rows: auto 1fr; gap: var(--s4);
+  min-height: calc(100vh - var(--bar-h)); min-height: calc(100dvh - var(--bar-h)); padding-top: 0; padding-bottom: var(--s6); }
+@media (min-width: 1441px) { .host-page { max-width: calc(var(--page-max) + 2 * var(--page-margin)); } }
+/* the track on the kit's .band (page ground, sticky, 1px rule). Full bleed; on the desk's grid (R6-12, host-craft-6-2,
+   host-bespoke-6-4, host-visual-6-7): words start on the card's text line (margin + card padding, x 80), the lane ends on
+   the card's text edge, and the third column is the aside plus the desk gap, so "38 checked in" ends on the page margin
+   (x 1392) with Sign out and the aside. Lost counts use the kit's one set (24 / 700, zeros muted, R6-06) */
+.host-track { margin-inline: calc(-1 * var(--page-margin));
+  padding-inline: calc(var(--page-margin) + var(--s8)) var(--page-margin);
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr) calc(var(--aside-w) + var(--s6)); }
+.host-track .track__room { justify-self: end; }
+
+/* the card hugs its content; the page ground shows under it (host-visual-5-1, host-bespoke-5-1). Round 7: the
+   desk sits --s6 under the band */
+.host-desk { grid-template-columns: minmax(0, 1fr) minmax(0, var(--aside-w)); align-items: start; align-content: start; gap: var(--s6); }
+.host-desk > * { min-width: 0; }
+/* the side panel: flat on --page, no rule, no fill, no shadow. The card's own edge and the 24 gap are the one
+   split (host-craft-5-9). Its first heading sits on the card's heading line (card padding --s6) */
+.host-side { display: flex; flex-direction: column; gap: var(--s8); padding: var(--s6) 0 0; }
+.side-sec { display: grid; gap: var(--s3); align-content: start; min-width: 0; }
+.side-sec__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s3); }
+.side-sec__head { flex-wrap: wrap; row-gap: var(--s2); }  /* at 1280 the action drops under the heading, the heading never breaks */
+.side-sec__head .card-title { line-height: 1.3; white-space: nowrap; }
+.side-sec__head .btn { margin-top: calc(-1 * var(--s2)); }
+.side__sum { font-size: var(--t-body); color: var(--muted); line-height: 1.5; }
+.side__sum b { color: var(--text); font-weight: var(--w-loud); font-variant-numeric: tabular-nums; }
+.side__sum .letter { vertical-align: -0.3em; margin-inline: .1em .15em; }
+/* one sentence where a list will be: 17 in --muted on the page, no well, no column heads (host-bespoke-5-2) */
+.side__line { font-size: var(--t-body); color: var(--muted); line-height: 1.5; }
+/* round 7: the waiting line sits in the kit's .state--inline well, at least 96 tall, so the aside reads as the slot
+   the table lands in (host-use-6-2). On the empty Now card the aside ends at the card's height (R6-11) */
+.side-wait { min-height: 96px; align-content: center; }
+.side-wait .state__text { font-size: var(--t-body); }
+.host-desk--match .host-side { align-self: stretch; }
+.host-desk--match .side-sec { flex: 1; grid-template-rows: auto 1fr; }
+/* the vote's top pick: letter tile, its words, its count, on one line */
+.toppick { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; column-gap: var(--s3); align-items: center; }
+.toppick__w { font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.3; }
+.toppick__n { font-size: var(--t-body); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.toppick__n b { font-size: 1.5rem; font-weight: var(--w-loud); color: var(--text); }
+/* the one "nothing here" treatment in a side list: the well, one sentence */
+.side__empty { font-size: var(--t-small); color: var(--muted); }
+
+/* ------------------------------------------------------------ Ask the room */
+.ask__head { min-height: 56px; }  /* the same header block in every state, with or without an action (host-craft-5-7) */
+/* round 7 (R6-11): the empty Now card is 280 tall, the sentence at --t-h3, the two --lg actions in the slot.
+   Loading actions take the kit's disabled look (R6-10); the loading body is the kit's three still blocks */
+.ask--start { min-height: 280px; }
+.ask__slotq--start { font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.4; color: var(--muted); }
+.ask__load { display: grid; gap: var(--s3); }
+.ask__load .skel-lines { font-size: var(--t-body); }
+.ask .question { font-weight: var(--w-head); }
+/* the question's slot when there is no question: same size and place as the question */
+.ask__slotq { font-size: var(--t-h2); font-weight: var(--w-head); line-height: 1.25; }
+/* error: the kit's lockup in the question's slot, the heading at the question's size */
+.ask__err .state__title { font-size: var(--t-h2); line-height: 1.25; }
+
+/* bars: the kit's one 96 count column (count 40 + 8 + percent 48) right next to the track (host-use-6-4) */
+/* the leading choice while open (and in a vote) fills in ink; green stays for the right answer (host-use-4-4) */
+.hbars .is-lead .rbar__fill { background: var(--text); }
+/* ------------------------------------------------------------ draft form */
+.draft { display: grid; gap: var(--s5); align-content: start; }
+.draft__kind { display: flex; align-items: center; gap: var(--s5); flex-wrap: wrap; }
+.draft__q .input { font-size: var(--t-h3); font-weight: var(--w-head); min-height: 48px; }
+/* kit_request: choice editor rows. Letter tile, the field, one 112 Right answer column. The column's head sits on
+   the Choices line, centered over the radios; "No right answer" is the column's fifth row (host-use-4-5,
+   host-craft-4-8, host-bespoke-4-3) */
+.draft__cols, .draft__row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 112px; column-gap: var(--s3); align-items: center; }
+.draft__cols { min-height: var(--tap); margin-bottom: var(--s1); align-items: end; }
+.draft__lh { grid-column: 1 / 3; display: flex; align-items: center; gap: var(--s4); min-height: var(--tap); }
+.draft__rh { grid-column: 3; text-align: center; font-size: var(--t-small); font-weight: var(--w-head); color: var(--muted); line-height: var(--tap); }
+.draft__choices { display: grid; gap: var(--s2); }
+/* kit_request: field error words right under their field, 15/500 in --error, no glyph (the field carries it)
+   (host-use-5-10) */
+.draft__err { grid-column: 2; margin-top: var(--s1); font-size: var(--t-small); font-weight: var(--w-head); color: var(--error); line-height: 1.4; }
+.draft__in { position: relative; display: block; min-width: 0; }
+.draft__in .icon { position: absolute; right: var(--s3); top: 50%; width: 20px; height: 20px; margin-top: -10px; color: var(--error); pointer-events: none; }
+.draft__in .input[aria-invalid="true"] { padding-right: calc(var(--s3) + 28px); }
+.draft__right { display: grid; place-items: center; min-height: var(--tap); border-radius: var(--r-sm); cursor: pointer; }
+.draft__right:hover { background: var(--bar); }
+/* the fifth row: its words right-aligned into the radio, at the choices' size and weight */
+.draft__nonel { grid-column: 2; display: flex; align-items: center; justify-content: end; min-height: var(--tap);
+  font-size: var(--t-body); font-weight: var(--w-head); cursor: pointer; }
+.draft__row--none { border-top: 1px solid var(--line); padding-top: var(--s2); }
+/* the right answer's tile is the kit's .is-right .letter (--accent), the same tile as the ended state (R6-08) */
+.draft--vote .draft__right, .draft--vote .draft__rh { visibility: hidden; }
+.draft--vote .draft__row--none { display: none; }
+
+/* ------------------------------------------------------------ who got it wrong (side panel) */
+.wrong { --rcols: 64px minmax(0, 1fr) minmax(0, 1.3fr); }
+.wrong > .ruled__head { font-size: 1rem; }
+.wrong .ruled__row { min-height: 40px; font-size: var(--t-body); }
+.wrong .ruled__row > *, .wrong .ruled__head > * { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* picked letters: a bare bold letter, quieter than the choice tiles (host-use-4-11) */
+.pick { display: inline-flex; align-items: baseline; gap: var(--s2); font-weight: var(--w-body); }
+.pick__l { display: inline-block; width: 1.1em; font-weight: var(--w-loud); }
+
+/* ------------------------------------------------------------ questions */
+.qa .hline__end .seg__item { white-space: nowrap; }
+/* round 7: the kit's list in a card (R6-01): rows on the card, transparent head over the 2px rule, the selected row a
+   --bar fill step, radius 0, no shadow. No host override (host-visual-6-3, host-craft-6-9) */
+.qa-list { --rcols: 72px minmax(0, 1fr) 80px; }
+.qa-list > #list { display: contents; }
+.qq { align-items: baseline; padding-block: var(--s3); font-size: var(--t-body); }
+/* the sort key: upvotes 24 / 700 in a 72 gutter (the head word "Upvotes" fits on one line); the question 18 / 500 (host-use-6-8) */
+.qq__n { font-size: 1.5rem; font-weight: var(--w-loud); line-height: 1.2; font-variant-numeric: tabular-nums; }
+.qq__open { display: grid; gap: var(--s1); color: var(--text); }
+.qq__text { font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.35; }
+.qq__meta { font-size: var(--t-small); color: var(--muted); align-items: center; }
+.qq__time { font-size: var(--t-small); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.qq > .qq__answer, .qq > .qq__acts { grid-column: 2 / -1; }
+/* a shared answer in the list: one line, no fill; the full answer lives in the side panel (host-bespoke-4-9) */
+.qq__answer { margin-top: var(--s2); font-size: var(--t-small); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qq__answer b { color: var(--text); font-weight: var(--w-head); }
+.qstate { display: inline-flex; align-items: center; gap: var(--s2); min-height: var(--btn-sm); font-size: var(--t-small); color: var(--muted); font-weight: var(--w-body); }
+.qstate .icon { width: 16px; height: 16px; }
+.qstate--priv .icon { color: var(--st-open-mark); }
+.qstate--shared .icon, .qstate--kept .icon { color: var(--st-in-mark); }
+/* three fixed slots (answer 120, Keep 96, Dismiss), 32 tall, then the overflow with Delete (host-use-5-8). Round 7
+   (R6-13): the full set shows on the selected row; other rows show their state mark (Kept, Shared, Private) in the first
+   slot and reveal the actions on hover and focus, with no change in height (host-bespoke-6-10, host-use-6-8) */
+.qq__acts { position: relative; display: flex; align-items: center; gap: var(--s1); padding-top: var(--s2); margin-inline-start: calc(-1 * var(--s3)); }
+.qq__mark { display: flex; align-items: center; gap: var(--s4); padding-inline-start: var(--s3); }
+.qq:not(.is-selected) .qq__acts > :not(.qq__mark) { display: none; }
+.qq:not(.is-selected):is(:hover, :focus-within) .qq__acts > :not(.qq__mark):not(.qa__menu) { display: inline-flex; }
+.qq:not(.is-selected):is(:hover, :focus-within) .qq__mark { display: none; }
+.qq.is-selected .qq__mark { display: none; }
+.qa__act { color: var(--text); }
+.qa__act .icon { width: 16px; height: 16px; }
+.qa__slot--ans { min-width: 120px; justify-content: flex-start; }
+.qa__slot--keep { min-width: 96px; justify-content: flex-start; }
+.qa__done { display: inline-flex; align-items: center; gap: var(--s2); min-height: var(--btn-sm); padding: 0 var(--s3);
+  font-size: var(--t-small); font-weight: var(--w-head); color: var(--text); }
+.qa__done .icon { width: 16px; height: 16px; color: var(--st-in-mark); }
+.qa__more-btn { margin-inline-start: auto; color: var(--text); }
+.qa__more-btn .icon { width: 20px; height: 20px; }
+/* kit_request: a row overflow menu (.menu): overlay rung, --shadow-2, --r-md, one item per action */
+.qa__menu { position: absolute; right: 0; top: calc(100% + var(--s1)); z-index: 5; min-width: 180px; padding: var(--s1);
+  background: var(--overlay); border-radius: var(--r-md); box-shadow: var(--hl), var(--shadow-2); }
+.qa__menu-i { all: unset; box-sizing: border-box; display: flex; align-items: center; width: 100%; min-height: 40px; padding: 0 var(--s3);
+  border-radius: var(--r-sm); font-size: var(--t-body); font-weight: var(--w-head); color: var(--error); cursor: pointer; }
+.qa__menu-i:hover { background: var(--bar); }
+.qa__more { min-height: var(--row-h); font-size: var(--t-small); }
+/* Shared with students: flat on the page, question 500 over the answer 400, ruled between */
+.shared .ruled__row { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s1); padding: var(--s3) 0; align-items: start; }
+.shared__q { font-size: var(--t-body); font-weight: var(--w-head); line-height: 1.4; }
+.shared__a { font-size: var(--t-small); line-height: 1.5; }
+.qa-confirm .row__quote { font-size: var(--t-body); font-weight: var(--w-head); padding: var(--s3) var(--s4); background: var(--well); border-radius: var(--r-sm); }
+.qa-confirm .confirm__q { font-size: var(--t-h3); }
+
+/* ------------------------------------------------------------ points */
+.pts-list .ruled__row { min-height: 52px; font-size: var(--t-body); }
+.pts-list .ln { font-size: var(--t-body); }
+/* numeric cells and their heads end on one right edge (host-craft-4-9) */
+.pts-list .ruled__head > .end, .pts-list .ln { text-align: right; padding-inline-end: 0; justify-self: stretch; }
+/* round 6: one 88 place column, every place right-aligned on one edge, "tied" on a second small line (host-craft-5-6,
+   host-use-5-7); team name and size on one baseline */
+.pts-list { --rcols: 88px minmax(0, 1fr) 56px 96px 104px 96px; }
+.pts-list .ln--place { display: grid; justify-items: end; line-height: 1.2; }
+.pts-list .ln--tied { margin: 0; font-size: var(--t-small); }
+.pts__team { display: flex; align-items: center; gap: var(--s2); min-width: 0; line-height: 20px; }
+.pts__team > .muted { padding-top: 2px; }  /* puts the 15 size word on the 17 name's baseline */
+/* the leader first, in the count sentence's numeral role: swatch, team at --n-hero, +5 (host-visual-5-5) */
+.pts__lead { align-items: baseline; }
+.pts__sw.team__chip { align-self: center; }  /* the kit's one 16 chip (R6, host-craft-6-3) */
+.pts__credit { color: var(--text); font-weight: var(--w-loud); }
+.pts__acts { display: flex; gap: var(--s2); justify-content: end; }
+/* −1 and +1: the kit's 32 outline icon button, full radius (R6-07) */
+.pm .icon { width: 16px; height: 16px; }
+/* the empty table's one line, before the table and on the card's text edge, no inline padding (R6-12) */
+.pts__note { font-size: var(--t-body); color: var(--muted); padding-inline: 0; }
+.chg { --rcols: 32px minmax(0, 1fr) auto auto; }
+.chg .ruled__row { column-gap: var(--s3); }
+.chg__d { font-size: var(--n-sm); font-weight: var(--w-loud); }
+.chg__who { display: grid; min-width: 0; }
+.chg__why { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Undo: a 32-tall text button with the ghost hover fill (host-use-4-7) */
+.undo { min-height: 32px; color: var(--text); }
+/* End of class: both outline, one row; disabled is the kit's look (R6-07) */
+.end__acts .btn .icon { width: 18px; height: 18px; }
+
+/* ------------------------------------------------------------ 1280 x 800: one step tighter */
+@media (max-height: 820px) {
+  .host-page { gap: var(--s3); padding-bottom: var(--s4); }
+  .hcard { gap: var(--s4); padding-block: var(--s5); }
+  .host-side { padding-top: var(--s5); gap: var(--s6); }
+  .draft { gap: var(--s3); }
+  .draft .fld { gap: 0; }
+  .wrong .ruled__row { min-height: 36px; }
+  .side-sec__head .btn { margin-top: 0; }  /* wrapped under the heading: no pull-up */
+  .pts__lead .tally__lead { font-size: var(--n-lg); }
+  .pts-list .ruled__row { min-height: 48px; }
+}
+
+/* no I'm lost taps yet: the sentence fills the count row, 17 in --muted (host-use-5-3) */
+.track__none { grid-column: 2 / -1; align-self: end; font-size: var(--t-body); color: var(--muted); line-height: 24px; }
+
+/* the rule line 24 under the last bar (card gap 20 + 4), beside the answers it describes (host-use-5-2) */
+.ask__foot { margin-top: var(--s1); }

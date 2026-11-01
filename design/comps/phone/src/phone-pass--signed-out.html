@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>Your check-in pass, signed out</title>
+<!-- #/checkin/student, PH-10: signed out. The empty pass (SIGNATURE 2): the same ticket at its real size and
+     place, top-anchored 16 under the bar. Round 7 (R6-02): the QR slot keeps the live QR's size and y but is
+     --well with the three finder patterns in --line-strong, no white plate, so Continue with Google is the brightest
+     object (phone-visual-6-1, phone-craft-6-7) and the pass lands in place after sign-in. The app's
+     sentence takes the head slot (the bar already names the page) and Google's 56 button is the card's last row. No seal, no centered card, no grey bars. -->
+</head>
+<body>
+<div class="phone">
+  @@part:checkin-bar@@
+  <main class="phone__body">
+    <section class="pass" aria-labelledby="pass-h">
+      <h2 id="pass-h" class="pass__head">Sign in to get your pass.</h2>
+      @@part:ghost-qr@@
+      <hr class="perf" />
+      @@part:gsi@@
+    </section>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>Your check-in pass</title>
+<!-- #/checkin/student, PH-13: signed in, pass ready, not checked in yet. First thing: the QR.
+     The pass (SIGNATURE 2, kit .pass) is the student's ticket, top-anchored 16 under the bar: the head, the QR
+     on its white plate inside the kit .qrwell (round 6: the well is the fill step that shows the plate in light, no hairline), the perforation, then the
+     name at 20 / 500 and the code at 40 / 700 Google Sans Code, tabular, tracking .08em: the line a professor reads
+     out when the camera fails. Every line starts on the card's 32 text edge, the same edge as the QR. HideLate, then
+     the signed-in line as its own group 24 below. Variants: --new-code, --signed-out, --sign-in-failed. -->
+</head>
+<body>
+<div class="phone">
+  @@part:checkin-bar@@
+  <main class="phone__body">
+    <section class="pass" aria-labelledby="pass-h">
+      <h2 id="pass-h" class="pass__head">Show this to the professor</h2>
+      <div class="qrwell"><div class="qrcode">@@QR@@</div></div>
+      <hr class="perf" />
+      <p class="pass__name">Ivy Sample</p>
+      <p class="pass__code" aria-label="Code 482 913">482<span class="code__gap"></span>913</p>
+      <p class="pass__note">The code changes every 20 seconds. A screenshot stops working within a minute.</p>
+    </section>
+    @@part:hidelate@@
+    @@part:whoami@@
+  </main>
+</div>
+</body>
+</html>

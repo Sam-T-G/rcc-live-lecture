@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="surface" content="laptop" />
+<title>Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Google+Sans+Code:wght@400..700&display=swap" />
+<link rel="stylesheet" href="../../system/tokens.css" />
+<link rel="stylesheet" href="../../system/kit.css" />
+<link rel="stylesheet" href="staff.css" />
+<!-- #/admin, ST-30 + ST-31: an admin just added jo@example.edu and is pairing a door iPad. Round 6: People first, in a ledger section on the page plane with its count in the heading; Add someone is one row above it (email, role, Add). Pair a door iPad is the page's one raised surface (kit .focal); Door iPads and Changes are ledger sections under it, drawn the same when empty. One filled green at a time: Add is outline until its email has a value, Pair fills once both its fields do. -->
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-check" viewBox="0 0 256 256"><polyline points="40 144 96 200 224 72"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 256 256"><rect x="40" y="88" width="176" height="128" rx="8"/><path d="M88 88V56a40 40 0 0 1 80 0v32"/></symbol>
+</svg>
+<header class="bar">
+  <h1 class="sr-only">Admin</h1>
+  <div class="tabs" role="tablist" aria-label="Staff pages"><a class="tabs__tab" role="tab" href="#checkin/teacher" aria-selected="false">Attendance</a><a class="tabs__tab" role="tab" href="#checkin/quiz" aria-selected="false">Ask a question or start a vote</a><a class="tabs__tab" role="tab" href="#admin" aria-selected="true">Admin</a></div>
+  <p class="whoami">Signed in as Pat Example (pat@example.edu) <button class="btn btn--plain" type="button">Not you? Sign out</button></p>
+</header>
+<main class="page staff-main">
+  <div class="desk admin">
+    <div>
+      <section class="lsec" aria-labelledby="h-add">
+        <div class="lsec__head"><h2 class="card-title" id="h-add">Add someone</h2></div>
+        <form class="addrow" onsubmit="return false">
+          <label class="label" for="email">Email</label><label class="label" for="role">Role</label><span></span>
+          <input class="input" id="email" type="email" autocomplete="off" aria-describedby="email-hint" />
+          <span class="select-wrap"><select class="select" id="role" aria-describedby="email-hint"><option selected>Professor</option><option>Scanner</option><option>Admin</option></select></span>
+          <button class="btn btn--outline" type="submit">Add</button>
+          <p class="addrow__hint" id="email-hint">The Google account they sign in with. Professors open every professor page and pair door iPads.</p>
+          <p class="addrow__done lockup lockup--plain lockup--in" role="status"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>jo@example.edu is a professor now.</p>
+        </form>
+      </section>
+      <section class="lsec" aria-labelledby="h-people">
+        <div class="lsec__head"><h2 class="card-title" id="h-people">People<span class="headn">7</span></h2><span class="lsec__sub">3 professors, 2 scanners, 2 admins</span></div>
+        <div class="ruled people" role="table" aria-labelledby="h-people">
+          <div class="ruled__head" role="row"><span role="columnheader">Email</span><span role="columnheader">Role</span><span role="columnheader">Added by</span><span role="columnheader" class="end">Added</span><span role="columnheader"><span class="sr-only">Actions</span></span></div>
+          <div class="ruled__row is-added" role="row"><span role="cell" title="jo@example.edu"><svg class="icon reg__mark" aria-hidden="true"><use href="#i-check"/></svg>jo@example.edu</span><span role="cell"><span class="select-wrap select-wrap--well"><select class="select" aria-label="Role for jo@example.edu"><option selected>Professor</option><option>Scanner</option><option>Admin</option></select></span></span><span role="cell">pat@example.edu</span><span role="cell" class="end"><span class="people__added">Added</span>, 2:41 PM</span><span role="cell"><button class="btn btn--ghost btn--sm people__rm" type="button">Remove<span class="sr-only"> jo@example.edu</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell" title="pat@example.edu">pat@example.edu</span><span role="cell"><span class="rolefix">Admin<span class="rolefix__perm"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>Permanent</span></span></span><span role="cell" class="muted">Server settings</span><span role="cell" class="end">Sep 2, 9:00 AM</span><span role="cell"></span></div>
+          <div class="ruled__row" role="row"><span role="cell" title="mo@example.edu">mo@example.edu</span><span role="cell"><span class="select-wrap select-wrap--well"><select class="select" aria-label="Role for mo@example.edu"><option selected>Professor</option><option>Scanner</option><option>Admin</option></select></span></span><span role="cell">pat@example.edu</span><span role="cell" class="end">Oct 31, 2:41 PM</span><span role="cell"><button class="btn btn--ghost btn--sm people__rm" type="button">Remove<span class="sr-only"> mo@example.edu</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell" title="lee.sample.longname@example.edu">lee.sample.longname@example.edu</span><span role="cell"><span class="select-wrap select-wrap--well"><select class="select" aria-label="Role for lee.sample.longname@example.edu"><option selected>Professor</option><option>Scanner</option><option>Admin</option></select></span></span><span role="cell">pat@example.edu</span><span role="cell" class="end">Oct 29, 1:12 PM</span><span role="cell"><button class="btn btn--ghost btn--sm people__rm" type="button">Remove<span class="sr-only"> lee.sample.longname@example.edu</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell" title="sky@example.edu">sky@example.edu</span><span role="cell"><span class="select-wrap select-wrap--well"><select class="select" aria-label="Role for sky@example.edu"><option>Professor</option><option selected>Scanner</option><option>Admin</option></select></span></span><span role="cell">mo@example.edu</span><span role="cell" class="end">Oct 29, 1:05 PM</span><span role="cell"><button class="btn btn--ghost btn--sm people__rm" type="button">Remove<span class="sr-only"> sky@example.edu</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell" title="rio@example.edu">rio@example.edu</span><span role="cell"><span class="select-wrap select-wrap--well"><select class="select" aria-label="Role for rio@example.edu"><option>Professor</option><option selected>Scanner</option><option>Admin</option></select></span></span><span role="cell">pat@example.edu</span><span role="cell" class="end">Oct 22, 2:20 PM</span><span role="cell"><button class="btn btn--ghost btn--sm people__rm" type="button">Remove<span class="sr-only"> rio@example.edu</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell" title="val@example.edu">val@example.edu</span><span role="cell"><span class="select-wrap select-wrap--well"><select class="select" aria-label="Role for val@example.edu"><option>Professor</option><option>Scanner</option><option selected>Admin</option></select></span></span><span role="cell">pat@example.edu</span><span role="cell" class="end">Oct 15, 10:02 AM</span><span role="cell"><button class="btn btn--ghost btn--sm people__rm" type="button">Remove<span class="sr-only"> val@example.edu</span></button></span></div>
+        </div>
+        <p class="lsec__note">You can't change or remove a permanent admin here: they're set in the server settings (ADMIN_EMAILS).</p>
+      </section>
+    </div>
+    <aside>
+      <section class="focal pair" aria-labelledby="h-pair">
+        <div class="stack" style="--gap: var(--s2)">
+          <h2 class="card-title" id="h-pair">Pair a door iPad</h2>
+          <p class="small muted">Open the Kiosk page on the iPad at the door to get a 6-digit code. Each code works for 10 minutes.</p>
+        </div>
+        <form class="pair__fields" onsubmit="return false">
+          <label class="label" for="code">Code on the iPad</label><label class="label" for="name">Name</label>
+          <input class="input input--code" id="code" inputmode="numeric" autocomplete="off" value="482 913" />
+          <input class="input" id="name" value="A-210 back door" aria-describedby="name-hint" />
+          <p class="hint pair__hint" id="name-hint">Name it for where the iPad is, like <span class="nowrap">A-210 door</span>.</p>
+          <div class="pair__end"><button class="btn btn--primary" type="submit">Pair</button></div>
+        </form>
+      </section>
+      <section class="lsec" aria-labelledby="h-ipads">
+        <div class="lsec__head"><h2 class="card-title" id="h-ipads">Door iPads<span class="headn">2</span></h2></div>
+        <div class="ruled devices" role="list" aria-labelledby="h-ipads">
+          <div class="ruled__row" role="listitem"><span class="stack" style="--gap: 2px"><span class="devices__name">A-210 door</span><span class="devices__meta">Paired by pat@example.edu, Nov 5, 2:30 PM. Last scan Nov 5, 2:44 PM.</span></span><button class="btn btn--ghost btn--sm" type="button">Unpair<span class="sr-only"> A-210 door</span></button></div>
+          <div class="ruled__row" role="listitem"><span class="stack" style="--gap: 2px"><span class="devices__name">A-210 side door</span><span class="devices__meta">Paired by mo@example.edu, Oct 29, 1:00 PM. No scans yet.</span></span><button class="btn btn--ghost btn--sm" type="button">Unpair<span class="sr-only"> A-210 side door</span></button></div>
+        </div>
+      </section>
+      <section class="lsec" aria-labelledby="h-changes">
+        <div class="lsec__head"><h2 class="card-title" id="h-changes">Changes</h2><span class="lsec__sub">The last 4, newest first.</span></div>
+        <div class="ruled changes" role="list" aria-labelledby="h-changes">
+          <div class="ruled__row" role="listitem"><span>pat@example.edu added jo@example.edu as professor.</span><span>Nov 5, 2:41 PM</span></div>
+          <div class="ruled__row" role="listitem"><span>pat@example.edu paired the door iPad “A-210 door”.</span><span>Nov 5, 2:30 PM</span></div>
+          <div class="ruled__row" role="listitem"><span>mo@example.edu changed sky@example.edu from professor to scanner.</span><span>Oct 29, 1:05 PM</span></div>
+          <div class="ruled__row" role="listitem"><span>pat@example.edu removed kai@example.edu (scanner).</span><span>Oct 22, 2:18 PM</span></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</main>
+</body>
+</html>

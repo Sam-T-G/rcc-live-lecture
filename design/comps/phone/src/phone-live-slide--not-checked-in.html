@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>Live slides, not checked in</title>
+<!-- #/live, PH-25: signed in but not checked in, the most common stuck state. One sticky line under the app bar in
+     the kit warning tint with the warning glyph, the app's sentence at 15 / 500 Round 7 (R6-04): the banner is the warning only; the action bar is one 56 row, Check in the green main action between the Back and Next icons, in the thumb band. No team line and no I'm lost until check-in. The
+     leaderboard shows its top row and See all teams. -->
+</head>
+<body>
+<div class="phone">
+  <header class="bar"><h1 class="bar__title">Live slides</h1></header>
+  <div class="banner banner--warn banner--bar" role="status">
+    @@icon:warn@@<p class="banner__title">Check in to answer, ask and join a team.</p>
+  </div>
+  <main class="phone__body">
+    @@part:slide-full@@
+    @@part:teams-top@@
+    @@part:past@@
+    @@part:whoami@@
+  </main>
+  <div class="phone-actions" role="group" aria-label="Slide actions">
+    <p class="phone-actions__why" id="slide-why" hidden>You can’t go past the professor’s slide.</p>
+    <button class="btn btn--raised btn--icon" type="button" aria-label="Back">@@icon:left@@</button>
+    <a class="btn btn--primary" href="#/checkin/student">Check in</a>
+    <button class="btn btn--raised btn--icon" type="button" disabled aria-label="Next" aria-describedby="slide-why">@@icon:right@@</button>
+  </div>
+</div>
+</body>
+</html>

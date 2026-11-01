@@ -1,0 +1,272 @@
+/* =============================================================================
+   Staff area (laptop): #/checkin/teacher (Attendance), #/checkin/quiz (Live quiz), #/admin and the staff gate.
+   Round 6: one raised surface per page (the kit's .focal: the scanner, the quiz, Pair a door iPad). Everything else
+   sits straight on --page as a ledger section: title at --t-h3, a 2px --line-strong rule under the title row,
+   rows ruled at 1px --line (staff-bespoke-5-1). Rules marked KIT-REQ are minimal local stand-ins for parts the
+   kit lacks (listed in the round's kit_requests); they move into kit.css in phase 2 and get deleted here.
+   ============================================================================= */
+
+/* ------------------------------------------------------------ page shell */
+.staff-main { max-width: calc(var(--page-max) + 2 * var(--page-margin)); padding-top: var(--s8); }
+.staff-main > .desk { column-gap: var(--s12); }
+.staff-main > .desk > div, .staff-main > .desk > aside { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s10); align-content: start; min-width: 0; }
+.bar { align-items: stretch; }
+.bar > .whoami { margin-left: auto; align-self: center; }
+.bar > .tabs { margin-left: calc(-1 * var(--s4)); }   /* the first tab's words sit on the content's left edge */
+.tabs__tab { text-decoration: none; }
+
+/* KIT-REQ lsec: a ledger section on the page plane. Title row (title, its count, the action at the end), a 2px
+   --line-strong rule under it, then a ruled list whose rows start on the title's x. No card, no fill. */
+.lsec { display: grid; gap: 0; align-content: start; min-width: 0; }
+.lsec__head { display: flex; align-items: baseline; gap: var(--s3); min-height: 40px; padding-bottom: var(--s2); border-bottom: 2px solid var(--line-strong); }
+.lsec__head > :first-child { margin-right: auto; }
+.lsec__head .btn { align-self: center; }
+.lsec__sub { font-size: var(--t-small); color: var(--muted); font-weight: var(--w-body); }
+.lsec__note { font-size: var(--t-small); color: var(--muted); padding-top: var(--s3); }
+.lsec > .ruled { background: transparent; border-radius: 0; }
+/* rows start on the title's x; a filled row (new, again, removing) takes its fill 8 past the text edge each side
+   so its words stay on that x. The scroll window gets 8 of padding so those fills aren't clipped. */
+.lsec .ruled__head, .lsec .ruled__row { padding-inline: 0; }
+.lsec .ruled__row.is-new, .lsec .ruled__row.is-again, .lsec .ruled__row.is-dim, .lsec .reg__confirm, .lsec .people .is-added { margin-inline: calc(-1 * var(--s2)); padding-inline: var(--s2); }
+.lsec .ruled__head { border-bottom: 1px solid var(--line-strong); }
+.lsec .ruled__row:last-child { border-bottom: 0; }
+.lsec .ruled__row--empty { font-size: var(--t-body); color: var(--muted); }
+
+/* ------------------------------------------------------------ attendance: page head + register */
+/* the count sentence is the page head: 38 at --t-numeral 72/700 in --accent (0 too: the focal number keeps its ink,
+   staff-use-5-11), "checked in" at h3, then one sentence "4 late, class started 2:28 PM", all on one baseline with a
+   fixed 24 gap. The numeral holds 2ch of tabular figures so "checked in" never moves between 0 and 38 (staff-use-5-5). */
+.staffhead { align-items: baseline; column-gap: var(--s3); flex-wrap: nowrap; margin-bottom: var(--s6); }
+/* round 7: no reserved width on the numeral, so "checked in" always sits 12 after the last digit (staff-visual-6-4,
+   staff-craft-6-2); the rest of the sentence takes another 12 so it reads as the second clause */
+.staffhead .tally__lead { font-size: var(--t-numeral); font-variant-numeric: tabular-nums lining-nums; }
+.staffhead .tally__w { font-size: var(--t-h3); font-weight: var(--w-head); }
+.staffhead .tally__rest { font-size: var(--t-body); color: var(--muted); white-space: nowrap; margin-inline-start: var(--s3); }
+.staffhead__late { color: var(--st-open-mark); font-weight: var(--w-head); }
+.staffhead .tally__rest .staffhead__late b { color: inherit; }
+
+/* the register: a scroll window of a whole number of rows (head 36 + 9 x 44 = 432, staff-craft-5-4), its head stuck on
+   top on the page tone, and a footer under it that says the list scrolls */
+.lsec__scroll { margin-inline: calc(-1 * var(--s2)); padding-inline: var(--s2); max-height: 432px; overflow-y: auto; overscroll-behavior: contain; }
+.lsec__scroll > .reg { background: transparent; border-radius: 0; }
+.lsec__scroll .ruled__head { position: sticky; top: 0; z-index: 3; background: var(--page); }
+.lsec__scroll .ruled__row:last-child { border-bottom: 0; }
+.lsec__foot { display: flex; align-items: center; min-height: 36px; font-size: var(--t-small); color: var(--muted); border-top: 1px solid var(--line-strong); }
+/* the row a scan just touched carries the check glyph before the name, so it ties to the scan result */
+.reg__mark { width: 16px; height: 16px; stroke-width: 32; margin-inline-end: var(--s2); vertical-align: -0.15em; color: var(--st-in-mark); }
+.reg .ruled__row .end, .reg .ruled__head .end { text-align: right; }
+/* round 7: one column template for both registers (staff-craft-6-1): name, two 96 number columns, a 144 action
+   column. Remove shows on row hover or focus; the confirm replaces the row in place at 44 (staff-use-6-6). */
+.reg, .past { --rcols: minmax(0, 1fr) 96px 96px 144px; }
+.past .ruled__row > :nth-child(2), .past .ruled__head > :nth-child(2) { grid-column: 3; }
+.past .ruled__row > :nth-child(3), .past .ruled__head > :nth-child(3) { grid-column: 4; }
+.reg .ruled__row:not(.ruled__row--empty) > :last-child { display: flex; justify-content: flex-end; }
+.reg__rm { opacity: 0; transition: opacity var(--fx) var(--ease); }
+.reg .ruled__row:hover .reg__rm, .reg .ruled__row:focus-within .reg__rm { opacity: 1; }
+.reg__rm:hover, .reg__rm:focus-visible { color: var(--error); }
+@media (hover: none) { .reg__rm { opacity: 1; } }
+/* the late value: clock glyph and 500 in the late ink, in every row state (staff-use-6-10, staff-craft-6-7) */
+.ln__clock { width: 12px; height: 12px; stroke-width: 32; margin-inline-end: var(--s1); vertical-align: -0.05em; }
+/* the register head is the same drawing filled or empty: page tone, 1px --line-strong under it (staff-craft-6-8) */
+.lsec .reg { background: transparent; border-radius: 0; }
+.lsec .reg > .ruled__head { background: transparent; box-shadow: none; border-radius: 0; border-bottom: 1px solid var(--line-strong); }
+.reg .ruled__row > :first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* KIT-REQ reg__confirm: Remove turns the row itself into the question, same 44 height, so nothing under it moves
+   (staff-use-6-6): --st-stop fill, warn glyph, "Remove Jo Sample?", Cancel with a 2px ring, the only red fill. */
+.ruled__row.reg__confirm { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--s4); min-height: var(--row-h);
+  background: var(--st-stop); color: var(--on-st-stop); border-radius: var(--r-sm); border-top-color: transparent; font-weight: var(--w-head); }
+.reg__confirm + .ruled__row { border-top-color: transparent; }
+.reg__q .icon { width: 16px; height: 16px; stroke-width: 28; color: var(--st-stop-mark); margin-inline-end: var(--s2); vertical-align: -0.15em; }
+.reg__confirm .cluster { display: flex; gap: var(--s3); }
+.reg__cancel { box-shadow: inset 0 0 0 2px var(--on-st-stop); color: var(--on-st-stop); }
+/* KIT-REQ ruled__row.is-again: a scan said "already checked in", so the matching row takes a --well fill and a 2px
+   --st-wait-mark ring, the same ring as the result card, for 2 s. Late stays late (staff-visual-6-3). */
+.ruled__row.is-again { background: var(--well); color: var(--text); border-radius: var(--r-sm); border-top-color: transparent;
+  box-shadow: inset 0 0 0 2px var(--st-wait-mark); }
+.ruled__row.is-again + .ruled__row { border-top-color: transparent; }
+.ruled__row.is-again .reg__mark { color: var(--text); }
+
+/* past classes: date (with "This class" as plain muted words), count, Download CSV as a ghost */
+.past .ruled__row { font-size: var(--t-body); }
+.past .ruled__row .btn--ghost { padding-inline: var(--s2) 0; }   /* the words end on the rule's end, inside the 144 column */
+.past .note { color: var(--muted); font-size: var(--t-small); margin-inline-start: var(--s2); }
+
+/* ------------------------------------------------------------ the scanner (aside, the page's one raised surface) */
+.task { display: grid; gap: var(--s4); }
+.task__head { display: flex; align-items: center; gap: var(--s3); min-height: 32px; }
+.task__head .card-title { margin-right: auto; }
+.task .cam { aspect-ratio: 16 / 9; border-radius: var(--r-lg); }   /* laptop webcams are 16:9 */
+.task .cam .target { --k-u: .4px; height: 72%; }                    /* the kit target at desk scale: 4px corners */
+
+/* round 7: the camera window is 16:9 only while the camera runs. Idle and blocked are compact rows on the card
+   (staff-craft-6-3, staff-visual-6-9): a dimmed static target (where the pass goes), the line, the button 16 under it. */
+.task .cam--idle { aspect-ratio: auto; background: var(--well); color: var(--text); display: grid; grid-template-columns: 72px minmax(0, 1fr);
+  column-gap: var(--s5); align-items: center; padding: var(--s5); place-items: center start; }
+.cam__dim { width: 72px; height: 72px; color: var(--muted); opacity: .4; }
+.cam__dim svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.cam__dim polyline { fill: none; stroke: currentColor; stroke-width: 4px; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+.cam--idle .cam__msg, .cam--blocked .cam__msg { display: grid; gap: var(--s4); justify-items: start; text-align: start; max-width: none; padding: 0; }
+.cam--idle .cam__msg > p { font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.35; }
+/* KIT-REQ cam--blocked: the same container as a refusal, in the warn tone: fill, 1px ring, glyph + bold words
+   (staff-use-6-5). The button says it retries. */
+.task .cam--blocked { aspect-ratio: auto; display: block; place-items: normal; padding: var(--s4) var(--s5); background: var(--st-open); color: var(--on-st-open);
+  box-shadow: inset 0 0 0 1px var(--st-open-mark); }
+.cam--blocked .lockup { font-size: var(--t-h3); }
+.cam--blocked .lockup > .icon { color: var(--st-open-mark); }
+.cam--blocked .cam__sub { font-size: var(--t-small); margin-top: 2px; }
+.cam__retry { box-shadow: inset 0 0 0 2px var(--on-st-open); color: var(--on-st-open); }
+
+/* the scan result: three fixed slots in every state (word, name, meta), top-aligned at the slot's padding.
+   KIT-REQ scanres--already / --stop / --none: the kit draws only checked in. */
+.scanres { min-height: 120px; align-content: start; transition: background-color var(--fx) var(--ease), color var(--fx) var(--ease); }
+.scanres .lockup { font-size: var(--t-h2); }
+.scanres__name { font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.3; }
+.scanres__meta { font-size: var(--t-small); line-height: 1.4; }
+.scanres--already { background: var(--well); color: var(--text); box-shadow: inset 0 0 0 2px var(--st-wait-mark); }
+.scanres--already .lockup > .icon { color: var(--st-in-mark); }
+.scanres--stop { background: var(--st-stop); color: var(--on-st-stop); box-shadow: inset 0 0 0 1px var(--st-stop-mark); }
+.scanres--stop .lockup > .icon { color: var(--st-stop-mark); }
+.scanres--in .lockup > .icon { color: var(--st-in-mark); }
+/* no scan yet: one 44 row until the first scan; a real result takes its 120 (staff-craft-6-3, staff-use-6-4) */
+.scanres--none { min-height: var(--tap); align-content: center; padding-block: var(--s2); background: var(--well); color: var(--muted); box-shadow: none; }
+.scanres--none > p { font-size: var(--t-body); font-weight: var(--w-head); }
+
+/* KIT-REQ joined: a field and its action as one 44 control (the code field + Check in) */
+.joined { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.joined > .input { border-start-end-radius: 0; border-end-end-radius: 0; }
+.joined > .btn { background: var(--bar); min-height: var(--tap); border-radius: 0 var(--r-sm) var(--r-sm) 0; margin-inline-start: -1px; padding: 0 var(--s5); }
+.codeform { display: grid; gap: var(--s1); }
+
+/* class start: a ledger section under the scanner. The two fields side by side, the saved line and Save on one row */
+.start-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s3) var(--s4); align-items: end; padding-top: var(--s4); }
+.start-form__foot { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.start-form .input { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------ live quiz */
+.quiz { display: grid; gap: var(--s5); }
+.quiz .question { font-size: var(--t-h2); font-weight: var(--w-head); line-height: 1.3; }
+.quiz .hline__t { font-size: var(--t-body); }
+.quiz .tally { row-gap: var(--s2); }
+.quiz .tally__lead { font-size: var(--n-hero); }
+.quiz .hline__end { grid-row: 1; }
+.quiz .rbar__fill { background: var(--muted); }
+.quiz .is-right .rbar__fill { background: var(--accent); }   /* staff-visual-6-8: the 61% and its bar are one green */
+.quiz .is-right .letter { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.quiz .is-right .rbar__tag { color: var(--text); }
+.quiz .is-right .rbar__tag .icon { color: var(--st-in-mark); }
+.desk > aside.sticky { position: sticky; top: calc(var(--bar-h) + 56px + var(--s8)); }
+.history { --rcols: minmax(0, 1fr); }
+.history .ruled__row { padding-block: var(--s3); display: grid; gap: 2px; }
+.history .ruled__row > :first-child { font-size: var(--t-body); font-weight: var(--w-head); }
+.history .facts-list { font-size: var(--t-small); color: var(--muted); }
+
+/* the sign-in ending bar: 56 tall, one 16/500 line with the time in 700, Google's button at its end */
+.endbar { position: sticky; top: var(--bar-h); z-index: var(--z-banner); display: flex; align-items: center; gap: var(--s3);
+  min-height: 56px; padding: 0 var(--page-margin); background: var(--st-open); color: var(--on-st-open); }
+.endbar > .icon { width: 20px; height: 20px; color: var(--st-open-mark); }
+.endbar p { margin-right: auto; font-size: 1rem; font-weight: var(--w-head); }
+.endbar b { font-weight: var(--w-loud); font-variant-numeric: tabular-nums; }
+.endbar .gsi { min-height: 40px; }
+
+/* ------------------------------------------------------------ admin
+   Round 6: People first. Main: a one-row Add form, then People. Aside: Pair a door iPad, the page's one raised
+   surface, then Door iPads and Changes as ledger sections, drawn the same when empty (staff-visual-5-2).
+   One filled green at a time: Add fills only when its email has a value, Pair only when both fields do. */
+.addrow { display: grid; grid-template-columns: minmax(0, 1fr) 176px auto; column-gap: var(--s3); row-gap: var(--s1); align-items: end; padding-top: var(--s4); }
+.addrow > .label { grid-row: 1; }
+.addrow__hint { grid-column: 1 / -1; font-size: var(--t-small); color: var(--muted); }
+.addrow__done { grid-column: 1 / -1; min-height: 24px; font-size: var(--t-small); margin-top: var(--s1); }
+.addrow__done > .icon { width: 16px; height: 16px; }
+.addrow .btn { min-width: 88px; }
+
+.pair { display: grid; gap: var(--s4); align-content: start; }
+.pair__fields { display: grid; grid-template-columns: 152px minmax(0, 1fr); gap: var(--s1) var(--s4); align-items: start; }
+.pair__hint { grid-column: 1 / -1; margin-top: var(--s1); }   /* one full-width line under both fields (staff-craft-6-11) */
+.pair__end { grid-column: 1 / -1; margin-top: var(--s4); }
+.pair .input--code { font-size: var(--t-h3); letter-spacing: .08em; }
+
+/* People: Email wide enough for a long address (title + wrap fallback), Role on one line for every row so all
+   rows are 44 (staff-use-5-8) */
+.people { --rcols: minmax(240px, 1fr) 176px 140px 136px 80px; }
+.people .ruled__row { font-size: var(--t-small); min-height: var(--row-h); }
+.people .ruled__row > :first-child { font-size: var(--t-body); font-weight: var(--w-head); overflow-wrap: anywhere; line-height: 1.3; padding-block: var(--s1); }
+.people .ruled__row--empty > :first-child { font-size: var(--t-body); font-weight: var(--w-body); color: var(--muted); }
+.people .ruled__row > :nth-child(3) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.people .end { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.people .ruled__row:not(.ruled__row--empty) > :last-child { display: flex; justify-content: flex-end; }
+/* the just-added row: a 2px --accent ring, the check glyph and "Added", no fill, so Pair stays the page's one green
+   mass (staff-visual-6-6) */
+.people .is-added { border-radius: var(--r-sm); border-top-color: transparent; box-shadow: inset 0 0 0 2px var(--accent); }
+.people .is-added + .ruled__row { border-top-color: transparent; }
+.people .is-added .reg__mark { color: var(--st-in-mark); }
+.people__added { font-weight: var(--w-loud); }
+/* KIT-REQ select--well: a role select drawn as a field: sunken fill, 8 radius, 32 tall, the 16 chevron in a fixed 24
+   slot at its end, one width for every row (staff-use-6-7). The permanent role is plain text with the lock. */
+.select-wrap--well { display: inline-block; width: 136px; }
+.select-wrap--well > .select { width: 100%; min-height: 32px; height: 32px; padding: 0 28px 0 var(--s2); border-radius: 8px; background-color: var(--well);
+  border-color: transparent; box-shadow: none; font-size: var(--t-small); }
+.select-wrap--well::after { right: 4px; }
+.select-wrap--well > .select:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.rolefix { display: inline-flex; align-items: center; gap: var(--s2); white-space: nowrap; padding-inline-start: var(--s2); }
+.rolefix__perm { display: inline-flex; align-items: center; gap: var(--s1); color: var(--muted); }
+.rolefix__perm .icon { width: 14px; height: 14px; stroke-width: 28; }
+.people__rm { color: var(--muted); }
+.people__rm:hover, .people__rm:focus-visible, .devices .btn--ghost:hover, .devices .btn--ghost:focus-visible { color: var(--error); }
+
+.changes { --rcols: minmax(0, 1fr); }
+.changes .ruled__row { padding-block: var(--s2); row-gap: 2px; font-size: var(--t-small); }
+.changes .ruled__row > :last-child { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.devices { --rcols: minmax(0, 1fr) auto; }
+.devices .ruled__row { padding-block: var(--s2); }
+.devices__name { font-size: var(--t-body); font-weight: var(--w-head); }
+.devices__meta { font-size: var(--t-small); color: var(--muted); }
+.nowrap { white-space: nowrap; }
+
+/* ------------------------------------------------------------ staff gate (round 7)
+   KIT-REQ gatec: no bar while signed out. Two columns, the block centered in the window (staff-visual-6-10,
+   staff-use-6-2). The door: the horizontal light lockup at 300 wide in light, the stacked dark file at 96 tall in
+   dark (staff-visual-6-2), 16 above the independence sentence; title 40/700, the gate sentence, its action. Staff
+   pages: one sunken well (12 radius, 16 padding) holding the three pages; the current page lifts one rung. */
+.gatec { display: grid; grid-template-columns: minmax(0, 576px) minmax(0, 1fr); column-gap: var(--s16); align-items: start; align-content: center;
+  min-height: 100vh; min-height: 100dvh; max-width: calc(var(--page-max) + 2 * var(--page-margin)); margin: 0 auto; padding: var(--s12) var(--page-margin); }
+.gatec__door { display: grid; gap: var(--s5); justify-items: start; align-content: start; }
+.gatec__brand { display: grid; gap: var(--s4); justify-items: start; }
+.gatec__logo { display: flex; align-items: flex-start; }
+.gatec__logo .gate__logo-l { width: 360px; height: auto; margin-inline-start: -18px; }   /* the mark's ink on the text edge */
+.gatec__logo .gate__logo-d { width: auto; height: 144px; margin-inline-start: -13px; }   /* 96 asked; at 96 the college line drops under 8px, so 144 */
+.gatec .indep { max-width: 62ch; text-wrap: pretty; }
+@supports not (text-wrap: pretty) { .gatec .indep { max-width: 56ch; } }   /* Safari before 17.4: two lines by measure */
+.gatec__door h1 { font-size: 2.5rem; font-weight: var(--w-loud); line-height: 1.1; letter-spacing: -0.01em; margin-top: var(--s2); }
+.gatec__lede { font-size: var(--t-h3); line-height: 1.45; margin-top: calc(-1 * var(--s2)); }
+.gatec__act { min-height: 48px; display: flex; align-items: center; }
+/* Google's button at 48 with the kit's GSI colors; our box adds only height and the one lift on the page */
+.gatec__act .gsi { min-width: 280px; min-height: 48px; justify-content: center; font-size: 15px; box-shadow: var(--shadow-1); }
+/* loading: a line and a 4px sunken rule in the button's 48 slot, the button's width; static, so reduced motion needs no change (staff-use-6-1) */
+.gatec__wait { display: grid; align-content: center; gap: var(--s2); width: 280px; height: 48px; }
+.gatec__wait p { font-size: var(--t-body); font-weight: var(--w-head); color: var(--muted); }
+.gatec__rule { display: block; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--line-strong) 0 32%, var(--well) 32%); }
+/* refused: the address in 700 inside the sentence; the two actions 16 under the instruction they carry out (staff-visual-6-5) */
+.gatec__msg { display: grid; gap: var(--s2); margin-top: calc(-1 * var(--s2)); font-size: var(--t-body); }
+.gatec__msg .lockup { font-size: var(--t-h3); font-weight: var(--w-head); }
+.gatec__msg .lockup > .icon { width: 18px; height: 18px; color: var(--muted); vertical-align: -0.15em; }
+.gatec__msg .lockup b { font-weight: var(--w-loud); }
+.gatec__next { font-size: var(--t-body); color: var(--text); }
+.gatec__acts { gap: var(--s3); flex-wrap: wrap; margin-top: calc(-1 * var(--s1)); }
+.gatec__copy { min-width: 156px; }   /* holds its width when the label swaps to Copied */
+/* Staff pages: a sunken well on the page, its rows on it; the current page lifts to --raised */
+.gatec__map { padding-top: var(--s2); }
+.gatec__map .lsec__head { border-bottom: 0; padding-bottom: var(--s3); }
+.gatec__map .lsec__head .icon { width: 16px; height: 16px; stroke-width: 28; color: var(--muted); vertical-align: -0.12em; margin-inline-end: var(--s1); }
+.gatec__rows { list-style: none; margin: 0; padding: var(--s2); background: var(--well); border-radius: 12px; }
+.gatec__row { display: grid; gap: 2px; min-height: 72px; align-content: center; padding: var(--s3) var(--s4); border-top: 1px solid var(--line); }
+.gatec__row:first-child { border-top: 0; }
+.gatec__row.is-here { background: var(--lift); border-radius: var(--r-sm); box-shadow: var(--hl); border-top-color: transparent; }
+.gatec__row.is-here + .gatec__row { border-top-color: transparent; }
+.gatec__name { display: block; font-size: var(--t-body); font-weight: var(--w-head); }
+.gatec__what { display: block; font-size: var(--t-small); color: var(--muted); }
+@media (max-width: 1100px) { .gatec { grid-template-columns: minmax(0, 1fr); row-gap: var(--s10); } }
+
+@media (prefers-contrast: more) {
+  .cam--idle, .scanres--none { box-shadow: inset 0 0 0 2px var(--line-strong); }
+  .select-wrap--well > .select { box-shadow: inset 0 0 0 1px var(--line-strong); }
+}

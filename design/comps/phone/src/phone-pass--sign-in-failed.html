@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>Your check-in pass, sign-in refused</title>
+<!-- #/checkin/student, PH-10 with SH-06: the server refused the sign-in. The empty pass as signed out. Round 7 (R6-02,
+     phone-bespoke-6-3): no alert box. The warning glyph (20, --st-stop-mark) and the app's sentence take the head
+     line's slot in --text, so the pass, the slot and Google's button keep the y they have when signed out. The slot is
+     the real QR's square in --well with the three finder patterns in --line-strong: no white plate without a code. -->
+</head>
+<body>
+<div class="phone">
+  @@part:checkin-bar@@
+  <main class="phone__body">
+    <section class="pass" aria-labelledby="pass-h">
+      <h2 id="pass-h" class="pass__head lockup lockup--stop lockup--plain" role="alert">@@icon:warn@@The server didn’t accept that sign-in.</h2>
+      @@part:ghost-qr@@
+      <hr class="perf" />
+      @@part:gsi@@
+    </section>
+  </main>
+</div>
+</body>
+</html>

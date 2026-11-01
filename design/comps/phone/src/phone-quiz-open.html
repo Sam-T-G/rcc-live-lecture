@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>Live slides, question open</title>
+<!-- #/live, PH-43: a quiz is open, this student is checked in and hasn't answered. First thing: the question.
+     The slide card folds to one 48 row ("Slide 4", the title on one line with an ellipsis at 18 so the question stays the
+     largest line, Show slide at the end). The green field (kit .qfield) starts with the question at 28 / 700, no
+     label above it, then four 72 tiles 8 apart. Open tiles are live: --field-tile with --hl and full-strength words,
+     no ring. No lock line until a choice is sent. Motion: field-fill 220ms when the poll opens;
+     choice-press .98 on tap (zero under reduced motion).
+     Round 7 (R6-14): the slide row (one line, Show slide on the title's baseline) and the leaderboard fold sit under
+     the bar and the field ends 16 above the screen's bottom, so the tiles sit in the thumb band (y about 400 to 790);
+     Questions and the signed-in row follow below the first screen. Open tiles carry no ring in either theme (R6-09). -->
+</head>
+<body>
+<div class="phone">
+  @@part:live-bar@@
+  <main class="phone__body">
+    <div class="q-first">
+    @@part:slide-row@@
+    @@part:teams-fold@@
+    <section class="qfield quiz" aria-labelledby="q">
+      <h2 id="q" class="qfield__q">What does a capacitor store?</h2>
+      <ul class="choices">
+        <li><button class="choice" type="button" aria-pressed="false"><span class="letter">A</span><span>Charge</span></button></li>
+        <li><button class="choice" type="button" aria-pressed="false"><span class="letter">B</span><span>Current</span></button></li>
+        <li><button class="choice" type="button" aria-pressed="false"><span class="letter">C</span><span>Resistance</span></button></li>
+        <li><button class="choice" type="button" aria-pressed="false"><span class="letter">D</span><span>Voltage</span></button></li>
+      </ul>
+    </section>
+    </div>
+    @@part:questions@@
+    @@part:whoami@@
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>You're checked in</title>
+<!-- #/checkin/student, PH-16: checked in, not late, no question open (PH-40). First thing: "You’re checked in."
+     The pass turns into its stub (SIGNATURE 2, kit .stub) in the same place, 16 under the bar: the lockup (32-stroke
+     check inline, the only display-size line), the name, the perforation at the pass's y, then the times as the kit's
+     paired grid: "Checked in at" and "Late after" labels on one row, 2:31 and 2:35 at one size on one baseline
+     (R6-06), then the team line. Round 7 (R6-05): no action bar. Follow the slides follows the stub, 56, full width,
+     raised with the green arrow (the stub stays the one green mass), then HideLate and the signed-in row; the page
+     ends at its content. Motion: field-fill 220ms when the pass becomes the stub. -->
+</head>
+<body>
+<div class="phone">
+  @@part:checkin-bar@@
+  <main class="phone__body phone__body--stub">
+    <section class="stub" aria-labelledby="done-h">
+      <h2 id="done-h" class="lockup">@@icond:check@@You’re checked in.</h2>
+      <p class="stub__name">Ivy Sample</p>
+      <hr class="perf" />
+      <div class="stub__times">
+        <p><span class="stub__l">Checked in at</span><span class="stub__v">2:31<span class="stub__u">PM</span></span></p>
+        <p><span class="stub__l">Late after</span><span class="stub__v">2:35<span class="stub__u">PM</span></span></p>
+      </div>
+      <p class="teamline"><span class="team__chip" style="--c:var(--team-purple)"></span>You’re on Purple</p>
+    </section>
+    <a class="btn btn--raised btn--lg btn--block ph-go" href="#/live">Follow the slides<span class="btn__go">@@icond:right@@</span></a>
+    @@part:hidelate@@
+    @@part:whoami@@
+  </main>
+</div>
+</body>
+</html>

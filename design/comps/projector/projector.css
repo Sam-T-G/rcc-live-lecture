@@ -1,0 +1,214 @@
+/* =============================================================================
+   Projector area, round 6: places the kit's signature parts on the 1920 x 1080 stage
+   (#/checkin/stage, #/live/leaderboard, the late line). Parts and their own sizes come
+   from kit.css (.stage-card, .lower3, .pnote, .ptab, .lockup, .tally, .first, .ledger,
+   .lbtitle, .lbgrid, .lbfoot). This file sets where they sit and the stage sizes the kit
+   doesn't carry yet (see kit_requests). Units: stage px via --u. No shadows: tone and
+   6 stage px rules only.
+
+   Geometry held in every state:
+   - check-in card: right 96, top 96, bottom 96 (888 tall), 600 wide, padding 32 / 44.
+     Rows: 56 top line, 16, QR 512, 48, count slot 192 (the 240 numeral at line-height .8).
+   - left column: left 96, top 96, 1080 wide (1920 - 96 - 600 - 48 - 96).
+   - bottom-left lane (bottom 96): the lower third (for the room) or a presenter note.
+   ============================================================================= */
+html, body { height: 100%; }
+body { overflow: hidden; }
+[data-surface="projector"] {
+  --u: var(--stage-u);
+  --p-gap: calc(48 * var(--u));
+  --p-left-w: calc(1920 * var(--u) - 2 * var(--p-margin) - var(--p-card) - var(--p-gap)); /* 1080 */
+  /* local until the kit has them (kit_requests): rules and letter tiles on the green field */
+  --p-field-rule: #3f9a5f;
+  --p-field-letter: #004d1e;
+  --p-ledger-rule: var(--line-strong);
+  --p-bar-fill: var(--muted); /* wrong-answer fills: 4.6:1 on the --line track light, 5.9:1 dark */
+  line-height: 1.3;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-surface="projector"] { --p-field-rule: #2c7a45; --p-field-letter: #013a16; --p-ledger-rule: var(--line); }
+}
+:root[data-theme="dark"] [data-surface="projector"] { --p-field-rule: #2c7a45; --p-field-letter: #013a16; --p-ledger-rule: var(--line); }
+
+/* ------------------------------------------------------------- the deck
+   In the app this is the professor's deck in an iframe. The comps draw a plain slide so the
+   overlays can be judged against it. */
+.p-deck { position: absolute; inset: 0; padding: var(--p-margin) 0 0 var(--p-margin);
+  width: calc(var(--p-margin) + var(--p-left-w)); display: grid; gap: calc(64 * var(--u)); align-content: start; }
+.p-deck__title { font-size: var(--p-head); font-weight: var(--w-head); line-height: 1.1; letter-spacing: -0.01em; margin-top: -0.24em; }
+.p-deck ul { list-style: disc; padding-left: 1.1em; display: grid; gap: calc(40 * var(--u)); font-size: calc(56 * var(--u)); line-height: 1.25; }
+.p-deck li::marker { color: var(--muted); }
+
+/* ------------------------------------------------------- the check-in card
+   Padding 44 on the sides so the QR is 512 and the scan line, QR and numeral share one left edge.
+   The count slot gets its own band: 48 under the QR, one 192 box in every state. */
+.stage-card { top: var(--p-margin); padding: calc(32 * var(--u)) calc(44 * var(--u)); grid-template-rows: auto auto minmax(0, 1fr); }
+.stage-card__count { align-self: end; height: calc(192 * var(--u)); margin: 0; display: flex; flex-wrap: nowrap;
+  align-items: last baseline; column-gap: calc(24 * var(--u)); }
+/* the standalone count uses proportional figures so "41" and "38" sit the same gap from "checked in";
+   the ledger and bar-row columns keep tabular figures */
+.stage-card__count .num { line-height: .8; font-variant-numeric: proportional-nums lining-nums; margin-left: -0.04em; }
+.stage-card__label { line-height: 1; }
+/* loading: the step word takes the numeral's place at the head size, left on the numeral's edge and on the
+   count's baseline; no separate label. Count failed: the last count stays in --on-field-muted with "checked in"
+   at its usual x, so the slot keeps one shape; the warning is the presenter note's job. */
+.stage-card__step { font-size: var(--p-head); font-weight: var(--w-loud); line-height: .8; letter-spacing: -0.01em; color: var(--on-field-muted); }
+.stage-card__count--stale .num, .stage-card__count--stale .stage-card__label { color: var(--on-field-muted); }
+
+/* while a question shows: the card steps down to the sunken rung and keeps its box (96 to 984, same QR), so it
+   never moves between states and ends on 984 with the question panel. The count stays a Numeral at --p-rank 160
+   (SIGNATURE 4) in ink at the slot's foot; the question's 240 still leads. */
+.stage-card--poll { background: var(--well); color: var(--text); }
+.stage-card--poll .stage-card__count .num { font-size: var(--p-rank); line-height: .8; }
+.stage-card--poll .stage-card__label { color: var(--muted); }
+.stage-card--poll .stage-card__hide { color: var(--text); box-shadow: inset 0 0 0 calc(3 * var(--u)) var(--line-strong); }
+.stage-card--poll :focus-visible { outline-color: var(--focus); }
+
+/* hidden: the check-in card folded down to its foot. The same --field green and --p-radius at the card's
+   bottom-right anchor (right 96, bottom 96), 120 tall, holding the one action. The folded card shows the state. */
+.p-show { position: absolute; right: var(--p-margin); bottom: var(--p-margin); width: auto; min-height: calc(120 * var(--u));
+  display: flex; align-items: center; padding: 0 calc(44 * var(--u)); border: 0; cursor: pointer;
+  background: var(--field); color: var(--on-field); border-radius: var(--p-radius); box-shadow: none;
+  font-family: inherit; font-size: var(--p-body); font-weight: var(--w-loud); line-height: 1; }
+.p-show:focus-visible { outline: var(--p-ring) solid var(--focus); outline-offset: calc(8 * var(--u)); }
+
+/* -------------------------------------------------------- the question panel
+   The left column, every state alike: the question on one line at 64, the count sentence (lead at
+   240) with the state word on its baseline at the right, then four ruled rows of 128+. */
+.p-poll { position: absolute; left: var(--p-margin); top: var(--p-margin); bottom: var(--p-margin); width: var(--p-left-w);
+  border-radius: var(--p-radius); padding: calc(36 * var(--u)) calc(40 * var(--u)) calc(16 * var(--u));
+  display: grid; grid-template-rows: auto auto minmax(0, 1fr); row-gap: calc(24 * var(--u)); }
+/* the question stands 56 clear of the count line so the 240 numeral never crowds it */
+.p-poll__q { margin-bottom: calc(32 * var(--u)); }
+.p-poll--open { background: var(--field); color: var(--on-field); }
+/* ended: the one raised surface on the screen (white light; the dark raised step with its top highlight) */
+.p-poll--ended { background: var(--raised); color: var(--text); box-shadow: var(--hl); }
+.p-poll__q { font-size: var(--p-q); font-weight: var(--w-loud); line-height: 1.15; text-wrap: balance; letter-spacing: -0.01em; }
+.p-poll__line { display: flex; align-items: last baseline; justify-content: space-between; column-gap: calc(40 * var(--u)); min-height: calc(160 * var(--u)); }
+.p-poll__tally { flex-wrap: nowrap; column-gap: calc(28 * var(--u)); }
+.p-poll .tally__lead { font-size: var(--p-count); line-height: .75; margin-left: -0.04em; letter-spacing: -0.03em; }
+.p-poll--ended .tally__lead { color: var(--accent); }
+.p-poll__of { font-size: var(--p-body); font-weight: var(--w-head); }
+.p-poll--ended .p-poll__of { font-size: calc(56 * var(--u)); color: var(--text); }
+/* nobody answered: the scoreboard keeps its shape, "0" at the count size in --muted with "answered" after it */
+.p-poll--ended .p-poll__tally--none .tally__lead { color: var(--muted); }
+/* the state word: 40/700 plain words, glyph inline before it */
+.p-poll__state { font-size: var(--p-small); white-space: nowrap; flex: none; }
+.p-poll--ended .p-poll__state, .p-poll--ended .p-poll__state > .icon { color: var(--muted); }
+/* results failed: the warn glyph and "Results unavailable" at 64/700 in ink take the count line from the
+   panel's left edge, "Ended" on the same baseline at the right. Try again is in the note at the panel's foot. */
+.p-poll__tally--err { align-items: last baseline; column-gap: calc(24 * var(--u)); }
+.p-poll .p-poll__tally--err .tally__lead { font-size: var(--p-q); font-weight: var(--w-loud); line-height: 1; letter-spacing: -0.01em; color: var(--text); margin: 0; }
+.p-poll__tally--err > .icon { width: calc(64 * var(--u)); height: calc(64 * var(--u)); flex: none; color: var(--st-open-mark); align-self: center; stroke-width: 28; }
+.p-poll--err { grid-template-rows: auto auto minmax(0, 1fr) auto; padding-bottom: calc(36 * var(--u)); }
+.p-poll--err .p-poll__line { min-height: calc(100 * var(--u)); }
+.p-poll.p-poll--err .barrow { min-height: calc(92 * var(--u)); }
+.stage .p-poll .p-poll__note { width: auto; }
+
+/* rows: one grid for open and ended. Letter 72 centred beside a block of label (48, count and percent on its
+   baseline) over a 32 track. Ruled tops, no fill, no radius: the stage board, never a form. */
+.p-poll .bars { font-size: var(--p-body); gap: 0; grid-auto-rows: minmax(0, 1fr); align-content: stretch; }
+.p-poll .barrow { min-height: calc(128 * var(--u)); padding: calc(14 * var(--u)) 0; border-radius: 0; background: none; box-shadow: none;
+  grid-template-columns: calc(72 * var(--u)) minmax(0, 1fr); column-gap: calc(28 * var(--u)); align-items: center;
+  border-top: var(--p-rule) solid var(--p-ledger-rule); }
+.p-poll .barrow .letter { width: calc(72 * var(--u)); height: calc(72 * var(--u)); border-radius: calc(12 * var(--u));
+  font-size: calc(56 * var(--u)); font-weight: var(--w-loud); line-height: 1; }
+.p-poll .barrow__text { display: grid; gap: calc(20 * var(--u)); padding: 0; align-content: center; }
+.p-poll .barrow__label { line-height: 1; gap: calc(24 * var(--u)); align-items: baseline; font-weight: var(--w-head); }
+/* open: rules on the green, letters on a dark green tile in white */
+.p-poll--open .barrow { border-top-color: var(--p-field-rule); color: var(--on-field); }
+.p-poll--open .barrow .letter { background: var(--p-field-letter); color: var(--on-field); }
+/* ended: letters on --bar; the track one rung down (--well) from the raised panel */
+.p-poll--ended .barrow .letter { background: var(--bar); color: var(--text); }
+/* tracks one step under the projector well (--bar on a dark panel, --line on white), wrong fills in --muted:
+   the bars carry the data, the words carry the count */
+.p-poll .barrow__track { height: calc(32 * var(--u)); border-radius: calc(6 * var(--u)); background: var(--well); }
+.p-poll--ended .barrow__track { background: var(--line); }
+.p-poll .barrow__fill { background: var(--p-bar-fill); }
+/* the right answer: the 6 stage px rule in the mark, then a square --st-in band on the same 136 to 1136 column,
+   8 clear of the rules, so rule and band read as one block. Every track stays --line. */
+.stage .p-poll .barrow.is-right { position: relative; isolation: isolate; background: none; color: var(--on-st-in); box-shadow: none;
+  border-top-color: var(--st-in-mark); }
+.stage .p-poll .barrow.is-right::before { content: ""; position: absolute; z-index: -1; inset: calc(8 * var(--u)) 0;
+  border-radius: 0; background: var(--st-in); }
+.stage .p-poll .barrow.is-right .barrow__track { background: color-mix(in srgb, var(--st-in-mark) 18%, var(--st-in)); }
+.p-poll .barrow.is-right .barrow__fill { background: var(--st-in-mark); }
+.p-poll .barrow.is-right .letter { background: var(--st-in-mark); color: var(--st-in); }
+/* "Right answer": plain words after the choice, check inline, no chip */
+.p-poll .barrow__tag { margin-left: 0; font-size: var(--p-small); font-weight: var(--w-loud); min-height: 0; padding: 0; gap: calc(10 * var(--u)); background: none; color: var(--on-st-in); }
+.p-poll .barrow__tag .icon { width: .9em; height: .9em; align-self: center; }
+/* count and percent on the label's baseline, same ink and weight as the label, two fixed right-aligned columns */
+.p-poll .barrow__n { margin-left: auto; display: grid; grid-template-columns: calc(80 * var(--u)) calc(130 * var(--u)); column-gap: calc(16 * var(--u));
+  align-items: baseline; text-align: right; font-size: var(--p-body); font-weight: var(--w-head); line-height: 1; color: inherit;
+  font-variant-numeric: tabular-nums lining-nums; }
+.p-poll .barrow__pct { grid-column: 2; font-size: var(--p-body); font-weight: var(--w-head); color: inherit; margin: 0; }
+
+/* --------------------------------------------- presenter notes (no box: a rule on top)
+   The left column's width (1080, --p-left-w). A 6 stage px rule in the warn mark in both themes, "For the
+   presenter:" with the glyph in the warn mark, then the instruction in ink at 40: the words the presenter acts on. */
+.stage .pnote { box-shadow: none; border-radius: 0; display: grid; gap: calc(8 * var(--u)); align-items: start; color: var(--text);
+  padding: calc(20 * var(--u)) 0 0; border-top: var(--p-rule) solid var(--st-open-mark); width: var(--p-left-w); max-width: none; }
+.pnote__who { display: flex; align-items: center; gap: calc(12 * var(--u)); font-weight: var(--w-head); color: var(--st-open-mark); }
+.pnote__who .icon { margin: 0; }
+.stage > .pnote { position: absolute; left: var(--p-margin); bottom: var(--p-margin); }
+.pnote code { font-family: var(--font-code); font-weight: var(--w-head); font-variant-ligatures: none; white-space: nowrap; font-size: var(--p-small); color: var(--text); }
+/* error note: the line and Try again side by side under the label */
+/* the sentence gets the button's 64 line box, both end on the note's foot, so the words share one baseline */
+.pnote--row { grid-template-columns: minmax(0, 1fr) auto; column-gap: calc(24 * var(--u)); align-items: end; }
+.pnote--row > p:not(.pnote__who) { line-height: calc(64 * var(--u)); }
+.pnote--row .pnote__who { grid-column: 1 / -1; }
+.pnote__act { min-height: calc(64 * var(--u)); padding: 0 calc(24 * var(--u)) 0 calc(20 * var(--u)); gap: calc(12 * var(--u)); background: none;
+  color: var(--text); font-size: var(--p-small); font-weight: var(--w-head); border-radius: calc(12 * var(--u));
+  box-shadow: inset 0 0 0 var(--p-ring) var(--line-strong); }
+.pnote__act .icon { width: 1em; height: 1em; }
+
+/* no deck: the slide column says so in the slide-title role; the note keeps its bottom-left lane */
+.p-nodeck { position: absolute; left: var(--p-margin); top: var(--p-margin); width: var(--p-left-w); display: grid; gap: calc(64 * var(--u)); }
+.p-nodeck__title { font-size: var(--p-head); font-weight: var(--w-head); line-height: 1.1; letter-spacing: -0.01em; margin-top: -0.24em; color: var(--muted); }
+
+/* --------------------------------------------- the lower third
+   A band in the bottom-left lane, from the 96 margin to 48 short of the card (1080), bottom on 984 with the
+   card. --p-radius like every stage surface, one solid fill step, no stripe. Light: the --warn fill. Dark: the
+   --raised step with the clock glyph in the late mark, so the band never outweighs the slide. The clock glyph
+   and the words carry "late". Name 700, everything else 500 in one ink. */
+.stage > .p-lower3 { left: var(--p-margin); bottom: var(--p-margin); width: var(--p-left-w); border-radius: var(--p-radius); min-height: calc(120 * var(--u));
+  padding: 0 calc(40 * var(--u)); font-size: var(--p-body); font-weight: var(--w-head); align-items: center; gap: calc(24 * var(--u)); }
+.p-lower3 .p-lower3__glyph { width: calc(56 * var(--u)); height: calc(56 * var(--u)); flex: none; color: var(--st-open-mark); }
+.p-lower3 .lower3__more { margin-inline-start: auto; font-weight: var(--w-head); color: inherit; white-space: nowrap; }
+.p-lower3 .num { font-variant-numeric: tabular-nums lining-nums; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .stage > .p-lower3 { background: var(--raised); color: var(--text); box-shadow: var(--hl); } }
+:root[data-theme="dark"] .stage > .p-lower3 { background: var(--raised); color: var(--text); box-shadow: var(--hl); }
+
+/* --------------------------------------------------------- leaderboard
+   Title row on the 96 frame. From 216: the 1st panel (560) beside the ledger, the panel's bottom flush with the
+   ledger's last rule, then the scoring line 48 under that rule. */
+.lbtitle h1 { font-size: var(--p-q); font-weight: var(--w-loud); line-height: 1.1; letter-spacing: -0.01em; }
+/* the body fills the frame from 216 to 984: the grid takes the height the footnote leaves, the ledger's five rows
+   share it, so the last rule and the 1st panel's foot land 48 above the footnote with no empty band */
+.lbbody { position: absolute; left: var(--p-margin); right: var(--p-margin); top: calc(216 * var(--u)); bottom: var(--p-margin);
+  display: grid; grid-template-rows: minmax(0, 1fr) auto; row-gap: calc(48 * var(--u)); }
+.lbbody > .lbgrid, .lbbody > .lbfoot { position: static; }
+.lbgrid { grid-template-columns: calc(560 * var(--u)) minmax(0, 1fr); align-items: stretch; }
+.first { grid-template-rows: auto auto auto minmax(0, 1fr); align-content: start; }
+.first__line { align-self: end; }
+.ledger { grid-template-rows: auto minmax(0, 1fr); }
+.ledger__rows { display: grid; grid-auto-rows: minmax(calc(104 * var(--u)), 1fr); }
+.ledger__row { border-top-color: var(--p-ledger-rule); }
+.ledger__rows > .ledger__row:last-child { border-bottom: var(--p-rule) solid var(--p-ledger-rule); }
+.ledger .ledger__head { padding-inline: 0; }
+/* the footnote slot: up to two 40 lines in --muted, 48 under the last rule. The scoring line first; a second
+   line names the teams past 6th or why the board is empty. */
+.lbfoot { margin: 0; display: grid; row-gap: calc(8 * var(--u)); }
+.lbfoot > p { margin: 0; text-wrap: pretty; }
+/* loading and empty: the panel stays on the page tone with the 4 stage px --line-strong ring, same box as the
+   loaded panel, so nothing empty is raised. "1st" muted, the step named at 48 in ink, centred in the room left. */
+.first--wait { background: none; color: var(--muted); box-shadow: inset 0 0 0 var(--p-ring) var(--line-strong); grid-template-rows: auto minmax(0, 1fr); }
+.first__wait { font-size: var(--p-body); font-weight: var(--w-head); color: var(--text); line-height: 1.2; align-self: center; }
+.ledger__dash { color: var(--muted); font-weight: var(--w-body); }
+
+@media (prefers-contrast: more) {
+  .p-poll--ended, .stage-card--poll { box-shadow: inset 0 0 0 var(--p-ring) var(--line-strong); }
+}
+
+/* "After 2 quizzes." in --muted before the lock glyph on the title's baseline */
+.lbtitle__after { color: var(--muted); margin-inline-end: calc(32 * var(--u)); }

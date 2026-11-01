@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="surface" content="laptop" />
+<title>Attendance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Google+Sans+Code:wght@400..700&display=swap" />
+<link rel="stylesheet" href="../../system/tokens.css" />
+<link rel="stylesheet" href="../../system/kit.css" />
+<link rel="stylesheet" href="staff.css" />
+<!-- r7-done. #/checkin/teacher, ST-06 already: a pass checked in earlier. Same three slots in the wait fill with the check glyph; Kit Example's row takes a well fill and the same 2px wait ring as the result for 2 s; its late minutes stay late. Corners stay white: no new check-in. Round 6: the scanner is the page's one raised surface (kit .focal); the register, Past classes and Class start are ledger sections on the page plane (title, 2px rule, 1px ruled rows). The register scrolls in a window of a whole number of rows with a footer that says so. -->
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-clock" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96"/><polyline points="128 72 128 128 184 128"/></symbol>
+  <symbol id="i-check" viewBox="0 0 256 256"><polyline points="40 144 96 200 224 72"/></symbol>
+  <symbol id="i-x" viewBox="0 0 256 256"><line x1="200" y1="56" x2="56" y2="200"/><line x1="200" y1="200" x2="56" y2="56"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 256 256"><path d="M128 32 240 216H16Z"/><line x1="128" y1="104" x2="128" y2="144"/><line x1="128" y1="180" x2="128" y2="182"/></symbol>
+  <symbol id="i-download" viewBox="0 0 256 256"><polyline points="80 112 128 160 176 112"/><line x1="128" y1="40" x2="128" y2="160"/><path d="M216 160v48a8 8 0 0 1-8 8H48a8 8 0 0 1-8-8v-48"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 256 256"><path d="M208 208H48a16 16 0 0 1-16-16V80a16 16 0 0 1 16-16h32l16-24h64l16 24h32a16 16 0 0 1 16 16v112a16 16 0 0 1-16 16Z"/><circle cx="128" cy="136" r="36"/></symbol>
+</svg>
+
+<header class="bar">
+  <h1 class="sr-only">Attendance</h1>
+  <div class="tabs" role="tablist" aria-label="Staff pages"><a class="tabs__tab" role="tab" href="#checkin/teacher" aria-selected="true">Attendance</a><a class="tabs__tab" role="tab" href="#checkin/quiz" aria-selected="false">Ask a question or start a vote</a><a class="tabs__tab" role="tab" href="#admin" aria-selected="false">Admin</a></div>
+  <p class="whoami">Signed in as Pat Example (pat@example.edu) <button class="btn btn--plain" type="button">Not you? Sign out</button></p>
+</header>
+
+<main class="page staff-main">
+  <div class="desk">
+    <div>
+      <section class="lsec" aria-labelledby="h-class">
+        <p class="tally tally--accent staffhead" aria-label="This class so far"><span class="tally__lead">38</span><span class="tally__w">checked in</span><span class="tally__rest"><span class="staffhead__late"><b>4</b> late</span>, class started <b>2:28</b> PM</span></p>
+        <div class="lsec__head"><h2 class="card-title" id="h-class">This class</h2><button class="btn btn--plain btn--sm" type="button"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download attendance (CSV)</button></div>
+        <div class="lsec__scroll" tabindex="0" aria-label="This class, scrolls"><div class="ruled reg" role="table" aria-labelledby="h-class">
+          <div class="ruled__head" role="row"><span role="columnheader">Name</span><span role="columnheader" class="end">Late</span><span role="columnheader" class="end">Checked in</span><span role="columnheader"><span class="sr-only">Actions</span></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Ivy Sample</span><span role="cell" class="ln ln--late end"><svg class="icon ln__clock" aria-hidden="true"><use href="#i-clock"/></svg>+13 min</span><span role="cell" class="reg__time">2:41<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Ivy Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Jo Sample</span><span role="cell" class="ln ln--late end"><svg class="icon ln__clock" aria-hidden="true"><use href="#i-clock"/></svg>+12 min</span><span role="cell" class="reg__time">2:40<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Jo Sample</span></button></span></div>
+          <div class="ruled__row is-again" role="row"><span role="cell"><svg class="icon reg__mark" aria-hidden="true"><use href="#i-check"/></svg>Kit Example</span><span role="cell" class="ln ln--late end"><svg class="icon ln__clock" aria-hidden="true"><use href="#i-clock"/></svg>+10 min</span><span role="cell" class="reg__time">2:38<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Kit Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Bo Example</span><span role="cell" class="ln ln--late end"><svg class="icon ln__clock" aria-hidden="true"><use href="#i-clock"/></svg>+8 min</span><span role="cell" class="reg__time">2:36<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Bo Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Cy Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:34<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Cy Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Dee Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:33<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Dee Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Eli Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:31<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Eli Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Fay Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:30<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Fay Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Hal Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:30<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Hal Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Ina Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:29<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Ina Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Jun Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:29<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Jun Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Kai Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:28<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Kai Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Lu Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:28<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Lu Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Max Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:28<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Max Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Nia Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:28<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Nia Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Oz Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:28<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Oz Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Pia Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:28<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Pia Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Quin Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:28<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Quin Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Rae Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:27<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Rae Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Sol Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:27<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Sol Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Tam Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:27<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Tam Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Uma Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:27<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Uma Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Vic Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:27<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Vic Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Wes Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:27<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Wes Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Xia Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:27<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Xia Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Yan Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:27<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Yan Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Zed Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:26<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Zed Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Abe Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:26<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Abe Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Bea Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:26<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Bea Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Cal Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:26<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Cal Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Dot Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:26<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Dot Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Eve Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:26<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Eve Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Gus Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:25<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Gus Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Hap Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:25<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Hap Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Iris Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:25<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Iris Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Jax Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:25<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Jax Example</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Kip Sample</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:25<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Kip Sample</span></button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Lia Example</span><span role="cell" class="end"></span><span role="cell" class="reg__time">2:25<small>PM</small></span><span role="cell" class="end"><button class="btn btn--ghost btn--sm reg__rm" type="button">Remove<span class="sr-only"> Lia Example</span></button></span></div>
+        </div></div>
+        <p class="lsec__foot">Showing 9 of 38. Scroll for the rest.</p>
+      </section>
+      <section class="lsec" aria-labelledby="h-past">
+        <div class="lsec__head"><h2 class="card-title" id="h-past">Past classes</h2></div>
+        <div class="ruled past" role="table" aria-labelledby="h-past">
+          <div class="ruled__head" role="row"><span role="columnheader">Class</span><span role="columnheader" class="end">Checked in</span><span role="columnheader"><span class="sr-only">Download</span></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Thu Nov 5<span class="note">This class</span></span><span role="cell" class="end reg__time">38</span><span role="cell" class="end"><button class="btn btn--ghost" type="button"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download CSV</button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Tue Nov 3</span><span role="cell" class="end reg__time">41</span><span role="cell" class="end"><button class="btn btn--ghost" type="button"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download CSV</button></span></div>
+          <div class="ruled__row" role="row"><span role="cell">Thu Oct 29</span><span role="cell" class="end reg__time">39</span><span role="cell" class="end"><button class="btn btn--ghost" type="button"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download CSV</button></span></div>
+        </div>
+      </section>
+    </div>
+
+    <aside>
+      <section class="focal task" aria-labelledby="h-scan">
+        <div class="task__head"><h2 class="card-title" id="h-scan">Scan passes</h2><button class="btn btn--ghost" type="button">Stop camera</button></div>
+        <div class="cam"><span class="target" aria-hidden="true"><svg viewBox="0 0 100 100"><polyline points="0 22 0 0 22 0"/><polyline points="78 0 100 0 100 22"/><polyline points="100 78 100 100 78 100"/><polyline points="22 100 0 100 0 78"/></svg></span><span class="sr-only">Camera on</span></div>
+        <div class="scanres scanres--already" role="status"><p class="lockup"><svg class="icon icon--d" aria-hidden="true"><use href="#i-check"/></svg>Already checked in</p><p class="scanres__name">Kit Example</p><p class="scanres__meta">kit@example.edu, checked in at 2:38 PM</p></div>
+        <form class="codeform" onsubmit="return false">
+          <label class="label" for="code">Code on their phone</label>
+          <div class="joined"><input class="input input--code" id="code" autocomplete="off" spellcheck="false" /><button class="btn btn--raised" type="submit">Check in</button></div>
+        </form>
+      </section>
+
+      <section class="lsec" aria-labelledby="h-start">
+        <div class="lsec__head"><h2 class="card-title" id="h-start">Class start</h2></div>
+        <form class="start-form" onsubmit="return false">
+          <div class="fld stack" style="--gap: var(--s1)"><label class="label" for="starts">Class starts</label><input class="input" id="starts" type="text" inputmode="text" autocomplete="off" value="2:28 PM" aria-describedby="starts-hint" /><span class="sr-only" id="starts-hint">Type a time like 2:28 PM.</span></div>
+          <div class="fld stack" style="--gap: var(--s1)"><label class="label" for="grace">Late after (minutes)</label><input class="input" id="grace" type="number" min="0" max="60" value="7" /></div>
+          <div class="start-form__foot"><p class="small muted">Late after <b class="nowrap" style="color: var(--text)">2:35 PM</b></p><button class="btn btn--outline" type="submit">Save</button></div>
+        </form>
+      </section>
+    </aside>
+  </div>
+</main>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>Live slides, answer sent</title>
+<!-- #/live, PH-44: the answer is sent and locked. First thing: the picked tile, ring plus check and Sent. The
+     other tiles sit on the solid out fill with full-strength words. The footer says the answer is locked and when
+     results show (lock glyph: the professor's rule stops a change). Motion: select 140ms; Sending to Sent swaps words.
+     Round 7 (R6-14): the slide row (one line, Show slide on the title's baseline) and the leaderboard fold sit under
+     the bar and the field ends 16 above the screen's bottom, so the tiles sit in the thumb band (y about 400 to 790);
+     Questions and the signed-in row follow below the first screen. Open tiles carry no ring in either theme (R6-09). -->
+</head>
+<body>
+<div class="phone">
+  @@part:live-bar@@
+  <main class="phone__body">
+    <div class="q-first">
+    @@part:slide-row@@
+    @@part:teams-fold@@
+    <section class="qfield quiz" aria-labelledby="q">
+      <h2 id="q" class="qfield__q">What does a capacitor store?</h2>
+      <ul class="choices">
+        <li><button class="choice is-out" type="button" disabled><span class="letter">A</span><span>Charge</span></button></li>
+        <li><button class="choice is-picked is-locked" type="button" aria-disabled="true" aria-pressed="true"><span class="letter">B</span><span>Current</span><span class="choice__state">@@icond:check@@Sent</span></button></li>
+        <li><button class="choice is-out" type="button" disabled><span class="letter">C</span><span>Resistance</span></button></li>
+        <li><button class="choice is-out" type="button" disabled><span class="letter">D</span><span>Voltage</span></button></li>
+      </ul>
+      <p class="qfield__foot" role="status">@@icon:lock@@<span>Answer sent. Results show when the professor ends the question.</span></p>
+    </section>
+    </div>
+    @@part:questions@@
+    @@part:whoami@@
+  </main>
+</div>
+</body>
+</html>

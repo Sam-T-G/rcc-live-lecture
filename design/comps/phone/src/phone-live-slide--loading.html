@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>Live slides, loading</title>
+<!-- #/live, PH-20 and PH-50: the slides and the scores are still loading. The real frame: "Slide – of 12", the step
+     named in the title slot at body size in --muted, then three still blocks at the bullet pitch (90 / 78 / 64%, 12
+     tall, --r-xs; dark --overlay so a block is lighter than the card), then the lost note, which is fixed copy. The
+     card sizes to its content (R6-10; phone-visual-6-7, phone-craft-6-2, phone-bespoke-6-7). The leaderboard keeps its
+     head and three numbered rows with blocks for team and credit. The action bar keeps its three slots, all in the
+     disabled look with aria-disabled. No shimmer. -->
+</head>
+<body>
+<div class="phone">
+  @@part:live-bar@@
+  <main class="phone__body">
+    <section class="livestate livestate--load" aria-busy="true" aria-labelledby="load-1">
+      <p class="livestate__where">Slide – of 12</p>
+      <h2 id="load-1" class="livestate__title">Loading the slides…</h2>
+      <ul class="load-lines" aria-hidden="true"><li><span class="skel"></span></li><li><span class="skel"></span></li><li><span class="skel"></span></li></ul>
+      @@part:lost-note@@
+    </section>
+    <section class="sect teams" aria-labelledby="teams-h" aria-busy="true">
+      <div class="sect__head"><h2 id="teams-h" class="card-title">Team leaderboard</h2><p class="sect__cap">Loading the scores…</p></div>
+      <div class="ruled board-ph" aria-hidden="true">
+        <div class="ruled__head"><span></span><span>Team</span><span class="end">Extra credit</span></div>
+        <ol class="board-ph__rows">
+          <li class="ruled__row"><span class="board-ph__rank pend">1</span><span class="skel skel--line skel--w40"></span><span class="skel skel--num"></span></li>
+          <li class="ruled__row"><span class="board-ph__rank pend">2</span><span class="skel skel--line skel--w40"></span><span class="skel skel--num"></span></li>
+          <li class="ruled__row"><span class="board-ph__rank pend">3</span><span class="skel skel--line skel--w40"></span><span class="skel skel--num"></span></li>
+        </ol>
+      </div>
+    </section>
+    @@part:whoami@@
+  </main>
+  <div class="phone-actions" role="group" aria-label="Slide actions">
+    <button class="btn btn--raised btn--icon" type="button" aria-disabled="true" aria-label="Back">@@icon:left@@</button>
+    <button class="btn btn--primary" type="button" aria-disabled="true">I’m lost</button>
+    <button class="btn btn--raised btn--icon" type="button" aria-disabled="true" aria-label="Next">@@icon:right@@</button>
+  </div>
+</div>
+</body>
+</html>

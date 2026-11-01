@@ -1,0 +1,184 @@
+/* =============================================================================
+   Kiosk area styles: #/checkin/kiosk on the door iPad, 820 x 1180 portrait.
+   The parts come from system/kit.css (.door family, .target, .camstart, .roomn, .lockup,
+   .pend, .pair family). This file holds layout and the local values the kit doesn't have
+   yet; each one is marked kit_request.
+
+   Round 7 rules for the door:
+   - One gutter, 24, on every kiosk screen: every headline, the bar, the strip label and the
+     pairing code start at x 24 (kiosk-craft-6-3).
+   - One geometry in every door state: bar 88, the panel as two rows (status band fixed at 432,
+     camera window in the rest), the strip. The window never changes box (kiosk-craft-6-1).
+   - A result floods the whole panel, so the flood frames the window; the words sit on fixed
+     rows at the band's foot, 32 above the window (kiosk-craft-6-2, kiosk-bespoke-6-1).
+   ============================================================================= */
+
+html, body { height: 100%; }
+body { overflow: hidden; }
+.door { height: 100vh; height: 100dvh; min-height: 0; position: relative; }
+
+/* ----------------------------------------------------------------- bar
+   88 tall so the count can be 64 (kiosk-use-6-6). No divider: the bar is --bar and the panel
+   under it --raised, so the fill step is the edge. kit_request: kiosk bar 88, .roomn 64 / 28. */
+.door .k-bar { box-shadow: none; gap: calc(24 * var(--k-u)); min-height: calc(88 * var(--k-u));
+  padding-top: env(safe-area-inset-top);
+  padding-left: max(var(--k-gutter), env(safe-area-inset-left)); padding-right: max(var(--k-gutter), env(safe-area-inset-right)); }
+/* Staff: the lock and the word in a 56 pill with a 2px ink ring. kit_request: .k-staffbtn as a labeled pill. */
+.door .k-staffbtn { width: auto; display: inline-flex; gap: calc(10 * var(--k-u)); padding: 0 calc(20 * var(--k-u)) 0 calc(16 * var(--k-u));
+  border: 0; background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 2px var(--text); cursor: pointer;
+  font: inherit; font-size: calc(22 * var(--k-u)); font-weight: var(--w-head); }
+.k-staffbtn .icon { stroke-width: 24; }
+.door .k-staffbtn[aria-expanded="true"] { background: var(--text); color: var(--page); }
+.k-bar__door { display: inline-flex; align-items: center; gap: var(--s2); font-size: calc(28 * var(--k-u)); color: var(--text); }
+.k-bar__door .icon { width: calc(32 * var(--k-u)); height: calc(32 * var(--k-u)); color: var(--muted); }
+.k-bar__title { display: inline-flex; align-items: center; gap: var(--s3); font-size: calc(28 * var(--k-u)); font-weight: var(--w-head); }
+.k-bar__title .icon { width: calc(32 * var(--k-u)); height: calc(32 * var(--k-u)); }
+/* the count: 64/700 in a 2ch tabular slot, start-aligned, "checked in" 28 on its baseline;
+   loading fills the slot with two en dashes so the label keeps its x */
+.door .roomn__n { color: var(--text); font-size: calc(64 * var(--k-u)); min-width: 2ch; text-align: start;
+  font-variant-numeric: tabular-nums lining-nums; letter-spacing: -0.02em; }
+.door .roomn__l { font-size: calc(28 * var(--k-u)); }
+.door .roomn__n.pend { color: var(--muted); letter-spacing: 0; font-weight: var(--w-loud); }
+
+/* ------------------------------------------------------- the panel
+   kit_request: .door__panel as a two-row grid, --k-door 400. */
+.door { --k-band: calc(432 * var(--k-u)); }
+.door__panel { display: grid; grid-template-rows: var(--k-band) minmax(0, 1fr); min-height: 0; }
+
+/* ------------------------------------------------------- status band */
+.door__status { height: auto; min-height: 0; box-sizing: border-box; row-gap: 0;
+  padding: calc(32 * var(--k-u)) max(var(--k-gutter), env(safe-area-inset-right)) calc(32 * var(--k-u)) max(var(--k-gutter), env(safe-area-inset-left)); }
+/* a prompt state: the line centered in the band */
+.door__status--prompt { align-content: center; row-gap: calc(16 * var(--k-u)); }
+.door__prompt { font-size: calc(72 * var(--k-u)); line-height: 1.08; font-weight: var(--w-head); max-width: 12em; text-wrap: balance; }
+.door__panel--wait .door__prompt { color: var(--muted); }
+.door__sub { font-size: calc(48 * var(--k-u)); line-height: 1.1; font-weight: var(--w-loud); color: var(--st-in-mark); }
+/* a result: three fixed rows at the band's foot. Word slot 200 (two lines at 96), name 100, fact 56, each bottom-set so the rows breathe.
+   A one-line word sits at the slot's foot, so the name lands on the same y in every result. */
+.door__status--result { align-content: end;
+  grid-template-rows: calc(200 * var(--k-u)) calc(100 * var(--k-u)) calc(56 * var(--k-u)); padding-bottom: calc(36 * var(--k-u)); }
+.door__status .door__word { align-self: end; font-size: var(--k-status); line-height: 1.02; letter-spacing: -0.01em;
+  white-space: normal; text-wrap: balance; max-width: 9em; }
+/* name: 80/500 under the word (kiosk-use-6-2). kit_request: --k-name 80 */
+.door__name { align-self: end; font-size: calc(80 * var(--k-u)); line-height: calc(88 * var(--k-u)); font-weight: var(--w-head); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.door__fact { align-self: end; font-size: calc(40 * var(--k-u)); line-height: calc(48 * var(--k-u)); font-weight: var(--w-head); font-variant-numeric: tabular-nums; }
+/* refusal and blocked: the app sentence at 40/48 across the name and fact rows, the band's full width */
+.door__reason { grid-row: 2 / span 2; align-self: start; margin-top: calc(16 * var(--k-u)); font-size: calc(40 * var(--k-u)); line-height: calc(48 * var(--k-u)); font-weight: var(--w-head); max-width: none; }
+/* a filled state draws the glyph in the words' ink (SIGNATURE 11) */
+.door__panel--stop .lockup > .icon { color: currentColor; }
+
+/* Refused and blocked: the full red fill, the same weight as the green Checked in fill.
+   kit_request: --st-stop-fill / --on-st-stop-fill tokens. Light #b3261e with white is 6.5:1;
+   dark #8c1d18 with white is 9.4:1. */
+.door { --k-stop-fill: #b3261e; --on-k-stop-fill: #ffffff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .door { --k-stop-fill: #8c1d18; } }
+:root[data-theme="dark"] .door { --k-stop-fill: #8c1d18; }
+.door__panel--stop { background: var(--k-stop-fill); color: var(--on-k-stop-fill); }
+
+/* Already: the pale green field and the double check carry the difference from Checked in
+   (full green, single check). kit_request: .door__panel--already on --st-in. */
+.door__panel--already { background: var(--st-in); color: var(--on-st-in); }
+.door__panel--already .lockup > .icon { color: var(--st-in-mark); width: .9em; }
+
+/* ------------------------------------------------------- camera window
+   One box in every state: row 2 of the panel, inset 24 left, right and bottom, radius 16.
+   The target is a fixed 320 square (kiosk-craft-6-1). kit_request: .target fixed size on the door. */
+.door__cam { flex: none; min-height: 0; box-sizing: border-box;
+  margin: 0 max(var(--k-gutter), env(safe-area-inset-right)) var(--k-gutter) max(var(--k-gutter), env(safe-area-inset-left)); }
+.door__cam .target { z-index: 1; height: calc(320 * var(--k-u)); width: calc(320 * var(--k-u)); }
+.door__panel .target, .door__panel--in .target { color: var(--cam-mark); }
+/* Reading: corners and a 6 ring in --cam-mark-ok, so the change reads from the side (kiosk-use-6-10) */
+.door__panel--reading .target { color: var(--cam-mark-ok); }
+.door__panel--reading .door__cam { box-shadow: inset 0 0 0 calc(6 * var(--k-u)) var(--cam-mark-ok); }
+
+/* ------------------------------------------------------- the window as a button
+   Start: the window keeps --cam, a 4 ring and the camera glyph over "Start check-in" in
+   --cam-mark-ok (9:1 on --cam). No green flood (kiosk-visual-6-3). kit_request: .camstart on --cam. */
+.camstart { width: auto; padding: 0; border: 0; font: inherit; background: var(--cam); color: var(--cam-mark-ok);
+  box-shadow: inset 0 0 0 calc(4 * var(--k-u)) var(--cam-mark-ok); display: grid; place-content: center; cursor: pointer; }
+.camstart .camstart__do { display: grid; justify-items: center; gap: calc(24 * var(--k-u)); }
+.camstart .camstart__do > .icon { width: calc(128 * var(--k-u)); height: calc(128 * var(--k-u)); stroke-width: 18; }
+.camstart .camstart__do > span { font-size: calc(64 * var(--k-u)); font-weight: var(--w-loud); line-height: 1.05; white-space: nowrap; }
+/* Blocked: the camera-off glyph in --cam-mark, the retry in --cam-mark-ok */
+.camstart--off .camstart__do > .icon { color: var(--cam-mark); }
+/* Loading: a sunken --well, the glyph in --muted, no ring, nothing to press */
+.camstart--wait { background: var(--well); color: var(--muted); box-shadow: none; cursor: default; pointer-events: none; }
+.camstart--wait .camstart__do > .icon { stroke-width: 14; }
+
+/* ---------------------------------------------------- code strip
+   The field (64, code face 32) and Check in as its own 64 button with a 2px ink ring and 700
+   words (kiosk-use-6-5). 24 under it plus the safe area. kit_request: .codein. */
+.door__strip { grid-template-columns: minmax(0, 1fr); padding-top: calc(16 * var(--k-u));
+  padding-bottom: calc(24 * var(--k-u) + env(safe-area-inset-bottom));
+  padding-left: max(var(--k-gutter), env(safe-area-inset-left)); padding-right: max(var(--k-gutter), env(safe-area-inset-right)); row-gap: calc(8 * var(--k-u)); }
+.door__strip .k-label { font-size: calc(24 * var(--k-u)); }
+.codein { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: calc(12 * var(--k-u)); }
+.codein .input { min-height: calc(64 * var(--k-u)); box-sizing: border-box; border: 2px solid var(--line-strong); border-radius: var(--r-md);
+  background: var(--raised); box-shadow: none; padding: 0 calc(20 * var(--k-u)); font-size: calc(32 * var(--k-u)); letter-spacing: .08em; }
+.codein .input::placeholder { color: var(--muted); opacity: 1; }
+.codein .input:disabled { opacity: 1; }
+.codein .input:focus { border-color: var(--accent); }
+.codein__go { min-height: calc(64 * var(--k-u)); border: 0; margin: 0; padding: 0 calc(36 * var(--k-u)); border-radius: var(--r-md);
+  background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 2px var(--text);
+  font: inherit; font-size: calc(28 * var(--k-u)); font-weight: var(--w-loud); cursor: pointer; }
+
+/* ---------------------------------------------------- staff menu
+   An overlay under the bar on --overlay with --shadow-2; a real scrim element over the panel and
+   strip, which keep their place. kit_request: .k-menu, .k-scrim on the door. */
+.k-menu { position: absolute; top: calc(96 * var(--k-u) + env(safe-area-inset-top)); left: max(var(--k-gutter), env(safe-area-inset-left)); width: calc(400 * var(--k-u)); z-index: var(--z-sheet);
+  display: grid; border-radius: var(--r-lg); overflow: hidden; background: var(--overlay); box-shadow: var(--shadow-2), var(--hl); }
+.k-scrim { position: absolute; top: calc(88 * var(--k-u) + env(safe-area-inset-top)); left: 0; right: 0; bottom: 0; z-index: var(--z-scrim);
+  background: rgb(0 0 0 / .5); }
+.k-menu__row { display: flex; align-items: center; gap: calc(16 * var(--k-u)); min-height: calc(80 * var(--k-u)); border: 0; margin: 0;
+  padding: 0 calc(24 * var(--k-u));
+  background: transparent; color: var(--text); font: inherit; font-size: calc(28 * var(--k-u)); font-weight: var(--w-head); text-align: start; cursor: pointer; }
+.k-menu__row + .k-menu__row { border-top: 1px solid var(--line); }
+.k-menu__row .icon { width: calc(32 * var(--k-u)); height: calc(32 * var(--k-u)); }
+.k-menu__row--stop { color: var(--st-stop-mark); font-weight: var(--w-loud); }
+
+/* --------------------------------------------------------- pairing
+   No card: the page is the surface on the 24 gutter. The code group (label, code, time rule and
+   line, instruction) is as wide as the code and centered in the space above the footer
+   (kiosk-visual-6-6, kiosk-craft-6-8). */
+.pairpage { height: 100vh; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--page); }
+.pairpage .k-bar { box-shadow: none; min-height: calc(88 * var(--k-u)); padding-left: max(var(--k-gutter), env(safe-area-inset-left)); padding-right: max(var(--k-gutter), env(safe-area-inset-right)); }
+.pair__body { display: grid; align-content: center; justify-content: start; gap: 0;
+  padding: calc(48 * var(--k-u)) max(var(--k-gutter), env(safe-area-inset-right)) calc(48 * var(--k-u)) max(var(--k-gutter), env(safe-area-inset-left)); }
+.pair__group { display: grid; width: max-content; max-width: 100%; }
+/* children other than the code take the code's width, never set it */
+.pair__group > :not(.pair__code) { inline-size: 0; min-inline-size: 100%; }
+.pair__head { min-height: calc(56 * var(--k-u)); margin: 0; font-size: calc(40 * var(--k-u)); line-height: calc(56 * var(--k-u)); white-space: nowrap; }
+.pair__label { color: var(--muted); font-weight: var(--w-head); }
+.pair__expired { font-weight: var(--w-loud); }
+.pair__expired > .icon { color: var(--st-stop-mark); }
+/* the code: one run, two groups .3em apart, tabular. kit_request: --k-code 184, .pair__code gap .3em */
+.pair__code { display: flex; justify-content: flex-start; gap: .3em; margin-top: calc(8 * var(--k-u)); font-size: calc(184 * var(--k-u));
+  font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+/* expired: muted, each group struck through its own glyph box with an 8 line in the stop mark
+   (kiosk-craft-6-5) */
+.pair__code--old { text-decoration: none; }
+.pair__code--old > span { position: relative; }
+.pair__code--old > span::after { content: ""; position: absolute; inset-inline: 0; top: calc(50% - 4 * var(--k-u)); height: calc(8 * var(--k-u));
+  border-radius: var(--r-full); background: var(--st-stop-mark); }
+.pair__after { display: grid; align-content: start; row-gap: calc(16 * var(--k-u)); min-height: calc(104 * var(--k-u)); margin-top: calc(24 * var(--k-u)); }
+/* the time bar: 8 tall, the code's width, --well track, green for the time left */
+.pair__rule { display: block; width: 100%; height: calc(8 * var(--k-u)); border-radius: var(--r-full); background: var(--well); }
+.pair__rule span { background: var(--accent); }
+.pair__until { display: flex; justify-content: space-between; align-items: baseline; gap: calc(16 * var(--k-u));
+  font-size: calc(28 * var(--k-u)); font-weight: var(--w-head); color: var(--text); font-variant-numeric: tabular-nums; }
+.pair__until .icon { width: .9em; height: .9em; vertical-align: -0.12em; margin-inline-end: .25em; color: var(--muted); }
+.pair__left { font-weight: var(--w-loud); color: var(--accent); white-space: nowrap; }
+.pair__after .btn--k { width: 100%; min-height: calc(104 * var(--k-u)); margin-top: 0; font-size: calc(32 * var(--k-u)); gap: var(--s3); }
+.pair__after .btn--k .icon { width: calc(36 * var(--k-u)); height: calc(36 * var(--k-u)); }
+/* the app's instruction in ink at 32, the code's width; the route in 700 (kiosk-use-6-8) */
+.pair__how { margin-top: calc(32 * var(--k-u)); font-size: calc(32 * var(--k-u)); line-height: 1.3; color: var(--text); }
+.pair__how b { font-weight: var(--w-loud); }
+/* footer: one 24 muted line beside Google's button, on the door gutter */
+.pair__or { margin: 0 max(var(--k-gutter), env(safe-area-inset-right)) max(calc(16 * var(--k-u)), env(safe-area-inset-bottom)) max(var(--k-gutter), env(safe-area-inset-left));
+  align-items: center; font-size: calc(24 * var(--k-u)); grid-template-columns: auto auto; justify-content: space-between; }
+.pair__or p { margin: 0; color: var(--muted); line-height: 1.25; white-space: nowrap; }
+.pair__or .gsi { font-size: calc(20 * var(--k-u)); padding: 0 calc(20 * var(--k-u)); gap: calc(10 * var(--k-u)); }
+.pair__or .gsi svg { width: 20px; height: 20px; }
+
+/* kit_request: .target polyline needs vector-effect: non-scaling-stroke (SIGNATURE 7: 10 device px) */
+.target polyline { vector-effect: non-scaling-stroke; }

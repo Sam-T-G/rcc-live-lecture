@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>Live slides, results, wrong answer</title>
+<!-- #/live, PH-46, answered wrong. First thing: Not this time., with an x in --muted (a wrong answer is not an app
+     failure, so never red). The professor ended the quiz. The field goes away; the result card (kit .livestate) takes the top:
+     the lockup headline (it says the poll ended, so no Ended word), the question in --muted, then the bars as a
+     ruled list (kit .rbars): letter, the words, the track with its percent at the end, one count per row at 24 / 700
+     on the label's baseline (round 7, phone-use-6-6). "Right answer" and "Your answer"
+     are words with their glyph on the label line, no chips. The slide card is its one-line row, ending whole above the
+     one-row action bar (Back and Next icons, I'm lost neutral: green belongs to the right answer). Motion: bar-fill scaleX 320ms when the poll ends; reduced motion shows the bars at their values. -->
+</head>
+<body>
+<div class="phone">
+  @@part:live-bar@@
+  <main class="phone__body">
+    <section class="livestate result result--miss" aria-labelledby="res">
+      <div class="result__band"><h2 id="res" class="lockup lockup--miss">@@icond:x@@Not this time.</h2>
+      <p class="result__q">What does a capacitor store?</p></div>
+      <ol class="ruled rbars">
+        <li class="ruled__row is-right"><span class="letter">A</span><span class="rbar__text"><span class="rbar__label">Charge<span class="rbar__tag">@@icon:check@@Right answer</span></span><span class="rbar__meter"><span class="rbar__track"><span class="rbar__fill" style="--f:0.63"></span></span><span class="rbar__pct">63%</span></span></span><span class="rbar__n">19</span></li>
+        <li class="ruled__row"><span class="letter">B</span><span class="rbar__text"><span class="rbar__label">Current<span class="rbar__tag rbar__tag--mine">@@icon:x@@Your answer</span></span><span class="rbar__meter"><span class="rbar__track"><span class="rbar__fill" style="--f:0.2"></span></span><span class="rbar__pct">20%</span></span></span><span class="rbar__n">6</span></li>
+        <li class="ruled__row"><span class="letter">C</span><span class="rbar__text"><span class="rbar__label">Resistance</span><span class="rbar__meter"><span class="rbar__track"><span class="rbar__fill" style="--f:0.1"></span></span><span class="rbar__pct">10%</span></span></span><span class="rbar__n">3</span></li>
+        <li class="ruled__row"><span class="letter">D</span><span class="rbar__text"><span class="rbar__label">Voltage</span><span class="rbar__meter"><span class="rbar__track"><span class="rbar__fill" style="--f:0.07"></span></span><span class="rbar__pct">7%</span></span></span><span class="rbar__n">2</span></li>
+      </ol>
+    </section>
+    @@part:slide-row-lost@@
+    @@part:teams@@
+    @@part:questions@@
+    @@part:whoami@@
+  </main>
+  @@part:actions-results@@
+</div>
+</body>
+</html>

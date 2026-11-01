@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>Live slides</title>
+<!-- #/live, PH-22 live slide, checked in, on a team (PH-29), I'm lost not pressed (PH-26), no poll (PH-40).
+     First thing: the slide title in the slide card (kit .livestate). No Live badge: the student is on the live
+     slide, so the card only says "Slide 4 of 12"; the live state is written out only when the student has paged back
+     (SIGNATURE 15). Back, I'm lost and Next sit in the sticky bottom bar; Next is disabled on the live slide and the
+     line above the row says why. Leaderboard as a ruled list with bare rank numerals, then questions and past
+     quizzes; the signed-in line ends the page. -->
+</head>
+<body>
+<div class="phone">
+  @@part:live-bar@@
+  <main class="phone__body">
+    @@part:slide-full-lost@@
+    @@part:teams@@
+    @@part:questions@@
+    @@part:past@@
+    @@part:whoami@@
+  </main>
+  @@part:actions-live@@
+</div>
+</body>
+</html>

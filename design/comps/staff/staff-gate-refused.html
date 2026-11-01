@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="surface" content="laptop" />
+<title>Attendance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Google+Sans+Code:wght@400..700&display=swap" />
+<link rel="stylesheet" href="../../system/tokens.css" />
+<link rel="stylesheet" href="../../system/kit.css" />
+<link rel="stylesheet" href="staff.css" />
+<!-- SH-16 signed in with Google, not on the staff list. The address in 700 inside the sentence; Copy address and Sign out sit 16 under the instruction they carry out. Staff pages stays the same list as signed out. Round 7 locked console: no bar while signed out. The two columns sit centered in the window. Logo: the horizontal light lockup at 360 wide in light, the stacked dark lockup at 144 tall in dark (bright-lines: no light file on a dark ground), 16 above the independence sentence, which breaks into two even lines. Title 40/700, then the gate sentence and its action. Staff pages is one sunken well with the three pages as rows; the current page lifts one rung. -->
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-lock" viewBox="0 0 256 256"><rect x="40" y="88" width="176" height="128" rx="8"/><path d="M88 88V56a40 40 0 0 1 80 0v32"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 256 256"><rect x="88" y="88" width="128" height="128" rx="8"/><path d="M168 88V48a8 8 0 0 0-8-8H48a8 8 0 0 0-8 8v112a8 8 0 0 0 8 8h40"/></symbol>
+</svg>
+<main class="gatec">
+  <section class="gatec__door" aria-labelledby="h-gate">
+    <div class="gatec__brand">
+      <div class="gatec__logo"><img class="gate__logo-l" src="../../system/assets/gdg-on-campus-horizontal-light.svg" alt="GDG on Campus Riverside City College" width="360" height="73" /><img class="gate__logo-d" src="../../system/assets/gdg-on-campus-stacked-dark.svg" alt="GDG on Campus Riverside City College" width="104" height="144" /></div>
+      <p class="indep">GDG on Campus Riverside City College is an independent group; our activities and the opinions expressed here should in no way be linked to Google, the corporation.</p>
+    </div>
+    <h1 id="h-gate">Attendance</h1>
+    <div class="gatec__msg" role="status">
+      <p class="lockup lockup--plain"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><b>ivy@example.edu</b> isn’t on the staff list.</p>
+      <p>Ask an admin to add you on #/admin.</p>
+      <p class="gatec__next">Send this address to an admin, then sign in again.</p>
+    </div>
+    <div class="cluster gatec__acts"><button class="btn btn--raised gatec__copy" type="button" aria-live="polite"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Copy address</button><button class="btn btn--outline" type="button">Sign out</button></div>
+  </section>
+  <section class="lsec gatec__map" aria-labelledby="h-map">
+    <div class="lsec__head"><h2 class="card-title" id="h-map">Staff pages</h2><span class="lsec__sub"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>Your account can’t open them yet.</span></div>
+    <ul class="gatec__rows">
+        <li class="gatec__row is-here" aria-current="page"><span class="gatec__name">Attendance<span class="sr-only"> (this page)</span></span><span class="gatec__what">Scan passes and see who checked in.</span></li>
+        <li class="gatec__row"><span class="gatec__name">Ask a question or start a vote</span><span class="gatec__what">Run quizzes and votes during class.</span></li>
+        <li class="gatec__row"><span class="gatec__name">Admin</span><span class="gatec__what">Add staff and pair door iPads. Admins only.</span></li>
+      </ul>
+  </section>
+</main>
+</body>
+</html>

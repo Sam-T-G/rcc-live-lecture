@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="surface" content="laptop" />
+<title>Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Google+Sans+Code:wght@400..700&display=swap" />
+<link rel="stylesheet" href="../../system/tokens.css" />
+<link rel="stylesheet" href="../../system/kit.css" />
+<link rel="stylesheet" href="staff.css" />
+<!-- #/admin, ST-32 empty: a new install. Same frame as the full page; every list keeps its head and section and shows one muted ruled row, Changes included. Round 6: People first, in a ledger section on the page plane with its count in the heading; Add someone is one row above it (email, role, Add). Pair a door iPad is the page's one raised surface (kit .focal); Door iPads and Changes are ledger sections under it, drawn the same when empty. Round 7: Pair stays the one filled green; the Code field takes focus on load; the permanent-admin note shows only when a permanent admin row does. -->
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-check" viewBox="0 0 256 256"><polyline points="40 144 96 200 224 72"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 256 256"><rect x="40" y="88" width="176" height="128" rx="8"/><path d="M88 88V56a40 40 0 0 1 80 0v32"/></symbol>
+</svg>
+<header class="bar">
+  <h1 class="sr-only">Admin</h1>
+  <div class="tabs" role="tablist" aria-label="Staff pages"><a class="tabs__tab" role="tab" href="#checkin/teacher" aria-selected="false">Attendance</a><a class="tabs__tab" role="tab" href="#checkin/quiz" aria-selected="false">Ask a question or start a vote</a><a class="tabs__tab" role="tab" href="#admin" aria-selected="true">Admin</a></div>
+  <p class="whoami">Signed in as Pat Example (pat@example.edu) <button class="btn btn--plain" type="button">Not you? Sign out</button></p>
+</header>
+<main class="page staff-main">
+  <div class="desk admin">
+    <div>
+      <section class="lsec" aria-labelledby="h-add">
+        <div class="lsec__head"><h2 class="card-title" id="h-add">Add someone</h2></div>
+        <form class="addrow" onsubmit="return false">
+          <label class="label" for="email">Email</label><label class="label" for="role">Role</label><span></span>
+          <input class="input" id="email" type="email" autocomplete="off" aria-describedby="email-hint" />
+          <span class="select-wrap"><select class="select" id="role" aria-describedby="email-hint"><option selected>Professor</option><option>Scanner</option><option>Admin</option></select></span>
+          <button class="btn btn--outline" type="submit">Add</button>
+          <p class="addrow__hint" id="email-hint">The Google account they sign in with. Professors open every professor page and pair door iPads.</p>
+          <p class="addrow__done" aria-live="polite"></p>
+        </form>
+      </section>
+      <section class="lsec" aria-labelledby="h-people">
+        <div class="lsec__head"><h2 class="card-title" id="h-people">People<span class="headn">0</span></h2></div>
+        <div class="ruled people" role="table" aria-labelledby="h-people">
+          <div class="ruled__head" role="row"><span role="columnheader">Email</span><span role="columnheader">Role</span><span role="columnheader">Added by</span><span role="columnheader" class="end">Added</span><span role="columnheader"><span class="sr-only">Actions</span></span></div>
+          <div class="ruled__row ruled__row--empty" role="row"><span role="cell" style="grid-column: 1 / -1">No one has a role yet. Add someone above.</span></div>
+        </div>
+      </section>
+    </div>
+    <aside>
+      <section class="focal pair" aria-labelledby="h-pair">
+        <div class="stack" style="--gap: var(--s2)">
+          <h2 class="card-title" id="h-pair">Pair a door iPad</h2>
+          <p class="small muted">Open the Kiosk page on the iPad at the door to get a 6-digit code. Each code works for 10 minutes.</p>
+        </div>
+        <form class="pair__fields" onsubmit="return false">
+          <label class="label" for="code">Code on the iPad</label><label class="label" for="name">Name</label>
+          <input class="input input--code" id="code" inputmode="numeric" autocomplete="off" value="" autofocus />
+          <input class="input" id="name" value="" aria-describedby="name-hint" />
+          <p class="hint pair__hint" id="name-hint">Name it for where the iPad is, like <span class="nowrap">A-210 door</span>.</p>
+          <div class="pair__end"><button class="btn btn--primary" type="submit">Pair</button></div>
+        </form>
+      </section>
+      <section class="lsec" aria-labelledby="h-ipads">
+        <div class="lsec__head"><h2 class="card-title" id="h-ipads">Door iPads<span class="headn">0</span></h2></div>
+        <div class="ruled devices" role="list" aria-labelledby="h-ipads">
+          <div class="ruled__row ruled__row--empty" role="listitem"><span style="grid-column: 1 / -1">No door iPads yet. Pair one with the code on its Kiosk page.</span></div>
+        </div>
+      </section>
+      <section class="lsec" aria-labelledby="h-changes">
+        <div class="lsec__head"><h2 class="card-title" id="h-changes">Changes</h2></div>
+        <div class="ruled changes" role="list" aria-labelledby="h-changes">
+          <div class="ruled__row ruled__row--empty" role="listitem"><span>No changes yet.</span></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</main>
+</body>
+</html>

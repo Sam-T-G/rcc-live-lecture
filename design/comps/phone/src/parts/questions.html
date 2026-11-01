@@ -1,0 +1,23 @@
+<section class="sect" aria-labelledby="ask-h">
+  <div class="sect__head"><h2 id="ask-h" class="card-title">Questions</h2></div>
+  <div class="ask">
+    <div class="seg seg--block seg--touch" role="radiogroup" aria-label="Which questions">
+      <button class="seg__item" type="button" role="radio" aria-checked="true">@@icon:check@@This slide</button>
+      <button class="seg__item" type="button" role="radio" aria-checked="false">@@icon:check@@All slides</button>
+    </div>
+    <div class="fld"><label class="sr-only" for="ask-t">Ask a question or leave a comment</label>
+      <textarea class="textarea" id="ask-t" placeholder="Ask a question or leave a comment"></textarea></div>
+    <div class="ask__checks">
+      <label class="checkrow ph-check"><input type="checkbox" checked /><span class="ph-check__box" aria-hidden="true"></span><span>Post anonymously</span></label>
+      <label class="checkrow ph-check"><input type="checkbox" /><span class="ph-check__box" aria-hidden="true"></span><span>Only the professor can see it</span></label>
+    </div>
+    <div class="ask__send"><span class="counter-hint">0/280</span><button class="btn btn--raised" type="button" disabled>Post</button></div>
+  </div>
+  <ul class="ruled qrows">
+    <li class="ruled__row"><button class="upvote" type="button" aria-pressed="true" aria-label="Upvote, 5 votes, you upvoted">@@icon:up@@<span class="num">5</span></button>
+      <span class="row__main"><span class="row__text">Why does the bulb dim when the capacitor fills up?</span><span class="row__meta">Anonymous, slide 4, 2:41 PM</span>
+        <span class="answer-block"><b>Professor’s answer:</b> Less current flows as the plates fill, so the bulb gets less.</span></span></li>
+    <li class="ruled__row"><button class="upvote" type="button" aria-pressed="false" aria-label="Upvote, 2 votes">@@icon:up@@<span class="num">2</span></button>
+      <span class="row__main"><span class="row__text">Is a bigger gap between the plates better or worse?</span><span class="row__meta">Milo, slide 4, 2:43 PM</span></span></li>
+  </ul>
+</section>

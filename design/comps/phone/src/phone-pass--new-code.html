@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>Your check-in pass, new code</title>
+<!-- #/checkin/student, PH-14: the code on screen is over 25 seconds old. The old QR stays in place at .35 with
+     nothing over it; "Getting a new code…" takes the code line at body size in --muted, the line keeps its 40 height. Nothing changes size, so the
+     new code lands in the same boxes and the perforation keeps its y. -->
+</head>
+<body>
+<div class="phone">
+  @@part:checkin-bar@@
+  <main class="phone__body">
+    <section class="pass" aria-labelledby="pass-h" aria-busy="true">
+      <h2 id="pass-h" class="pass__head">Show this to the professor</h2>
+      <div class="qrwell"><div class="qrcode is-stale">@@QR@@</div></div>
+      <hr class="perf" />
+      <p class="pass__name">Ivy Sample</p>
+      <p class="pass__code pass__code--wait" role="status">Getting a new code…</p>
+      <p class="pass__note">The code changes every 20 seconds. A screenshot stops working within a minute.</p>
+    </section>
+    @@part:hidelate@@
+    @@part:whoami@@
+  </main>
+</div>
+</body>
+</html>

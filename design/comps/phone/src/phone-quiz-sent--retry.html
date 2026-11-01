@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>Live slides, answer didn't send</title>
+<!-- #/live, PH-48: the send failed. B keeps its place with a 3px stop ring and Try again; the footer is the same
+     inline line as Sending and Sent, warning glyph and the app's sentence, so the field keeps one shape. Nothing is
+     locked yet, so every tile stays live.
+     Round 7 (R6-14): the slide row (one line, Show slide on the title's baseline) and the leaderboard fold sit under
+     the bar and the field ends 16 above the screen's bottom, so the tiles sit in the thumb band (y about 400 to 790);
+     Questions and the signed-in row follow below the first screen. Open tiles carry no ring in either theme (R6-09). -->
+</head>
+<body>
+<div class="phone">
+  @@part:live-bar@@
+  <main class="phone__body">
+    <div class="q-first">
+    @@part:slide-row@@
+    @@part:teams-fold@@
+    <section class="qfield quiz" aria-labelledby="q">
+      <h2 id="q" class="qfield__q">What does a capacitor store?</h2>
+      <ul class="choices">
+        <li><button class="choice" type="button" aria-pressed="false"><span class="letter">A</span><span>Charge</span></button></li>
+        <li><button class="choice is-error" type="button" aria-pressed="false" aria-describedby="send-err"><span class="letter">B</span><span>Current</span><span class="choice__state">@@icon:repeat@@Try again</span></button></li>
+        <li><button class="choice" type="button" aria-pressed="false"><span class="letter">C</span><span>Resistance</span></button></li>
+        <li><button class="choice" type="button" aria-pressed="false"><span class="letter">D</span><span>Voltage</span></button></li>
+      </ul>
+      <p class="qfield__foot qfield__foot--err" id="send-err" role="alert">@@icon:warn@@<span>Something went wrong. Try again.</span></p>
+    </section>
+    </div>
+    @@part:questions@@
+    @@part:whoami@@
+  </main>
+</div>
+</body>
+</html>

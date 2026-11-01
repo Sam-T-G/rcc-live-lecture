@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+@@part:head@@
+<title>Live slides, sending answer</title>
+<!-- #/live, PH-43 to PH-44: the student tapped B and the answer is on its way. B keeps the tile fill with a 3px
+     ink ring and Sending at its end (the kit send bar along its bottom edge; the clock glyph under reduced motion). The other tiles go to the out drawing (light: white, muted words) and take no
+     tap. The footer line under the tiles has one shape in Sending, Sent and Try again: glyph and words at the same x.
+     Round 7 (R6-14): the slide row (one line, Show slide on the title's baseline) and the leaderboard fold sit under
+     the bar and the field ends 16 above the screen's bottom, so the tiles sit in the thumb band (y about 400 to 790);
+     Questions and the signed-in row follow below the first screen. Open tiles carry no ring in either theme (R6-09). -->
+</head>
+<body>
+<div class="phone">
+  @@part:live-bar@@
+  <main class="phone__body">
+    <div class="q-first">
+    @@part:slide-row@@
+    @@part:teams-fold@@
+    <section class="qfield quiz" aria-labelledby="q">
+      <h2 id="q" class="qfield__q">What does a capacitor store?</h2>
+      <ul class="choices">
+        <li><button class="choice is-out" type="button" disabled><span class="letter">A</span><span>Charge</span></button></li>
+        <li><button class="choice is-picked is-locked" type="button" aria-disabled="true" aria-pressed="true" aria-busy="true"><span class="letter">B</span><span>Current</span><span class="choice__state"><svg class="icon choice__clock" viewBox="0 0 256 256" aria-hidden="true"><circle cx="128" cy="128" r="96"/><polyline points="128 72 128 128 184 128"/></svg>Sending</span></button></li>
+        <li><button class="choice is-out" type="button" disabled><span class="letter">C</span><span>Resistance</span></button></li>
+        <li><button class="choice is-out" type="button" disabled><span class="letter">D</span><span>Voltage</span></button></li>
+      </ul>
+      <p class="qfield__foot" role="status">@@icon:clock@@<span>Sending your answer.</span></p>
+    </section>
+    </div>
+    @@part:questions@@
+    @@part:whoami@@
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,289 @@
+/* =============================================================================
+   RCC Live Lecture design system: tokens (direction 1, tonal depth, with grafts).
+   Source of truth for colors, type, space, shape, motion and the per-surface
+   sizes. Base hexes are GDG v1.0 (rcc-gdg docs/04-brand/design-system/tokens.css).
+   Every ratio is in DESIGN-SYSTEM.md "Contrast". Phase 2 copies this file into
+   src/styles/tokens.css inside @layer tokens; the app's old short names are kept
+   as aliases at the bottom so existing pages keep working.
+   ============================================================================= */
+:root {
+  --font: "Google Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-code: "Google Sans Code", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --w-body: 400; --w-head: 500; --w-loud: 700;
+
+  /* space: N x 4px. Nothing off this ladder. */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px;
+  --s8: 32px; --s10: 40px; --s12: 48px; --s16: 64px; --s24: 96px;
+
+  /* shape: GDG scale. Full radius only for things you press. Inner = outer - padding. */
+  --r-xs: 4px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 24px; --r-full: 9999px;
+
+  /* lines */
+  --rule-focal: 3px;     /* retired in round 1: no focal top rule. Kept only so old comps resolve */
+  --strip: 0px;          /* retired in round 4: no edge stripes anywhere (SIGNATURE.md rules). 0 so old calc()s collapse */
+  --rule-answer: 0px;    /* retired in round 4 with the strips */
+  --ring-select: 3px;    /* ink ring on a chosen tile or selected row */
+  --focus-w: 3px; --focus-off: 2px;
+
+  /* motion: GDG two tracks. Effects never overshoot; spatial may, a little. */
+  --fx-fast: 90ms; --fx: 140ms; --fx-slow: 220ms;
+  --sp-fast: 200ms; --sp: 320ms; --sp-slow: 480ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);            /* standard */
+  --ease-sp: cubic-bezier(0.34, 1.28, 0.64, 1);  /* spatial, mild overshoot: phone answer tap and switch knob only */
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --hold-result: 3000ms;  /* kiosk result before it returns to idle (Kiosk.tsx today) */
+  --hold-new: 4000ms;     /* a row just added keeps its tint this long */
+
+  /* layers */
+  --z-bar: 10; --z-banner: 20; --z-scrim: 30; --z-sheet: 31;
+
+  /* phone and laptop type roles (rem, so Safari text size scales them) */
+  --t-display: 2rem;      /* 32: phone state headline ("You're checked in.") */
+  --t-h1: 1.75rem;        /* 28: page or slide title */
+  --t-h2: 1.5rem;         /* 24: the question */
+  --t-h3: 1.125rem;       /* 18: card title */
+  --t-choice: 1.1875rem;  /* 19: answer tile words */
+  --t-body: 1.0625rem;    /* 17 */
+  --t-small: 0.9375rem;   /* 15 */
+  --t-label: 0.9375rem;   /* 15, weight 500 */
+  --t-ledger: 0.8125rem;  /* 13: badges, table heads, readout labels on laptop */
+
+  /* numerals: one role, four sizes. tabular + lining, 700, line-height 1 */
+  --n-hero: 6rem;    /* 96: the one live number on a laptop screen ("14 of 38"); "of 38" at --t-h1 */
+  --n-lg: 3rem;      /* 48: the one lead readout when no live number is on screen */
+  --n-md: 2rem;      /* 32: room strip and summary readouts, the readouts beside a lead one */
+  --n-sm: 1.25rem;   /* 20: bar values, table numbers, upvotes */
+  --t-numeral: 4.5rem; /* 72: the one big staff number (quiz "got it right", attendance "checked in"); label at --t-h3 500 --muted (staff-craft-5-9) */
+
+  /* icons on the 24 grid: two sizes, one stroke that scales with the size (staff-craft-5-8) */
+  --icon-s: 16px; --icon-m: 20px;
+
+  /* phone */
+  --tap: 44px; --choice-h: 72px; --phone-gutter: 16px; --field-gutter: 8px;
+  /* laptop */
+  --page-margin: 48px; --page-max: 1344px; --bar-h: 56px; --row-h: 44px; --btn-sm: 32px;
+  --aside-w: 400px;  /* host and staff right column */
+
+  /* kiosk unit: 1px on the device; kit.html shrinks it to preview. Projector unit: 1 stage px at 1920 x 1080. */
+  --k-u: 1px;
+  --stage-u: min(100vw / 1920, 100vh / 1080);
+
+}
+
+/* Sizes built from a unit. Declared again on [data-surface] so a scope that changes --k-u or
+   --stage-u (a preview, a smaller window) gets sizes from its own unit. */
+:root, [data-surface] {
+  /* kiosk: iPad at about 1m. --k-u is 1px on the device; kit.html shrinks it to preview. */
+  --k-status: calc(96 * var(--k-u));  /* status word */
+  --k-name: calc(56 * var(--k-u));
+  --k-prompt: calc(48 * var(--k-u));
+  --k-code: calc(144 * var(--k-u));   /* 6-digit pairing code, 140 or more */
+  --k-num: calc(72 * var(--k-u));
+  --k-body: calc(22 * var(--k-u));
+  --k-label: calc(18 * var(--k-u));   /* the floor on the iPad is 16 */
+  --k-panel: calc(440 * var(--k-u));  /* status panel height, same in every state: the biggest surface */
+  --k-medal: calc(80 * var(--k-u));   /* retired disc; old comps draw a bare glyph this size */
+  --k-status-long: calc(72 * var(--k-u));  /* a long status word ("Camera blocked"), nowrap */
+  --k-door: calc(320 * var(--k-u));   /* door panel status zone height, same in every state */
+  --k-btn: calc(72 * var(--k-u));     /* Start check-in */
+  --k-gutter: calc(24 * var(--k-u));
+
+  /* projector: 1 stage px at 1920 x 1080. Everything scales with the window. */
+  --p-count: calc(240 * var(--stage-u));   /* the stage count: the one number */
+  --p-rank: calc(160 * var(--stage-u));    /* 1st place, read alone */
+  --p-head: calc(92 * var(--stage-u));
+  --p-q: calc(64 * var(--stage-u));       /* the stage question and the leaderboard title */
+  --p-body: calc(48 * var(--stage-u));
+  --p-small: calc(40 * var(--stage-u));    /* floor for any sentence */
+  --p-ledger: calc(32 * var(--stage-u));   /* floor for any text at all */
+  --p-margin: calc(96 * var(--stage-u));
+  --p-rule: calc(6 * var(--stage-u));
+  --p-card: calc(600 * var(--stage-u));    /* check-in card width; the QR tile fills it */
+  --p-radius: calc(24 * var(--stage-u));
+  --p-ring: calc(4 * var(--stage-u));      /* presenter note, hidden tab, held row */
+}
+
+/* ------------------------------------------------------------------ light */
+:root, [data-theme="light"] {
+  color-scheme: light;
+  /* rungs, low to high. Each neighbour step is 1.05:1 or more (measured). */
+  --well: #e4e9e5;      /* sunken: holds rows, tables, readouts. Round 4: neutral, was mint #eef6ef */
+  --page: #eef2ee;      /* the ground. Round 4: was #f7faf8, a 1.05 step under white that merged with cards (phone-visual-4-4) */
+  --raised: #ffffff;    /* content, rows inside a well */
+  --bar: #dce3dd;       /* sticky bars, skeletons, neutral badges, letter tiles. Round 4: was #e3eae3; #d9e0da (the doc's pick) put green and red bar text at 4.48, this is 4.61 */
+  --overlay: #ffffff;   /* sheets and confirms, always with --shadow-2 and a scrim */
+  --hl: 0 0 #0000;      /* dark-only 1px top highlight */
+  --scrim: rgb(16 20 18 / .48);  /* round 4: was .40, the page behind barely dimmed (host-visual-4-8) */
+
+  --text: #1e201e; --muted: #575a58;
+  --line: #ccd4cd;        /* decoration only (1.44:1). Never the only edge of anything. */
+  --line-strong: #727873; /* control edges, rings: 4.52 on raised */
+
+  --accent: #00732d; --on-accent: #ffffff;
+  --accent-soft: #cff1d3; --on-accent-soft: #003a13;
+
+  /* the color field: a live or done state, filled edge to edge */
+  --field: #00732d; --on-field: #ffffff; --on-field-muted: #cff1d3;
+  --field-tile: #ffffff; --on-field-tile: #1e201e;
+  --field-letter: #e4e9e5;  /* the letter well on a field tile: one step under the tile, every state (= --well) */
+
+  /* state triples: fill, words on it, mark (glyph disc, rule, ring: 3:1 or more on the fill) */
+  --st-in: #cff1d3;   --on-st-in: #003a13;   --st-in-mark: #00732d;   /* checked in, right, sent, paired, added */
+  --st-open: #ffe5c0; --on-st-open: #4f3400; --st-open-mark: #8a5a00; /* open now, private, needs you */
+  --st-stop: #ffeae6; --on-st-stop: #6f0604; --st-stop-mark: #c5150f; /* refused, failed */
+  --st-wait: #e3eae3; --on-st-wait: #1e201e; --st-wait-mark: #575a58; /* waiting, ended, already in, dismissed */
+
+  --error: #c5150f; --on-error: #ffffff;
+  --live: #00732d; --on-live: #ffffff;     /* the Open / Live badge fill only, with a still dot. Amber is warn only */
+  --warn: #ffe5c0; --on-warn: #4f3400;     /* late banner, sign-in ending */
+  --focus: #00732d;
+
+  /* picked tile ("yours") and the tiles left out after a pick; light keeps the soft green fill */
+  --pick: #cff1d3; --on-pick: #003a13;
+  --tile-out: #ffffff;  /* round 6 (R6-08): light out tiles stay the white tile, words --on-tile-out (--muted), letter on --bar. Was mint #d5e8da. Never opacity */
+  --out-letter: #dce3dd; --on-out-letter: #1e201e;            /* letter on a tile left out after sending: light --bar */
+  --lift: #ffffff;      /* a selected row lifted one rung (+ --shadow-1): raised in light, overlay in dark */
+  /* the one button on a green field: white tile, green words, both themes */
+  --field-btn: #ffffff; --on-field-btn: #00732d;
+  --skel: #d9e1da;      /* retired in round 4 (no grey bars); old comps only */
+  --select-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23575a58' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
+  --ink: 30 32 30;
+  --shadow-1: 0 1px 2px rgb(var(--ink) / .22), 0 2px 6px 1px rgb(var(--ink) / .10);
+  --shadow-2: 0 2px 4px rgb(var(--ink) / .24), 0 8px 20px 4px rgb(var(--ink) / .14);
+
+  /* teams: data, always chip + written name. 3:1 or more on page and well. */
+  --team-red: #c5221f; --team-yellow: #a66f00; --team-green: #188038; --team-orange: #c25400;
+  --team-purple: #8430ce; --team-pink: #c2185b; --team-teal: #0e7c8a; --team-brown: #8a5a2b;
+  --team-gray: #646b76; --team-navy: #1e3a8a; --team-lime: #4d7c0f; --team-blue: #2a5bd7;
+
+  /* camera and QR: fixed in both themes */
+  --chip-ring: inset 0 0 0 1px rgb(var(--ink) / .16);  /* team swatch edge, so a pale team color keeps an edge */
+  --card-ring: 0 0 0 1px rgb(var(--ink) / .08);       /* a non-focal raised card in light: its edge without a shadow */
+  --cam: #1e201e; --cam-mark: #ffffff; --cam-mark-ok: #96d6a0;
+  --qr-tile: #ffffff; --qr-ink: #000000;
+  --qr-ghost: #727873;  /* finder patterns on the empty pass's white plate; fixed, since the plate is white in both themes */
+
+  /* round 5 additions */
+  --focal-fill: #ffffff;   /* the one focal card. Dark steps one rung over --raised so it reads up without the shadow (host-visual-5-9) */
+  --tonal: #cff1d3; --on-tonal: #003a13;  /* .btn--tonal (I'm lost). Dark is a light green so it never reads as disabled (phone-use-5-4) */
+  --p-well: #d2d9d3;       /* projector well: 9 L* under --page, since projectors crush light neutral steps (projector-visual-5-2) */
+  /* Google's own button colors (GSI outline in light, filled_black in dark). Tokens so no rule carries raw hex (staff-craft-5-2) */
+  --gsi-bg: #ffffff; --gsi-ink: #1f1f1f; --gsi-edge: #747775;
+
+  /* round 7 (LESSONS R6-03, R6-07, R6-08, R6-10) */
+  --chrome: #ffffff;    /* sticky bars (.bar, .k-bar, .phone-actions): one rung above the page. Light --raised, dark --bar */
+  --shadow-bar: 0 1px 3px rgb(var(--ink) / .12);      /* under a top bar; light only */
+  --shadow-bar-up: 0 -1px 3px rgb(var(--ink) / .12);  /* over the phone action bar; light only */
+  --track: #e4e9e5;     /* bar chart track: light --well under a white card; dark --bar, never below the page */
+  --on-tile-out: #575a58; /* words on a tile left out after sending: light --muted on the white tile (6.98:1) */
+  --neutral-btn: #dce3dd; /* .btn--neutral fill: light --bar, dark --overlay; one rung off a --raised bar */
+  --skel-fill: #e4e9e5; /* skeleton block: light --well; dark --overlay, always lighter than its ground */
+}
+
+/* ------------------------------------------------------------------- dark */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --well: #111512; --page: #181c19; --raised: #222823; --bar: #2d332e; --overlay: #383f39;
+    --hl: inset 0 1px 0 rgb(255 255 255 / .06);
+    --card-ring: 0 0 #0000;  /* dark: the fill step and --hl carry a card edge */
+    --scrim: rgb(0 0 0 / .64);
+    --text: #e6e9e6; --muted: #b9bcba; --line: #424943; --line-strong: #919791;
+    --accent: #96d6a0; --on-accent: #003410; --accent-soft: #26402c; --on-accent-soft: #c6eccb;
+    --field: #025620; --on-field: #ffffff; --on-field-muted: #b5e8bd;
+    --field-tile: #1a6a35; --on-field-tile: #e6e9e6; --field-letter: #0e4420;
+    --st-in: #1f3d29;   --on-st-in: #c6eccb;   --st-in-mark: #96d6a0;
+    --st-open: #624000; --on-st-open: #fcdeb5; --st-open-mark: #e7ae58;
+    --st-stop: #3a1d1b; --on-st-stop: #ffdbd4; --st-stop-mark: #ffb3a8;
+    --st-wait: #383f39; --on-st-wait: #e6e9e6; --st-wait-mark: #b9bcba;
+    --error: #ffb3a8; --on-error: #660604;
+    --live: #96d6a0; --on-live: #003410; --warn: #624000; --on-warn: #fcdeb5;
+    --focus: #96d6a0;
+    --pick: #1a6a35; --on-pick: #e6e9e6; --tile-out: #0e4420;
+    --out-letter: #025620; --on-out-letter: #ffffff; --lift: #383f39;
+    --field-btn: #ffffff; --on-field-btn: #025620;
+    --skel: #383f39;
+    --select-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23b9bcba' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --ink: 0 0 0;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / .5), 0 8px 24px rgb(0 0 0 / .45);  /* parts add --hl for the top highlight */
+    --shadow-2: 0 2px 4px rgb(0 0 0 / .5), 0 8px 20px 4px rgb(0 0 0 / .32);
+    --team-red: #ff8a80; --team-yellow: #f2c14e; --team-green: #7fd492; --team-orange: #ff9a4d;
+    --team-purple: #c39bff; --team-pink: #ff8abf; --team-teal: #4cc9d8; --team-brown: #d8a673;
+    --team-gray: #aeb4be; --team-navy: #a9b8ff; --team-lime: #b5e06b; --team-blue: #6fc3ff;
+    --cam: #0b0e0c;
+    --focal-fill: #2a302c; --tonal: #81c995; --on-tonal: #0d3b1e; --p-well: #0c0f0d;
+    --gsi-bg: #131314; --gsi-ink: #e3e3e3; --gsi-edge: #8e918f;
+    --on-tile-out: #e6e9e6;
+    --chrome: #2d332e; --shadow-bar: 0 0 #0000; --shadow-bar-up: 0 0 #0000;
+    --track: #2d332e; --neutral-btn: #383f39; --skel-fill: #383f39;
+  }
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --well: #111512; --page: #181c19; --raised: #222823; --bar: #2d332e; --overlay: #383f39;
+  --hl: inset 0 1px 0 rgb(255 255 255 / .06);
+  --card-ring: 0 0 #0000;
+  --scrim: rgb(0 0 0 / .64);
+  --text: #e6e9e6; --muted: #b9bcba; --line: #424943; --line-strong: #919791;
+  --accent: #96d6a0; --on-accent: #003410; --accent-soft: #26402c; --on-accent-soft: #c6eccb;
+  --field: #025620; --on-field: #ffffff; --on-field-muted: #b5e8bd;
+  --field-tile: #1a6a35; --on-field-tile: #e6e9e6; --field-letter: #0e4420;
+  --st-in: #1f3d29;   --on-st-in: #c6eccb;   --st-in-mark: #96d6a0;
+  --st-open: #624000; --on-st-open: #fcdeb5; --st-open-mark: #e7ae58;
+  --st-stop: #3a1d1b; --on-st-stop: #ffdbd4; --st-stop-mark: #ffb3a8;
+  --st-wait: #383f39; --on-st-wait: #e6e9e6; --st-wait-mark: #b9bcba;
+  --error: #ffb3a8; --on-error: #660604;
+  --live: #96d6a0; --on-live: #003410; --warn: #624000; --on-warn: #fcdeb5;
+  --focus: #96d6a0;
+  --pick: #1a6a35; --on-pick: #e6e9e6; --tile-out: #0e4420;
+  --out-letter: #025620; --on-out-letter: #ffffff; --lift: #383f39;
+  --field-btn: #ffffff; --on-field-btn: #025620;
+  --skel: #383f39;
+  --select-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23b9bcba' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --ink: 0 0 0;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / .5), 0 8px 24px rgb(0 0 0 / .45);  /* parts add --hl for the top highlight */
+  --shadow-2: 0 2px 4px rgb(0 0 0 / .5), 0 8px 20px 4px rgb(0 0 0 / .32);
+  --team-red: #ff8a80; --team-yellow: #f2c14e; --team-green: #7fd492; --team-orange: #ff9a4d;
+  --team-purple: #c39bff; --team-pink: #ff8abf; --team-teal: #4cc9d8; --team-brown: #d8a673;
+  --team-gray: #aeb4be; --team-navy: #a9b8ff; --team-lime: #b5e06b; --team-blue: #6fc3ff;
+  --cam: #0b0e0c;
+  --focal-fill: #2a302c; --tonal: #81c995; --on-tonal: #0d3b1e; --p-well: #0c0f0d;
+  --gsi-bg: #131314; --gsi-ink: #e3e3e3; --gsi-edge: #8e918f;
+  --on-tile-out: #e6e9e6;
+  --chrome: #2d332e; --shadow-bar: 0 0 #0000; --shadow-bar-up: 0 0 #0000;
+  --track: #2d332e; --neutral-btn: #383f39; --skel-fill: #383f39;
+}
+
+/* --------------------------------------------- the app's old short names
+   Declared on every theme scope so they resolve inside a data-theme island. */
+:root, [data-theme] {
+  --bg: var(--page);
+  --surface: var(--raised);
+  --fill: var(--bar);
+  --accent-text: var(--on-accent);
+  --accent-soft-text: var(--on-accent-soft);
+  --error-text: var(--on-error);
+  --error-soft: var(--st-stop);
+  --error-soft-text: var(--on-st-stop);
+  --live-text: var(--on-live);
+  --warn-text: var(--on-warn);
+}
+
+/* ----------------------------------------------------- per surface */
+[data-surface="kiosk"], [data-surface="projector"] { --focus-off: 3px; }
+/* the stage has no shadows, so its well is a deeper tone step (projector-visual-5-2) */
+[data-surface="projector"] { --well: var(--p-well); }
+@media (min-width: 1024px) and (max-width: 1365px) { :root { --page-margin: 32px; --aside-w: 360px; } }
+
+/* GDG's sampled springs, where the browser has linear() (Safari 17.2+). iPadOS 16 keeps the cubic-bezier. */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --ease-sp: linear(0, 0.0714 5%, 0.2269 10%, 0.405 15%, 0.5719 20%, 0.7116 25%, 0.8195 30%, 0.8975 35%, 0.9503 40%, 0.9834 45%, 1.0024 50%, 1.0117 55%, 1.015 60%, 1.0147 65%, 1.0127 70%, 1.01 75%, 1.0074 80%, 1.0051 85%, 1.0033 90%, 1.0019 95%, 1);
+  }
+}
+
+/* Reduced motion: spatial moves go to 0, effects stay, so every change still shows as color or opacity. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --sp-fast: 0ms; --sp: 0ms; --sp-slow: 0ms; }
+}
