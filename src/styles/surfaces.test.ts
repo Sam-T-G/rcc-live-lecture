@@ -105,4 +105,11 @@ describe("design fixes that only a stylesheet shows (DESIGN-fixcheck-3)", () => 
     expect(pad).toBeTruthy();
     expect(value(index, ".btn--quiet.btn--flush", "margin-inline-start")).toBe(`calc(-1 * ${pad})`);
   });
+
+  it("the slide track's lane keeps 28px a slide, so the lost counts never overlap in a narrow window (DS-KIT-design-1)", () => {
+    // The lane's columns were minmax(0, 1fr) beside a 260px place column that grew first: in a
+    // 564px #/ui column the lane got 106px and '0 2 0 3' printed as one blob.
+    expect(value(kit, ".track__lane", "min-width")).toMatch(/var\(--slides, 12\) \* \(28px/);
+    expect(value(kit, ".track", "grid-template-columns")).not.toMatch(/^minmax\(0, 260px\) minmax\(0,/);
+  });
 });

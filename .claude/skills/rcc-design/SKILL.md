@@ -31,7 +31,7 @@ Evidence tags: `L:R1-nn` to `L:R7-nn` = an entry in `design/system/LESSONS.md` (
 - A glyph before a heading hangs in a 24 column (`.hang`); wrapped lines start at the text; no `max-width` or `balance` on a sentence with room. L:R7-09.
 - Paired values are one grid (`.pairs`): labels on one row, values on the next, one type role per row, emphasis by color never size; a rank beside a two-line name sits on its first baseline; a text link beside a label-over-title block sits on the title's last baseline (`.sec-head`), icon buttons center. "Alignment and space". L:R6-06.
 - A part keeps its radius, padding and x across states (`.barrow` = `.choice` geometry; confirm rows keep the row's columns); laptop tracks `minmax(0, …)`; a scrolling list ends on a whole row or `.rows__more`. L:R2-06, L:R2-07.
-- Host: the slide track (`SlideTrack`: segments, lost taps over each at one size on one baseline, past zeros muted, the room count at the right end) sits on its own band across the top on every tab; the live action sits in the focal card's header-row slot; Offline is glyph plus word in a reserved bar slot, no chip. "Layout per area: host". L:R3-02, L:R4-06, L:R6-03, L:R6-12.
+- Host: the slide track (`SlideTrack`: segments, lost taps over each at one size on one baseline, past zeros muted, the room count at the right end; the lane keeps 28px a slide, so the title shrinks first) sits on its own band across the top on every tab; the live action sits in the focal card's header-row slot; Offline is glyph plus word in a reserved bar slot, no chip (the word "Offline" waits for the COPY pass; until then the slot shows the glyph alone). "Layout per area: host". L:R3-02, L:R4-06, L:R6-03, L:R6-12.
 - Staff: one count line in the page head comes before any table (no stat tiles); the page's task is the focal card in the aside. "Layout per area: staff". SYN-35, L:R3-02.
 - Phone: the state word or question sits above the choices; choices full width, 72 tall, 12 apart, in the thumb band; an open poll's field sits above the slide card. "Layout per area: phone". SYN-33, R:fit.
 - Projector: everything inside the 96 stage px frame; the QR keeps one size and spot in every state; the count is 240 stage px. "Layout per area: projector". SYN-36, R blocker 5.
@@ -78,7 +78,7 @@ Evidence tags: `L:R1-nn` to `L:R7-nn` = an entry in `design/system/LESSONS.md` (
 - "Yours" after results is words: "Your answer" and the team name in 700 + "(you)"; letters and ranks never invert; the right row keeps its green ring even when it's mine. L:R2-09, L:R3-08.
 - One icon construction (`Icon`: Phosphor Bold geometry, no fills) and one meaning per glyph. L:R3-12.
 - Row actions are ghost buttons (`variant="ghost"`) with no resting ring; text actions use `.link`. L:R2-08, L:R4-04.
-- The tapped thing confirms in place: the tile says Sent, a new row tints `st-in`, the door panel floods. No toasts. SYN-29.
+- The tapped thing confirms in place: the tile shows the check (its word "Sent" waits for the COPY pass), a new row tints `st-in`, the door panel floods. No toasts. SYN-29.
 - Targets: laptop 32 with 8px gaps; phone and iPad 44; door buttons 56 to 72. SYN-38, R:fit.
 - Buttons: full radius; outline 2px on phone and iPad, 1px on laptop; disabled keeps its footprint on the neutral fill with `--muted` words, never bare text. L:R6-07, L:R7-01.
 - Spacing from the 4px ladder; radii from the GDG scale, nested. SYN-9, SYN-23.

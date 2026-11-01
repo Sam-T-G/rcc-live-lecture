@@ -110,3 +110,45 @@ describe("sample copy names what people see, not a URL or the screen", () => {
     }
   });
 });
+
+// Builders copy these parts from #/ui, so each kit.html part kit.css already builds shows here.
+describe("DS-KIT-design-2 #/ui shows the checked-in stub, the heading line and the glyph set", () => {
+  const html = open("#/ui");
+  const count = (re: RegExp) => html.match(new RegExp(re, "g"))?.length ?? 0;
+
+  it("the checked-in stub with its perforation and times, in light and dark", () => {
+    expect(count(/<section class="stub"/)).toBe(2);
+    expect(count(/<hr class="perf"\/>/)).toBe(2);
+    expect(count(/class="stub__times"/)).toBe(2);
+  });
+
+  it("the heading line with its state word, Open and Ended, in light and dark", () => {
+    expect(count(/<div class="hline">/)).toBe(4);
+    expect(count(/class="stateword stateword--open"/)).toBe(2);
+    expect(count(/class="stateword stateword--ended"/)).toBe(2);
+    expect(count(/class="facts facts-list"/)).toBe(4);
+  });
+
+  it("the glyph set: every Icon name at 24 and at 64, in light and dark", () => {
+    const kit = readFileSync(new URL("../blocks/kit.tsx", import.meta.url), "utf8");
+    const names = [...kit.match(/export type IconName =([^;]+);/)![1].matchAll(/"([a-z-]+)"/g)].map((m) => m[1]);
+    expect(names.length).toBeGreaterThan(5);
+    for (const name of names) expect(count(new RegExp(`data-glyph="${name}"`)), name).toBe(2);
+  });
+});
+
+describe("DS-KIT-risk-5 #/ui adds no on-screen words the app doesn't have yet", () => {
+  it("no Sent, Sending, Offline, Show slide or See all teams on #/ui or #/ui/projector", () => {
+    for (const hash of ["#/ui", "#/ui/projector"]) {
+      const text = words(open(hash));
+      for (const w of [/\bSent\b/, /\bSending\b/, /\bOffline\b/, /Show slide/, /See all teams/]) expect(text, `${hash} ${w}`).not.toMatch(w);
+    }
+  });
+
+  it("the rcc-design skill says Sent and Offline wait for the COPY pass", () => {
+    const skill = readFileSync(new URL("../../.claude/skills/rcc-design/SKILL.md", import.meta.url), "utf8");
+    const lines = skill.split("\n").filter((l) => /\bSent\b|\bOffline\b/.test(l));
+    expect(lines.length).toBeGreaterThan(0);
+    for (const l of lines) expect(l).toMatch(/COPY pass/);
+  });
+});

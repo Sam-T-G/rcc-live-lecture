@@ -1044,13 +1044,14 @@
   /* ==================================================== host parts */
   /* The slide track: the lecture's own timeline with the lost taps over each slide. One fixed-height
      row; every lost count one size (24, 700) on one baseline; the current slide is its filled segment
-     and bold number; past slides with no taps print a muted 0, future slides nothing. */
-  .track { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr) auto; column-gap: var(--s8); align-items: end; height: 88px; padding: var(--s2) 0; }
+     and bold number; past slides with no taps print a muted 0, future slides nothing. The lane keeps
+     28px a slide (its min-width), so in a narrow window the slide title shrinks first. */
+  .track { display: grid; grid-template-columns: minmax(0, 260px) minmax(auto, 1fr) auto; column-gap: var(--s8); align-items: end; height: 88px; padding: var(--s2) 0; }
   .track__where { display: grid; padding-bottom: 2px; min-width: 0; }
   .track__of { font-size: var(--t-small); font-weight: var(--w-head); color: var(--muted); font-variant-numeric: tabular-nums; }
   .track__title { font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .track__lane { display: grid; grid-template-columns: 44px repeat(var(--slides, 12), minmax(0, 1fr)); grid-template-rows: 32px 8px 20px;
-    column-gap: var(--s1); row-gap: var(--s1); align-items: end; min-width: 0; }
+    column-gap: var(--s1); row-gap: var(--s1); align-items: end; min-width: calc(44px + var(--slides, 12) * (28px + var(--s1))); }
   .track__rl { font-size: var(--t-small); font-weight: var(--w-head); color: var(--muted); line-height: 20px; align-self: end; }
   .track__n { text-align: center; font-size: 1.5rem; font-weight: var(--w-loud); line-height: 1; font-variant-numeric: tabular-nums lining-nums; align-self: end; }
   .track__n--zero { color: var(--muted); }

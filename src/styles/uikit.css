@@ -93,6 +93,18 @@
 .uikit-stage .pnote { margin: 0; }
 .uikit-stage .lbgrid { grid-template-columns: minmax(0, 1fr); }
 
+/* The heading line samples, the checked-in stub at phone width, the glyph set, and the slide
+   track at full width under the two theme columns. */
+.uikit-hcards { display: grid; gap: var(--s4); margin: 0 0 var(--s6); }
+.uikit-hcards h4 { margin: 0; }
+.uikit-stubcol { width: 20rem; max-width: 100%; }
+.uikit-stubcol .stub > * { margin: 0; }
+.uikit-glyph--24 { width: 24px; height: 24px; }
+.uikit-glyph--64 { width: 64px; height: 64px; }
+.uikit-glyph__name { justify-self: start; }
+.uikit-wide { display: grid; gap: var(--rcc-space-6); margin-top: var(--rcc-space-6); }
+.uikit-wide .uikit__section { margin-top: 0; }
+
 /* #/ui/projector */
 .uikit-board { font-variant-numeric: tabular-nums; }
 .uikit-board li { display: flex; flex-wrap: wrap; align-items: center; gap: 0 calc(24 * var(--stage-u)); }

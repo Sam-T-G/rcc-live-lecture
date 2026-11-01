@@ -31,6 +31,7 @@ import {
   TeamChip,
   StateChip,
   type ButtonLook,
+  type IconName,
 } from "../blocks/kit";
 import { PAIRS, contrastRatio, parseColor, toHex, type Pair } from "../styles/contrast";
 import "../styles/uikit.css";
@@ -62,7 +63,39 @@ export default function UIKit() {
         <Theme name="light" />
         <Theme name="dark" />
       </div>
+      {/* The host's slide track spans the page, as on #/host: in a half-width column its title
+          has no room. */}
+      <div className="uikit-wide">
+        <WideTrack name="light" />
+        <WideTrack name="dark" />
+      </div>
     </main>
+  );
+}
+
+function WideTrack({ name }: { name: "light" | "dark" }) {
+  return (
+    <section className="uikit__theme" data-theme={name}>
+      <Section title="Slide track">
+        <SlideTrack
+          counts={[0, 2, 0, 3, null, null, null, null]}
+          at={3}
+          where={
+            <>
+              <span className="track__of">Slide 4 of 8</span>
+              <span className="track__title">Capacitors in a circuit</span>
+            </>
+          }
+          label="Lost"
+          end={
+            <span className="roomn">
+              <span className="roomn__n">38</span>
+              <span className="roomn__l">checked in</span>
+            </span>
+          }
+        />
+      </Section>
+    </section>
   );
 }
 
@@ -110,32 +143,17 @@ function Theme({ name }: { name: "light" | "dark" }) {
         <Surfaces />
       </Section>
       <Section title="Cards, lists and tables">
+        <HeadingLines />
         <CardsAndTables />
       </Section>
       <Section title="Rows">
         <RowsSample />
       </Section>
+      <Section title="Glyph set">
+        <Glyphs />
+      </Section>
       <Section title="Answer choices and bars">
         <ChoicesAndBars />
-      </Section>
-      <Section title="Slide track">
-        <SlideTrack
-          counts={[0, 2, 0, 3, null, null, null, null]}
-          at={3}
-          where={
-            <>
-              <span className="track__of">Slide 4 of 8</span>
-              <span className="track__title">Capacitors in a circuit</span>
-            </>
-          }
-          label="Lost"
-          end={
-            <span className="roomn">
-              <span className="roomn__n">38</span>
-              <span className="roomn__l">checked in</span>
-            </span>
-          }
-        />
       </Section>
       <Section title="Empty, loading and confirm">
         <EmptyAndConfirm />
@@ -419,12 +437,12 @@ function Buttons() {
       <div className="uikit-states">
         <State name="Link">
           <button type="button" className="link">
-            Show slide <Icon name="chevron-right" />
+            Follow the slides <Icon name="chevron-right" />
           </button>
         </State>
         <State name="Small link (laptop)">
           <button type="button" className="link link--sm">
-            See all teams <Icon name="chevron-right" />
+            Attendance <Icon name="chevron-right" />
           </button>
         </State>
         <State name="Plain link">
@@ -676,9 +694,9 @@ function BadgesAndBanners() {
         <Banner tone="error" inset title="The quiz didn't load." action={<Button variant="on-field">Try again</Button>} />
       </div>
       <p className="row">
+        {/* The host's Offline slot: its word comes with the COPY pass. */}
         <span className="offline">
           <Icon name="warning" />
-          Offline
         </span>
       </p>
       <Banner title="Class starts at 2:30 PM.">Scan your pass at the door when you walk in.</Banner>
@@ -706,6 +724,77 @@ function BadgesAndBanners() {
         </BannerStack>
       </div>
     </>
+  );
+}
+
+// A focal card's heading line: the title with its state word, the facts under it, the action at
+// the right, open and ended.
+function HeadingLines() {
+  return (
+    <div className="uikit-hcards">
+      <div className="hcard">
+        <div className="hline">
+          <h4 className="hline__t">
+            Ask the room <span className="stateword stateword--open">Open</span>
+          </h4>
+          <p className="facts facts-list">
+            <span>Quiz</span>
+            <span>AI draft</span>
+          </p>
+          <div className="hline__end">
+            <Button size="lg">End the quiz</Button>
+          </div>
+        </div>
+      </div>
+      <div className="hcard">
+        <div className="hline">
+          <h4 className="hline__t">
+            Ask the room <span className="stateword stateword--ended">Ended</span>
+          </h4>
+          <p className="facts facts-list">
+            <span>Quiz</span>
+            <span>AI draft</span>
+          </p>
+          <div className="hline__end">
+            <Button variant="outline">Draft with AI</Button>
+            <Button variant="outline">Write my own</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Every Icon name, so a glyph added to the kit shows here (the type fails without it).
+const GLYPH_NAMES = Object.keys({
+  check: 1,
+  x: 1,
+  warning: 1,
+  clock: 1,
+  lock: 1,
+  eye: 1,
+  repeat: 1,
+  inbox: 1,
+  "arrow-left": 1,
+  "arrow-right": 1,
+  "chevron-right": 1,
+} satisfies Record<IconName, 1>) as IconName[];
+
+function Glyphs() {
+  return (
+    <Rows head={["24", "64", "Name"]} cols="48px 88px minmax(0, 1fr)">
+      {GLYPH_NAMES.map((name) => (
+        <Row key={name}>
+          <span data-glyph={name}>
+            <Icon name={name} className="uikit-glyph--24" />
+          </span>
+          <span>
+            <Icon name={name} className="icon--d uikit-glyph--64" />
+          </span>
+          <code className="uikit-glyph__name">{name}</code>
+        </Row>
+      ))}
+    </Rows>
   );
 }
 
@@ -956,7 +1045,8 @@ function ChoicesAndBars() {
           <Choice letter="B" state="picked" aria-pressed>
             Current
           </Choice>
-          <Choice letter="C" state="sending" word="Sending">
+          {/* The state words (Sending, Sent) come with the COPY pass. */}
+          <Choice letter="C" state="sending">
             Resistance
           </Choice>
           <Choice letter="D" state="error" word={<>Try again</>}>
@@ -966,7 +1056,7 @@ function ChoicesAndBars() {
       </div>
       <div className="qfield uikit-qfield">
         <div className="choices">
-          <Choice letter="A" state="sent" word={<><Icon name="check" />Sent</>}>
+          <Choice letter="A" state="sent" word={<Icon name="check" />}>
             Charge
           </Choice>
           <Choice letter="B" state="out">
@@ -1040,6 +1130,34 @@ function PassSample() {
       </div>
       <div className="uikit-pass">
         <p className="qr--wait uikit-wait">Getting a new code…</p>
+      </div>
+      <div className="uikit-stubcol">
+        <section className="stub">
+          <h4 className="lockup">
+            <Icon name="check" className="icon--d" />
+            You’re checked in.
+          </h4>
+          <p className="stub__name">Ana</p>
+          <hr className="perf" />
+          <div className="stub__times">
+            <p>
+              <span className="stub__l">Checked in</span>
+              <span className="stub__v">
+                2:27<span className="stub__u">PM</span>
+              </span>
+            </p>
+            <p>
+              <span className="stub__l">Late after</span>
+              <span className="stub__v">
+                2:35<span className="stub__u">PM</span>
+              </span>
+            </p>
+          </div>
+          <p className="teamline group--purple">
+            <span className="team__chip" aria-hidden="true" />
+            You’re on Purple
+          </p>
+        </section>
       </div>
     </div>
   );
