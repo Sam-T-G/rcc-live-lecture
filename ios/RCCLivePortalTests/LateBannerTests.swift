@@ -1,4 +1,6 @@
 import Foundation
+import SwiftUI
+import UIKit
 import Testing
 @testable import RCCLivePortal
 
@@ -187,5 +189,69 @@ struct LateBannerTests {
         let five = [cy, ben, ana, cy, ben]
         #expect(LateBannerView.cards(five, tight: false) == [cy, ben])
         #expect(LateBannerView.cards(five, tight: true) == [cy])
+    }
+}
+
+/// The banner's height as the deck screen lays it out: LateBannerView in a hosting controller
+/// `width` pt wide, with the text size and vertical size class a phone would give it.
+@MainActor
+private func bannerHeight(
+    _ arrivals: [LateArrival], width: CGFloat, typeSize: DynamicTypeSize, verticalSize: UserInterfaceSizeClass
+) -> CGFloat {
+    let banner = LateBanner(hold: .seconds(60), now: { 0 })
+    banner.take([])  // launch
+    banner.take(arrivals)
+    let view = LateBannerView(banner: banner)
+        .environment(\.verticalSizeClass, verticalSize)
+        .dynamicTypeSize(typeSize)
+    return UIHostingController(rootView: view)
+        .sizeThatFits(in: CGSize(width: width, height: .greatestFiniteMagnitude)).height
+}
+
+/// iPhone 17 in landscape: 874 x 402 pt.
+private let landscape = CGSize(width: 874, height: 402)
+/// iPhone 17 in portrait.
+private let portraitWidth: CGFloat = 402
+
+@Suite("Late banner height")
+@MainActor
+struct LateBannerHeightTests {
+    @Test("sweep1-ios-fixcheck-1 the rule: tight at accessibility text sizes or in compact height (landscape on a phone)")
+    func tightRule() {
+        #expect(LateBannerView.tight(accessibilitySize: false, verticalSize: .compact))
+        #expect(LateBannerView.tight(accessibilitySize: true, verticalSize: .regular))
+        #expect(LateBannerView.tight(accessibilitySize: true, verticalSize: nil))
+        #expect(!LateBannerView.tight(accessibilitySize: false, verticalSize: .regular))
+        #expect(!LateBannerView.tight(accessibilitySize: false, verticalSize: nil))
+    }
+
+    @Test("sweep1-ios-fixcheck-1 in landscape (compact height) two late arrivals draw one card, as tall as a single arrival's")
+    func landscapeShowsOneCard() {
+        let one = bannerHeight([ben], width: landscape.width, typeSize: .large, verticalSize: .compact)
+        let two = bannerHeight([cy, ben], width: landscape.width, typeSize: .large, verticalSize: .compact)
+        #expect(one > 0)
+        #expect(two == one, "two arrivals in landscape: \(two) pt, one: \(one) pt")
+        // In portrait at the same text size both cards show.
+        let portraitOne = bannerHeight([ben], width: portraitWidth, typeSize: .large, verticalSize: .regular)
+        let portraitTwo = bannerHeight([cy, ben], width: portraitWidth, typeSize: .large, verticalSize: .regular)
+        #expect(portraitTwo > portraitOne + 40, "portrait: two \(portraitTwo) pt, one \(portraitOne) pt")
+    }
+
+    @Test("sweep1-ios-check-1 at the largest accessibility text size in landscape the banner takes at most a quarter of the screen height")
+    func accessibilityLandscapeFits() {
+        // A long first name on the longest line ("👀 Everyone say hi to ...") too.
+        let long = LateArrival(id: "s6", first: "Maximiliana-Josefina", lateMin: 15, at: 3_000)
+        #expect(LateLines.pick(long.id) == 4)
+        for type in [DynamicTypeSize.accessibility1, .accessibility3, .accessibility5] {
+            for arrivals in [[cy, ben], [long]] {
+                let h = bannerHeight(arrivals, width: landscape.width, typeSize: type, verticalSize: .compact)
+                #expect(h > 0)
+                #expect(h <= landscape.height / 4, "\(type) in landscape, \(arrivals[0].first): \(h) pt of \(landscape.height)")
+            }
+        }
+        // Portrait keeps the full accessibility size (one card, can wrap).
+        let portrait = bannerHeight([cy, ben], width: portraitWidth, typeSize: .accessibility5, verticalSize: .regular)
+        let portraitLarge = bannerHeight([cy], width: portraitWidth, typeSize: .large, verticalSize: .regular)
+        #expect(portrait > portraitLarge * 1.5, "portrait AX5 \(portrait) pt vs large \(portraitLarge) pt")
     }
 }

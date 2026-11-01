@@ -183,7 +183,8 @@ enum LateColors {
 }
 
 /// The banner at the bottom of the deck screen: a card for each of the newest 2 late arrivals
-/// (1 in landscape or at the accessibility text sizes; see `cards`), newest first.
+/// (1 in landscape or at the accessibility text sizes; see `cards`), newest first. In landscape
+/// the card is one line, at most the AX1 text size (see `largestType`).
 /// DeckView puts it in a bottom inset, so the slides and buttons move up above it and it covers
 /// nothing, like #/portal (src/portal/Page.tsx, --late-room).
 struct LateBannerView: View {
@@ -194,12 +195,16 @@ struct LateBannerView: View {
     @Environment(\.verticalSizeClass) private var verticalSize
 
     var body: some View {
-        let tight = typeSize.isAccessibilitySize || verticalSize == .compact
+        let tight = LateBannerView.tight(accessibilitySize: typeSize.isAccessibilitySize, verticalSize: verticalSize)
         let cards = LateBannerView.cards(banner.showing, tight: tight)
+        let landscape = verticalSize == .compact
         VStack(spacing: 8) {
             ForEach(cards) { arrival in
                 Text(LateLines.line(for: arrival))
                     .font(.title3.weight(.bold))
+                    .dynamicTypeSize(...LateBannerView.largestType(verticalSize: verticalSize))
+                    .lineLimit(landscape ? 1 : nil)
+                    .minimumScaleFactor(landscape ? 0.5 : 1)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(LateColors.words)
                     .padding(.vertical, 14)
@@ -225,5 +230,19 @@ struct LateBannerView: View {
     /// VoiceOver still reads every arrival out (sweep1-ios-fixcheck-2).
     static func cards(_ showing: [LateArrival], tight: Bool) -> [LateArrival] {
         Array(showing.prefix(tight ? 1 : 2))
+    }
+
+    /// When the banner shows only 1 card: at the accessibility text sizes, or in compact height
+    /// (an iPhone in landscape). LateBannerTests checks both halves (sweep1-ios-fixcheck-1).
+    static func tight(accessibilitySize: Bool, verticalSize: UserInterfaceSizeClass?) -> Bool {
+        accessibilitySize || verticalSize == .compact
+    }
+
+    /// The largest text size a card uses. In landscape a card at AX5 took 175 of iPhone 17's
+    /// 402 pt and left the slide about 30 pt (sweep1-ios-check-1), so there it stops at AX1 and
+    /// keeps to one line, shrinking the words to fit; that keeps it under a quarter of the height.
+    /// Portrait keeps every size. VoiceOver reads the full line either way.
+    static func largestType(verticalSize: UserInterfaceSizeClass?) -> DynamicTypeSize {
+        verticalSize == .compact ? .accessibility1 : .accessibility5
     }
 }
