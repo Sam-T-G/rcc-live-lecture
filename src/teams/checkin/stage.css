@@ -98,7 +98,7 @@ body.stage-body { margin: 0; overflow: hidden; }
   width: calc(1080 * var(--stage-u));
   overflow: hidden;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: min-content min-content minmax(min-content, 1fr);
   row-gap: calc(24 * var(--stage-u));
   padding: calc(36 * var(--stage-u)) calc(40 * var(--stage-u)) calc(16 * var(--stage-u));
   border-radius: var(--p-radius);
@@ -108,7 +108,7 @@ body.stage-body { margin: 0; overflow: hidden; }
 /* Ended, on the raised rung: a 4 stage px --line-strong ring keeps its edge on a white slide. The
    bars take the count line's room too, so a 3-line question and four 2-line choices still fit. */
 .stage__poll:has(.stage__bars) {
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: min-content minmax(min-content, 1fr);
   background: var(--raised);
   color: var(--text);
   box-shadow: inset 0 0 0 var(--p-ring) var(--line-strong);
@@ -212,7 +212,7 @@ body.stage-body { margin: 0; overflow: hidden; }
 
 /* ------------------------------------------------------------------ the bottom-left lane
    The late banner's strips, then the presenter notes (the kit's .pnote), stacked up from the
-   frame's bottom in the left column. Above the quiz panel, so a late arrival always shows. */
+   frame's bottom in the left column. The quiz panel ends above it (the left column's stack, below), so a late arrival never covers a choice. */
 .stage__lane {
   position: absolute;
   left: var(--p-margin);
@@ -279,6 +279,50 @@ body.stage-body { margin: 0; overflow: hidden; }
 }
 .stage__card > .stage-card > .row { position: fixed; left: var(--p-margin); bottom: var(--p-margin); z-index: 2; }
 .stage__card > .stage-card > .stage__hint ~ .row { top: var(--p-margin); bottom: auto; }
+
+/* ------------------------------------------------------------------ the left column's stack
+   Nothing in the left column overlaps: from the bottom up, the lane (late strips and notes),
+   the count's error row, then the quiz panel, 24 apart. Each one's bottom sits on the top of
+   the box under it (CSS anchor positioning), so 1 to 3 late strips or a 2-line note push the
+   panel up instead of covering its last choices. With an empty lane and no count error, the
+   panel and the row keep their bottom on the frame (.stage__poll above). The count's row
+   (Count's ErrorBoundary) is the .row right before "Scan to check in". A browser without anchor
+   positioning reserves one 120 strip instead. */
+.stage__lane { anchor-name: --stage-lane, --stage-foot; }
+.stage__card > .stage-card > .row:has(+ .stage__hint) { anchor-name: --stage-foot; }
+.stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card > .row:has(+ .stage__hint) {
+  bottom: calc(var(--p-margin) + 144 * var(--stage-u));
+}
+.stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card .stage__poll,
+.stage__card > .stage-card:has(> .row + .stage__hint) .stage__poll {
+  bottom: calc(var(--p-margin) + 144 * var(--stage-u));
+  min-height: min-content;
+}
+/* With the panel shortened, its rows drop their inner padding (the 6 rules still part them) and
+   the question stops at 2 lines, so the question, the count and four choices fit above one late
+   strip, a 2-line note or the count's error. Two or more of those at once can still run past it. */
+.stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card :is(.stage__choice, .stage__bar),
+.stage__card > .stage-card:has(> .row + .stage__hint) :is(.stage__choice, .stage__bar) {
+  padding-block: calc(2 * var(--stage-u));
+}
+.stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card .stage__q,
+.stage__card > .stage-card:has(> .row + .stage__hint) .stage__q {
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card:has(> .row + .stage__hint) .stage__poll {
+  bottom: calc(var(--p-margin) + 288 * var(--stage-u));
+}
+@supports (anchor-name: --a) {
+  .stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card > .row:has(+ .stage__hint) {
+    bottom: calc(anchor(--stage-lane top) + 24 * var(--stage-u));
+  }
+  .stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card .stage__poll,
+  .stage__card > .stage-card:has(> .row + .stage__hint) .stage__poll,
+  .stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card:has(> .row + .stage__hint) .stage__poll {
+    bottom: calc(anchor(--stage-foot top) + 24 * var(--stage-u));
+  }
+}
 
 /* ------------------------------------------------------------------ the card hidden
    Its foot in the card's bottom-right corner: the same field green and corner, 120 tall, holding
