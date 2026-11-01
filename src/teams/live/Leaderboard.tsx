@@ -34,7 +34,8 @@ const credit = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 // One team: place, color and name, extra credit, then right answers (or points, once the
 // professor has changed them), points per student, and students. The projector leaves out the
-// number of students so the line fits.
+// number of students so the line fits, and puts the numbers in .board__score, which stays on
+// screen with 7 or more teams (.board--many hides only .board__members).
 function TeamRow({ g, mine, big }: { g: Row; mine: boolean; big?: boolean }) {
   const score = g.changes === 0 ? `${g.correct} right` : plural(g.points, "point");
   const parts = [score, `${g.perStudent.toFixed(1)} per student`, ...(big ? [] : [plural(g.members, "student")])];
@@ -43,7 +44,7 @@ function TeamRow({ g, mine, big }: { g: Row; mine: boolean; big?: boolean }) {
       <span className="board__rank">{g.rank}</span>
       <span className="board__name">{g.label}{mine && " (you)"}</span>
       <span className="board__ec">+{credit(g.ec)} <small>extra credit</small></span>
-      <span className="board__members muted">{parts.join(" · ")}</span>
+      <span className={big ? "board__score muted" : "board__members muted"}>{parts.join(" · ")}</span>
     </li>
   );
 }

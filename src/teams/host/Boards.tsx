@@ -10,7 +10,7 @@ import { Card, Status } from "../../blocks/ui";
 import { Badge, Banner, Button, ConfirmButton, Field, Segmented } from "../../blocks/kit";
 import { TeamChip, errorText } from "./Team";
 import { localDate } from "../checkin/sheet";
-import { extraCreditCsv } from "./csv";
+import { allResults, extraCreditCsv } from "./csv";
 import "./points.css";
 
 type Teams = FunctionReturnType<typeof api.live.groups.leaderboard>["teams"];
@@ -306,7 +306,7 @@ function Download() {
     setBusy(true);
     setNote(null);
     try {
-      const rows = await convex.query(api.live.groups.results, { channel: CHANNEL });
+      const rows = await allResults((cursor) => convex.query(api.live.groups.results, { channel: CHANNEL, paginationOpts: { numItems: 200, cursor } }));
       if (rows.length === 0) {
         setNote({ kind: "empty", text: "No extra credit saved yet. End day saves it." });
         return;

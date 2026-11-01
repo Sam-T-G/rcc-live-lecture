@@ -181,7 +181,8 @@ describe("F24 teams and the leaderboard", () => {
     await t.run((ctx) => ctx.scheduler.runAt(T0 + 5 * MIN, internal.live.groups.lock, { channel: CH, lecture }));
     vi.advanceTimersByTime(T0 + 6 * MIN - Date.now());
     await t.finishInProgressScheduledFunctions();
-    expect(await t.query(api.live.groups.status, { channel: CH })).toEqual({ size: 4, locked: false, locksAt: T0 + 5 * MIN });
+    // UB-spec-3: that lock found nobody, so no lock time that has passed (T0 + 5) is shown.
+    expect(await t.query(api.live.groups.status, { channel: CH })).toEqual({ size: 4, locked: false, locksAt: null });
     const ss = await arrive(t, 1, 7);
     expect(await sizes(ss)).toEqual([3, 2, 2]);
     expect((await t.query(api.live.groups.status, { channel: CH })).locksAt).toBe(T0 + 11 * MIN);
@@ -697,7 +698,10 @@ describe("F29 End day", () => {
     ]);
     await admin(t).mutation(api.live.groups.endDay, { channel: CH });
 
-    const all = await admin(t).query(api.live.groups.results, { channel: CH });
+    const page = { numItems: 200, cursor: null };
+    const res = await admin(t).query(api.live.groups.results, { channel: CH, paginationOpts: page });
+    expect(res.isDone).toBe(true);
+    const all = res.page;
     expect(all.map((r) => [r.lecture === first ? 1 : r.lecture === second ? 2 : 0, r.name, r.email, r.team.label, r.rank, r.points, r.ec])).toEqual([
       [1, "Sample student 1", "student1@example.edu", "Red", 1, 1, 5],
       [1, "Sample student 2", "student2@example.edu", "Blue", 2, 0, 0],
@@ -705,7 +709,7 @@ describe("F29 End day", () => {
       [2, "Sample student 1", "student1@example.edu", "Red", 1, 1, 5],
       [2, "Sample student 4", "student4@example.edu", "Blue", 2, 0, 0],
     ]);
-    expect((await admin(t).query(api.live.groups.results, { channel: CH, lecture: first })).map((r) => r.name)).toEqual(["Sample student 1", "Sample student 2", "Sample student 3"]);
+    expect((await admin(t).query(api.live.groups.results, { channel: CH, lecture: first, paginationOpts: page })).page.map((r) => r.name)).toEqual(["Sample student 1", "Sample student 2", "Sample student 3"]);
     expect(keysDeep(all)).not.toContain("user");
   });
 });
@@ -736,6 +740,6 @@ describe("F28.3/F28.5/F29.5 the Points tab is for professors and admins", () => 
       await oneTeam(t);
       await as.mutation(api.live.groups.endDay, { channel: CH });
     });
-    await authMatrix(HOST_ONLY, (as) => as.query(api.live.groups.results, { channel: CH }));
+    await authMatrix(HOST_ONLY, (as) => as.query(api.live.groups.results, { channel: CH, paginationOpts: { numItems: 10, cursor: null } }));
   });
 });

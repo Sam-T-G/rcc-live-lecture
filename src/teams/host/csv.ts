@@ -30,3 +30,19 @@ export function extraCreditCsv(rows: SavedCredit[], date: (ms: number) => string
   const body = rows.map((r) => [date(r.endedAt), r.name, r.email ?? "", r.team.label, r.rank, r.points, Math.round(r.ec * 100) / 100]);
   return "\uFEFF" + [head, ...body].map((row) => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }
+
+type Page<R> = { page: R[]; isDone: boolean; continueCursor: string };
+
+// Every saved row, read a page at a time (live.groups.results returns at most 200 per call),
+// oldest class first, then place, team number and name.
+export async function allResults<R extends SavedCredit & { team: { team: number } }>(read: (cursor: string | null) => Promise<Page<R>>): Promise<R[]> {
+  const rows: R[] = [];
+  let cursor: string | null = null;
+  for (;;) {
+    const res: Page<R> = await read(cursor);
+    rows.push(...res.page);
+    if (res.isDone) break;
+    cursor = res.continueCursor;
+  }
+  return rows.sort((a, b) => a.endedAt - b.endedAt || a.rank - b.rank || a.team.team - b.team.team || a.name.localeCompare(b.name));
+}

@@ -1,6 +1,7 @@
 // @vitest-environment node
 // The team leaderboard (Leaderboard.tsx) on the phone card and the projector, rendered to HTML
 // with made-up query results (no backend).
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getFunctionName, type FunctionReference } from "convex/server";
@@ -124,5 +125,25 @@ describe("UB the phone card's top rows", () => {
     const [above, fold] = card().split("<details>");
     expect(above.match(/board__name/g)).toHaveLength(3);
     expect(fold).toContain("All 5 teams");
+  });
+});
+
+describe("UB-spec-1 the projector shows right answers and points per student with 7 or more teams", () => {
+  it("with 7 teams (.board--many) the '6 right · 1.5 per student' line sits in a span no .board--many rule hides", () => {
+    const css = ["live.css", "leaderboard.css"].map((f) => readFileSync(new URL("./" + f, import.meta.url), "utf8")).join("\n");
+    // Every class a `.board--many .x { display: none }` rule hides on the projector.
+    const hidden = [...css.matchAll(/\.board--many\s+\.([\w-]+)\s*\{[^}]*display:\s*none/g)].map((m) => m[1]);
+    expect(hidden.length).toBeGreaterThan(0);
+    const names = ["Red", "Blue", "Yellow", "Green", "Orange", "Purple", "Pink"];
+    results["live/groups:leaderboard"] = {
+      questions: 3,
+      teams: names.map((n, i) => team(i, n, i === 0 ? { members: 4, correct: 6, points: 6, perStudent: 1.5, ec: 5 } : { rank: 2 })),
+    };
+    const html = big();
+    expect(html).toContain("board--many");
+    const span = html.match(/<span class="([^"]*)">6 right · 1\.5 per student<\/span>/);
+    expect(span).not.toBeNull();
+    for (const cls of span![1].split(/\s+/)) expect(hidden).not.toContain(cls);
+    expect(html).not.toContain("4 students");
   });
 });

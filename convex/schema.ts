@@ -263,18 +263,25 @@ export default defineSchema({
     at: v.number(),
   }).index("by_channel", ["channel"]),
 
-  // team: live. Extra credit saved by End day: one row per student on a team with members, with
-  // that team's rank, points and extra credit in the class that ended.
+  // team: live. Extra credit saved when a class ends (End day, or the class closing by itself):
+  // one row per student on a team with members, with that team's rank, points and extra credit in
+  // the class that ended. name, email and total are on rows saved from 2026-10-31 on.
   groupResults: defineTable({
     channel: v.string(),
     lecture: v.id("lectures"), // the class that ended
     endedAt: v.number(),
     user: v.string(), // identity.tokenIdentifier; never returned by a query
+    name: v.optional(v.string()), // from the student's check-in in that class
+    email: v.optional(v.string()),
     team: v.number(),
     rank: v.number(),
     points: v.number(), // the team's points in that class
     ec: v.number(), // 5, 3, 1 or 0; teams that tie split the places they fill (two tied for 3rd get 0.5 each)
-  }).index("by_channel", ["channel"]),
+    total: v.optional(v.number()), // the student's extra credit on this channel, this class included
+  })
+    .index("by_channel", ["channel"])
+    .index("by_channel_and_lecture", ["channel", "lecture"])
+    .index("by_channel_and_user", ["channel", "user"]),
 
   // team: host. A question the professor asked the room on one slide. `correct` never goes to
   // students (questions.current leaves it out).

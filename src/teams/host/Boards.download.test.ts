@@ -4,6 +4,7 @@
 // class at 5:30 PM is already the next day in UTC.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveExtraCredit } from "./Boards";
+import { allResults } from "./csv";
 
 vi.mock("convex/react", () => ({ useQuery: () => undefined, useMutation: () => async () => null, useConvex: () => ({}) }));
 vi.mock("../../blocks/deck", () => ({ CHANNEL: "gdg" }));
@@ -33,5 +34,21 @@ describe("UB the extra credit CSV download", () => {
     expect(log).not.toContain("revoke blob:extra-credit");
     vi.advanceTimersByTime(1_000);
     expect(log.at(-1)).toBe("revoke blob:extra-credit");
+  });
+
+  it("UB-convex-2 reads every page of saved rows, passing each page's cursor, and sorts them by class, place, team and name", async () => {
+    const row = (endedAt: number, rank: number, team: number, name: string) =>
+      ({ lecture: "l" as never, endedAt, name, email: null, team: { team, color: "red", label: "Red" }, rank, points: 1, ec: 0 });
+    const pages = [
+      { page: [row(2, 1, 0, "B"), row(1, 2, 1, "A")], isDone: false, continueCursor: "c1" },
+      { page: [row(1, 1, 0, "C"), row(2, 1, 0, "A")], isDone: true, continueCursor: "c2" },
+    ];
+    const cursors: (string | null)[] = [];
+    const rows = await allResults(async (cursor) => {
+      cursors.push(cursor);
+      return pages[cursors.length - 1];
+    });
+    expect(cursors).toEqual([null, "c1"]);
+    expect(rows.map((r) => `${r.endedAt}${r.rank}${r.name}`)).toEqual(["11C", "12A", "21A", "21B"]);
   });
 });

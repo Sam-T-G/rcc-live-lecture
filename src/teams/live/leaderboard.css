@@ -10,5 +10,10 @@ ol.board.board--card .board__rank { grid-row: 1 / span 2; }
 ol.board.board--card .board__ec { grid-column: 3; grid-row: 1; }
 ol.board.board--card .board__members { grid-column: 2 / -1; grid-row: 2; }
 
-/* The projector: the same three columns in every row. */
+/* The projector: the same three columns in every row. Its numbers line is .board__score: the
+   second line of a row up to six teams, in the small projector size. */
 .board--big .board__row { grid-template-columns: 2.2em minmax(0, 1fr) auto; }
+ol.board.board--big .board__score { grid-column: 2 / -1; font-size: var(--proj-small); font-weight: 400; }
+/* 7 or more teams (.board--many): one-line rows, the numbers after the extra credit. */
+ol.board.board--many .board__row { grid-template-columns: 2.2em minmax(0, 1fr) auto auto; }
+ol.board.board--many .board__score { grid-column: auto; }

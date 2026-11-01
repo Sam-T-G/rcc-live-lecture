@@ -4,6 +4,8 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import { requireProf } from "./checkin/prof";
+// live/groups.ts imports this file too; saveExtraCredit is only called inside ensureLecture.
+import { saveExtraCredit } from "./live/groups";
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -116,14 +118,15 @@ export async function lectureWindow(ctx: Ctx, channel: string): Promise<LectureW
 // professor's actions that start class activity (a deck press, a pass scan, a saved start time,
 // a quiz), never from a student's: students can't start a class. A new class gets a job that
 // closes it 12 hours later (the job waits longer when a saved start time moves lectureClosesAt).
-// A class still open past lectureClosesAt (its close job never ran) ends there, and a new one
-// opens.
+// A class still open past lectureClosesAt (its close job never ran) ends there, after its teams'
+// extra credit is saved the way End day saves it, and a new one opens.
 export async function ensureLecture(ctx: MutationCtx, channel: string): Promise<Doc<"lectures">> {
   const now = Date.now();
   const last = await newestLecture(ctx, channel);
   if (last && last.endedAt === undefined) {
     const closesAt = lectureClosesAt(last);
     if (now < closesAt) return last;
+    await saveExtraCredit(ctx, channel, closesAt, last._id);
     await ctx.db.patch("lectures", last._id, { endedAt: closesAt });
   }
   const id = await ctx.db.insert("lectures", { channel, startedAt: now });

@@ -56,7 +56,7 @@ describe("old rows keep working", () => {
     expect(byChannel).toEqual({ questions: ["Why does the loop stop?"], lost: [2] });
   });
 
-  it("every index that existed before the class model is unchanged, and the only new ones are by_channel on lectures, groupPoints, groupResults, questions and lost, plus the access tables' (ROLES)", () => {
+  it("every index that existed before the class model is unchanged, and the only new ones are by_channel on lectures, groupPoints, groupResults, questions and lost, groupResults' by lecture and by user, plus the access tables' (ROLES)", () => {
     const before: Record<string, Record<string, string[]>> = {
       deckChannels: { by_channel: ["channel"] },
       deckSlides: { by_channel_and_index: ["channel", "index"] },
@@ -81,7 +81,8 @@ describe("old rows keep working", () => {
     const added: Record<string, Record<string, string[]>> = {
       lectures: { by_channel: ["channel"] },
       groupPoints: { by_channel: ["channel"] },
-      groupResults: { by_channel: ["channel"] },
+      // UB-convex-2/3: results reads one class's rows, roster each student's newest row.
+      groupResults: { by_channel: ["channel"], by_channel_and_lecture: ["channel", "lecture"], by_channel_and_user: ["channel", "user"] },
       questions: { by_channel: ["channel"] },
       lost: { by_channel: ["channel"] },
       // ROLES: new tables for the staff list and the door iPads.

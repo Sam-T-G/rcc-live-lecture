@@ -32,7 +32,9 @@
 // class's groupSettings row, check-ins, quizzes and point changes made since the class started.
 // A student is on a team only while they have a check-in in this class, so a check-in the
 // professor removes earns nothing. End day saves each team member's extra credit (groupResults)
-// and ends the class, so the next class deals fresh teams and starts from 0 points. The team size
+// and ends the class, so the next class deals fresh teams and starts from 0 points. A class that
+// closes by itself (lectures.close after 12 hours, or lib.ensureLecture finding it open past its
+// close time) saves the same rows first (saveExtraCredit). The team size
 // carries over to the next class. A lock job carries the class it was queued for and does nothing
 // once that class is over.
 //
@@ -41,8 +43,9 @@
 //
 //   Anyone (the phone card, #/live/leaderboard, #/host):
 //   api.live.groups.status       { channel } -> { size, locked, locksAt }
-//       size 3 or 4. locksAt: when the teams lock (ms), or null once locked, or with no start
-//       time and nobody checked in.
+//       size 3 or 4. locksAt: when the teams lock (ms), or null once locked, or while nobody is
+//       checked in and either no start time is saved or its lock time has passed (the teams
+//       then lock 5 minutes after the first check-in).
 //   api.live.groups.leaderboard  { channel } -> { questions, teams }
 //       questions: quizzes ended in this class. teams, best first: [{ team, color, label,
 //       members, correct, changes, points, perStudent, rank, ec }]. correct: right answers;
@@ -76,15 +79,17 @@
 //   api.live.groups.endDay       { channel } -> the line to show
 //       Refused while a quiz or vote is open ("End the open question first."). Saves extra credit
 //       and ends the class; "No class is running." when no class is open.
-//   api.live.groups.results      { channel, lecture? } -> [{ lecture, endedAt, name, email, team,
-//                                  rank, points, ec }]
-//       The extra credit End day saved: one row per student per class (one class with
-//       `lecture`), for the CSV.
+//   api.live.groups.results      { channel, lecture?, paginationOpts } -> { page: [{ lecture,
+//                                  endedAt, name, email, team, rank, points, ec }], isDone,
+//                                  continueCursor }
+//       The extra credit saved when classes ended: one row per student per class (one class with
+//       `lecture`), at most 200 rows a page, for the CSV, which reads every page.
 //
 //   Internal: internal.live.groups.lock { channel, force?, lecture? }, queued by ensureGroup and
 //   by checkin.attendance.setClassStart.
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
+import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { ConvexError, v, type Infer } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { endLecture, lectureWindow, requireUser, type LectureWindow } from "../lib";
@@ -315,7 +320,10 @@ export const lock = internalMutation({
         return null;
       }
       if (!first) {
-        if (set.row?.scheduled) await ctx.db.patch("groupSettings", set.row._id, { scheduled: false });
+        // scheduled: false also tells status the lock time has passed with nobody here, so the
+        // screens stop showing it.
+        if (!set.row) await ctx.db.insert("groupSettings", { channel, size: set.size, scheduled: false });
+        else if (set.row.scheduled !== false) await ctx.db.patch("groupSettings", set.row._id, { scheduled: false });
         return null;
       }
     }
@@ -327,6 +335,8 @@ export const lock = internalMutation({
 });
 
 // What the screens need: the team size, whether this class's teams are locked, and when they lock.
+// A lock that came due with nobody checked in marked the settings row (scheduled: false); then
+// locksAt is null until the first check-in, so no screen shows a lock time that has passed.
 export const status = query({
   args: { channel: v.string() },
   returns: v.object({ size: v.number(), locked: v.boolean(), locksAt: v.union(v.null(), v.number()) }),
@@ -334,7 +344,10 @@ export const status = query({
     const win = await lectureWindow(ctx, channel);
     const set = await classSettings(ctx, channel, win.start);
     const locked = !!set.row?.lockedAt;
-    return { size: set.size, locked, locksAt: locked ? null : lockTime(win, await firstCheckin(ctx, channel, win.start)) };
+    if (locked) return { size: set.size, locked, locksAt: null };
+    const first = await firstCheckin(ctx, channel, win.start);
+    const passed = !first && set.row?.scheduled === false;
+    return { size: set.size, locked, locksAt: passed ? null : lockTime(win, first) };
   },
 });
 
@@ -566,12 +579,9 @@ export const roster = query({
   handler: async (ctx, { channel }) => {
     await requireProf(ctx);
     const s = await scoreDay(ctx, channel);
+    // Only this class's students' rows, so the read stays the size of the class.
     const saved = new Map<string, number>();
-    const results = await ctx.db
-      .query("groupResults")
-      .withIndex("by_channel", (q) => q.eq("channel", channel))
-      .collect();
-    for (const r of results) saved.set(r.user, (saved.get(r.user) ?? 0) + r.ec);
+    for (const c of s.checkins) saved.set(c.user, await savedTotal(ctx, channel, c.user));
     const rows = s.checkins.map((c) => {
       const me = s.students.get(c.user) ?? { right: 0, answered: 0, changes: 0 };
       const team = s.teamOf.get(c.user);
@@ -694,30 +704,47 @@ function endLine(s: ClassScores, credited: number) {
   return `${first} Saved extra credit for ${plural(credited, "student")}. The next class starts from 0 points.`;
 }
 
+// All the extra credit saved for a student on this channel: their newest row's running total. Rows
+// saved before the total existed have none; then it adds up that student's rows.
+async function savedTotal(ctx: Ctx, channel: string, user: string) {
+  const byUser = () => ctx.db.query("groupResults").withIndex("by_channel_and_user", (q) => q.eq("channel", channel).eq("user", user));
+  const newest = await byUser().order("desc").first();
+  if (!newest) return 0;
+  if (newest.total !== undefined) return newest.total;
+  return (await byUser().collect()).reduce((sum, r) => sum + r.ec, 0);
+}
+
 // Saves each team member's extra credit for the open class (one groupResults row per student on
-// a team, with the team's rank, points and extra credit, the same numbers the board shows) and
-// returns how many students got some. Nothing is saved with no class open, or when no quiz ended
-// and no points changed. Call it just before the class ends.
+// a team, with the team's rank, points and extra credit, the same numbers the board shows, plus
+// the student's name and email from their check-in and their running total) and returns how many
+// students got some. Nothing is saved with no class open, or when no quiz ended and no points
+// changed. Call it just before the class ends.
 async function saveScores(ctx: MutationCtx, channel: string, s: ClassScores, endedAt: number) {
   const lecture = s.win.lecture;
   if (!lecture || (s.quizzes === 0 && s.changes === 0)) return 0;
   const byTeam = new Map(s.teams.map((g) => [g.team, g]));
+  const checkins = new Map(s.checkins.map((c) => [c.user, c]));
   let credited = 0;
   for (const [user, team] of s.teamOf) {
     const g = byTeam.get(team);
     if (!g || g.members === 0) continue;
-    await ctx.db.insert("groupResults", { channel, lecture, endedAt, user, team, rank: g.rank, points: g.points, ec: g.ec });
+    const c = checkins.get(user);
+    const total = (await savedTotal(ctx, channel, user)) + g.ec;
+    await ctx.db.insert("groupResults", { channel, lecture, endedAt, user, name: c?.name, email: c?.email, team, rank: g.rank, points: g.points, ec: g.ec, total });
     if (g.ec > 0) credited++;
   }
   return credited;
 }
 
-// The same save for a class that ends without End day, for the 12-hour close (lectures.close)
-// and lib.ensureLecture's close of a class left open past its close time to call just before
-// they set endedAt, with that endedAt. A quiz still open counts for nothing, the way the board
-// shows it. Returns how many students got extra credit.
-export async function saveExtraCredit(ctx: MutationCtx, channel: string, endedAt: number) {
-  return await saveScores(ctx, channel, await scoreDay(ctx, channel), endedAt);
+// The same save for a class that ends without End day: the 12-hour close (lectures.close) and
+// lib.ensureLecture's close of a class left open past its close time call it just before they
+// set endedAt, with that endedAt and the class they close (nothing is saved when that isn't the
+// open class). A quiz still open counts for nothing, the way the board shows it. Returns how many
+// students got extra credit.
+export async function saveExtraCredit(ctx: MutationCtx, channel: string, endedAt: number, lecture?: Id<"lectures">) {
+  const s = await scoreDay(ctx, channel);
+  if (lecture && s.win.lecture !== lecture) return 0;
+  return await saveScores(ctx, channel, s, endedAt);
 }
 
 // End day: saves each team member's extra credit for this class (saveScores) and ends the class.
@@ -735,39 +762,54 @@ export const endDay = mutation({
   },
 });
 
-// The extra credit End day saved, one row per student per class, oldest class first, for the
-// professor's CSV. `lecture` limits it to one class. Professors only.
+// Rows results returns per call at most; the CSV reads every page.
+const RESULTS_PAGE = 200;
+
+const savedRow = v.object({
+  lecture: v.id("lectures"),
+  endedAt: v.number(),
+  name: v.string(),
+  email: v.union(v.null(), v.string()),
+  team: teamInfo,
+  rank: v.number(),
+  points: v.number(), // the team's points in that class
+  ec: v.number(),
+});
+
+// The extra credit saved when classes ended, one row per student per class, a page at a time
+// (at most 200 rows, in the order they were saved), for the professor's CSV. `lecture` limits it
+// to one class. Each page is sorted by class, then place, team and name. Professors only.
 export const results = query({
-  args: { channel: v.string(), lecture: v.optional(v.id("lectures")) },
-  returns: v.array(
-    v.object({
-      lecture: v.id("lectures"),
-      endedAt: v.number(),
-      name: v.string(),
-      email: v.union(v.null(), v.string()),
-      team: teamInfo,
-      rank: v.number(),
-      points: v.number(), // the team's points in that class
-      ec: v.number(),
-    }),
-  ),
-  handler: async (ctx, { channel, lecture }) => {
+  args: { channel: v.string(), lecture: v.optional(v.id("lectures")), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(savedRow),
+  handler: async (ctx, { channel, lecture, paginationOpts }) => {
     await requireProf(ctx);
-    const rows = await ctx.db
-      .query("groupResults")
-      .withIndex("by_channel", (q) => q.eq("channel", channel))
-      .collect();
-    const out = [];
-    for (const r of rows) {
-      if (lecture && r.lecture !== lecture) continue;
-      // The student's check-in for that class: their newest one from before it ended.
-      const c = await ctx.db
-        .query("checkins")
-        .withIndex("by_channel_and_user", (q) => q.eq("channel", channel).eq("user", r.user).lte("_creationTime", r.endedAt))
-        .order("desc")
-        .first();
-      out.push({ lecture: r.lecture, endedAt: r.endedAt, name: c?.name ?? "Student", email: c?.email ?? null, team: describe(r.team), rank: r.rank, points: r.points, ec: r.ec });
+    const opts = { ...paginationOpts, numItems: Math.max(1, Math.min(RESULTS_PAGE, Math.floor(paginationOpts.numItems) || RESULTS_PAGE)) };
+    const found = await (lecture
+      ? ctx.db.query("groupResults").withIndex("by_channel_and_lecture", (q) => q.eq("channel", channel).eq("lecture", lecture))
+      : ctx.db.query("groupResults").withIndex("by_channel", (q) => q.eq("channel", channel))
+    ).paginate(opts);
+    const page: Infer<typeof savedRow>[] = [];
+    for (const r of found.page) {
+      // Rows saved before name was kept: the student's newest check-in from before that class ended.
+      const c =
+        r.name === undefined
+          ? await ctx.db
+              .query("checkins")
+              .withIndex("by_channel_and_user", (q) => q.eq("channel", channel).eq("user", r.user).lte("_creationTime", r.endedAt))
+              .order("desc")
+              .first()
+          : null;
+      const name = r.name ?? c?.name ?? "Student";
+      const email = r.name !== undefined ? (r.email ?? null) : (c?.email ?? null);
+      page.push({ lecture: r.lecture, endedAt: r.endedAt, name, email, team: describe(r.team), rank: r.rank, points: r.points, ec: r.ec });
     }
-    return out.sort((a, b) => a.endedAt - b.endedAt || a.rank - b.rank || a.team.team - b.team.team || a.name.localeCompare(b.name));
+    page.sort(byClassAndPlace);
+    return { ...found, page };
   },
 });
+
+// Oldest class first, then place, team number and name: the order the CSV lists saved rows in.
+function byClassAndPlace(a: Infer<typeof savedRow>, b: Infer<typeof savedRow>) {
+  return a.endedAt - b.endedAt || a.rank - b.rank || a.team.team - b.team.team || a.name.localeCompare(b.name);
+}
