@@ -10,7 +10,7 @@ No functions. The access checks every other file calls: `staffRole(ctx)`, `requi
 
 ## pass.ts
 
-Writes `passes`, `checkins`, `lectures` (a scan opens a class when none is open) and `devices` (last used).
+Writes `passes`, `checkins`, `lectures` (a scan opens a class when none is open) and `devices` (last used). `scan` also calls Live's `ensureGroup`, which writes `groups` (the student's team), `groupSettings` (marks the team lock as queued) and `groupPoints` (when a student checked in again moves off an empty team: `convex/live/README.md`).
 
 | Function | Who | What it does |
 |---|---|---|

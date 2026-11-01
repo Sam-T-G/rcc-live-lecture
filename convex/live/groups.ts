@@ -20,8 +20,10 @@
 // team stays with that team; a change for a student counts for that student's current team, the
 // way their right answers do. When the lock or a new size re-deals a team's students, that team's
 // changes become changes for the students who were on it, spread as evenly as whole points allow
-// (first checked in first; see splitChanges), so the points follow them to their new teams. Teams rank
-// by points per student (points / members, Sam's decision D6), so a team of 3 and a team of 4 that
+// (first checked in first; see splitChanges), so the points follow them to their new teams. The
+// same happens when a scan moves a student whose check-in was removed off a team with nobody else
+// checked in on it (ensureGroup): that team's changes are spread over every student dealt to it, and
+// the student takes their own share along. Teams rank by points per student (points / members, Sam's decision D6), so a team of 3 and a team of 4 that
 // answer equally well tie. They rank on that number to one decimal, the way every screen shows it,
 // so two teams that both show "1.3 per student" tie. Extra credit: 1st place 5, 2nd 3, 3rd 1, the
 // rest 0. Teams with the same points per student share the places they fill (two tied for 1st get
@@ -292,18 +294,25 @@ async function splitChanges(
     if (stays.length === members.length && members.every((u, j) => stays[j] === u)) continue;
     const got = given.get(c.team) ?? members.map(() => 0);
     given.set(c.team, got);
-    const share = members.map(() => 0);
-    const step = Math.sign(c.delta);
-    for (let n = 0; n < Math.abs(c.delta); n++) {
-      let pick = 0;
-      for (let j = 1; j < members.length; j++) if (step > 0 ? got[j] < got[pick] : got[j] > got[pick]) pick = j;
-      got[pick] += step;
-      share[pick] += step;
-    }
-    for (const [j, user] of members.entries())
-      if (share[j] !== 0) await ctx.db.insert("groupPoints", { channel, user, delta: share[j], reason: c.reason, at: c.at });
-    await ctx.db.delete("groupPoints", c._id);
+    await spread(ctx, channel, c, members, got);
   }
+}
+
+// Turn one team change into changes for `members`, one point at a time: a point added goes to the
+// student with the fewest of that team's points so far (`got`, updated here), a point taken off to
+// the one with the most, the first in `members` on a tie. Then the team change is deleted.
+async function spread(ctx: MutationCtx, channel: string, c: Doc<"groupPoints">, members: string[], got: number[]) {
+  const share = members.map(() => 0);
+  const step = Math.sign(c.delta);
+  for (let n = 0; n < Math.abs(c.delta); n++) {
+    let pick = 0;
+    for (let j = 1; j < members.length; j++) if (step > 0 ? got[j] < got[pick] : got[j] > got[pick]) pick = j;
+    got[pick] += step;
+    share[pick] += step;
+  }
+  for (const [j, user] of members.entries())
+    if (share[j] !== 0) await ctx.db.insert("groupPoints", { channel, user, delta: share[j], reason: c.reason, at: c.at });
+  await ctx.db.delete("groupPoints", c._id);
 }
 
 // Give a student a team in this class if they don't have one, and return it. The caller has just
@@ -314,11 +323,13 @@ async function splitChanges(
 // when nobody else checked in is on their team. That happens when the professor removed their
 // check-in before the lock (the lock re-dealt everyone else and left their row behind) or before a
 // new size re-dealt the class, and then they were scanned again. They then join the smallest team,
-// the way a late arrival does, so they never make a team of 1 (Sam's decision D12 l), and their old
-// team's point changes go with them as changes for them alone (they're the only student on it, the
-// way splitChanges gives a team's changes to the students on it), so no change is left counting for
-// nobody. When every team already has 5 they stay where they are, so a second scan of a student who
-// opened a new team never moves them. A second scan (not fresh) never moves anyone.
+// the way a late arrival does (Sam's decision D12 l), and their old team's point changes become
+// changes for every student dealt to it in this class, removed students included, spread as evenly
+// as whole points allow (first dealt first; see spread). The mover takes only their own share, so
+// with two returners each gets the same points whichever is scanned first, and a removed student's
+// share counts again when they're back. When every team already has 5 they stay on their old team,
+// alone until a teammate comes back, and its changes stay on it. A second scan (not fresh) never
+// moves anyone.
 export async function ensureGroup(ctx: MutationCtx, channel: string, user: string, fresh = false): Promise<number> {
   const win = await lectureWindow(ctx, channel);
   const groups = await classGroups(ctx, channel, win.start);
@@ -333,11 +344,11 @@ export async function ensureGroup(ctx: MutationCtx, channel: string, user: strin
     if (count.has(had.team)) return had.team; // someone else checked in is on their team
     const team = pickTeam(count, true, set.size, -1);
     if (team === -1) return had.team; // every team has 5: pickTeam would open a new team
-    for (const c of await classChanges(ctx, channel, win.start)) {
-      if (c.team !== had.team) continue;
-      await ctx.db.insert("groupPoints", { channel, user, delta: c.delta, reason: c.reason, at: c.at });
-      await ctx.db.delete("groupPoints", c._id);
-    }
+    // Everyone this class dealt to the old team, removed students included, in the order their
+    // groups rows were written (first dealt first), so each keeps their own share.
+    const members = [...groups].filter(([, g]) => g.team === had.team).map(([u]) => u);
+    const got = members.map(() => 0);
+    for (const c of await classChanges(ctx, channel, win.start)) if (c.team === had.team) await spread(ctx, channel, c, members, got);
     await ctx.db.patch("groups", had._id, { team });
     return team;
   }
