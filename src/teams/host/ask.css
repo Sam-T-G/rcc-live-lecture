@@ -54,26 +54,36 @@
 .ask-choices__none > .radio { justify-self: center; }
 
 .ask-form__acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
-/* A new question with none in the class yet: Ask the room and Cancel sit in the heading row's
-   empty action slot, where Draft with AI was, so they show at 1280 x 800 without a scroll. They
-   stay last in the form, after its fields, for the keyboard. */
+/* A new question, with or without one already in the class: Ask the room and Cancel sit in the
+   heading row's empty action slot, where Draft with AI was, so they show at 1280 x 800 without a
+   scroll. They stay last in the form, after its fields, for the keyboard. */
 @media (min-width: 720px) {
   .ask--draft { position: relative; }
   .ask--draft .ask-form__acts { position: absolute; top: var(--s6); right: var(--s8); }
 }
+
+/* While a new question is written, an open one folds to one line: its question, then End. */
+.ask-run { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2) var(--s4);
+  padding-bottom: var(--s4); border-bottom: 1px solid var(--line); }
+.ask-run__q { flex: 1 1 16em; min-width: 0; margin: 0; font-size: var(--t-body); font-weight: var(--w-head); line-height: 1.4; overflow-wrap: anywhere; }
 
 /* ------------------------------------------------------ Who got it wrong */
 .ask-wrong__q { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--s3); font-size: var(--t-body); font-weight: var(--w-head); line-height: 1.4;
   overflow-wrap: anywhere; }
 .ask-wrong__sum { font-size: var(--t-body); line-height: 1.5; color: var(--muted); }
 /* The well before anyone is listed: the table's head over one row with the line that says why. */
-.ask-wrong__wait { --rcols: 34% 33% minmax(0, 1fr); }
+.ask-wrong__wait { --rcols: 37% 33% minmax(0, 1fr); }
 .ask-wrong__wait > .ruled__row--empty { display: block; padding-block: var(--s2); }
 .ask-wrong__wait .status { padding-block: 0; font-size: var(--t-body); line-height: 1.5; }
-/* The table in its well, columns fixed to the aside: a long name ends in an ellipsis. */
+/* The table in its well, columns fixed to the aside. Name is the widest column; a long name and
+   the picked choice's words wrap onto more lines, so the professor reads both in full. The team
+   chip stays on one line. */
 .ask-wrong__table { table-layout: fixed; }
-.ask-wrong__table th:first-child { width: 34%; }
+.ask-wrong__table th:first-child { width: 37%; }
 .ask-wrong__table th:nth-child(2) { width: 33%; }
-.ask-wrong__table td { overflow: hidden; text-overflow: ellipsis; font-size: var(--t-body); }
+.ask-wrong__table td { font-size: var(--t-body); }
+.ask-wrong__table td:first-child,
+.ask-wrong__table td:last-child { white-space: normal; overflow-wrap: anywhere; padding-block: var(--s2); line-height: 1.4; }
+.ask-wrong__table td:nth-child(2) { overflow: hidden; }
 /* The AI's note: the kit's answer well, under the table. */
 .ask-note { margin: 0; font-size: var(--t-body); line-height: 1.5; white-space: pre-wrap; }

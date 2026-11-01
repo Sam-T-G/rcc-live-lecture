@@ -7,6 +7,10 @@
 // question's state word and facts, and the card's actions in one slot at the right in every state
 // (Draft with AI and Write my own, then End while a question is open). The hero slot under it
 // holds one number: how many answered while open, % right once a quiz with a right answer ends.
+//   While a new question is being written the form is the card's content in every state: its Ask
+// the room and Cancel take the heading row's action slot, and an existing question folds to its
+// heading (and, while it's open, its question with End), so the form opens where the professor
+// pressed Draft with AI or Write my own.
 import { useId, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -106,7 +110,7 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
   );
 
   return (
-    <section className={form && !current ? "hcard ask ask--draft" : "hcard ask"}>
+    <section className={form ? "hcard ask ask--draft" : "hcard ask"}>
       {current ? <Running key={current.id} poll={current} writing={!!form} actions={start} /> : <Head actions={start} />}
       {loading && (
         <div className="ask__load">
@@ -165,8 +169,9 @@ type Poll = NonNullable<FunctionReturnType<typeof api.checkin.quiz.current>>;
 type Stats = NonNullable<FunctionReturnType<typeof api.checkin.quiz.stats>>;
 
 // The question in this class now: open or ended, with its bars and numbers. While the next
-// question is being written (`writing`), its Open button is the main one, so End steps back.
-// `actions` (Draft with AI and Write my own) go in the heading row's slot before End.
+// question is being written (`writing`), the form's Ask the room holds the heading row's slot, so
+// this folds to its heading and, while it's open, one line with its question and End (stepped back
+// to secondary). `actions` (Draft with AI and Write my own) go in the heading row's slot before End.
 function Running({ poll, writing, actions }: { poll: Poll; writing: boolean; actions: ReactNode }) {
   const stats = useQuery(api.checkin.quiz.stats, { poll: poll.id });
   const end = useMutation(api.checkin.quiz.end);
@@ -182,7 +187,8 @@ function Running({ poll, writing, actions }: { poll: Poll; writing: boolean; act
   const most = Math.max(...counts);
   const top = (i: number) => ended && right === null && answered > 0 && counts[i] === most;
   // While it's open, the choice most students picked so far fills in ink; nothing is green yet.
-  const lead = (i: number) => poll.open && answered > 0 && counts[i] === most;
+  // Before the counts arrive every count is a stand-in 0, so nothing leads.
+  const lead = (i: number) => poll.open && !!stats && stats.answered > 0 && counts[i] === most;
   const share = (i: number) => (answered ? counts[i] / answered : 0);
   const pct = (i: number) => Math.round(share(i) * 100);
   const facts = [vote ? "Vote" : "Quiz", ...(stats?.aiDraft ? ["AI draft"] : []), ...(stats && stats.index !== null ? [`Slide ${stats.index + 1}`] : [])];
@@ -199,6 +205,26 @@ function Running({ poll, writing, actions }: { poll: Poll; writing: boolean; act
     }
   }
 
+  const endButton = poll.open && (
+    <Button variant={writing ? "secondary" : "primary"} size="lg" busy={ending} onClick={() => endIt(poll.id)}>
+      {vote ? "End the vote" : "End the quiz"}
+    </Button>
+  );
+
+  if (writing)
+    return (
+      <>
+        <Head state={poll.open ? "open" : "ended"} facts={facts} />
+        {poll.open && (
+          <div className="ask-run">
+            <p className="ask-run__q">{poll.question}</p>
+            {endButton}
+          </div>
+        )}
+        {error && <Status kind="error">{error}</Status>}
+      </>
+    );
+
   return (
     <>
       <Head
@@ -207,11 +233,7 @@ function Running({ poll, writing, actions }: { poll: Poll; writing: boolean; act
         actions={
           <>
             {actions}
-            {poll.open && (
-              <Button variant={writing ? "secondary" : "primary"} size="lg" busy={ending} onClick={() => endIt(poll.id)}>
-                {vote ? "End the vote" : "End the quiz"}
-              </Button>
-            )}
+            {endButton}
           </>
         }
       />
