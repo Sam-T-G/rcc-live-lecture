@@ -89,6 +89,24 @@ describe("projector (#/checkin/stage and #/live/leaderboard at 1920 x 1080)", ()
     expect(value(stage, ".stage__card > .stage-card > .qr", "width")).toBe("100%");
     const widths = every(stage, "width").filter((d) => d.r.selectors.some((s) => /\.qr\b/.test(s)));
     expect(widths.map((d) => d.v)).toEqual(["100%"]);
+    // The QR is the card's width minus the card's side padding, so a rule that changes either one
+    // moves it. Nothing but that width sizes the QR (no max-width, transform, zoom or scale), and the
+    // card's padding and columns are set once, by `.stage__card > .stage-card` (the QR spans both
+    // columns), with no quiz-state rule (`:has(.stage__poll)` and the like) changing them.
+    const BOX = /^((max-|min-)?(width|height|inline-size|block-size)|padding(-\w+)*|margin(-\w+)*|transform|translate|zoom|scale|aspect-ratio|grid-template-columns|box-sizing)$/;
+    // The selector's subject: its last compound, with any :has(...) taken out.
+    const subject = (s: string) => s.replace(/:has\((?:[^()]|\([^()]*\))*\)/g, "").trim().split(/\s*[\s>+~]\s*/).pop() ?? "";
+    const isQr = (s: string) => /\.qr\b/.test(subject(s));
+    const isCard = (s: string) => /\.stage-card(?![\w-])/.test(subject(s));
+    const boxed = (pick: (s: string) => boolean) =>
+      stage
+        .filter((r) => r.selectors.some(pick))
+        .flatMap((r) => r.decls.filter(([k]) => BOX.test(k)).map(([k, v]) => `${r.selectors.filter(pick).join(", ")} { ${k}: ${v} }`));
+    expect(boxed(isQr)).toEqual([".stage__card > .stage-card > .qr { width: 100% }"]);
+    expect(boxed(isCard)).toEqual([
+      ".stage__card > .stage-card { padding: calc(32 * var(--stage-u)) calc(44 * var(--stage-u)) }",
+      ".stage__card > .stage-card { grid-template-columns: minmax(0, 1fr) auto }",
+    ]);
   });
 
   it("with an ended quiz's bars on screen, the card and the quiz panel fit the stage (DCHK-1)", () => {

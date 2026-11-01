@@ -8,6 +8,12 @@
 // credit, and its numbers under the name). Past BIG_ROOMY the ledger takes the full width in two
 // columns of tighter rows and the top team's row is the field. The scoring line sits under the
 // board. stageboard.css sizes and places it all for the stage.
+//
+// Teams with the same points per student share a place, and before any quiz with a right answer
+// ends every team is 1st. The block is for a team alone in 1st: when two or more share it, every
+// team is a ledger row at the full width, so no team reads as the only winner, and the ledger's
+// <ol> gets .board--tied. Past BIG_ROOMY the green top row in stageboard.css doesn't check
+// .board--tied yet, so a shared 1st still paints its first row green there. StageBoard.test.ts.
 import type { ReactNode } from "react";
 import { TeamChip } from "../../blocks/kit";
 import { Status } from "../../blocks/ui";
@@ -116,7 +122,9 @@ export function StageBoard() {
   const cls = "board board--big" + (many ? " board--many" : "");
   const { shown, more } = bigRows(teams, me?.team);
   const [top, ...rest] = shown;
-  const ledger = many ? shown : rest;
+  // A team alone in 1st (ranks come sorted from the server, so ties for 1st come first).
+  const alone = top !== undefined && shown.filter((g) => g.rank === top.rank).length === 1;
+  const ledger = many || !alone ? shown : rest;
   return (
     <>
       <div className="stageboard__lock">
@@ -132,10 +140,11 @@ export function StageBoard() {
         </Waiting>
       ) : (
         <>
-          <div className="lbgrid stageboard">
-            {!many && <First g={top} mine={top.team === me?.team} />}
+          {/* With no 1st place block the ledger takes the block's column too. */}
+          <div className="lbgrid stageboard" style={!many && !alone ? { gridTemplateColumns: "minmax(0, 1fr)" } : undefined}>
+            {!many && alone && <First g={top} mine={top.team === me?.team} />}
             <div className="pledger">
-              <ol className={cls}>
+              <ol className={alone ? cls : cls + " board--tied"}>
                 {ledger.map((g) => (
                   <LedgerRow key={g.team} g={g} mine={g.team === me?.team} />
                 ))}
