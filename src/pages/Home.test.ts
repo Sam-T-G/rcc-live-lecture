@@ -77,3 +77,20 @@ describe("Home", () => {
     expect(html.match(/<div class="muted">/g)).toHaveLength(links.length);
   });
 });
+
+// sweep2-blocks-7: one name for the door iPad's page. Home's link, the page's own title once it
+// scans (src/teams/checkin/prof.tsx) and #/admin's pairing steps all call it the same thing.
+describe("sweep2-blocks-7 the door iPad's page has one name", () => {
+  const prof = readFileSync(new URL("../teams/checkin/prof.tsx", import.meta.url), "utf8");
+  const admin = readFileSync(new URL("./Admin.tsx", import.meta.url), "utf8");
+  const name = links.find((l) => l.to === "checkin/kiosk")?.text ?? "";
+
+  it("Home links it by the title the page shows", () => {
+    expect(prof).toContain(`<Screen title="${name}"`);
+  });
+
+  it("#/admin names it the same way in both pairing lines, and never as the Kiosk page", () => {
+    expect(admin).not.toMatch(/Kiosk page/);
+    expect(admin.split(name).length - 1).toBeGreaterThanOrEqual(2);
+  });
+});

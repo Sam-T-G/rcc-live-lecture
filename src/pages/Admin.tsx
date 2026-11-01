@@ -305,7 +305,7 @@ function PairDevice() {
 
   return (
     <Card title="Pair a door iPad">
-      <p className="muted">Open the Kiosk page on the iPad at the door to get a pairing code. Each code works for 10 minutes.</p>
+      <p className="muted">On the iPad at the door, open Home and tap Check-in kiosk to get a pairing code. Each code works for 10 minutes.</p>
       <form onSubmit={submit}>
         <Field label="Code on the iPad">
           {(f) => (
@@ -338,7 +338,7 @@ function Devices() {
       {devices === undefined ? (
         <Status kind="loading">Loading the door iPads…</Status>
       ) : devices.length === 0 ? (
-        <EmptyState title="No door iPads yet">Pair one with the code on its Kiosk page.</EmptyState>
+        <EmptyState title="No door iPads yet">Pair one with the code that Check-in kiosk shows on the iPad.</EmptyState>
       ) : (
         <ul className="list">
           {devices.map((d) => (

@@ -4,7 +4,6 @@
 // same layout dark. Any other part after #/ui shows "No page". docs/design.md says when to use
 // each part.
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ConvexError } from "convex/values";
 import { Link, useRoute } from "../blocks/router";
 import { Big, Card, Screen, Status } from "../blocks/ui";
 import {
@@ -566,18 +565,37 @@ function EmptyAndConfirm() {
             Remove
           </ConfirmButton>
         </State>
+        <State name="Busy">
+          <ConfirmState busy />
+        </State>
         <State name="Failed">
-          <ConfirmButton
-            defaultOpen
-            question="End class for today?"
-            confirm="End class"
-            onConfirm={() => wait(800).then(() => Promise.reject(new ConvexError("That class already ended.")))}
-          >
-            End class
-          </ConfirmButton>
+          <ConfirmState error="That class already ended." />
         </State>
       </div>
     </>
+  );
+}
+
+// <ConfirmButton>'s open box by hand, in the two states only a press reaches: `busy` (onConfirm
+// is running: the confirm button spins and Cancel is off) and `error` (onConfirm threw: the box
+// stays open with the error under the question). UIKit.test.ts checks it against the real one.
+function ConfirmState({ busy, error }: { busy?: boolean; error?: string }) {
+  const id = useId();
+  return (
+    <div className="confirm" role="group" aria-labelledby={id}>
+      <p className="confirm__question" id={id}>
+        End class for today?
+      </p>
+      {error && <Status kind="error">{error}</Status>}
+      <div className="confirm__actions">
+        <Button variant="danger" busy={busy}>
+          End class
+        </Button>
+        <Button variant="secondary" disabled={busy}>
+          Cancel
+        </Button>
+      </div>
+    </div>
   );
 }
 

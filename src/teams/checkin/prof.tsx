@@ -346,7 +346,7 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
 // The scanner, with "Signed in as …" and Sign out above it whenever someone is signed in on the
 // iPad (a scanner, or anyone signed in on a paired iPad who isn't staff), so the next person at
 // the door can see the sign-in and end it. `ends`: the scanner opened for this sign-in, so it also
-// says when the sign-in ends. Google's renewal never runs on #/checkin/kiosk (auth.tsx onDoorIPad),
+// says when the sign-in ends. Google's renewal never runs on #/checkin/kiosk (auth.tsx noPromptHere),
 // so the scanner closes then with no other warning.
 function WhoIsSignedIn({ ends, children }: { ends?: boolean; children: ReactNode }) {
   const { user } = useGoogleUser();

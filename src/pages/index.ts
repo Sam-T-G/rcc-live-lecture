@@ -15,25 +15,32 @@
 //   #/admin             staff roles and door iPads
 //   #/lab               every building block, one panel each
 //   #/ui                the design kit, light and dark (#/ui/projector at projector size)
-import { createElement, lazy, Suspense, type ComponentType } from "react";
+import { createElement, Suspense, useState, type ComponentType } from "react";
 import { Link, useRoute } from "../blocks/router";
 import { Screen, Status } from "../blocks/ui";
 import Home from "./Home";
 import Lab from "./Lab";
+import { retryLazy } from "./retryLazy";
 import CheckinPage from "../teams/checkin/Page";
 import LivePage from "../teams/live/Page";
 import HostPage from "../teams/host/Page";
 import PortalPage from "../portal/Page";
 
 // #/ui loads only when someone opens it, so phones on other pages never download the gallery.
-const UIKit = lazy(() => import("./UIKit"));
-// #/admin too: only staff open it, on a laptop.
-const Admin = lazy(() => import("./Admin"));
+// #/admin too: only staff open it, on a laptop. retryLazy instead of React.lazy, so after a failed
+// load (a phone offline for a moment) the page boundary's Go home and a link back import the file
+// again (src/pages/retryLazy.ts says why).
+const pickUIKit = retryLazy(() => import("./UIKit"));
+const pickAdmin = retryLazy(() => import("./Admin"));
 
 // What a lazy page shows while its file downloads, so a slow network never shows a blank page.
-function loading(Page: ComponentType, title: string) {
+// Each mount picks the page once.
+function loading(pick: () => ComponentType, title: string) {
   const fallback = createElement(Screen, { title, wide: true }, createElement(Status, { kind: "loading", children: "Loading…" }));
-  return () => createElement(Suspense, { fallback }, createElement(Page));
+  return function Loading() {
+    const [Page] = useState(pick);
+    return createElement(Suspense, { fallback }, createElement(Page));
+  };
 }
 
 // A page that has nothing after its name: #/lab/nope and #/admin/x show "No page at #/...", the
@@ -58,6 +65,6 @@ export const pages: Record<string, ComponentType> = {
   live: LivePage, // #/live, #/live/leaderboard
   host: HostPage, // #/host
   portal: PortalPage, // #/portal, #/portal?channel=<name>
-  ui: loading(UIKit, "UI kit"), // #/ui (every color and kit part, light and dark), #/ui/projector
-  admin: alone(loading(Admin, "Admin")), // #/admin: the staff list and the door iPads
+  ui: loading(pickUIKit, "UI kit"), // #/ui (every color and kit part, light and dark), #/ui/projector
+  admin: alone(loading(pickAdmin, "Admin")), // #/admin: the staff list and the door iPads
 };

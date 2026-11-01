@@ -154,10 +154,11 @@ function ending(s: Stored | null) {
   return !!s && isGoogle(s.token) && s.exp - WARN <= Date.now();
 }
 
-// The door iPad (#/checkin/kiosk): Google's prompt never shows there, since anyone in line could
-// tap its "Continue as <staff email>" card.
-function onDoorIPad() {
-  return /^#\/?checkin\/kiosk(?:[/?]|$)/.test(window.location?.hash ?? "");
+// Routes where Google's prompt never shows: the door iPad (#/checkin/kiosk), where anyone in line
+// could tap its "Continue as <staff email>" card, and the projector (#/checkin/stage,
+// #/live/leaderboard), where that card would show the professor's Google account to the room.
+function noPromptHere() {
+  return /^#\/?(?:checkin\/kiosk|checkin\/stage|live\/leaderboard)(?:[/?]|$)/.test(window.location?.hash ?? "");
 }
 
 // ready: Google's script has loaded (or failed to), so its button can show. It loads once a page
@@ -294,7 +295,7 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
   //   back in with no click, unless it did so in the last 10 minutes. Safari and Firefox show a
   //   One Tap card instead, which needs a click; anyone who dismissed the card gets none for a
   //   while. If nothing comes, it asks once more 2 minutes before the token runs out. Never on the
-  //   door iPad (onDoorIPad).
+  //   door iPad or the projector (noPromptHere).
   // - endsAt turns on, and professor pages, #/admin, #/live and #/checkin/student show the end
   //   time with Google's button (SignInEnding), which works in every browser.
   // When the sign-in ends here, `ended` turns on until the next sign-in or sign-out.
@@ -305,7 +306,7 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
     const left = user.exp - Date.now();
     const google = isGoogle(user.token);
     const asks = google && gsi === "ready" ? [left - WARN, left - 2 * MIN] : [];
-    const timers = asks.map((ms) => setTimeout(() => onDoorIPad() || window.google?.accounts.id.prompt(), Math.max(0, ms)));
+    const timers = asks.map((ms) => setTimeout(() => noPromptHere() || window.google?.accounts.id.prompt(), Math.max(0, ms)));
     if (google) timers.push(setTimeout(() => setEndingToken(user.token), Math.max(0, left - WARN)));
     timers.push(
       setTimeout(() => {

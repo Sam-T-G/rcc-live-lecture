@@ -24,6 +24,7 @@ struct Hex: Equatable {
 /// stylesheets. Each line ends with its token; src/styles/ios.test.ts fails when a hex here
 /// differs from tokens.css, or when a screen uses a system color instead of one of these.
 enum Palette {
+    static let bg = Hex(light: 0xF7FAF8, dark: 0x121412) // --bg
     static let accent = Hex(light: 0x00732D, dark: 0x96D6A0) // --accent
     static let accentText = Hex(light: 0xFFFFFF, dark: 0x003410) // --accent-text
     static let warn = Hex(light: 0xFFE5C0, dark: 0x624000) // --warn

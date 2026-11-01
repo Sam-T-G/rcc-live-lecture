@@ -2,6 +2,7 @@
 // Every route shows something while it loads, and a URL with a part no page has shows "No page"
 // (F41). The pages in src/pages/index.ts render here with the real router reading a stubbed
 // location.hash. No case below reaches the server, so there is no Convex client.
+import { readFileSync } from "node:fs";
 import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -56,5 +57,18 @@ describe("E2E-2 a part after a page's name that the page doesn't have shows 'No 
     expect(open(pages.live, "#/live/leaderboard/extra")).toBe(noPage("live/leaderboard/extra"));
     expect(open(pages.live, "#/live/nope/x")).toBe(noPage("live/nope/x"));
     expect(open(pages.live, "#/live/nope")).toBe(noPage("live/nope"));
+  });
+});
+
+describe("sweep2-blocks-4 F41 before the app's file runs", () => {
+  // Every route is index.html until the main bundle (about 130 kB gzipped) downloads and runs, so
+  // #root holds a loading line, the same markup as the app's own, which createRoot().render
+  // replaces. With JavaScript off, a line says so instead of a blank page.
+  const html = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  const root = /<div id="root">([\s\S]*?)<\/div>/.exec(html)?.[1] ?? "";
+
+  it("index.html's #root shows Loading…, and a browser with JavaScript off gets a line that says so", () => {
+    expect(root).toContain('<p class="status status--loading" role="status">Loading…</p>');
+    expect(html).toMatch(/<noscript>[\s\S]*Turn on JavaScript[\s\S]*<\/noscript>/);
   });
 });

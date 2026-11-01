@@ -118,7 +118,7 @@ describe("ROLES #/admin as an admin", () => {
     const html = open(ADMIN, staff("admin@example.edu", "admin"));
     const pair = words(html.slice(html.indexOf("<h2>Pair a door iPad</h2>"), html.indexOf("<h2>Door iPads</h2>")));
     expect(pair).not.toMatch(/\d-digit/);
-    expect(pair).toContain("Open the Kiosk page on the iPad at the door to get a pairing code. Each code works for 10 minutes.");
+    expect(pair).toContain("On the iPad at the door, open Home and tap Check-in kiosk to get a pairing code. Each code works for 10 minutes.");
   });
 
   it("ROLES Changes lists each change as a sentence, newest first", () => {

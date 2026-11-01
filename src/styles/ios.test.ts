@@ -74,10 +74,11 @@ describe("iOS app colors and layout follow docs/design.md", () => {
   });
 
   it("no screen uses a system color or the unset AccentColor", () => {
-    // `Color.red`, `UIColor.systemOrange`, and a bare `.red` or `.accentColor` where a color goes
-    // (`.tint(showNotice ? .red : .accentColor)`).
+    // `Color.red`, `UIColor.systemOrange`, and a bare `.red`, `.accentColor` or `.systemX` where a
+    // color goes (`.tint(showNotice ? .red : .accentColor)`, `Color(.systemOrange)`,
+    // `Color(uiColor: .systemRed)`, `Color(.systemBackground)`). `.system(size:)` fonts don't match.
     const system =
-      /\b(?:Color|UIColor)\s*\.\s*(?:red|orange|blue|yellow|green|pink|purple|accentColor|system\w+)\b|(?<![\w)\]])\.(?:red|orange|blue|yellow|green|pink|purple|accentColor)\b/g;
+      /\b(?:Color|UIColor)\s*\.\s*(?:red|orange|blue|yellow|green|pink|purple|accentColor|system\w+)\b|(?<![\w)\]])\.(?:red|orange|blue|yellow|green|pink|purple|accentColor|system\w+)\b/g;
     const hits = Object.entries(SWIFT).flatMap(([file, src]) =>
       code(src)
         .split("\n")

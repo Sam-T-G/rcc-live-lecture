@@ -22,25 +22,29 @@
    script stores that list with the key and takes it out of the address bar too. A
    &bridge-site= without ?bridge= sends nothing and stays in the address bar.
 
-   It sends when the slide or the number of presses shown on it changes:
+   It sends when the slide or the number of presses shown on it changes, and again in the 3 s
+   after that when the slide's title or lines change as its animation runs:
      index   the slide, 0-based
      beat    how many of the slide's presses are shown
      count   slides in the deck
-     title   the slide's first h1 or h2, or its aria-label when it has neither
+     title   the slide's first h1 or h2 the room can see, or its aria-label when there is none
      lines   at most 12 lines of the slide's text, in page order, each once, from .eyebrow,
              .sub, li (a list item inside another list item is part of its parent's line),
-             .label, .clock__hint and p.figure
+             .label, .clock__hint and p.figure (a counting figure sends its end value)
      run     an id the script stores in this tab for the deck (a reload reuses it)
      seq     a number that goes up with every send, so the backend can ignore a press that
              arrives after a newer one (convex/deck.ts)
-   Never speaker notes (aside.notes), .notice text, or data-beat items not shown yet.
-   When a site can't be reached (no network, a typo'd deployment name), only that site gets
-   the same send again: 0.3 s later, then 0.6, 1.2 and 2.4 s and so on up to every 9.6 s, until
-   it answers, the slide changes, or 2 minutes have passed since the first send. After 2 minutes
-   the press is old: the professor may have ended the class since, and a late press would open a
-   new one (convex/deck.ts), so that site waits for the next slide. Sites that took the send get
-   nothing more, so a dead site
-   never makes the others reopen a class the professor ended.
+   Only text the room can see on the projector: never speaker notes (aside.notes), .notice
+   text, data-beat items not shown yet, anything display:none or visibility:hidden (a strip
+   card off the stage), or a deck-kit source list (.flow-src, .strip-src, .compress-src and the
+   other *-src lists a scene or compress slide draws from one step at a time).
+   When a site can't be reached (no network, a typo'd deployment name) or answers 500 or more,
+   only that site gets the same send again: 0.3 s later, then 0.6, 1.2 and 2.4 s and so on up to
+   every 9.6 s, until it takes it, the slide changes, or 2 minutes have passed since the first
+   send. A 4xx answer (wrong key, bad slide) is not tried again. After 2 minutes the press is
+   old: the professor may have ended the class since, and a late press would open a new one
+   (convex/deck.ts), so that site waits for the next slide. Sites that took the send get
+   nothing more, so a dead site never makes the others reopen a class the professor ended.
    Presenter, mirror, remote and run-sheet windows (?view=) never send. Decks load this file
    from the live site, so a change here reaches them only after Sam deploys. */
 (function () {
@@ -111,6 +115,34 @@
 
   function clean(t) { return (t || '').replace(/\s+/g, ' ').trim(); }
 
+  // Whether the room can see `el` now: false when it or a parent is display:none (deck-kit hides
+  // a scene's source list that way once the scene draws) or it is visibility:hidden (a beat not
+  // shown yet, a strip card off the stage). An element that isn't rendered has no innerText of its
+  // own (the browser hands back textContent instead), so this check comes before reading it.
+  function visible(el) {
+    if (typeof el.checkVisibility === 'function') return el.checkVisibility({ visibilityProperty: true });
+    if (!el.getClientRects().length) return false; // a browser without checkVisibility (Safari before 17.4)
+    return getComputedStyle(el).visibility === 'visible';
+  }
+  // A deck-kit source list (.flow-src, .strip-src, .bars-src, .compress-src, .rung-src ...): the
+  // text a scene, compress or rung slide draws from step by step. compress-src and rung-src stay
+  // rendered (clipped to 1 px), so only their class keeps them off the phones.
+  var SOURCE = '[class$="-src"], [class*="-src "]';
+  // A figure counts from data-from to data-to over a second or so after the slide opens, so its
+  // text is a number on the way. Send the end value, the way deck.js shows it when the count lands.
+  function figureText(el) {
+    var num = el.querySelector('.figure__num[data-to]');
+    var to = num ? parseFloat(num.getAttribute('data-to')) : NaN;
+    if (isNaN(to)) return el.innerText;
+    var end = Math.round(to);
+    end = Math.abs(to) >= 1000 ? end.toLocaleString('en-US') : String(end);
+    return Array.prototype.map.call(el.childNodes, function (n) {
+      if (n === num) return end;
+      if (n.nodeType !== 1) return n.textContent;
+      return n.contains(num) ? figureText(n) : visible(n) ? n.innerText : '';
+    }).join(' ');
+  }
+
   function read(st) {
     var slides = document.querySelectorAll('main.deck > section.slide');
     var slide = slides[st.i];
@@ -118,58 +150,79 @@
     var beats = Array.prototype.slice.call(slide.querySelectorAll('[data-beat]'));
     var hidden = beats.slice(st.b);
     function shown(el) {
-      if (el.closest('aside.notes, .notice')) return false;
+      if (el.closest('aside.notes, .notice') || el.closest(SOURCE)) return false;
       for (var k = 0; k < hidden.length; k++) if (hidden[k] === el || hidden[k].contains(el)) return false;
-      return true;
+      return visible(el);
     }
-    var head = slide.querySelector('h1, h2');
+    var head = Array.prototype.filter.call(slide.querySelectorAll('h1, h2'), shown)[0];
     var lines = [];
     slide.querySelectorAll('.eyebrow, .sub, li, .label, .clock__hint, p.figure').forEach(function (el) {
       if (!shown(el)) return;
       if (el.tagName === 'LI' && el.parentElement.closest('li')) return;
-      var t = clean(el.innerText || el.textContent); // innerText keeps the gap between a beat and its detail line
+      // innerText leaves out a beat inside the line that isn't shown yet, and keeps the gap
+      // between a beat and its detail line.
+      var t = clean(el.matches('p.figure') ? figureText(el) : el.innerText);
       if (t && lines.indexOf(t) < 0) lines.push(t);
     });
-    return { index: st.i, beat: st.b, count: slides.length, title: head ? clean(head.textContent) : clean(slide.getAttribute('aria-label')), lines: lines.slice(0, 12) };
+    return { index: st.i, beat: st.b, count: slides.length, title: head ? clean(head.innerText) : clean(slide.getAttribute('aria-label')), lines: lines.slice(0, 12) };
   }
+  // True when two reads of a slide would show the phones the same thing.
+  function same(a, b) { return a.title === b.title && a.lines.join('\n') === b.lines.join('\n'); }
 
   var last = '';
+  var pressAt = 0; // when the deck reached slide:press `last` (Date.now())
+  // A press starts animations (a strip card scrolling onto the stage, a scene drawing its next
+  // stop), so for 3 s after it each check reads the slide again and sends it again when what the
+  // phones would show has changed. After that a slide's lines stay as sent until the next press.
+  var SETTLE_MS = 3000;
   var latest = null; // the body of the last send
   var latestAt = 0; // when `latest` first went out (Date.now())
   var RETRY_MS = 120000; // a failed send is tried again for 2 minutes after it first went out
-  // Sites whose fetch of `latest` failed: { wait: checks until the next try, gap: checks between
+  // Sites whose send of `latest` failed: { wait: checks until the next try, gap: checks between
   // tries (1, 2, 4 ... 32), busy: a try is on its way }.
   var retry = {};
+  // A send that didn't land: no answer (no network, a typo'd deployment name) or a 5xx (the
+  // backend failed to store it or was busy). Only that site tries `latest` again.
+  function failed(site, body, why) {
+    if (body !== latest) return; // a newer slide has gone out since
+    var gap = retry[site] ? Math.min(retry[site].gap * 2, 32) : 1;
+    retry[site] = { wait: gap, gap: gap, busy: false };
+    console.warn('deck-bridge:', site, why);
+  }
   function send(site, body) {
     fetch(site.replace(/\/$/, '') + '/deck', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) })
       .then(function (r) {
+        // A 4xx (403 wrong key, 400 bad slide) fails the same way every time: no retry.
+        if (r.status >= 500) return failed(site, body, r.status);
         if (!r.ok) console.warn('deck-bridge:', site, r.status);
         if (body === latest) delete retry[site];
       })
-      .catch(function (e) {
-        if (body !== latest) return; // a newer slide has gone out since
-        var gap = retry[site] ? Math.min(retry[site].gap * 2, 32) : 1;
-        retry[site] = { wait: gap, gap: gap, busy: false };
-        console.warn('deck-bridge: offline', site, e);
-      });
+      .catch(function (e) { failed(site, body, e); });
   }
   function tick() {
     var st = window.__deck && window.__deck.state();
     if (!st) return;
     var sig = st.i + ':' + st.b;
+    var body = null;
     if (sig === last) {
-      if (Date.now() - latestAt > RETRY_MS) { retry = {}; return; }
-      Object.keys(retry).forEach(function (site) {
-        var r = retry[site];
-        if (r.busy || --r.wait > 0) return;
-        r.busy = true;
-        send(site, latest);
-      });
-      return;
+      var fresh = Date.now() - pressAt < SETTLE_MS ? read(st) : null;
+      if (fresh && !same(fresh, latest)) body = fresh;
+      else {
+        if (Date.now() - latestAt > RETRY_MS) { retry = {}; return; }
+        Object.keys(retry).forEach(function (site) {
+          var r = retry[site];
+          if (r.busy || --r.wait > 0) return;
+          r.busy = true;
+          send(site, latest);
+        });
+        return;
+      }
+    } else {
+      body = read(st);
+      if (!body) return;
+      last = sig;
+      pressAt = Date.now();
     }
-    var body = read(st);
-    if (!body) return;
-    last = sig;
     // Up by at least 1 on every send, and never behind the clock, so after a reload it is past
     // every send before it even when the last one never reached sessionStorage.
     run.seq = Math.max(run.seq + 1, Date.now());

@@ -281,11 +281,21 @@ describe("ROLES-UI-fixcheck-2 the page says when a Google sign-in ends", () => {
   });
 });
 
-// A One Tap card on the door iPad would let anyone in line tap "Continue as <staff email>".
-describe("ROLES-UI-fixcheck-1 no Google prompt on the door iPad", () => {
+// A One Tap card on the door iPad would let anyone in line tap "Continue as <staff email>", and on
+// the projector (#/checkin/stage, #/live/leaderboard, sweep2-blocks-1) it would show the
+// professor's Google account to the whole room.
+describe("ROLES-UI-fixcheck-1 sweep2-blocks-1 no Google prompt on the door iPad or the projector", () => {
   const goTo = (hash: string) => ((window as unknown as { location: { hash: string } }).location.hash = hash);
 
-  for (const hash of ["#/checkin/kiosk", "#checkin/kiosk", "#/checkin/kiosk?x=1"])
+  for (const hash of [
+    "#/checkin/kiosk",
+    "#checkin/kiosk",
+    "#/checkin/kiosk?x=1",
+    "#/checkin/stage",
+    "#/checkin/stage?deck=https%3A%2F%2Fexample.org%2Fdeck%2F&bridge=saved",
+    "#/live/leaderboard",
+    "#live/leaderboard",
+  ])
     it(`never calls prompt() on ${hash}; the sign-in ends a minute before its token`, async () => {
       goTo(hash);
       signedIn(GOOGLE, T0 + 60 * MIN);
@@ -296,11 +306,12 @@ describe("ROLES-UI-fixcheck-1 no Google prompt on the door iPad", () => {
       expect(user()).toBeNull();
     });
 
-  it("still calls prompt() on a route that only starts like the kiosk's", async () => {
-    goTo("#/checkin/kioskette");
-    signedIn(GOOGLE, T0 + 60 * MIN);
-    await settle();
-    await at(55 * MIN);
-    expect(prompt).toHaveBeenCalledTimes(1);
-  });
+  for (const hash of ["#/checkin/kioskette", "#/checkin/stagehand", "#/live", "#/live/leaderboards"])
+    it(`still calls prompt() on ${hash}, which only starts like a route that never asks`, async () => {
+      goTo(hash);
+      signedIn(GOOGLE, T0 + 60 * MIN);
+      await settle();
+      await at(55 * MIN);
+      expect(prompt).toHaveBeenCalledTimes(1);
+    });
 });

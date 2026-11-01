@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { ConfirmButton } from "../blocks/kit";
 import UIKit from "./UIKit";
 
 function open(hash: string) {
@@ -36,6 +37,36 @@ describe("#/ui shows every kit part in every state", () => {
   it("links to the projector layout in light and in dark", () => {
     expect(html).toContain('href="#/ui/projector"');
     expect(html).toContain('href="#/ui/projector/dark"');
+  });
+
+  // The busy and failed boxes otherwise show only after a real press and an 800 ms wait, which
+  // screenshots never catch.
+  describe("sweep2-blocks-5 ConfirmButton closed, asking, busy and failed", () => {
+    const boxes = html.match(/<div class="confirm"[^]*?<\/div><\/div>/g) ?? [];
+    const ids = (s: string) => s.replace(/«[^»]*»|:[a-z0-9]+:|_r_[a-z0-9]+_/gi, "ID");
+
+    it("in light and dark: one box asking, one busy, one with its error line", () => {
+      expect(boxes).toHaveLength(6);
+      expect(boxes.filter((b) => b.includes('aria-busy="true"'))).toHaveLength(2);
+      const failed = boxes.filter((b) => b.includes('<p class="status status--error" role="alert">That class already ended.</p>'));
+      expect(failed).toHaveLength(2);
+      expect(failed.every((b) => !b.includes("aria-busy"))).toBe(true);
+    });
+
+    it("the busy and failed samples are ConfirmButton's own markup in that state", () => {
+      const real = renderToStaticMarkup(
+        createElement(ConfirmButton, { defaultOpen: true, question: "End class for today?", confirm: "End class", onConfirm: () => {}, children: "End class" }),
+      );
+      const failed = boxes.find((b) => b.includes("status--error"))!;
+      expect(ids(failed.replace(/<p class="status status--error"[^]*?<\/p>/, ""))).toBe(ids(real));
+      const busy = boxes.find((b) => b.includes("aria-busy"))!;
+      expect(busy).toMatch(
+        /<button[^>]*aria-busy="true"[^>]*><span class="btn__label">End class<\/span><span class="btn__spinner"[^>]*><\/span><\/button><button[^>]*disabled=""[^>]*><span class="btn__label">Cancel<\/span><\/button>/,
+      );
+      // Apart from the busy marks, the same markup as the real box.
+      const calm = busy.replace(/ aria-busy="true"| aria-disabled="true"| disabled=""|<span class="btn__spinner"[^>]*><\/span>/g, "");
+      expect(ids(calm)).toBe(ids(real));
+    });
   });
 });
 

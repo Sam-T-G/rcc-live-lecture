@@ -172,7 +172,7 @@ struct DeckView: View {
                 Spacer()
             }
         }
-        .background(Color(.systemBackground))
+        .background(Palette.bg.color) // #/portal's page color, not the system's white or black
         // The late banner takes its own room under the buttons, so it never covers the slide
         // count, the Live badge, the bar or the slide (sweep1-ios-1). #/portal does the same.
         .safeAreaInset(edge: .bottom, spacing: 0) { LateBannerView(banner: store.late) }
