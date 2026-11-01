@@ -29,8 +29,9 @@ export type Seen = { at: number; ids: string[] };
 // just came into the list.
 export const RECENT_MS = 60_000;
 
-// The arrivals in `feed` to show now, and what's seen once they show. `now` is the phone's clock
-// when the feed arrived (Date.now()); `at` is the scan time by the server's clock.
+// The arrivals in `feed` to show now, and what's seen once they show. `now` is when the feed
+// arrived by the server's clock (LateBanner.tsx: the screen's Date.now() less how far it runs
+// ahead of checkin.attendance.clock); `at` is the scan time by the server's clock.
 // - The first feed a banner gets (seen null) shows nothing and marks everything scanned before
 //   `now` as seen, so an arrival from before the page opened never shows, even one the first
 //   feed didn't hold.
@@ -40,8 +41,8 @@ export const RECENT_MS = 60_000;
 // - An arrival scanned more than a minute before `now` never shows (RECENT_MS): someone who had
 //   the opt-out ticked and unticks it later, or students who become late when the professor saves
 //   or moves the class start after they walked in (lateFeed works lateness out when read).
-// A phone clock that runs fast by a few seconds only skips arrivals in the page's first seconds;
-// one that runs over a minute fast shows no arrivals at all.
+// If the first feed comes back before the server's clock does, `now` for it is the screen's own
+// clock, so a screen that runs fast skips arrivals in its first seconds (as many as it runs fast).
 export function newArrivals(feed: Late[], seen: Seen | null, now: number): { fresh: Late[]; seen: Seen } {
   if (seen === null) return { fresh: [], seen: newest(feed, { at: now, ids: [] }) };
   const fresh = feed.filter((f) => (f.at > seen.at || (f.at === seen.at && !seen.ids.includes(f.id))) && f.at >= now - RECENT_MS);

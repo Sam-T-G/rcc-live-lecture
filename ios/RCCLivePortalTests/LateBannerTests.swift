@@ -19,12 +19,74 @@ private func contrast(_ a: UInt32, _ b: UInt32) -> Double {
     return (max(x, y) + 0.05) / (min(x, y) + 0.05)
 }
 
+/// A phone clock a test sets by hand, in ms since 1970.
+@MainActor
+private final class TestClock {
+    var ms: Double
+    init(_ ms: Double) { self.ms = ms }
+}
+
+private let minute = 60_000.0
+private let t2130 = 1_793_914_200_000.0  // 2026-11-05 21:30 UTC, as in late.opened.test.ts
+private func arrival(_ name: String, _ at: Double) -> LateArrival {
+    LateArrival(id: name, first: name, lateMin: 10, at: at)
+}
+
 @Suite("Late banner")
 @MainActor
 struct LateBannerTests {
+    // Existing tests below pass `now: { 0 }`: the phone's clock reads 0 ms, before every arrival
+    // in them, so only the newest-seen rule decides what shows.
+
+    @Test("CKP-fixcheck-2 an arrival from before launch that comes into the feed later doesn't show (she unticks the opt-out); a new one does")
+    func beforeLaunchUntick() {
+        // Xena is scanned 10 min late at 21:40 with the opt-out ticked. Yuri launches the app at 21:42: the feed is empty.
+        let clock = TestClock(t2130 + 12 * minute)
+        let banner = LateBanner(hold: .seconds(60), now: { clock.ms })
+        banner.take([])
+        // At 21:48 Xena unticks it, so the feed has her row again.
+        clock.ms = t2130 + 18 * minute
+        banner.take([arrival("Xena", t2130 + 10 * minute)])
+        #expect(banner.showing.isEmpty)
+        // Zed walks in late at 21:50: he shows, once.
+        clock.ms = t2130 + 20 * minute + 500
+        let zed = arrival("Zed", t2130 + 20 * minute)
+        banner.take([zed, arrival("Xena", t2130 + 10 * minute)])
+        #expect(banner.showing.map(\.first) == ["Zed"])
+        banner.take([zed, arrival("Xena", t2130 + 10 * minute)])
+        #expect(banner.showing.map(\.first) == ["Zed"])
+    }
+
+    @Test("CKP-fixcheck-1 an arrival scanned 30 s before launch that comes into the feed 20 s after doesn't show")
+    func justBeforeLaunch() {
+        let clock = TestClock(t2130)
+        let banner = LateBanner(hold: .seconds(60), now: { clock.ms })
+        banner.take([])
+        clock.ms = t2130 + 20_000
+        banner.take([arrival("Xena", t2130 - 30_000)])
+        #expect(banner.showing.isEmpty)
+    }
+
+    @Test("CKP-risk-3 only arrivals scanned in the last minute are new: an unticked opt-out 8 min after the scan doesn't show")
+    func olderThanAMinute() {
+        // The app launches at 21:25. Xena is scanned at 21:31 with the opt-out ticked and unticks it at 21:39.
+        let clock = TestClock(t2130 - 5 * minute)
+        let banner = LateBanner(hold: .seconds(60), now: { clock.ms })
+        banner.take([])
+        clock.ms = t2130 + 9 * minute
+        banner.take([arrival("Xena", t2130 + minute)])
+        #expect(banner.showing.isEmpty)
+        // An arrival exactly a minute old still shows; one a millisecond older doesn't.
+        clock.ms = t2130 + 10 * minute
+        banner.take([arrival("Dee", t2130 + 9 * minute), arrival("Xena", t2130 + minute)])
+        #expect(banner.showing.map(\.first) == ["Dee"])
+        clock.ms = t2130 + 11 * minute + 1
+        banner.take([arrival("Eve", t2130 + 10 * minute), arrival("Dee", t2130 + 9 * minute)])
+        #expect(banner.showing.map(\.first) == ["Dee"])
+    }
     @Test("ios-9 arrivals in the feed at launch never show; a later arrival shows once")
     func newArrivalShowsOnce() {
-        let banner = LateBanner(hold: .seconds(60))
+        let banner = LateBanner(hold: .seconds(60), now: { 0 })
         banner.take([ana])  // the first answer after launch: Ana walked in before the app opened
         #expect(banner.showing.isEmpty)
 
@@ -40,7 +102,7 @@ struct LateBannerTests {
 
     @Test("ios-9 a student who turns the banner off and on again doesn't show twice")
     func optOutAndBackOn() {
-        let banner = LateBanner(hold: .seconds(60))
+        let banner = LateBanner(hold: .seconds(60), now: { 0 })
         banner.take([])  // launch: nobody late yet
         banner.take([ben])  // Ben checks in late
         banner.take([])  // Ben turns the banner off, so lateFeed leaves him out
@@ -51,7 +113,7 @@ struct LateBannerTests {
     @Test("ios-9 an older arrival that comes back into the 5-row feed doesn't show")
     func olderArrivalBackInFeed() {
         let rows = (0..<6).map { LateArrival(id: "id\($0)", first: "S\($0)", lateMin: $0 + 1, at: Double(1_000 + $0)) }
-        let banner = LateBanner(hold: .seconds(60))
+        let banner = LateBanner(hold: .seconds(60), now: { 0 })
         banner.take(Array(rows[1...5].reversed()))  // launch: the newest 5, so S0 is out of the feed
         banner.take(Array(rows[0...4].reversed()))  // S5 turns the banner off and S0 moves back in
         #expect(banner.showing.isEmpty)
@@ -61,7 +123,7 @@ struct LateBannerTests {
     func sameMillisecond() {
         let first = LateArrival(id: "id1", first: "Ana", lateMin: 5, at: 5_000)
         let second = LateArrival(id: "id2", first: "Ben", lateMin: 5, at: 5_000)
-        let banner = LateBanner(hold: .seconds(60))
+        let banner = LateBanner(hold: .seconds(60), now: { 0 })
         banner.take([])
         banner.take([first])
         banner.take([second, first])  // Ben's scan landed in the same millisecond as Ana's
@@ -71,7 +133,7 @@ struct LateBannerTests {
     @Test("ios-9 a name leaves the screen after the hold, 8 seconds in the app")
     func leavesAfterTheHold() async throws {
         #expect(LateBanner.defaultHold == .seconds(8))
-        let banner = LateBanner(hold: .milliseconds(100))
+        let banner = LateBanner(hold: .milliseconds(100), now: { 0 })
         banner.take([])
         banner.take([ben])
         #expect(banner.showing.count == 1)

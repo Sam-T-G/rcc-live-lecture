@@ -436,3 +436,18 @@ describe("F16 the late banner's feed", () => {
     expect(await t.query(api.checkin.attendance.myHideLate, {})).toBe(false);
   });
 });
+
+describe("CKP-fixcheck-2 the late banner's clock", () => {
+  it("clock answers with the server's time, signed out or in, and writes nothing", async () => {
+    const t = setup();
+    vi.setSystemTime(T0 + 90_000);
+    expect(await t.mutation(api.checkin.attendance.clock, {})).toBe(T0 + 90_000);
+    expect(await student(t, 1).mutation(api.checkin.attendance.clock, {})).toBe(T0 + 90_000);
+    const rows = await t.run(async (ctx) => [
+      ...(await ctx.db.query("lectures").take(1)),
+      ...(await ctx.db.query("passes").take(1)),
+      ...(await ctx.db.query("checkins").take(1)),
+    ]);
+    expect(rows).toEqual([]);
+  });
+});

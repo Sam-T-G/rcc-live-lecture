@@ -30,6 +30,15 @@ describe("F16.2 the late banner shows only arrivals after its page opened", () =
     expect(r.fresh).toEqual([]);
   });
 
+  it("CKP-fixcheck-1 an arrival scanned under a minute before the page opened that comes into the feed later doesn't show", () => {
+    // Xena is scanned late at 21:29:30 with the opt-out ticked. Yuri opens #/live at 21:30:00: the feed is empty.
+    let r = newArrivals([], null, T);
+    expect(r.seen).toEqual({ at: T, ids: [] });
+    // At 21:30:20 Xena unticks it. Her row is 50 s old, so the one-minute rule alone would let it through.
+    r = newArrivals([row("xena", T - 30_000)], r.seen, T + 20_000);
+    expect(r.fresh).toEqual([]);
+  });
+
   it("CKP-check-1 CKP-risk-3 a class start saved after students arrived doesn't replay them on a page opened after they arrived", () => {
     // No start saved: Ana and Ben are scanned at 21:31 and 21:33, and lateFeed is empty. A phone opens #/live at 21:34.
     let r = newArrivals([], null, T + 4 * MIN);

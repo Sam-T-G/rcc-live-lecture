@@ -33,6 +33,8 @@
 //   lateFeed({ channel })                 anyone: the late banner's newest 5 late arrivals in this
 //                                         class, first names only
 //   myHideLate() / setHideLate({ hide })  the signed-in student's own switch for the late banner
+//   clock()                               anyone: the server's time in ms, so a late banner can
+//                                         tell how far its screen's clock is off (LateBanner.tsx)
 import { mutation, query, type QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { ConvexError, v, type Infer } from "convex/values";
@@ -166,8 +168,8 @@ export const setClassStart = mutation({
       throw new ConvexError("This class is still open. Press End day on #/host, then save the next start.");
     await ctx.db.patch("lectures", lecture._id, { startsAt, graceMin });
     // The channel's legacy classStarts row too, replaced so its _creationTime says when the start
-    // was saved (startSavedAt, for lateFeed). pass.scan reads it for the lateMin it still stores,
-    // and lib.lectureWindow only while no class exists (a class exists from here on).
+    // was saved. Two things read it: startSavedAt (for lateFeed), and lib.lectureWindow only while
+    // no class exists (a class exists from here on).
     const legacy = await ctx.db
       .query("classStarts")
       .withIndex("by_channel", (q) => q.eq("channel", channel))
@@ -360,4 +362,13 @@ export const setHideLate = mutation({
     await ctx.db.patch(p._id, { hideLate: hide });
     return null;
   },
+});
+
+// The server's time in ms. The late banner asks once when it opens and compares it with its own
+// clock, so a screen whose clock runs fast or slow still judges a lateFeed row's `at` (the
+// server's time) right. A mutation, so each call gets the time it runs; it writes nothing.
+export const clock = mutation({
+  args: {},
+  returns: v.number(),
+  handler: async () => Date.now(),
 });

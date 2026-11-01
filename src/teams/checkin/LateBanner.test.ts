@@ -48,11 +48,21 @@ vi.mock("react", async (orig) => {
   };
 });
 
-const server = vi.hoisted(() => ({ feed: undefined as unknown, asked: [] as { name: string; args: unknown }[] }));
+// `ahead`: how far the screen's clock runs ahead of the server's. The clock mutation answers
+// `wait` ms after it's called with the server's time then, the screen's Date.now() minus `ahead`.
+const server = vi.hoisted(() => ({ feed: undefined as unknown, asked: [] as { name: string; args: unknown }[], ahead: 0, wait: 0, told: [] as string[] }));
+const clock = vi.hoisted(() => async () => {
+  if (server.wait > 0) await new Promise((answer) => setTimeout(answer, server.wait));
+  return Date.now() - server.ahead;
+});
 vi.mock("convex/react", () => ({
   useQuery: (ref: FunctionReference<"query">, args: unknown) => {
     server.asked.push({ name: getFunctionName(ref), args });
     return server.feed;
+  },
+  useMutation: (ref: FunctionReference<"mutation">) => {
+    server.told.push(getFunctionName(ref));
+    return clock;
   },
 }));
 
@@ -90,6 +100,9 @@ beforeEach(() => {
   hooks.slots = [];
   server.feed = undefined;
   server.asked = [];
+  server.ahead = 0;
+  server.wait = 0;
+  server.told = [];
   vi.useFakeTimers();
   vi.setSystemTime(T);
   vi.stubGlobal("window", globalThis);
@@ -151,6 +164,14 @@ describe("F16.2 LateBanner never shows an arrival from before its page opened", 
     expect(lines(show([zed, at("xena", T + 10 * MIN)]))).toEqual([lateLine(zed)]);
   });
 
+  it("CKP-fixcheck-1 an arrival scanned 30 s before the page opened that comes into the feed 20 s after it opened never shows", () => {
+    // Xena is scanned late at 21:29:30 with the opt-out ticked. Yuri opens #/live at 21:30:00: the feed is empty.
+    expect(show([])).toBe("");
+    // At 21:30:20 Xena unticks it: her row is 50 s old, inside the minute.
+    vi.setSystemTime(T + 20_000);
+    expect(show([at("xena", T - 30_000)])).toBe("");
+  });
+
   it("CKP-check-1 CKP-risk-3 a class start saved after students arrived shows none of them, on a page opened after they arrived or before", () => {
     // No start saved, so lateFeed is empty. Ana and Ben are scanned at 21:31 and 21:33.
     // A phone opens #/live at 21:34.
@@ -166,5 +187,51 @@ describe("F16.2 LateBanner never shows an arrival from before its page opened", 
     expect(show([])).toBe("");
     vi.setSystemTime(T + 6 * MIN);
     expect(show([at("ben", T + 3 * MIN, 3), at("ana", T + 1 * MIN, 1)])).toBe("");
+  });
+});
+
+describe("CKP-fixcheck-2 a screen whose clock is off shows late arrivals by the server's clock", () => {
+  const MIN = 60_000;
+  const at = (id: string, ms: number): Late => ({ id, first: "Sample" + id, lateMin: 10, at: ms });
+
+  it("a projector whose clock runs 90 s fast shows Zed a second after his scan", async () => {
+    // The server's clock says 21:30:00 and the projector's says 21:31:30 when #/checkin/stage opens.
+    server.ahead = 90_000;
+    vi.setSystemTime(T + 90_000);
+    expect(show([])).toBe("");
+    await vi.advanceTimersByTimeAsync(0); // the server's clock answers
+    // Zed is scanned 10 min late at 21:40:00 by the server's clock, and the feed brings him a second later.
+    vi.setSystemTime(T + 10 * MIN + 1_000 + 90_000);
+    const zed = at("zed", T + 10 * MIN);
+    expect(lines(show([zed]))).toEqual([lateLine(zed)]);
+    expect([...new Set(server.told)]).toEqual(["checkin/attendance:clock"]);
+  });
+
+  it("a phone whose clock runs 90 s slow still skips Xena when she unticks the opt-out 8 min after her scan", async () => {
+    server.ahead = -90_000;
+    vi.setSystemTime(T - 90_000);
+    expect(show([])).toBe("");
+    await vi.advanceTimersByTimeAsync(0);
+    // Xena was scanned at 21:31:00 with the opt-out ticked and unticks it at 21:39:00.
+    vi.setSystemTime(T + 9 * MIN - 90_000);
+    expect(show([at("xena", T + MIN)])).toBe("");
+  });
+
+  it("a clock answer that took 10 min (the page opened offline) is dropped, so a correct clock still shows Zed", async () => {
+    server.wait = 10 * MIN;
+    expect(show([])).toBe("");
+    await vi.advanceTimersByTimeAsync(10 * MIN); // back online: the call runs and answers now
+    vi.setSystemTime(T + 11 * MIN + 1_000);
+    const zed = at("zed", T + 11 * MIN);
+    expect(lines(show([zed]))).toEqual([lateLine(zed)]);
+  });
+
+  it("an answer from the clock that isn't a number changes nothing", async () => {
+    server.ahead = Number.NaN;
+    expect(show([])).toBe("");
+    await vi.advanceTimersByTimeAsync(0);
+    vi.setSystemTime(T + 10_000);
+    const g = at("g", T + 9_000);
+    expect(lines(show([g]))).toEqual([lateLine(g)]);
   });
 });

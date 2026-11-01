@@ -63,25 +63,47 @@ enum LateLines {
 }
 
 /// Picks the arrivals to show from each lateFeed answer, by the web's rule (newArrivals in
-/// src/teams/checkin/late.ts). The first answer after launch only records the newest arrival
-/// time, so arrivals from before launch never show. lateFeed holds the newest 5, so an older
-/// arrival comes back into it when someone ticks or unticks the opt-out; comparing times keeps
-/// it from showing twice. Two scans can land in the same millisecond, so the arrivals at
-/// exactly the newest time are kept too.
+/// src/teams/checkin/late.ts). Change both together.
+/// - The first answer after launch shows nothing and marks everything scanned before the phone's
+///   clock then as seen, so an arrival from before launch never shows, even one the first answer
+///   didn't hold (she had the opt-out ticked and unticks it later).
+/// - After that, an arrival shows once: when it's newer than every one seen. lateFeed holds the
+///   newest 5, so an older arrival comes back into it when someone ticks or unticks the opt-out;
+///   comparing times keeps it from showing twice. Two scans can land in the same millisecond, so
+///   the arrivals at exactly the newest time are kept too.
+/// - An arrival scanned more than a minute before the phone's clock never shows: someone who had
+///   the opt-out ticked and unticks it later.
+/// The web judges times by the server's clock (checkin.attendance.clock); the app uses the
+/// phone's, which iOS sets from the network unless someone turned that off.
 struct LateCutoff {
+    /// The web's RECENT_MS.
+    static let recentMs: Double = 60_000
+    /// The phone's clock in ms since 1970, the same scale as lateFeed's `at`.
+    static func phoneClock() -> Double { Date().timeIntervalSince1970 * 1000 }
+
+    private let now: () -> Double
     /// False until the first answer.
     private var started = false
     /// The newest arrival time seen, and the arrivals seen at exactly that time.
     private var at = -Double.infinity
     private var ids: Set<String> = []
 
+    init(now: @escaping () -> Double = LateCutoff.phoneClock) {
+        self.now = now
+    }
+
     mutating func fresh(_ feed: [LateArrival]) -> [LateArrival] {
+        let t = now()
         guard started else {
             started = true
+            at = t
+            ids = []
             see(feed)
             return []
         }
-        let new = feed.filter { $0.at > at || ($0.at == at && !ids.contains($0.id)) }
+        let new = feed.filter {
+            ($0.at > at || ($0.at == at && !ids.contains($0.id))) && $0.at >= t - Self.recentMs
+        }
         see(new)
         return new
     }
@@ -106,12 +128,14 @@ final class LateBanner {
     /// The arrivals on screen now, newest first.
     private(set) var showing: [LateArrival] = []
 
-    @ObservationIgnored private var cutoff = LateCutoff()
+    @ObservationIgnored private var cutoff: LateCutoff
     @ObservationIgnored private let hold: Duration
     @ObservationIgnored private var sub: AnyCancellable?
 
-    init(hold: Duration = LateBanner.defaultHold) {
+    /// `now`: the clock LateCutoff reads, the phone's unless a test passes its own.
+    init(hold: Duration = LateBanner.defaultHold, now: @escaping () -> Double = LateCutoff.phoneClock) {
         self.hold = hold
+        self.cutoff = LateCutoff(now: now)
     }
 
     /// Listens to lateFeed on the deck's channel (DeckSource.lateFeed). `ended` runs when the
