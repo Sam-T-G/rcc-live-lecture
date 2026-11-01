@@ -84,8 +84,11 @@ export function Leaderboard({ big }: { big?: boolean }) {
   const many = big && teams.length > BIG_ROOMY;
   const cls = "board" + (big ? " board--big" : " board--card") + (many ? " board--many" : "");
   const projector = bigRows(teams, me?.team);
-  const top = big ? projector.shown : teams.slice(0, 3);
-  const rest = big ? [] : teams.slice(3);
+  // The phone card shows the first 3 rows, and every other team tied for a place that earns extra
+  // credit (a 3-way tie for 2nd shows all three). Teams tied with no points stay in the fold.
+  const cardTop = teams.filter((g, i) => i < 3 || g.ec > 0);
+  const top = big ? projector.shown : cardTop;
+  const rest = big ? [] : teams.filter((g) => !cardTop.includes(g));
   const mineBelow = rest.find((g) => g.team === me?.team);
   const body = (
     <>

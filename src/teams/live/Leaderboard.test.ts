@@ -97,3 +97,32 @@ describe("the team leaderboard", () => {
     expect(card()).not.toContain("Blue");
   });
 });
+
+describe("UB the phone card's top rows", () => {
+  it("UB-check-2 the phone card lists every team tied for a place that earns extra credit above the fold, so a 3-way tie for 2nd shows all three", () => {
+    results["live/groups:leaderboard"] = {
+      questions: 2,
+      teams: [
+        team(0, "Red", { correct: 5, points: 5, perStudent: 5 / 3, rank: 1, ec: 5 }),
+        team(3, "Green", { members: 1, correct: 1, points: 1, perStudent: 1, rank: 2, ec: 4 / 3 }),
+        team(4, "Orange", { members: 1, correct: 1, points: 1, perStudent: 1, rank: 2, ec: 4 / 3 }),
+        team(5, "Purple", { members: 1, correct: 1, points: 1, perStudent: 1, rank: 2, ec: 4 / 3 }),
+        team(1, "Blue", { correct: 0, points: 0, perStudent: 0, rank: 5, ec: 0 }),
+        team(2, "Yellow", { correct: 0, points: 0, perStudent: 0, rank: 5, ec: 0 }),
+      ],
+    };
+    const [above, fold] = card().split("<details>");
+    for (const n of ["Red", "Green", "Orange", "Purple"]) expect(above).toContain(`board__name">${n}<`);
+    expect(fold).toContain("All 6 teams");
+    expect(fold).not.toContain(`board__name">Purple<`);
+    expect(fold).toContain(`board__name">Blue<`);
+  });
+
+  it("UB-check-2 teams tied with no points still stop at 3 rows above the fold", () => {
+    const names = ["Red", "Blue", "Yellow", "Green", "Orange"];
+    results["live/groups:leaderboard"] = { questions: 0, teams: names.map((n, i) => team(i, n, { correct: 0, points: 0, perStudent: 0, rank: 1, ec: 0 })) };
+    const [above, fold] = card().split("<details>");
+    expect(above.match(/board__name/g)).toHaveLength(3);
+    expect(fold).toContain("All 5 teams");
+  });
+});

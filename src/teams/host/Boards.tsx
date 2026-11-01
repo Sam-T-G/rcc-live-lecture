@@ -9,6 +9,7 @@ import { CHANNEL } from "../../blocks/deck";
 import { Card, Status } from "../../blocks/ui";
 import { Badge, Banner, Button, ConfirmButton, Field, Segmented } from "../../blocks/kit";
 import { TeamChip, errorText } from "./Team";
+import { localDate } from "../checkin/sheet";
 import { extraCreditCsv } from "./csv";
 import "./points.css";
 
@@ -281,6 +282,21 @@ function EndCard() {
   );
 }
 
+// Saves the extra credit CSV as extra-credit-gdg-2026-11-05.csv, named with the local date (the
+// UTC date names an evening class's file for the next day). Same steps as saveCsv in
+// ../checkin/sheet.ts: Safari starts the download after the click returns, so the link goes on
+// the page for the click and the file's URL stays a while.
+export function saveExtraCredit(text: string, now = Date.now()) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `extra-credit-${CHANNEL}-${localDate(now)}.csv`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 // "Download extra credit (CSV)": every class's saved extra credit, read when pressed.
 function Download() {
   const convex = useConvex();
@@ -295,11 +311,7 @@ function Download() {
         setNote({ kind: "empty", text: "No extra credit saved yet. End day saves it." });
         return;
       }
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob([extraCreditCsv(rows)], { type: "text/csv;charset=utf-8" }));
-      a.download = `extra-credit-${CHANNEL}-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      saveExtraCredit(extraCreditCsv(rows));
     } catch (e) {
       setNote({ kind: "error", text: errorText(e) });
     } finally {
