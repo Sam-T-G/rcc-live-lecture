@@ -1,113 +1,300 @@
-/* #/checkin/stage (Stage.tsx): the deck full screen with the check-in card on top. The room reads
-   it from the back of A-210 on a 1920 x 1080 projector, so every size here is a stage size
-   (--stage-u and the --proj-* sizes in tokens.css). stage.surfaces.test.ts checks the card's
+/* #/checkin/stage (Stage.tsx): the deck full screen with the check-in card, the quiz panel and the
+   bottom-left lane on top. The room reads it from the back of A-210 on a 1920 x 1080 projector, so
+   every size here is a stage size (--stage-u and the --p-* and --proj-* sizes in tokens.css). The
+   frame is 96 stage px inside every edge (--p-margin): the card takes the right 600 (--p-card),
+   the left column the 1080 beside it after a 48 gap. No shadows: tone and 6 stage px rules.
+   Stage.tsx themes every part light like the deck under it. stage.surfaces.test.ts checks the
    sizes and colors. */
 body.stage-body { margin: 0; overflow: hidden; }
 .stage { position: fixed; inset: 0; background: #000; }
 .stage__deck { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-/* The card is read from the back of A-210 on a 1920 x 1080 projector, so every size is a stage
-   size (--stage-u and --proj-* in tokens.css), and Stage.tsx themes it light like the deck under it. */
-.stage__card { position: absolute; right: calc(24 * var(--stage-u)); bottom: calc(24 * var(--stage-u)); box-sizing: border-box; width: calc(440 * var(--stage-u)); max-height: calc(100% - 48 * var(--stage-u)); overflow: hidden; padding: calc(64 * var(--stage-u)) calc(24 * var(--stage-u)) calc(24 * var(--stage-u)); border-radius: calc(24 * var(--stage-u)); background: var(--surface); color: var(--text); box-shadow: var(--rcc-elevation-2); font-size: var(--proj-ledger); line-height: 1.2; display: flex; flex-direction: column; align-items: center; text-align: center; }
-/* <QR> writes its px width inline; the card's width wins, so phones can scan it from the seats.
-   It gives up some room while a quiz is on the card. */
-.stage__card .qr { width: 100% !important; margin: 0; }
-.stage__card:has(.stage__poll) .qr { width: 60% !important; }
-.stage__card:has(.stage__bars) .qr { width: 40% !important; }
-.stage__card .qr svg { display: block; width: 100%; height: auto; }
-.stage__hide { position: absolute; top: calc(8 * var(--stage-u)); right: calc(8 * var(--stage-u)); width: calc(56 * var(--stage-u)); height: calc(56 * var(--stage-u)); min-height: 0; padding: 0; border-radius: 50%; background: transparent; color: var(--muted); box-shadow: none; font-size: var(--proj-small); line-height: 1; }
-.stage__count { margin: calc(8 * var(--stage-u)) 0 0; font-size: var(--proj-small); }
-.stage__count b { font-size: var(--proj-head); line-height: 1; font-variant-numeric: tabular-nums; margin-right: calc(12 * var(--stage-u)); }
-.stage__hint { margin: 0; color: var(--muted); font-size: var(--proj-ledger); }
-.stage__poll { width: 100%; margin-top: calc(16 * var(--stage-u)); padding-top: calc(16 * var(--stage-u)); border-top: max(1px, calc(2 * var(--stage-u))) solid var(--line); text-align: left; }
-/* The card can't grow past the stage, so a long question or choice stops at a line count with "...": the
-   question at 4 lines (3 once the bars show) and each choice at 2. Phones show the whole text. */
-.stage__q { margin: 0 0 calc(8 * var(--stage-u)); font-weight: 700; font-size: var(--proj-small); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
-.stage__poll:has(.stage__bars) .stage__q { -webkit-line-clamp: 3; line-clamp: 3; }
-.stage__label { min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
-.stage__answered { margin: 0; font-size: var(--proj-small); }
-.stage__answered b { font-size: var(--proj-head); line-height: 1; font-variant-numeric: tabular-nums; margin-right: calc(12 * var(--stage-u)); }
-.stage__bars { list-style: none; margin: 0; padding: 0; display: grid; gap: calc(8 * var(--stage-u)); }
-.stage__bar { position: relative; display: flex; justify-content: space-between; gap: calc(12 * var(--stage-u)); padding: calc(8 * var(--stage-u)) calc(16 * var(--stage-u)); border-radius: calc(12 * var(--stage-u)); background: var(--fill); overflow: hidden; font-size: var(--proj-ledger); }
-.stage__bar > span:not(.stage__fill), .stage__bar b { position: relative; }
-.stage__fill { position: absolute; inset: 0 auto 0 0; background: var(--line); }
-.stage__bar--right { font-weight: 700; }
-.stage__bar--right .stage__fill { background: color-mix(in srgb, var(--accent) 35%, var(--surface)); }
-/* Stage.tsx themes this button light like the card. The base [data-theme] rule paints --bg over a
-   button's fill (it outranks `button` in the same layer), so the green fill is set again here. */
-.stage__show { position: absolute; right: calc(24 * var(--stage-u)); bottom: calc(24 * var(--stage-u)); min-height: 0; background-color: var(--accent); color: var(--accent-text); padding: calc(12 * var(--stage-u)) calc(24 * var(--stage-u)); font-size: var(--proj-ledger); opacity: 0.85; }
+/* No ?deck=, or one that can't load: the Projector is the slide area's ground and the lane's note
+   says what to fix. */
+.stage > .projector { position: absolute; inset: 0; }
 
-/* An ended quiz: the right choice gets "✓ right answer" on its own line under its words and a
-   green edge, so it shows even when nobody picked it (its fill is 0 wide then). The edge takes 4
-   of the bar's padding, so its words line up with the other bars' words. */
-.stage__bars .stage__bar--right {
+/* ------------------------------------------------------------------ the check-in card
+   The kit's .stage-card inside the aside is the card: the field, 600 wide on the frame's right
+   edge. The aside only themes it, so it takes no box. The card spans the frame's height and keeps
+   one box in every state: the top row (Scan to check in and the hide control), the QR at full
+   width, then the count at its foot. Side padding 44 makes the QR 512, so the words, the QR and
+   the numeral share one left edge. */
+.stage__card { display: contents; }
+.stage__card > .stage-card {
+  top: var(--p-margin);
+  padding: calc(32 * var(--stage-u)) calc(44 * var(--stage-u));
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-areas: "scan hide" "qr qr" "count count";
+  align-items: center;
+}
+.stage__hint { grid-area: scan; margin: 0; font-size: var(--p-small); font-weight: var(--w-head); line-height: 1.2; }
+/* The hide control: the kit's stage-card hide (a 56 ring button), on the button Stage.tsx names. */
+.stage__hide {
+  grid-area: hide;
+  display: inline-grid;
+  place-items: center;
+  width: max(24px, calc(56 * var(--stage-u)));
+  height: max(24px, calc(56 * var(--stage-u)));
+  min-height: 0;
+  padding: 0;
+  background-color: transparent;
+  color: var(--on-field);
+  box-shadow: inset 0 0 0 max(1px, calc(3 * var(--stage-u))) var(--on-field-muted);
+}
+.stage__hide .icon { width: 50%; height: 50%; }
+/* <QR> writes its px width inline; the card's width wins, so phones scan it from the back row. It
+   keeps this size and spot in every state. */
+.stage__card > .stage-card > .qr { grid-area: qr; width: 100% !important; }
+
+/* The count: the one number at 240 with "checked in" on its baseline, at the card's foot. A
+   three-digit count puts "checked in" under the numeral inside the same slot. */
+.stage__count {
+  grid-area: count;
+  align-self: end;
+  align-self: safe end;
+  display: flex;
   flex-wrap: wrap;
-  row-gap: 0;
-  padding: calc(4 * var(--stage-u)) calc(12 * var(--stage-u));
-  border: calc(4 * var(--stage-u)) solid var(--accent);
+  align-items: baseline;
+  column-gap: calc(24 * var(--stage-u));
+  margin: 0;
+  font-size: var(--p-small);
+  font-weight: var(--w-head);
+  line-height: 1;
 }
-.stage__right { flex-basis: 100%; }
+.stage__count b {
+  font-size: var(--p-count);
+  font-weight: var(--w-loud);
+  line-height: 0.8;
+  letter-spacing: -0.03em;
+  margin-inline-start: -0.04em;
+  font-variant-numeric: lining-nums proportional-nums;
+}
+/* Loading: "…" takes the numeral's place at the head size, muted, on the same baseline. */
+.stage__count[aria-busy="true"] { color: var(--on-field-muted); }
+.stage__count[aria-busy="true"] b { font-size: var(--p-head); letter-spacing: -0.01em; }
 
-/* No quiz or vote yet: one line under the hint. The QR keeps its full width. */
-.stage__none {
-  width: 100%;
-  margin: calc(16 * var(--stage-u)) 0 0;
-  padding-top: calc(16 * var(--stage-u));
-  border-top: max(1px, calc(2 * var(--stage-u))) solid var(--line);
-  color: var(--muted);
-  font-size: var(--proj-ledger);
+/* While a quiz or vote shows, the card steps down to the sunken rung (the kit's
+   .stage-card--poll), keeps its box and its QR, and its count drops to 160, so the quiz panel
+   is the screen's first thing. */
+.stage__card > .stage-card:has(.stage__poll) { background: var(--well); color: var(--text); }
+.stage__card > .stage-card:has(.stage__poll) :focus-visible { outline-color: var(--focus); }
+.stage__card:has(.stage__poll) .stage__hide { color: var(--text); box-shadow: inset 0 0 0 max(1px, calc(3 * var(--stage-u))) var(--line-strong); }
+.stage__card:has(.stage__poll) .stage__count { color: var(--muted); }
+.stage__card:has(.stage__poll) .stage__count b { font-size: var(--p-rank); color: var(--text); }
+
+/* ------------------------------------------------------------------ the quiz panel
+   Drawn from the card's markup, so × hides it with the card, as its own panel in the left column
+   beside the card: 1080 wide, the frame's full height, the same box open and ended, with one ruled
+   row per choice (6 stage px rules, no fill, no radius) sharing the height under the question.
+   Open: the field, the screen's one green mass, with "N answered" at 240 as its first thing
+   between the question and the choices. Ended: the raised rung with a bar per choice, and the
+   right answer's row is the first thing. */
+.stage__poll {
+  position: fixed;
+  top: var(--p-margin);
+  bottom: var(--p-margin);
+  left: var(--p-margin);
+  box-sizing: border-box;
+  width: calc(1080 * var(--stage-u));
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  row-gap: calc(24 * var(--stage-u));
+  padding: calc(36 * var(--stage-u)) calc(40 * var(--stage-u)) calc(16 * var(--stage-u));
+  border-radius: var(--p-radius);
+  text-align: start;
+}
+.stage__poll:has(.stage__choices) { background: var(--field); color: var(--on-field); }
+/* Ended, on the raised rung: a 4 stage px --line-strong ring keeps its edge on a white slide. The
+   bars take the count line's room too, so a 3-line question and four 2-line choices still fit. */
+.stage__poll:has(.stage__bars) {
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--raised);
+  color: var(--text);
+  box-shadow: inset 0 0 0 var(--p-ring) var(--line-strong);
+}
+/* The panel can't grow past the frame, so a long question or choice stops at a line count with
+   "...": the question at 4 lines (3 once the bars show) and each choice at 2. Phones show the
+   whole text. */
+.stage__q {
+  margin: 0;
+  font-size: var(--p-body);
+  font-weight: var(--w-loud);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+.stage__poll:has(.stage__bars) .stage__q { -webkit-line-clamp: 3; line-clamp: 3; }
+/* Open: the question stands 56 clear of the count line, so the 240 numeral never crowds it. */
+.stage__poll:has(.stage__choices) .stage__q { margin-block-end: calc(32 * var(--stage-u)); }
+.stage__answered {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: calc(28 * var(--stage-u));
+  font-size: var(--p-body);
+  font-weight: var(--w-head);
+  line-height: 1;
+}
+.stage__answered b {
+  font-size: var(--p-count);
+  font-weight: var(--w-loud);
+  line-height: 0.75;
+  letter-spacing: -0.03em;
+  margin-inline-start: -0.04em;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* The late banner (LateBanner.tsx, its colors in checkin.css) at the bottom left at projector
-   size, clear of the card: 24 + 440 + 24 stage px from the right edge. */
-.stage__late {
+/* The rows share what the question and the count line leave, never less than their words need.
+   Open: the choice at 48 on the field, one line. Ended, at 40: the choice and its count on the
+   first line, the track on the second; the track is the row's ::before and the fill (its width
+   set inline by Stage.tsx) lies on it. */
+.stage__choices,
+.stage__bars { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-rows: minmax(min-content, 1fr); }
+.stage__choice {
+  display: grid;
+  align-content: center;
+  padding: calc(12 * var(--stage-u)) 0;
+  border-top: var(--p-rule) solid var(--on-field-muted);
+  font-size: var(--p-body);
+  font-weight: var(--w-head);
+  line-height: 1.2;
+}
+.stage__bars { font-size: var(--p-small); }
+.stage__bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "label tag n" "track track track";
+  align-content: center;
+  align-items: baseline;
+  column-gap: calc(24 * var(--stage-u));
+  row-gap: calc(12 * var(--stage-u));
+  padding: calc(10 * var(--stage-u)) 0;
+  border-top: var(--p-rule) solid var(--line-strong);
+  font-weight: var(--w-head);
+  line-height: 1.2;
+}
+.stage__bar::before { content: ""; grid-area: track; align-self: center; height: calc(24 * var(--stage-u)); border-radius: calc(6 * var(--stage-u)); background: var(--on-raised); }
+.stage__fill { grid-area: track; align-self: center; justify-self: start; height: calc(24 * var(--stage-u)); border-radius: calc(6 * var(--stage-u)); background: var(--bar-rest); }
+.stage__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.stage__bar > .stage__label { grid-area: label; }
+.stage__choice > .stage__label { -webkit-line-clamp: 1; line-clamp: 1; }
+.stage__bar > b { grid-area: n; text-align: end; font-weight: var(--w-loud); font-variant-numeric: tabular-nums lining-nums; }
+.stage__right { grid-area: tag; font-weight: var(--w-loud); white-space: nowrap; }
+/* The right answer: the st-in fill inside a 6 stage px ring in its mark (the projector's rule
+   width), reaching 20 past the text column so the words keep their edge, with "✓ right answer"
+   on its first line and a green fill, so it shows even when nobody picked it. The rules above
+   and below it give way to the ring. */
+.stage__bars > .stage__bar--right {
+  margin-inline: calc(-20 * var(--stage-u));
+  padding-inline: calc(20 * var(--stage-u));
+  border-top-color: transparent;
+  background: var(--st-in) padding-box;
+  color: var(--on-st-in);
+  box-shadow: inset 0 0 0 var(--p-rule) var(--st-in-mark);
+}
+.stage__bars > .stage__bar--right + .stage__bar { border-top-color: transparent; }
+.stage__bar--right::before { background: var(--raised); }
+.stage__bar--right .stage__fill { background: var(--st-in-mark); }
+
+/* ------------------------------------------------------------------ the bottom-left lane
+   The late banner's strips, then the presenter notes (the kit's .pnote), stacked up from the
+   frame's bottom in the left column. Above the quiz panel, so a late arrival always shows. */
+.stage__lane {
   position: absolute;
-  left: calc(24 * var(--stage-u));
-  right: calc(488 * var(--stage-u));
-  bottom: calc(24 * var(--stage-u));
+  left: var(--p-margin);
+  bottom: var(--p-margin);
+  z-index: 2;
+  width: calc(1080 * var(--stage-u));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(16 * var(--stage-u));
   background: none;
   pointer-events: none;
 }
+.stage__lane code {
+  padding: 0;
+  background: none;
+  color: var(--text);
+  font-weight: var(--w-head);
+  font-size: var(--p-small);
+  overflow-wrap: anywhere;
+}
+/* A ?bridge=saved link opened in a tab with no saved key (Stage.tsx): the note tells the presenter
+   that phones aren't following the slides. */
+.stage__warn { margin: 0; background: none; }
+/* The late banner (LateBanner.tsx; the kit's .late__item strip, its colors in kit.css) at stage
+   size: one strip per arrival, 120 tall, the --warn fill alone. */
+.stage__late { background: none; pointer-events: none; }
 .stage__late .late {
   position: static;
+  display: flex;
+  flex-direction: column;
   align-items: flex-start;
   gap: calc(16 * var(--stage-u));
 }
 .stage__late .late__item {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
   width: auto;
   max-width: 100%;
+  min-height: calc(120 * var(--stage-u));
   margin: 0;
-  padding: calc(16 * var(--stage-u)) calc(32 * var(--stage-u));
-  border-radius: calc(24 * var(--stage-u));
-  font-size: var(--proj-body);
+  padding: calc(16 * var(--stage-u)) calc(40 * var(--stage-u));
+  font-size: var(--p-body);
   line-height: 1.2;
-  text-align: left;
+  text-align: start;
 }
 
-/* A part that didn't load (ErrorBoundary in ui.tsx): its error and its Try again button at
-   projector size. In the banner's spot they sit on a white box that takes clicks. */
+/* A part that didn't load (ErrorBoundary in ui.tsx): its error line and Try again at projector
+   size on the presenter note's ground, where the presenter looks for it: the count's and the late
+   banner's in the bottom-left lane, the quiz's in the quiz panel's place. The card keeps its box. */
 .stage .row > .status--error,
 .stage .row > .btn--quiet { font-size: var(--proj-ledger); }
-.stage__late > .row {
-  width: fit-content;
-  padding: calc(16 * var(--stage-u)) calc(24 * var(--stage-u));
-  border-radius: calc(24 * var(--stage-u));
-  background: var(--surface);
+.stage__late > .row,
+.stage__card > .stage-card > .row {
+  box-sizing: border-box;
+  max-width: calc(1080 * var(--stage-u));
+  gap: calc(16 * var(--stage-u));
+  padding: calc(20 * var(--stage-u)) calc(28 * var(--stage-u));
+  border-radius: calc(16 * var(--stage-u));
+  background: var(--p-well);
+  color: var(--text);
   pointer-events: auto;
 }
+.stage__card > .stage-card > .row { position: fixed; left: var(--p-margin); bottom: var(--p-margin); z-index: 2; }
+.stage__card > .stage-card > .stage__hint ~ .row { top: var(--p-margin); bottom: auto; }
 
-/* A ?bridge=saved link opened in a tab with no saved key (Stage.tsx): one line across the top of
-   the stage, clear of the card, so the professor sees that phones aren't following the slides. */
-.stage__warn {
+/* ------------------------------------------------------------------ the card hidden
+   Its foot in the card's bottom-right corner: the same field green and corner, 120 tall, holding
+   the one action. Stage.tsx themes this button light like the card. The base [data-theme] rule
+   paints --bg over a button's fill (it outranks `button` in the same layer), so the green fill is
+   set again here. */
+.stage__show {
   position: absolute;
-  top: calc(24 * var(--stage-u));
-  left: calc(24 * var(--stage-u));
-  width: fit-content;
-  max-width: calc(100% - 512 * var(--stage-u));
-  margin: 0;
-  padding: calc(16 * var(--stage-u)) calc(24 * var(--stage-u));
-  border-radius: calc(24 * var(--stage-u));
-  background: var(--warn);
-  color: var(--warn-text);
-  font-size: var(--proj-ledger);
-  line-height: 1.2;
+  right: var(--p-margin);
+  bottom: var(--p-margin);
+  min-height: calc(120 * var(--stage-u));
+  padding: 0 calc(44 * var(--stage-u));
+  border-radius: var(--p-radius);
+  background-color: var(--accent);
+  color: var(--accent-text);
+  font-size: var(--p-body);
+  font-weight: var(--w-loud);
+  line-height: 1;
 }

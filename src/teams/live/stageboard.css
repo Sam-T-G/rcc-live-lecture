@@ -1,48 +1,144 @@
-/* The team leaderboard on the projector (#/live/leaderboard, BoardPage.tsx and StageBoard.tsx),
-   inside <Projector>: stage sizes (--stage-u and the --proj-* sizes in tokens.css). live.css and
-   leaderboard.css draw the rows; these rules size and place them for the stage, and the late
-   banner on this page. stage.surfaces.test.ts and leaderboardCss.test.ts check them. */
+/* #/live/leaderboard on the 1920 x 1080 projector (BoardPage.tsx, StageBoard.tsx), inside the
+   kit's <Projector>. Every size is a stage size (--stage-u and the --p-* and --proj-* sizes in
+   tokens.css) inside the 96 frame, and nothing has a shadow: tone and 6 stage px rules. The kit
+   draws the parts (.lbgrid, .first, .pledger, .lbfoot); these rules lay them out on the page and
+   size the words StageBoard.tsx names. live.css draws the phone card's rows, and every rule here
+   names .board--big or a stage part, so none reaches the phone. stage.surfaces.test.ts and
+   leaderboardCss.test.ts check them. */
 
-/* The projector: the same three columns in every row. Its numbers line is .board__score: the
-   second line of a row up to six teams, in the small projector size. */
-.board--big .board__row { grid-template-columns: 2.2em minmax(0, 1fr) auto; }
-ol.board.board--big .board__score { grid-column: 2 / -1; font-size: var(--proj-small); font-weight: 400; }
-/* Six teams and a two-line note under them came out 2 px taller than 1080, so the projector
-   scrolled: 80 at the bottom instead of 96. */
-.projector:has(> .board--big) { padding-bottom: calc(80 * var(--stage-u)); }
-/* 7 or more teams (.board--many): the same two lines, tighter, so ten teams and the "Plus 2 more
-   teams" line fit on 1920 x 1080. The numbers can't share the first line: beside the extra
-   credit they are wider than a column, and the name gets 0 px (UB-r3-check-1). The page's top
-   and bottom margins and the space between its parts shrink to make the room. */
-.projector:has(> .board--many) { padding-block: calc(48 * var(--stage-u)); gap: calc(16 * var(--stage-u)); }
-ol.board.board--many { row-gap: calc(8 * var(--stage-u)); }
-ol.board.board--many .board__row { padding-block: calc(6 * var(--stage-u)); row-gap: 0; }
-ol.board.board--many :is(.board__name, .board__ec) { line-height: 1; }
-ol.board.board--many .board__rank { grid-row: 1 / span 2; }
-ol.board.board--many .board__score { grid-row: 2; font-size: var(--proj-ledger); }
+/* The page: the title and the lock line on one row, the board under them, the scoring line last. */
+.projector:has(> .live-board__late) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: start;
+  align-items: baseline;
+  gap: calc(32 * var(--stage-u)) calc(48 * var(--stage-u));
+}
+.projector:has(> .live-board__late) > h1 {
+  grid-column: 1;
+  font-size: var(--p-q);
+  font-weight: var(--w-loud);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.stageboard__lock { grid-column: 2; font-size: var(--p-small); font-weight: var(--w-head); line-height: 1.2; }
+.stageboard__lock > p { margin: 0; }
+.projector:has(> .live-board__late) > :is(.lbgrid, .lbfoot, .row) { grid-column: 1 / -1; align-self: start; }
 
-/* #/live/leaderboard on the 1920 x 1080 projector, inside <Projector>: stage sizes (tokens.css). */
-/* Two columns, and the rank beside both lines of a row: six teams fit on one screen. StageBoard.tsx
-   adds .board--many past six teams: one-line rows without "3 students", so ten fit, and past ten
-   it lists the top teams and a .board__more line. live.css loads after this file, so the two
-   rules for the board itself name .board too, to outrank its .board { gap; margin }. */
-.board.board--big { grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(800 * var(--stage-u))), 1fr)); gap: calc(16 * var(--stage-u)) calc(32 * var(--stage-u)); margin: 0; }
-.board--big .board__rank { grid-row: 1 / span 2; }
-.board--big .board__row { padding: calc(24 * var(--stage-u)) calc(32 * var(--stage-u)); gap: calc(8 * var(--stage-u)) calc(32 * var(--stage-u)); border-radius: calc(16 * var(--stage-u)); border-width: max(1px, calc(2 * var(--stage-u))); border-left-width: calc(24 * var(--stage-u)); }
-.board--big .board__rank { font-size: var(--proj-head); line-height: 1; }
-.board--big .board__name { font-size: var(--proj-body); line-height: 1.1; }
-.board--big .board__score, .board--big .board__ec { font-size: var(--proj-body); line-height: 1.1; }
-.board--big .board__members { font-size: var(--proj-small); }
+/* The board: the 1st place block (560) beside the ledger. The block grows to the ledger's height
+   when the ledger is taller; the ledger keeps its rows' own height when it is shorter. */
+.stageboard { grid-template-columns: calc(560 * var(--stage-u)) minmax(0, 1fr); align-items: stretch; }
+.stageboard > .pledger { align-self: start; }
+.stageboard .first { grid-template-rows: auto auto auto minmax(0, 1fr); align-content: start; }
+.stageboard .first__line { align-self: end; text-wrap: balance; }
+/* live.css sizes the phone card's names, credit and numbers; in the block they take its sizes. */
+.first .board__name { font-size: inherit; font-weight: inherit; line-height: inherit; }
+.first :is(.board__ec, .board__score) { color: inherit; font-weight: inherit; white-space: normal; }
+.first .board__score { font-variant-numeric: tabular-nums lining-nums; }
+
+/* The ledger: ruled rows (the kit's .pledger__row, its 6 stage px rule in --line-strong), no fill
+   and no radius. Each row: the place on the name's baseline, the chip and the name, the extra
+   credit at the end, then the numbers under the name. */
+ol.board.board--big { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.board--big .pledger__row {
+  grid-template-columns: calc(104 * var(--stage-u)) minmax(0, 1fr) auto;
+  row-gap: calc(4 * var(--stage-u));
+  align-items: baseline;
+  min-height: 0;
+  padding-block: calc(10 * var(--stage-u));
+  border-top-color: var(--line-strong);
+}
+.board--big .pledger__place { font-size: var(--proj-body); font-weight: var(--w-loud); line-height: 1.1; }
+.board--big .team { min-width: 0; }
+.board--big .board__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--proj-body);
+  font-weight: var(--w-head);
+  line-height: 1.1;
+}
+.board--big .board__score, .board--big .board__ec { line-height: 1.1; }
+.board--big .board__ec { justify-self: end; font-size: var(--proj-body); font-weight: var(--w-loud); color: var(--text); }
+.board--big .board__ec--zero { font-weight: var(--w-body); color: var(--muted); }
 .board--big small { font-size: var(--proj-small); }
-.board--big .board__row--mine { outline-width: max(2px, calc(4 * var(--stage-u))); }
-.board.board--many { gap: calc(12 * var(--stage-u)) calc(32 * var(--stage-u)); }
-.board--many .board__row { padding-block: calc(12 * var(--stage-u)); }
-.board--many .board__rank { grid-row: auto; font-size: var(--proj-body); line-height: 1.1; }
+.board--big .board__score {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  font-size: var(--proj-small);
+  font-weight: var(--w-body);
+  color: var(--muted);
+  white-space: normal;
+}
+
+/* Past six teams (.board--many): the ledger takes the full width in two columns, filled down and
+   then across, its rows at 40 with the numbers at 32, and the top team's row is the field. Ten
+   teams and the "Plus 2 more teams" line fit on 1920 x 1080. */
+.stageboard:has(.board--many) { grid-template-columns: minmax(0, 1fr); }
+ol.board.board--many {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(4, auto);
+  grid-auto-flow: column;
+  column-gap: calc(48 * var(--stage-u));
+}
+ol.board.board--many:has(> :nth-child(9)) { grid-template-rows: repeat(5, auto); }
+.board--many .pledger__row { grid-template-columns: calc(72 * var(--stage-u)) minmax(0, 1fr) auto; padding-inline: calc(24 * var(--stage-u)); }
+.board--many .pledger__place { grid-row: auto; font-size: var(--proj-small); }
+.board--many :is(.board__name, .board__ec) { font-size: var(--proj-small); }
+.board--many small { font-size: var(--proj-ledger); }
+.board--many .board__score { grid-row: 2; font-size: var(--proj-ledger); }
+.board--many > .pledger__row:first-child {
+  border-top-color: transparent;
+  border-radius: var(--p-radius);
+  background: var(--field) padding-box;
+  color: var(--on-field);
+}
+.board--many > .pledger__row:first-child :is(.board__ec, .board__score, small) { color: var(--on-field); }
+.board--many > .pledger__row:first-child .team__chip { box-shadow: 0 0 0 calc(3 * var(--stage-u)) var(--on-field); }
+.board--many > .pledger__row:first-child + .pledger__row { border-top-color: transparent; }
+
+/* No teams yet, or the scores still loading: the 1st place block's frame on the page tone with a
+   4 stage px ring, the step in it. While loading, still blocks stand where the ledger's places,
+   names and credit will land. */
+.first--wait { align-content: start; background: none; color: var(--text); box-shadow: inset 0 0 0 var(--p-ring) var(--line-strong); }
+.first--wait > .status { padding: 0; font-size: var(--p-body); font-weight: var(--w-head); line-height: 1.25; color: var(--text); }
+.stageboard__skel {
+  grid-template-columns: calc(104 * var(--stage-u)) minmax(0, 1fr) auto;
+  min-height: calc(120 * var(--stage-u));
+  border-top-color: var(--line-strong);
+  font-size: var(--p-body);
+}
+.stageboard__skel .skel { height: 0.72em; }
+.stageboard__skel .skel--num { width: 1ch; justify-self: end; }
+.stageboard__skel .skel:nth-child(2) { width: 40%; }
+.stageboard__skel .skel:nth-child(3) { width: calc(200 * var(--stage-u)); }
+
+/* The scoring line, and "Plus 3 more teams" before it, under the board at 40 in --muted. */
+.lbfoot { display: grid; row-gap: calc(8 * var(--stage-u)); }
+.lbfoot > p { margin: 0; text-wrap: pretty; }
 .board__more { margin: 0; color: var(--muted); }
 
-/* The late banner on #/live/leaderboard, in projector sizes so the back of the room can read it
-   (docs/design.md: nothing on the projector under 32px; body words 48px). The wrapper takes no
-   space, so the projector's column gap doesn't add a row under the board. */
+/* The late banner on #/live/leaderboard: the stage's strip (120 tall, words at 48, the --warn fill
+   alone) in the bottom-left lane over the board. The wrapper takes no space in the page's grid. */
 .live-board__late { display: contents; }
-.live-board__late .late { left: var(--proj-margin); right: var(--proj-margin); bottom: calc(48 * var(--stage-u)); gap: calc(16 * var(--stage-u)); }
-.live-board__late .late__item { max-width: none; padding: calc(24 * var(--stage-u)) calc(40 * var(--stage-u)); border-radius: calc(24 * var(--stage-u)); font-size: var(--proj-body); line-height: 1.2; }
+.live-board__late .late {
+  left: var(--p-margin);
+  right: auto;
+  bottom: var(--p-margin);
+  max-width: calc(1080 * var(--stage-u));
+  align-items: flex-start;
+  gap: calc(16 * var(--stage-u));
+}
+.live-board__late .late__item {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: auto;
+  max-width: 100%;
+  min-height: calc(120 * var(--stage-u));
+  margin: 0;
+  padding: calc(16 * var(--stage-u)) calc(40 * var(--stage-u));
+  font-size: var(--p-body);
+  line-height: 1.2;
+}

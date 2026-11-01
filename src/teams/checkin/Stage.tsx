@@ -1,10 +1,14 @@
-// #/checkin/stage: the projector screen. The professor's deck fills the screen. A card in the
-// bottom-right corner shows the check-in QR (it opens #/checkin/student), how many students have
-// checked in, and the newest quiz or vote: "N answered" while it's open, then a bar per choice once
-// it ends, with "✓ right answer" on the right one. × hides the card and "Show check-in" brings it
-// back. When a student checks in late, the late banner (LateBanner.tsx) shows their first name,
-// unless they turned that off on their pass. The whole room sees this screen, so it never shows a
-// full name or an email.
+// #/checkin/stage: the projector screen. The professor's deck fills the screen. The check-in card
+// (the kit's .stage-card, 600 stage px wide on the right of the 96 frame, the frame's full height)
+// shows the check-in QR (it opens #/checkin/student) and how many students have checked in. The
+// newest quiz or vote shows in a panel that takes the left column: the question, "N answered" and
+// the choices while it's open, then a bar per choice once it ends, with "✓ right answer" on the
+// right one; the card steps down to the sunken rung while it shows and keeps its box. × hides the
+// card (and the quiz panel with it) and "Show check-in" brings it back. The bottom-left lane holds
+// the late banner (LateBanner.tsx: a student's first name when they check in late, unless they
+// turned that off on their pass) and the notes for the presenter: no ?deck=, a deck link that
+// can't load, a ?bridge=saved link with no saved key, and a part that didn't load. The whole room
+// sees this screen, so it never shows a full name or an email. stage.css places it all.
 //
 // The link: #/checkin/stage?deck=<the deck's address>&bridge=<channel>.<DECK_BRIDGE_KEY>
 //   deck: the deck to show. "https://" is added when it's missing, and on the https site an
@@ -30,8 +34,14 @@
 // The deck can't go full screen inside this page (allow="fullscreen 'none'"), so the deck's F key
 // can't cover the card; use the browser's own full screen. Arrow keys go to the deck: it gets focus
 // when it loads and after every click or tap on the card. The count, the quiz and the late banner
-// each sit in an ErrorBoundary, so a query that fails shows an error in that spot and the deck
-// stays up.
+// each sit in an ErrorBoundary, so a query that fails shows an error and the deck and the QR stay
+// up: the error and its Try again sit in the bottom-left lane for the count and the late banner,
+// and in the quiz panel's place for the quiz.
+//
+// Markup that Stage.test.ts and Stage.press.test.ts pin: the root .stage with the deck first, the
+// aside .stage__card (data-theme light), the hide button right before the QR, the count, "Scan to
+// check in" and the quiz in that order, and the .stage__warn line. The kit's look comes from the
+// .stage-card inside the aside and the .pnote notes; stage.css draws the rest.
 import "./stage.css";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "convex/react";
@@ -39,7 +49,7 @@ import { api } from "../../../convex/_generated/api";
 import { pageUrl, useHashParams } from "../../blocks/router";
 import { QR } from "../../blocks/qr";
 import { CHANNEL } from "../../blocks/deck";
-import { Projector } from "../../blocks/kit";
+import { Icon, Projector } from "../../blocks/kit";
 import { ErrorBoundary } from "../../blocks/ui";
 import LateBanner from "./LateBanner";
 import { SAVED, bindTo, bridgeIn, deckAddress, frameSrc, keyFor, savedBridge, takeBridge } from "./stageLink";
@@ -63,6 +73,7 @@ export default function Stage() {
     return () => document.body.classList.remove("stage-body");
   }, []);
 
+  // With no deck the left column is the page's ground and a presenter note says what to add.
   return (
     <div className="stage" onPointerUp={() => setTimeout(refocus, 0)}>
       {deck ? (
@@ -74,34 +85,53 @@ export default function Stage() {
           onLoad={refocus}
           allow="fullscreen 'none'"
         />
-      ) : link ? (
-        <Projector title="That deck link didn't work.">
-          <p>Put your deck's address after <code>?deck=</code> in this page's link.</p>
-        </Projector>
       ) : (
-        <Projector title={<>Add <code>{"?deck=<your deck's address>"}</code> to this page's link.</>} />
+        <Projector />
       )}
-      <div className="stage__late" data-theme="light">
-        <ErrorBoundary label="The late banner">
-          <LateBanner />
-        </ErrorBoundary>
+      <div className="stage__lane" data-theme="light" data-surface="projector">
+        <div className="stage__late" data-theme="light">
+          <ErrorBoundary label="The late banner">
+            <LateBanner />
+          </ErrorBoundary>
+        </div>
+        {!deck && (
+          <p className="pnote">
+            <Icon name="warning" />
+            {link ? (
+              <span>
+                <b>That deck link didn't work.</b> Put your deck's address after <code>?deck=</code> in this page's link.
+              </span>
+            ) : (
+              <span>
+                Add <code>{"?deck=<your deck's address>"}</code> to this page's link.
+              </span>
+            )}
+          </p>
+        )}
+        {lost && (
+          <p className="stage__warn" data-theme="light" role="alert">
+            <span className="pnote" data-surface="projector">
+              <Icon name="warning" />
+              <span>Phones aren't getting these slides. Open this page from the full link again.</span>
+            </span>
+          </p>
+        )}
       </div>
-      {lost && (
-        <p className="stage__warn" data-theme="light" role="alert">
-          Phones aren't getting these slides. Open this page from the full link again.
-        </p>
-      )}
       {shown ? (
         <aside className="stage__card" data-theme="light">
-          <button className="stage__hide" onClick={() => setShown(false)} aria-label="Hide check-in">×</button>
-          <QR value={pageUrl("checkin/student")} size={150} />
-          <ErrorBoundary label="The check-in count">
-            <Count />
-          </ErrorBoundary>
-          <p className="stage__hint">Scan to check in</p>
-          <ErrorBoundary label="The quiz">
-            <Poll />
-          </ErrorBoundary>
+          <div className="stage-card" data-surface="projector">
+            <button className="stage__hide" onClick={() => setShown(false)} aria-label="Hide check-in">
+              <Icon name="x" />
+            </button>
+            <QR value={pageUrl("checkin/student")} size={150} />
+            <ErrorBoundary label="The check-in count">
+              <Count />
+            </ErrorBoundary>
+            <p className="stage__hint">Scan to check in</p>
+            <ErrorBoundary label="The quiz">
+              <Poll />
+            </ErrorBoundary>
+          </div>
         </aside>
       ) : (
         <button className="stage__show" data-theme="light" onClick={() => setShown(true)}>Show check-in</button>
@@ -131,23 +161,45 @@ function useBridge(inLink: string | null, deck: URL | null) {
   return { bridge: keyFor(bindTo(saved, deck), deck), waiting: !deck && saved?.origin === null };
 }
 
+// The count at the card's foot, "checked in" on its baseline. While it loads, "…" takes the
+// numeral's place at the head size (stage.css, by aria-busy), so the card keeps its box.
 function Count() {
   const count = useQuery(api.checkin.read.count, { channel: CHANNEL });
-  return <p className="stage__count"><b>{count ?? "…"}</b> checked in</p>;
+  if (count === undefined) {
+    return (
+      <p className="stage__count" aria-busy="true">
+        <b>…</b> checked in
+      </p>
+    );
+  }
+  return <p className="stage__count"><b>{count}</b> checked in</p>;
 }
 
-// The newest quiz or vote: how many answered while it's open, then a bar per choice.
+// The newest quiz or vote: the question, then how many answered and the choices while it's open,
+// then a bar per choice once it ends. It sits in the card's markup, so × hides it with the card;
+// stage.css draws it as its own panel in the left column (the field while it's open, the raised
+// rung once it ends), the same box in both. "No quiz or vote yet." is there for screen readers
+// only: the stage shows the deck until a question opens.
 function Poll() {
   const poll = useQuery(api.checkin.quiz.current, { channel: CHANNEL });
   if (poll === undefined) return null;
-  if (poll === null) return <p className="stage__none">No quiz or vote yet.</p>;
+  if (poll === null) return <p className="stage__none sr-only">No quiz or vote yet.</p>;
   const results = poll.results;
   const total = results ? results.counts.reduce((a, b) => a + b, 0) : 0;
   return (
     <div className="stage__poll">
       <p className="stage__q">{poll.question}</p>
       {poll.open ? (
-        <p className="stage__answered"><b>{poll.answered}</b> answered</p>
+        <>
+          <p className="stage__answered"><b>{poll.answered}</b> answered</p>
+          <ul className="stage__choices">
+            {poll.choices.map((c, i) => (
+              <li key={i} className="stage__choice">
+                <span className="stage__label">{LETTERS[i]} {c}</span>
+              </li>
+            ))}
+          </ul>
+        </>
       ) : (
         results && (
           <ul className="stage__bars">

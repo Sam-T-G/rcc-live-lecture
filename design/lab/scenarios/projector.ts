@@ -50,6 +50,16 @@ const QUIZ_OPEN = fx(api.checkin.quiz.current, {
   results: null,
 });
 
+// A question and choices as long as a professor might type them (DCHK-1: a 126-character question).
+const LONG_Q =
+  "When a component's state changes and React renders it again, which hook runs its callback after the screen updates by default?";
+const LONG_CHOICES = [
+  "useMemo, which keeps a computed value between renders until its inputs change",
+  "useEffect, which runs after the browser paints, once per render unless its list of inputs stays the same",
+  "useRef, which holds a value that survives renders without causing one",
+  "useId, which makes an id that matches on the server and in the browser",
+];
+
 // Stage fixtures for a class in progress: 38 checked in, no question open, nobody late yet.
 const stage = (extra: Fixtures = {}): Fixtures => ({
   ...fx(api.checkin.read.count, 38),
@@ -249,6 +259,53 @@ export const scenarios: Scenario[] = [
         ),
       },
     ],
+  },
+  {
+    id: "projector-stage-count-hundreds",
+    area: "projector",
+    route: DECK,
+    role: "signedout",
+    title: "PR-04 Stage card with a three-digit count: 128 checked in, the card keeps its box",
+    now: NOW,
+    fixtures: stage(fx(api.checkin.read.count, 128)),
+  },
+  {
+    id: "projector-stage-quiz-long",
+    area: "projector",
+    route: DECK,
+    role: "signedout",
+    title: "PR-05 Open quiz with a 126-character question and four long choices (DCHK-1)",
+    now: NOW,
+    fixtures: stage(
+      fx(api.checkin.quiz.current, {
+        id: pollId(13),
+        kind: "quiz",
+        question: LONG_Q,
+        choices: LONG_CHOICES,
+        open: true,
+        answered: 9,
+        results: null,
+      }),
+    ),
+  },
+  {
+    id: "projector-stage-quiz-ended-long",
+    area: "projector",
+    route: DECK,
+    role: "signedout",
+    title: "PR-06 The same long quiz ended: the panel stays in the frame (DCHK-1)",
+    now: NOW,
+    fixtures: stage(
+      fx(api.checkin.quiz.current, {
+        id: pollId(13),
+        kind: "quiz",
+        question: LONG_Q,
+        choices: LONG_CHOICES,
+        open: false,
+        answered: 31,
+        results: { counts: [4, 19, 6, 2], correct: 1 },
+      }),
+    ),
   },
   {
     id: "projector-stage-count-error",
