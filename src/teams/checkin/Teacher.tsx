@@ -7,11 +7,14 @@
 // "late"; and downloads attendance as a CSV for this class or any past one. End class, next to the
 // status line, ends the class (the same End class, live.groups.endDay, as the Professor view's
 // Points tab).
+// The page: the staff bar (StaffGate), the count line and the status line, then the main column
+// (This class and Past classes, each a list in a well) and the side column (the scanner card, the
+// page's one raised card, and Class start).
 import "./teacher.css";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Badge, Banner, Button, ConfirmButton, Field, Stat } from "../../blocks/kit";
+import { Badge, Banner, Button, ConfirmButton, Field, Icon } from "../../blocks/kit";
 import { Link } from "../../blocks/router";
 import { Card, ErrorBoundary, Screen, Status } from "../../blocks/ui";
 import { CHANNEL } from "../../blocks/deck";
@@ -40,62 +43,76 @@ const MIN = 60_000;
 
 export function Teacher() {
   return (
-    <StaffGate title="Attendance">
+    <StaffGate title="Attendance" bar>
       <Scanner />
     </StaffGate>
   );
 }
 
 // Each part that reads its own data has its own ErrorBoundary, so a list that fails to load
-// leaves the camera and the typed code working.
+// leaves the camera and the typed code working. The title is in the staff bar (StaffGate).
 export function Scanner() {
   return (
-    <Screen title="Attendance" wide>
-      <div className="row att-status">
-        <ErrorBoundary label="The class status">
-          <ClassStatus />
-        </ErrorBoundary>
-        <ErrorBoundary label="The End class button">
-          <EndClass />
-        </ErrorBoundary>
-      </div>
-      <ErrorBoundary label="The counts">
-        <Counts />
-      </ErrorBoundary>
-      <div className="scanner">
-        <ScanPasses />
-        <div>
-          <ErrorBoundary label="The class start">
-            <ClassStart />
+    <div className="staff-page">
+      <Screen wide>
+        <div className="att-head">
+          <ErrorBoundary label="The counts">
+            <Counts />
           </ErrorBoundary>
-          <Card title="This class">
-            <ErrorBoundary label="This class's attendance">
-              <Download />
-              <Names />
-            </ErrorBoundary>
-          </Card>
-          <ErrorBoundary label="Past classes">
-            <PastClasses />
-          </ErrorBoundary>
-          <p>
-            <Link to="checkin/quiz">Start a quiz or a vote</Link>
-          </p>
+          <Link to="checkin/quiz" className="link att-head__link">
+            Start a quiz or a vote
+            <Icon name="chevron-right" />
+          </Link>
         </div>
-      </div>
-    </Screen>
+        <div className="row att-status">
+          <ErrorBoundary label="The class status">
+            <ClassStatus />
+          </ErrorBoundary>
+          <ErrorBoundary label="The End class button">
+            <EndClass />
+          </ErrorBoundary>
+        </div>
+        <div className="desk att-desk">
+          <div className="att-main">
+            <section className="att-sec">
+              <h2>This class</h2>
+              <ErrorBoundary label="This class's attendance">
+                <Download />
+                <Names />
+              </ErrorBoundary>
+            </section>
+            <ErrorBoundary label="Past classes">
+              <PastClasses />
+            </ErrorBoundary>
+          </div>
+          <div className="att-side">
+            <ScanPasses />
+            <ErrorBoundary label="The class start">
+              <ClassStart />
+            </ErrorBoundary>
+          </div>
+        </div>
+      </Screen>
+    </div>
   );
 }
 
-// How many checked in to this class, and how many of them late.
+// How many checked in to this class, and how many of them late: the page's lead number, with the
+// late count on its baseline. Each number is a still block until it loads.
 function Counts() {
   const names = useQuery(api.checkin.read.names, { channel: CHANNEL });
   const sheet = useQuery(api.checkin.attendance.sheet, { channel: CHANNEL });
   const late = sheet?.filter((r) => r.lateMin !== null).length;
+  const here = names?.length;
+  const pending = <span className="skel skel--num" />;
   return (
-    <div className="att-stats">
-      <Stat value={names?.length ?? "…"} label="checked in" accent />
-      <Stat value={late ?? "…"} label="late" />
-    </div>
+    <p className={here ? "tally tally--accent staffhead att-count" : "tally staffhead att-count"} aria-busy={here === undefined || late === undefined || undefined}>
+      <span className="tally__lead">{here ?? pending}</span>
+      <span className="tally__w">checked in</span>
+      <span className="tally__rest">
+        <b>{late ?? pending}</b> late
+      </span>
+    </p>
   );
 }
 
@@ -218,35 +235,57 @@ export function ScanPasses() {
     setTyped("");
   }
 
+  // The scanner card: the camera well (the video stays mounted, so start() can hand it the
+  // picture), the last scan's result under it, then the typed code.
   return (
-    <section>
-      <video ref={cam.video} className={cam.on ? "scanner__video" : "scanner__video scanner__video--off"} muted playsInline />
-      <p className="row">
-        {cam.on ? (
-          <Button variant="secondary" onClick={cam.stop}>
-            Stop camera
-          </Button>
-        ) : (
-          <Button onClick={() => void cam.start()}>Start scanning</Button>
-        )}
-      </p>
-      {cam.error && <Status kind="error">{cam.error}</Status>}
+    <section className="focal att-scan">
+      <div className={cam.on ? "cam att-cam is-on" : cam.error ? "cam cam--off att-cam has-msg" : "cam cam--off att-cam"}>
+        <video ref={cam.video} className={cam.on ? "scanner__video" : "scanner__video scanner__video--off"} muted playsInline />
+        <span className="cam__corners" aria-hidden="true">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <polyline points="0 18 0 0 18 0" />
+            <polyline points="82 0 100 0 100 18" />
+            <polyline points="100 82 100 100 82 100" />
+            <polyline points="18 100 0 100 0 82" />
+          </svg>
+        </span>
+        <div className="att-cam__act">
+          {cam.error && <Status kind="error">{cam.error}</Status>}
+          <p className="row">
+            {cam.on ? (
+              <Button variant="neutral" onClick={cam.stop}>
+                Stop camera
+              </Button>
+            ) : (
+              <Button onClick={() => void cam.start()}>Start scanning</Button>
+            )}
+          </p>
+        </div>
+      </div>
       {cam.on && noScanner && <Status kind="error">{SCANNER_DIDNT_LOAD}</Status>}
+      {result && (
+        <ErrorBoundary key={result.n} label="The last check-in">
+          <LastScan result={result} />
+        </ErrorBoundary>
+      )}
       <form className="att-code" onSubmit={sendTyped}>
         <Field label="Code on their phone">
           {(f) => (
-            <input {...f} value={typed} onChange={(e) => setTyped(e.target.value)} autoCapitalize="characters" autoComplete="off" spellCheck={false} />
+            <input
+              {...f}
+              className="input input--code"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
+            />
           )}
         </Field>
         <Button type="submit" variant="secondary">
           Check in
         </Button>
       </form>
-      {result && (
-        <ErrorBoundary key={result.n} label="The last check-in">
-          <LastScan result={result} />
-        </ErrorBoundary>
-      )}
     </section>
   );
 }
@@ -281,11 +320,16 @@ function LastScan({ result }: { result: Result }) {
   }
   if (open !== undefined && open !== mine) return null;
   if (!result.ok && opens !== null && result.at < opens && Date.now() >= opens) return null;
+  // A check-in is the st-in panel with the check, one already in is the waiting tone with the
+  // repeat glyph; a refusal is the error line.
   return result.ok ? (
-    <Card title={result.already ? "Already checked in" : "Checked in"}>
-      <p className="pass__name">{result.name}</p>
-      <p className="muted">{result.email}</p>
-    </Card>
+    <div className={result.already ? "scanres att-result att-result--again" : "scanres att-result"}>
+      <Icon name={result.already ? "repeat" : "check"} />
+      <Card title={result.already ? "Already checked in" : "Checked in"}>
+        <p className="pass__name">{result.name}</p>
+        <p className="muted">{result.email}</p>
+      </Card>
+    </div>
   ) : (
     <Status kind="error">{scanError(result.text, openRow?.startsAt)}</Status>
   );
@@ -362,8 +406,11 @@ export function ClassStart() {
     await send(startsAt);
   }
 
+  // A section under the scanner card: the two fields side by side, the saved line and Save under
+  // them. On the page, not in a well, so its fields keep their edge while they wait (disabled).
   return (
-    <Card title="Class start">
+    <section className="att-start-panel">
+      <h2>Class start</h2>
       {/* noValidate: send() checks "Late after" and says what's wrong, in place of the browser's own bubble. */}
       <form onSubmit={save} noValidate>
         <fieldset className="att-start" disabled={start === undefined}>
@@ -385,16 +432,16 @@ export function ClassStart() {
           <Field label="Late after (minutes)">
             {(f) => <input {...f} type="number" min={0} max={60} step={1} inputMode="numeric" value={shownGrace} onChange={(e) => setGrace(e.target.value)} />}
           </Field>
+          {start !== undefined && (
+            <p className="muted att-start__saved">
+              {start ? `Late after ${timeOrDay(start.startsAt + start.graceMin * MIN, now)}` : "No start time yet, so nobody is late."}
+            </p>
+          )}
           <Button type="submit" variant="secondary" busy={busy}>
             Save
           </Button>
         </fieldset>
       </form>
-      {start !== undefined && (
-        <p className="muted att-start__saved">
-          {start ? `Late after ${timeOrDay(start.startsAt + start.graceMin * MIN, now)}` : "No start time yet, so nobody is late."}
-        </p>
-      )}
       {err && <Status kind="error">{anyway !== null ? stillOpen(anyway, sheet?.[0]) : err}</Status>}
       {anyway !== null && (
         <p className="row">
@@ -410,7 +457,7 @@ export function ClassStart() {
           </Button>
         </p>
       )}
-    </Card>
+    </section>
   );
 }
 
@@ -423,16 +470,16 @@ function stillOpen(startsAt: number, first: { name: string; at: number } | undef
   return `This class is still open. Its first check-in, ${first.name} at ${clock(first.at)}, is more than 45 minutes before ${clock(startsAt)}. If ${first.name} is in this class, press Save anyway. If ${clock(startsAt)} is the next class's start, press End class, then save it.`;
 }
 
-// This class's attendance as a CSV, and how many were late.
+// This class's attendance as a CSV, at the end of the This class heading. The late count is the
+// count line's (Counts).
 export function Download() {
   const sheet = useQuery(api.checkin.attendance.sheet, { channel: CHANNEL });
   const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
   if (sheet === undefined) return null;
   const open = classes?.find((c) => c.open);
   const earlier = earlierOnly(classes);
-  const late = sheet.filter((r) => r.lateMin !== null).length;
   return (
-    <p className="row">
+    <p className="att-sec__act">
       <Button
         variant="secondary"
         small
@@ -441,30 +488,49 @@ export function Download() {
       >
         Download attendance (CSV)
       </Button>
-      <span className="muted">{late} late</span>
     </p>
   );
 }
 
-// Who checked in to this class, newest first. Remove takes a wrong check-in off, and that
-// student's phone shows the pass again; their quiz and vote answers in this class go too
-// (attendance.removeCheckin). The check-ins from before the first class get no Remove.
+// Who checked in to this class, newest first, as rows in a well: the name, the time, and Remove.
+// Remove takes a wrong check-in off, and that student's phone shows the pass again; their quiz
+// and vote answers in this class go too (attendance.removeCheckin). It asks first, in a box that
+// rises over its row. The check-ins from before the first class get no Remove. While the list
+// loads, three rows of still blocks hold its place under the loading line.
 function Names() {
   const names = useQuery(api.checkin.read.names, { channel: CHANNEL });
   const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
   const remove = useMutation(api.checkin.attendance.removeCheckin);
   const canRemove = classes !== undefined && earlierOnly(classes) === undefined;
-  if (names === undefined) return <Status kind="loading">Loading…</Status>;
-  if (names.length === 0) return <Status kind="empty">No one yet.</Status>;
+  if (names === undefined)
+    return (
+      <div className="att-list-wrap" aria-busy="true">
+        <Status kind="loading">Loading…</Status>
+        <ul className="ruled ruled--well reg att-list" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="ruled__row att-row">
+              <span className="skel skel--line skel--w40" />
+              <span className="skel skel--line" />
+              <span />
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  if (names.length === 0)
+    return (
+      <div className="state state--inline att-empty">
+        <Status kind="empty">No one yet.</Status>
+      </div>
+    );
   return (
-    <ul className="list">
+    <ul className="ruled ruled--well reg att-list">
       {names.map((n) => (
-        <li key={n.id} className="att-row">
-          <span className="att-row__main">
-            <span className="att-row__name">{n.name}</span> <span className="muted">{clock(n.at)}</span>
-          </span>
-          {canRemove && (
-            <span className="att-row__action">
+        <li key={n.id} className="ruled__row att-row">
+          <span className="att-row__name">{n.name}</span>
+          <span className="reg__time">{clock(n.at)}</span>
+          <span className="att-row__action">
+            {canRemove && (
               <ConfirmButton
                 question={`Remove ${n.name} from this class? Their phone shows their pass again, and their quiz and vote answers in this class are removed.`}
                 confirm="Remove"
@@ -472,8 +538,8 @@ function Names() {
               >
                 Remove<span className="sr-only"> {n.name}</span>
               </ConfirmButton>
-            </span>
-          )}
+            )}
+          </span>
         </li>
       ))}
     </ul>
@@ -500,23 +566,28 @@ function PastClasses() {
     }
   }
 
+  // Rows in a well: the class and its date, how many checked in, and its CSV as a row action.
   return (
-    <Card title="Past classes">
+    <section className="att-sec">
+      <h2>Past classes</h2>
       {shown === undefined ? (
-        <Status kind="loading">Loading…</Status>
+        <div className="state state--inline att-empty">
+          <Status kind="loading">Loading…</Status>
+        </div>
       ) : shown.length === 0 ? (
-        <Status kind="empty">No classes with check-ins yet.</Status>
+        <div className="state state--inline att-empty">
+          <Status kind="empty">No classes with check-ins yet.</Status>
+        </div>
       ) : (
-        <ul className="list">
+        <ul className="ruled ruled--well reg att-past">
           {shown.map((c) => (
-            <li key={c.lecture} className="att-row">
-              <span className="att-row__main">
-                <span className="att-row__name">{classLabel(c)}</span> {c.open && <Badge tone="accent">This class</Badge>}
-                <br />
-                <span className="muted">{c.count} checked in</span>
+            <li key={c.lecture} className="ruled__row att-row">
+              <span className="att-row__name">
+                {classLabel(c)} {c.open && <Badge tone="accent">This class</Badge>}
               </span>
+              <span className="att-past__n">{c.count} checked in</span>
               <span className="att-row__action">
-                <Button variant="secondary" small busy={busy === c.lecture} onClick={() => void download(c)}>
+                <Button variant="ghost" busy={busy === c.lecture} onClick={() => void download(c)}>
                   Download CSV
                 </Button>
               </span>
@@ -525,6 +596,6 @@ function PastClasses() {
         </ul>
       )}
       {err && <Status kind="error">{err}</Status>}
-    </Card>
+    </section>
   );
 }

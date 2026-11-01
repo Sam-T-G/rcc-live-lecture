@@ -25,8 +25,6 @@ const noClass: Fixtures = {
 
 // The typed code, sent with Enter (the field's form has the Check in button).
 const typeCode = (code: string) => [{ label: "Code on their phone", text: code, submit: true as const }];
-// The last scan's card (Checked in or Already checked in), under the code field.
-const SCAN_CARD = "section.panel:has(.pass__name)";
 const settle = [{ afterMs: 600, fixtures: {} }];
 
 // ---------- Live quiz (#/checkin/quiz) ----------
@@ -293,7 +291,6 @@ export const scenarios: Scenario[] = [
     fixtures: { ...attendance, ...fx(api.checkin.pass.scan, { name: "Gale Example", email: "gale.example@example.edu", already: false }) },
     clicks: ['button:has-text("Start scanning")'],
     later: [{ afterMs: 1200, fixtures: {} }],
-    scrollTo: SCAN_CARD,
   },
   {
     id: "staff-attendance-scan-checked-in",
@@ -305,7 +302,6 @@ export const scenarios: Scenario[] = [
     fixtures: { ...attendance, ...fx(api.checkin.pass.scan, { name: "Gale Example", email: "gale.example@example.edu", already: false }) },
     type: typeCode("RCC-7Q4K-PX2M"),
     later: settle,
-    scrollTo: SCAN_CARD,
   },
   {
     id: "staff-attendance-scan-already",
@@ -317,7 +313,6 @@ export const scenarios: Scenario[] = [
     fixtures: { ...attendance, ...fx(api.checkin.pass.scan, { name: "Pip Example", email: "pip.example@example.edu", already: true }) },
     type: typeCode("RCC-7Q4K-PX2M"),
     later: settle,
-    scrollTo: SCAN_CARD,
   },
   {
     id: "staff-attendance-scan-refused",
@@ -329,7 +324,6 @@ export const scenarios: Scenario[] = [
     fixtures: { ...attendance, ...fx(api.checkin.pass.scan, refuses("That code is old. Ask them to open their pass again.")) },
     type: typeCode("RCC-0000-OLD1"),
     later: settle,
-    scrollTo: "form.att-code ~ p.status--error",
   },
   {
     id: "staff-attendance-remove-confirm",

@@ -1,11 +1,72 @@
-/* #/admin (src/pages/Admin.tsx), a laptop page: two columns from 1024px wide, one below.
-   Tokens only (src/styles/tokens.css); the cards, table, list and buttons are the shared ones. */
-.admin { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 var(--rcc-space-6); align-items: start; }
-@media (min-width: 1024px) { .admin { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
-/* Emails and names break anywhere, so a long one never pushes the table or a row sideways. */
-.admin__email { overflow-wrap: anywhere; }
-.admin__locked { display: inline-flex; align-items: center; gap: var(--rcc-space-2); }
-.admin__device { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--rcc-space-3); }
-.admin__device > div { flex: 1 1 16rem; min-width: 0; }
+/* #/admin (src/pages/Admin.tsx), a laptop page. Tokens and kit parts only (src/styles/tokens.css,
+   src/styles/kit.css, docs/design.md "staff"); the bar, the page width and the sign-in screen are
+   the staff pages' (src/teams/checkin/teacher.css). The kit's .desk makes the two columns (one
+   below 900 wide); each section ends at its content. */
+.admin__main, .admin__side { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s10); align-content: start; min-width: 0; }
+.admin__side { gap: var(--s8); }
+/* A professor's page: Pair a door iPad (first on the page for a keyboard) in the side column. */
+@media (min-width: 901px) {
+  .admin--prof > .admin__side { grid-column: 2; grid-row: 1; }
+  .admin--prof > .admin__main { grid-column: 1; grid-row: 1; }
+}
+.admin--prof > .admin__main { gap: var(--s6); }
+
+/* A section on the page: its heading, then its form, list or table. */
+.admin-sec { display: grid; gap: var(--s3); align-content: start; min-width: 0; }
+.admin-sec > * { margin: 0; }
+.admin-sec > h2, .admin-pair > h2 { font-size: var(--t-h3); line-height: 1.3; }
+.admin__note { font-size: var(--t-small); }
+.admin-empty > :is(.status, .empty) { padding: 0; }
+
+/* Add someone: the email, the role, the roles' sentence, then Add. */
+.admin-add { display: grid; gap: var(--s4); justify-items: start; max-width: 40rem; }
+.admin-add > * { margin: 0; }
+.admin-add > .field { justify-self: stretch; }
+.admin-add > .muted { font-size: var(--t-small); }
+.admin__done { font-size: var(--t-small); }
+
+/* People: the kit's table in a well with a raised head. Fixed columns, so the role pickers and the
+   Remove column line up and a long email is cut short (its title has the whole address). */
+.admin-people > .table { table-layout: fixed; }
+.admin-people__role { width: 156px; }
+.admin-people__at { width: 140px; }
+.admin-people__act { width: 112px; }
+.admin-people .trunc { --trunc: 100%; }
+.admin-people .admin__email { overflow-wrap: normal; }
+.admin-people td select { min-height: var(--btn-sm); padding-block: 0; font-size: var(--t-small); }
+.admin__locked { display: inline-flex; align-items: center; gap: var(--s2); }
+.admin__when { font-variant-numeric: tabular-nums; }
+.admin__act { position: relative; text-align: right; }
+/* The People table scrolls on its own below 900 wide; with two columns it fits, so a row's
+   question box can rise over the rows around it. */
+@media (min-width: 901px) { .admin-people { overflow: visible; } }
+
+/* Remove and Unpair are ConfirmButtons, whose opener is the kit's danger button. Here it draws as
+   the kit's ghost row action with red words: 32 tall, no fill, the --line-strong ring on hover and
+   keyboard focus. The red fill stays on the confirming button inside the question box. */
+.admin__act > .btn--danger { min-height: var(--btn-sm); padding: 0 var(--s3); font-size: var(--t-small); background-color: transparent; color: var(--error); }
+.admin__act > .btn--danger:is(:hover, :focus-visible) { box-shadow: inset 0 0 0 1px var(--line-strong); }
+/* The row's question box rises over its row from the action's slot, so the list never reflows. */
+.admin__act > .confirm { position: absolute; top: calc(-1 * var(--s2)); right: calc(-1 * var(--s2)); z-index: 3;
+  width: max-content; max-width: min(34rem, 80vw); text-align: start; white-space: normal; }
+
+/* Pair a door iPad: the page's one raised card. */
+.admin-pair { display: grid; gap: var(--s4); align-content: start; }
+.admin-pair > * { margin: 0; }
+.admin-pair > .muted { font-size: var(--t-small); }
+.admin-pair__form { display: grid; gap: var(--s4); justify-items: start; }
+.admin-pair__form > * { margin: 0; }
+.admin-pair__form > .field { justify-self: stretch; }
+
+/* Door iPads and Changes: rows in a well. */
+.admin-devices, .admin-changes { margin: 0; list-style: none; }
+.admin-devices > .ruled__row { --rcols: minmax(0, 1fr) auto; align-items: start; padding-block: var(--s3); font-size: var(--t-body); }
 .admin__device p { margin: 0; }
-.admin__label { font-weight: var(--rcc-weight-strong); }
+.admin__device .muted { font-size: var(--t-small); }
+.admin__label { font-weight: var(--w-head); }
+.admin-devices .admin__act { align-self: center; }
+.admin-changes { --rcols: minmax(0, 1fr); }
+.admin-changes > .ruled__row { row-gap: 2px; padding-block: var(--s3); }
+.admin-changes .muted { font-size: var(--t-small); }
+/* Emails and names break anywhere, so a long one never pushes a row sideways. */
+.admin__email { overflow-wrap: anywhere; }

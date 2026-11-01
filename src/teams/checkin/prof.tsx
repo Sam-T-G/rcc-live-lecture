@@ -6,19 +6,29 @@
 //                "scanner" or null).
 //   <StaffGate title="Live quiz">...</StaffGate>   the page, for professors and admins, under a
 //                "Signed in as" line with Sign out. Anyone else sees how to sign in, or why their
-//                sign-in doesn't open it.
+//                sign-in doesn't open it. With `bar` (the staff laptop pages: Attendance, Live
+//                quiz) the open page starts with <StaffBar>, the page title and who is signed in,
+//                and the page itself draws no title.
+//   <StaffBar title="Admin" />   the staff pages' app bar: the page's h1, then "Signed in as" and
+//                Sign out at its end.
+//   <SignInScreen title>, <SignInChecking />, <SignInRefused>   the staff sign-in screen (no bar,
+//                one column at the top of the page), its checking line, and the lock glyph
+//                hung before a sign-in the page doesn't open for. StaffGate and #/admin use them.
 //   <SignInEnding />   for the 5 minutes before a Google sign-in ends, its end time and Google's
 //                button pinned to the bottom of the page (StaffGate and #/admin show it; #/live
-//                and #/checkin/student show it with line={STUDENT_ENDING}).
+//                and #/checkin/student show it with line={STUDENT_ENDING}). With `bar` it is the
+//                full-width bar under <StaffBar> instead.
 //   <DoorGate>, <PairScreen>, readDeviceToken() and newDeviceToken()   the door iPad's gate for
 //                #/checkin/kiosk, in door.tsx; this file re-exports them, so imports from
 //                "./prof" keep working.
+// The bar and the sign-in screens (.staff-bar, .staff-gate) are styled in teacher.css, which the
+// check-in pages load on every route.
 import { type ReactNode } from "react";
 import { useConvexAuth, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { GoogleButton, SignedInAs, SignInButton, useGoogleUser } from "../../blocks/auth";
-import { Banner, BannerStack, Button } from "../../blocks/kit";
+import { Banner, BannerStack, Button, Icon } from "../../blocks/kit";
 import { Screen, Status } from "../../blocks/ui";
 import { clock } from "./util";
 
@@ -111,10 +121,19 @@ export function NotStaff({ me }: { me: StaffMe }) {
 // everyone else, under the page's title. An open page starts with who is signed in and Sign out:
 // the sign-in stays in the browser (and Chrome renews it with no click), so a professor on a
 // shared lectern PC signs out before leaving, or the next person there opens the page as them.
-export function StaffGate({ title, children }: { title: string; children: ReactNode }) {
+// `bar` puts the title and who is signed in in <StaffBar>, the sign-in ending under it.
+export function StaffGate({ title, bar, children }: { title: string; bar?: boolean; children: ReactNode }) {
   const me = useStaff();
   const { user } = useGoogleUser();
-  if (me && isProfRole(me.role))
+  if (me && isProfRole(me.role)) {
+    if (bar)
+      return (
+        <>
+          <StaffBar title={title} />
+          <SignInEnding bar />
+          {children}
+        </>
+      );
     return (
       <>
         <SignInEnding />
@@ -126,10 +145,55 @@ export function StaffGate({ title, children }: { title: string; children: ReactN
         {children}
       </>
     );
+  }
   return (
-    <Screen title={title} wide>
-      {me === undefined ? <Status kind="loading">Checking who is signed in…</Status> : <NotStaff me={me} />}
-    </Screen>
+    <SignInScreen title={title}>
+      {me === undefined ? <SignInChecking /> : me === null ? <NotStaff me={me} /> : <SignInRefused><NotStaff me={me} /></SignInRefused>}
+    </SignInScreen>
+  );
+}
+
+// The staff pages' app bar: the page title and who is signed in, with Sign out at its end.
+export function StaffBar({ title }: { title: string }) {
+  return (
+    <header className="bar staff-bar">
+      <h1>{title}</h1>
+      <div className="bar__end whoami">
+        <SignedInAs />
+      </div>
+    </header>
+  );
+}
+
+// The sign-in screens of the staff pages (and #/host): no bar, one column at the top of the
+// page with the title, the sentence and the action under it.
+export function SignInScreen({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="staff-gate">
+      <Screen title={title} wide>
+        {children}
+      </Screen>
+    </div>
+  );
+}
+
+// While the server checks who is signed in: the action's slot, with the clock glyph and the step.
+export function SignInChecking() {
+  return (
+    <div className="staff-gate__wait">
+      <Icon name="clock" />
+      <Status kind="loading">Checking who is signed in…</Status>
+    </div>
+  );
+}
+
+// A sign-in this page doesn't open for: the lock glyph hangs before the reason and Sign out.
+export function SignInRefused({ children }: { children: ReactNode }) {
+  return (
+    <div className="hang staff-gate__why">
+      <Icon name="lock" />
+      <div>{children}</div>
+    </div>
   );
 }
 
@@ -140,15 +204,16 @@ export function StaffGate({ title, children }: { title: string; children: ReactN
 // Student pages (#/live, #/checkin/student) pass their own `line` (STUDENT_ENDING), since the
 // page stays open for them but signs them out.
 export const STUDENT_ENDING = "Sign in with Google again before then, or this page signs you out.";
-export function SignInEnding({ line = "Sign in with Google again before then to keep this page open." }: { line?: string }) {
+export function SignInEnding({ line = "Sign in with Google again before then to keep this page open.", bar }: { line?: string; bar?: boolean }) {
   const { endsAt } = useGoogleUser();
   if (endsAt == null) return null;
-  return (
-    <BannerStack>
-      <Banner tone="warn" title={`Your sign-in ends at ${clock(endsAt)}.`} action={<GoogleButton />}>
-        {line}
-      </Banner>
-    </BannerStack>
+  const banner = (
+    <Banner tone="warn" bar={bar} title={`Your sign-in ends at ${clock(endsAt)}.`} action={<GoogleButton />}>
+      {line}
+    </Banner>
   );
+  // On a staff laptop page the banner is the bar under the app bar; elsewhere it is pinned to the
+  // bottom of the screen.
+  return bar ? banner : <BannerStack>{banner}</BannerStack>;
 }
 

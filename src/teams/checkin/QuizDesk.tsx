@@ -2,15 +2,19 @@
 // and admins (StaffGate). Start a quiz or a vote, watch answers come in, end it, see the results.
 // On screen a poll is a quiz or a vote, never a "question" (that word is for students' posts;
 // Quiz.press.test.ts checks it). Quiz.tsx re-exports Professor and has the student's side
-// (QuizCard) and the parts both use (Bars, usePending, useCurrent).
-import { useState, type FormEvent } from "react";
+// (QuizCard) and the parts both use (usePending, useCurrent).
+// The page: the staff bar (StaffGate), then the quiz card, the page's one raised card, and This
+// class beside it. The card's action (End the quiz, Ask another) sits at the end of its first
+// line in every state; the results are the kit's ruled bar chart (.rbars) on the card.
+import "./quizdesk.css";
+import { useState, type CSSProperties, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Big, Screen, Status } from "../../blocks/ui";
-import { Button, Segmented, Stat, type Choice } from "../../blocks/kit";
+import { Button, Icon, Segmented, Stat, type Choice } from "../../blocks/kit";
 import { CHANNEL } from "../../blocks/deck";
 import { StaffGate } from "./prof";
-import { Bars, LETTERS, usePending, type Poll } from "./Quiz";
+import { LETTERS, usePending, type Poll } from "./Quiz";
 import { why } from "./util";
 
 const KINDS: Choice<"quiz" | "vote">[] = [
@@ -19,7 +23,7 @@ const KINDS: Choice<"quiz" | "vote">[] = [
 ];
 
 export function Professor() {
-  return <StaffGate title="Live quiz"><ProfessorBoard /></StaffGate>;
+  return <StaffGate title="Live quiz" bar><ProfessorBoard /></StaffGate>;
 }
 
 function ProfessorBoard() {
@@ -27,17 +31,28 @@ function ProfessorBoard() {
   const [asking, setAsking] = useState(false);
   const showForm = poll === null || (!!poll && !poll.open && asking);
   return (
-    <Screen title="Live quiz" wide>
-      <div className="scanner">
-        <div>
-          {poll === undefined && <Status kind="loading">Loading…</Status>}
-          {showForm
-            ? <AskForm onDone={() => setAsking(false)} />
-            : poll && <Running key={poll.id} poll={poll} onNew={() => setAsking(true)} />}
+    <div className="staff-page">
+      <Screen wide>
+        <div className="desk qd">
+          <section className="focal qd-card" aria-busy={poll === undefined || undefined}>
+            {poll === undefined && (
+              <>
+                <Status kind="loading">Loading…</Status>
+                <div className="skel-lines" aria-hidden="true">
+                  <span className="skel" />
+                  <span className="skel" />
+                  <span className="skel" />
+                </div>
+              </>
+            )}
+            {showForm
+              ? <AskForm onDone={() => setAsking(false)} />
+              : poll && <Running key={poll.id} poll={poll} onNew={() => setAsking(true)} />}
+          </section>
+          <History />
         </div>
-        <History />
-      </div>
-    </Screen>
+      </Screen>
+    </div>
   );
 }
 
@@ -78,6 +93,8 @@ function AskForm({ onDone }: { onDone: () => void }) {
     });
   }
 
+  // Quiz or Vote on the card's first line, the rule under it, the text, then A to D as rows: the
+  // letter tile, the choice, and the right-answer radio in one column at the end.
   return (
     <form onSubmit={send} className="ask" noValidate>
       <Segmented label="Quiz or vote" hideLabel options={KINDS} value={kind} onChange={setKind} />
@@ -90,18 +107,20 @@ function AskForm({ onDone }: { onDone: () => void }) {
         {kind === "quiz" ? "Quiz text" : "Vote text"}
         <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={kind === "quiz" ? "What does a capacitor store?" : "What should we cover next?"} required />
       </label>
-      {choices.map((c, i) => (
-        <div key={i} className="row ask__choice">
-          <b>{LETTERS[i]}</b>
-          <input value={c} onChange={(e) => setChoices(choices.map((x, j) => (j === i ? e.target.value : x)))} placeholder={i < 2 ? "Choice (needed)" : "Choice (optional)"} aria-label={"Choice " + LETTERS[i]} />
-          {kind === "quiz" && (
-            <label className="muted">
-              <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} aria-label={`Right answer: ${LETTERS[i]}`} /> Right
-            </label>
-          )}
-        </div>
-      ))}
-      <p className="row">
+      <div className="ask__choices">
+        {choices.map((c, i) => (
+          <div key={i} className="row ask__choice">
+            <span className="letter" aria-hidden="true">{LETTERS[i]}</span>
+            <input value={c} onChange={(e) => setChoices(choices.map((x, j) => (j === i ? e.target.value : x)))} placeholder={i < 2 ? "Choice (needed)" : "Choice (optional)"} aria-label={"Choice " + LETTERS[i]} />
+            {kind === "quiz" && (
+              <label className="muted ask__right">
+                <input type="radio" className="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} aria-label={`Right answer: ${LETTERS[i]}`} /> Right
+              </label>
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="row ask__send">
         <Button type="submit" busy={sending}>{kind === "quiz" ? "Ask the room" : "Start the vote"}</Button>
         {kind === "quiz" && correct !== null && <Button variant="quiet" onClick={() => setCorrect(null)}>No right answer</Button>}
       </p>
@@ -130,45 +149,102 @@ function Running({ poll, onNew }: { poll: Poll; onNew: () => void }) {
     });
   }
 
+  // The lead count: got it right for a quiz with a right answer, else answered.
+  const right = stats?.rightPct ?? null;
   return (
-    <div>
-      <p className="muted">{vote ? "Vote" : "Quiz"} · {poll.open ? "open" : "ended"}</p>
+    <div className="qd-run">
+      <p className="qd-run__state">
+        <span>{vote ? "Vote" : "Quiz"}</span> · <span className={poll.open ? "stateword stateword--open" : "stateword stateword--ended"}>{poll.open ? "open" : "ended"}</span>
+      </p>
       <h2 className="quiz__q">{poll.question}</h2>
       {poll.open ? (
         <>
           <Big value={stats ? `${stats.answered} of ${stats.checkedIn}` : "…"} label="checked-in students answered" />
-          <ul className="quiz__list">{poll.choices.map((c, i) => <li key={i}><b>{LETTERS[i]}</b> {c}</li>)}</ul>
-          <p className="row"><Button busy={ending} onClick={stop}>{vote ? "End the vote" : "End the quiz"}</Button></p>
+          <ul className="ruled rbars qd-choices">
+            {poll.choices.map((c, i) => (
+              <li key={i} className="ruled__row">
+                <span className="letter">{LETTERS[i]}</span> <span>{c}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="row qd-act"><Button busy={ending} onClick={stop}>{vote ? "End the vote" : "End the quiz"}</Button></p>
           {err && <Status kind="error">{err}</Status>}
         </>
       ) : stats ? (
         <>
-          <Bars choices={poll.choices} counts={stats.counts} correct={stats.correct} />
           <div className="quiz__stats">
-            <Stat value={`${stats.answered} of ${stats.checkedIn}`} label="answered" accent />
-            {stats.rightPct !== null && <Stat value={stats.rightPct + "%"} label="got it right" />}
+            {right !== null && <Stat value={right + "%"} label="got it right" accent />}
+            <Stat value={`${stats.answered} of ${stats.checkedIn}`} label="answered" accent={right === null} />
             {stats.medianSec !== null && <Stat value={stats.medianSec + " s"} label="median time to answer" />}
           </div>
-          <p className="row"><button onClick={onNew}>Ask another</button></p>
+          <Results choices={poll.choices} counts={stats.counts} correct={stats.correct} />
+          <p className="row qd-act"><button onClick={onNew}>Ask another</button></p>
         </>
       ) : <Status kind="loading">Counting…</Status>}
     </div>
   );
 }
 
+// The ended quiz's or vote's answers as the kit's ruled bar chart on the card: the letter, the
+// choice over its bar, the count and the percent. The right answer's bar fills green with the
+// check and "right answer" on its line; a vote's top pick is marked as the lead. The percent is
+// of everyone who answered.
+function Results({ choices, counts, correct }: { choices: string[]; counts: number[]; correct: number | null }) {
+  const total = counts.reduce((a, b) => a + b, 0);
+  const top = Math.max(...counts);
+  return (
+    <ul className="ruled rbars qd-bars">
+      {choices.map((c, i) => {
+        const n = counts[i] ?? 0;
+        const share = total ? n / total : 0;
+        const right = correct === i;
+        const lead = correct === null && total > 0 && n === top;
+        return (
+          <li key={i} className={"ruled__row" + (right ? " is-right" : "") + (lead ? " is-lead" : "")}>
+            <span className="letter">{LETTERS[i]}</span>
+            <span className="rbar__text">
+              <span className="rbar__label">
+                <span>{c}</span>
+                {right && (
+                  <span className="rbar__tag">
+                    <Icon name="check" />
+                    right answer
+                  </span>
+                )}
+              </span>
+              <span className="rbar__track">
+                <span className="rbar__fill" style={{ "--f": share } as CSSProperties} />
+              </span>
+            </span>
+            <span className="rbar__n">
+              <span>{n}</span>
+              <span className="rbar__pct">{Math.round(share * 100)}%</span>
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// This class's quizzes and votes, newest first, as rows in a well beside the card.
 function History() {
   const past = useQuery(api.checkin.quiz.history, { channel: CHANNEL });
   return (
-    <div>
+    <section className="qd-history">
       <h2>This class</h2>
       {past === undefined ? (
-        <Status kind="loading">Loading…</Status>
+        <div className="state state--inline">
+          <Status kind="loading">Loading…</Status>
+        </div>
       ) : past.length === 0 ? (
-        <Status kind="empty">No quiz or vote yet.</Status>
+        <div className="state state--inline">
+          <Status kind="empty">No quiz or vote yet.</Status>
+        </div>
       ) : (
-        <ul className="scanner__names">
+        <ul className="ruled ruled--well qd-history__list">
           {past.map((p) => (
-            <li key={p.id}>
+            <li key={p.id} className="ruled__row">
               {p.question}{" "}
               <span className="muted">
                 {p.kind === "vote" ? "vote" : "quiz"} · {p.answered} answered{p.rightPct !== null ? ` · ${p.rightPct}% right` : ""}
@@ -177,6 +253,6 @@ function History() {
           ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }

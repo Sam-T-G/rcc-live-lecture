@@ -4,14 +4,18 @@
 //   Professors: Pair a door iPad and Door iPads, and "Only admins can add people."
 //   Everyone else: "Admins only." with the email they're signed in with, or the sign-in.
 // The server checks every call (convex/staff.ts lists each function and who may call it).
+// The page: the staff bar (StaffBar: the title, who is signed in), then the main column (Add
+// someone, People) and the side column (Pair a door iPad, the page's one raised card, then Door
+// iPads and Changes). Lists and the People table sit in wells; Remove and Unpair ask in a box that
+// rises over their row.
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../convex/_generated/api";
 import { SignedInAs } from "../blocks/auth";
-import { Badge, Button, ConfirmButton, EmptyState, Field, Segmented, type Choice } from "../blocks/kit";
-import { Card, ErrorBoundary, Screen, Status } from "../blocks/ui";
-import { NotStaff, SignInEnding, useStaff, type StaffMe } from "../teams/checkin/prof";
+import { Badge, Button, ConfirmButton, EmptyState, Field, Icon, Segmented, type Choice } from "../blocks/kit";
+import { ErrorBoundary, Screen, Status } from "../blocks/ui";
+import { NotStaff, SignInChecking, SignInEnding, SignInRefused, SignInScreen, StaffBar, useStaff, type StaffMe } from "../teams/checkin/prof";
 import { stillPaired, type Paired } from "./paired";
 import { why } from "../teams/checkin/util";
 import "./admin.css";
@@ -32,74 +36,77 @@ export default function Admin() {
   if (me?.role === "admin" || me?.role === "professor")
     return (
       <>
-        <SignInEnding />
+        <StaffBar title="Admin" />
+        <SignInEnding bar />
         {me.role === "admin" ? <AdminView /> : <ProfessorView />}
       </>
     );
-  return (
-    <Screen title="Admin" wide>
-      {me === undefined ? <Status kind="loading">Checking who is signed in…</Status> : <AdminsOnly me={me} />}
-    </Screen>
-  );
+  return <SignInScreen title="Admin">{me === undefined ? <SignInChecking /> : <AdminsOnly me={me} />}</SignInScreen>;
 }
 
-// Signed out, a scanner, a student, or a sign-in that can't hold a role.
+// Signed out, a scanner, a student, or a sign-in that can't hold a role. A sign-in the page
+// doesn't open for gets the lock glyph before the reason (SignInRefused).
 function AdminsOnly({ me }: { me: StaffMe }) {
-  return (
+  const reason = (
     <>
       <p>Admins only.</p>
       {me && me.canHoldRole ? <SignedInAs /> : <NotStaff me={me} />}
     </>
   );
+  return me === null ? reason : <SignInRefused>{reason}</SignInRefused>;
 }
 
+// The page under the staff bar (Admin draws the bar, with who is signed in).
 export function AdminView() {
   return (
-    <Screen title="Admin" wide>
-      <SignedInAs />
-      <div className="admin">
-        <div>
-          <ErrorBoundary label="The Add someone form">
-            <AddPerson />
-          </ErrorBoundary>
-          <ErrorBoundary label="The staff list">
-            <People />
-          </ErrorBoundary>
+    <div className="staff-page">
+      <Screen wide>
+        <div className="desk admin">
+          <div className="admin__main">
+            <ErrorBoundary label="The Add someone form">
+              <AddPerson />
+            </ErrorBoundary>
+            <ErrorBoundary label="The staff list">
+              <People />
+            </ErrorBoundary>
+          </div>
+          <div className="admin__side">
+            <ErrorBoundary label="The pairing form">
+              <PairDevice />
+            </ErrorBoundary>
+            <ErrorBoundary label="The door iPad list">
+              <Devices />
+            </ErrorBoundary>
+            <ErrorBoundary label="The list of changes">
+              <Changes />
+            </ErrorBoundary>
+          </div>
         </div>
-        <div>
-          <ErrorBoundary label="The pairing form">
-            <PairDevice />
-          </ErrorBoundary>
-          <ErrorBoundary label="The door iPad list">
-            <Devices />
-          </ErrorBoundary>
-          <ErrorBoundary label="The list of changes">
-            <Changes />
-          </ErrorBoundary>
-        </div>
-      </div>
-    </Screen>
+      </Screen>
+    </div>
   );
 }
 
+// A professor's page: Pair a door iPad in the side column, Door iPads in the main one.
 export function ProfessorView() {
   return (
-    <Screen title="Admin" wide>
-      <SignedInAs />
-      <p>Only admins can add people.</p>
-      <div className="admin">
-        <div>
-          <ErrorBoundary label="The pairing form">
-            <PairDevice />
-          </ErrorBoundary>
+    <div className="staff-page">
+      <Screen wide>
+        <div className="desk admin admin--prof">
+          <div className="admin__side">
+            <ErrorBoundary label="The pairing form">
+              <PairDevice />
+            </ErrorBoundary>
+          </div>
+          <div className="admin__main">
+            <p className="muted admin__note">Only admins can add people.</p>
+            <ErrorBoundary label="The door iPad list">
+              <Devices />
+            </ErrorBoundary>
+          </div>
         </div>
-        <div>
-          <ErrorBoundary label="The door iPad list">
-            <Devices />
-          </ErrorBoundary>
-        </div>
-      </div>
-    </Screen>
+      </Screen>
+    </div>
   );
 }
 
@@ -130,9 +137,12 @@ export function AddPerson() {
     }
   }
 
+  // A section on the page: the email, the role as text options, the roles' sentence, then Add (an
+  // outline button, so Pair is the page's one filled button).
   return (
-    <Card title="Add someone">
-      <form onSubmit={submit}>
+    <section className="admin-sec">
+      <h2>Add someone</h2>
+      <form onSubmit={submit} className="admin-add">
         <Field label="Email" hint="The Google account they sign in with.">
           {(f) => <input {...f} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" required />}
         </Field>
@@ -142,40 +152,48 @@ export function AddPerson() {
           remove people here.
         </p>
         {error && <Status kind="error">{error}</Status>}
-        <Button type="submit" busy={busy}>
+        <Button type="submit" variant="secondary" busy={busy}>
           Add
         </Button>
         {done && (
-          <p className="muted" role="status">
-            {done}
+          <p className="hang hang--in admin__done" role="status">
+            <Icon name="check" />
+            <span>{done}</span>
           </p>
         )}
       </form>
-    </Card>
+    </section>
   );
 }
 
 type Person = FunctionReturnType<typeof api.staff.people>[number];
 
+// The staff list: a table in a well with a raised head; emails cut short with the whole one in
+// the title.
 function People() {
   const people = useQuery(api.staff.people, {});
   const [error, setError] = useState("");
   return (
-    <Card title="People">
+    <section className="admin-sec">
+      <h2>People</h2>
       {people === undefined ? (
-        <Status kind="loading">Loading the staff list…</Status>
+        <div className="state state--inline admin-empty">
+          <Status kind="loading">Loading the staff list…</Status>
+        </div>
       ) : people.length === 0 ? (
-        <EmptyState title="No one has a role yet">Add someone above.</EmptyState>
+        <div className="state state--inline admin-empty">
+          <EmptyState title="No one has a role yet">Add someone above.</EmptyState>
+        </div>
       ) : (
-        <div className="table-scroll">
-          <table>
+        <div className="table-scroll admin-people">
+          <table className="table">
             <thead>
               <tr>
                 <th>Email</th>
-                <th>Role</th>
+                <th className="admin-people__role">Role</th>
                 <th>Added by</th>
-                <th>Added</th>
-                <th>
+                <th className="admin-people__at">Added</th>
+                <th className="admin-people__act">
                   <span className="sr-only">Remove</span>
                 </th>
               </tr>
@@ -190,9 +208,9 @@ function People() {
       )}
       {error && <Status kind="error">{error}</Status>}
       {people?.some((p) => p.locked) && (
-        <p className="muted">You can't change or remove a permanent admin here: they're set in the server settings (ADMIN_EMAILS).</p>
+        <p className="muted admin__note">You can't change or remove a permanent admin here: they're set in the server settings (ADMIN_EMAILS).</p>
       )}
-    </Card>
+    </section>
   );
 }
 
@@ -216,7 +234,11 @@ function PersonRow({ p, onError }: { p: Person; onError: (message: string) => vo
 
   return (
     <tr>
-      <td className="admin__email">{p.email}</td>
+      <td className="admin__email">
+        <span className="trunc" title={p.email}>
+          {p.email}
+        </span>
+      </td>
       <td>
         {p.locked ? (
           <span className="admin__locked">
@@ -237,9 +259,13 @@ function PersonRow({ p, onError }: { p: Person; onError: (message: string) => vo
           </select>
         )}
       </td>
-      <td className="admin__email">{p.addedBy}</td>
-      <td>{p.at === null ? "" : when(p.at)}</td>
-      <td>
+      <td className="admin__email">
+        <span className="trunc" title={p.addedBy}>
+          {p.addedBy}
+        </span>
+      </td>
+      <td className="admin__when">{p.at === null ? "" : when(p.at)}</td>
+      <td className="admin__act">
         {!p.locked && (
           <ConfirmButton question={`Remove ${p.email} from the staff list?`} confirm="Remove" onConfirm={() => remove({ email: p.email })}>
             Remove
@@ -250,27 +276,33 @@ function PersonRow({ p, onError }: { p: Person; onError: (message: string) => vo
   );
 }
 
+// The last 50 changes, newest first, as rows in a well: the sentence, its time under it.
 function Changes() {
   const changes = useQuery(api.staff.changes, {});
   return (
-    <Card title="Changes">
+    <section className="admin-sec">
+      <h2>Changes</h2>
       {changes === undefined ? (
-        <Status kind="loading">Loading the changes…</Status>
+        <div className="state state--inline admin-empty">
+          <Status kind="loading">Loading the changes…</Status>
+        </div>
       ) : changes.length === 0 ? (
-        <EmptyState title="No changes yet" />
+        <div className="state state--inline admin-empty">
+          <EmptyState title="No changes yet" />
+        </div>
       ) : (
         <>
-          <p className="muted">The last {changes.length}, newest first.</p>
-          <ul className="list">
+          <p className="muted admin__note">The last {changes.length}, newest first.</p>
+          <ul className="ruled ruled--well admin-changes">
             {changes.map((c) => (
-              <li key={c._id}>
+              <li key={c._id} className="ruled__row">
                 <span className="admin__email">{c.text}</span> <span className="muted">{when(c.at)}</span>
               </li>
             ))}
           </ul>
         </>
       )}
-    </Card>
+    </section>
   );
 }
 
@@ -303,13 +335,24 @@ function PairDevice() {
     }
   }
 
+  // The page's one raised card: the steps, the code and the name, then Pair.
   return (
-    <Card title="Pair a door iPad">
+    <section className="focal admin-pair">
+      <h2>Pair a door iPad</h2>
       <p className="muted">On the iPad at the door, open Home and tap Check-in kiosk to get a pairing code. Each code works for 10 minutes.</p>
-      <form onSubmit={submit}>
+      <form onSubmit={submit} className="admin-pair__form">
         <Field label="Code on the iPad">
           {(f) => (
-            <input {...f} value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="off" maxLength={11} required />
+            <input
+              {...f}
+              className="input input--code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={11}
+              required
+            />
           )}
         </Field>
         <Field label="Name" hint="Where the iPad is, like A-210 door.">
@@ -320,53 +363,62 @@ function PairDevice() {
           Pair
         </Button>
         {done && stillPaired(done, devices) && (
-          <p className="muted" role="status">
-            {done.text}
+          <p className="hang hang--in admin__done" role="status">
+            <Icon name="check" />
+            <span>{done.text}</span>
           </p>
         )}
       </form>
-    </Card>
+    </section>
   );
 }
 
 type Device = FunctionReturnType<typeof api.staff.devices>[number];
 
+// The paired iPads as rows in a well: the name, who paired it and its last scan, then Unpair.
 function Devices() {
   const devices = useQuery(api.staff.devices, {});
   return (
-    <Card title="Door iPads">
+    <section className="admin-sec">
+      <h2>Door iPads</h2>
       {devices === undefined ? (
-        <Status kind="loading">Loading the door iPads…</Status>
+        <div className="state state--inline admin-empty">
+          <Status kind="loading">Loading the door iPads…</Status>
+        </div>
       ) : devices.length === 0 ? (
-        <EmptyState title="No door iPads yet">Pair one with the code that Check-in kiosk shows on the iPad.</EmptyState>
+        <div className="state state--inline admin-empty">
+          <EmptyState title="No door iPads yet">Pair one with the code that Check-in kiosk shows on the iPad.</EmptyState>
+        </div>
       ) : (
-        <ul className="list">
+        <ul className="ruled ruled--well admin-devices">
           {devices.map((d) => (
             <DeviceRow key={d._id} d={d} />
           ))}
         </ul>
       )}
-    </Card>
+    </section>
   );
 }
 
 function DeviceRow({ d }: { d: Device }) {
   const unpair = useMutation(api.staff.unpair);
   return (
-    <li className="admin__device">
+    <li className="ruled__row admin__device">
       <div>
         <p className="admin__label">{d.label}</p>
         <p className="muted admin__email">
           Paired by {d.pairedBy}, {when(d.pairedAt)}. {d.lastUsedAt === null ? "No scans yet." : `Last scan ${when(d.lastUsedAt)}.`}
         </p>
       </div>
-      <ConfirmButton
-        question={`Unpair ${d.label}? That iPad stops scanning right away and shows a new pairing code.`}
-        confirm="Unpair"
-        onConfirm={() => unpair({ device: d._id })}
-      >
-        Unpair
-      </ConfirmButton>
+      <span className="admin__act">
+        <ConfirmButton
+          question={`Unpair ${d.label}? That iPad stops scanning right away and shows a new pairing code.`}
+          confirm="Unpair"
+          onConfirm={() => unpair({ device: d._id })}
+        >
+          Unpair
+        </ConfirmButton>
+      </span>
     </li>
   );
 }

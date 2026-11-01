@@ -1,0 +1,53 @@
+/* #/checkin/quiz (QuizDesk.tsx): the professor's quiz and vote desk on a laptop, 1280 to 1440 wide.
+   Tokens and kit parts only (src/styles/tokens.css, src/styles/kit.css, docs/design.md "staff").
+   The page: the quiz card (the one raised card) in the main column, This class beside it. The bar
+   and the page width are the staff pages' (teacher.css). */
+
+/* ------------------------------------------------------------ the quiz card */
+.qd-card { display: grid; gap: var(--s5); align-content: start; min-width: 0; }
+.qd-card > .status { padding: 0; }
+
+/* Open or ended: the kind and its state word on the first line, the action at the end of it in
+   every state (End the quiz, then Ask another), then the question, the count and the answers. */
+.qd-run { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--s4); row-gap: var(--s5); min-width: 0; }
+.qd-run > * { grid-column: 1 / -1; margin: 0; }
+.qd-run > .qd-run__state { grid-column: 1; grid-row: 1; font-size: var(--t-body); font-weight: var(--w-head); }
+.qd-run > .qd-act { grid-column: 2; grid-row: 1; justify-self: end; }
+.qd-run > .quiz__q { font-size: var(--t-h2); line-height: 1.3; font-weight: var(--w-head); overflow-wrap: anywhere; }
+/* The live count while it's open: the screen's one big number. */
+.qd-run .big__value { font-size: var(--n-hero); }
+.qd-run .big__label { font-size: var(--t-body); }
+/* The choices while it's open, and the results once it ends: ruled rows on the card. */
+.qd-choices, .qd-bars { margin: 0; list-style: none; }
+.qd-choices { --rcols: 44px minmax(0, 1fr); }
+/* The ended counts: the lead one first and largest, the others beside it. One two-row grid, so the
+   labels share one line and the numbers one baseline. */
+.qd-run > .quiz__stats { display: grid; grid-template-rows: auto auto; grid-auto-columns: max-content; justify-content: start; column-gap: var(--s10); row-gap: var(--s1); }
+.qd-run > .quiz__stats > .stat { display: contents; }
+.qd-run > .quiz__stats .stat__label { grid-row: 1; align-self: end; }
+.qd-run > .quiz__stats .stat__value { grid-row: 2; align-self: last baseline; }
+@supports not (align-self: last baseline) { .qd-run > .quiz__stats .stat__value { align-self: end; } }
+
+/* No quiz yet: the ask form. Quiz or Vote on the first line, the rule under it, the text, A to D
+   as rows (the letter tile, the choice, the right-answer radio at the end of the row). */
+.qd-card .ask { display: grid; gap: var(--s4); margin: 0; }
+.qd-card .ask > * { margin: 0; }
+.qd-card .ask > .muted { font-size: var(--t-small); }
+.qd-card .ask__q { display: grid; gap: var(--s1); font-size: var(--t-label); font-weight: var(--w-head); }
+.qd-card .ask__q > input { margin: 0; font-size: var(--t-body); }
+.qd-card .ask__choices { display: grid; gap: var(--s2); }
+.qd-card .ask__choice { flex-wrap: nowrap; gap: var(--s3); margin: 0; }
+.qd-card .ask__choice > .letter { background: var(--on-raised); }
+.qd-card .ask__choice > input { flex: 1; min-width: 0; }
+.qd-card .ask__right { gap: var(--s2); min-height: var(--tap); font-size: var(--t-small); }
+.qd-card .ask__send { margin-top: var(--s2); }
+
+/* ------------------------------------------------------------ This class */
+/* The quizzes and votes so far: rows in a well, the quiz on one line and its counts under it. */
+.qd-history { display: grid; gap: var(--s3); align-content: start; min-width: 0; }
+.qd-history > * { margin: 0; }
+.qd-history > h2 { font-size: var(--t-h3); line-height: 1.3; }
+.qd-history .state--inline > .status { padding: 0; }
+.qd-history__list { --rcols: minmax(0, 1fr); margin: 0; list-style: none; }
+.qd-history__list > .ruled__row { row-gap: 2px; padding-block: var(--s3); font-size: var(--t-body); font-weight: var(--w-head); overflow-wrap: anywhere; }
+.qd-history__list .muted { font-size: var(--t-small); font-weight: var(--w-body); }
