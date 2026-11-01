@@ -1,6 +1,6 @@
 # convex/host
 
-This folder has no code. The old professor view's functions (`api.host.*`) were deleted in UZ, and `convex/retired.test.ts` fails if any code file is added here.
+This folder has no code. The old professor view's functions were deleted in UZ, and `convex/retired.test.ts` fails if any code file is added here.
 
 #/host runs on the modules students already use:
 

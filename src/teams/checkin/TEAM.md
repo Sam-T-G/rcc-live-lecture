@@ -2,6 +2,8 @@
 
 The agent reads this before every change to `src/teams/checkin/` or `convex/checkin/`. It describes the code on `main`; when the code changes what a student, professor or door iPad sees or what the server keeps, update this file in the same commit.
 
+**Goal:** the professor knows who is in the room, and who came late, without calling names.
+
 **What it does:** each student's phone shows a QR pass whose code changes every 20 s. The professor's laptop (#/checkin/teacher) or the paired door iPad (#/checkin/kiosk) scans it, and the student is checked in to this class. The professor sets when class starts and how many minutes of grace come before "late", downloads attendance as a CSV, and asks the room a quiz or a vote. The projector page shows the deck with the check-in QR, the count and the newest quiz or vote on top.
 
 ## Pages
@@ -15,6 +17,8 @@ The agent reads this before every change to `src/teams/checkin/` or `convex/chec
 | #/checkin/stage?deck=…&bridge=… | the projector | The deck full screen with the check-in QR, the count, the newest quiz or vote and the late banner. Hands `DECK_BRIDGE_KEY` only to a deck on the origin the key came with. |
 
 Staff sign in with Google; the server gives a role only to a Google account with a verified email that is on the staff list (convex/checkin/prof.ts). The typed test sign-in exists only in `npm run dev` builds.
+
+**Not doing:** location checks (the pass and the scan replaced them; `checkins.meters` is unused) and a kiosk QR that students scan (the `kiosks` table is unused).
 
 ## What it sees
 
@@ -39,5 +43,6 @@ Writes `passes` (one per student: name, email, the current and previous code, th
 ## Where it lives
 
 - Pages: `src/teams/checkin/Page.tsx` routes each #/checkin/<part> to its file (Student, Teacher, Kiosk, Quiz, Stage). The gates are in `prof.tsx`.
-- Server: `convex/checkin/` (pass, read, attendance, quiz, prof). Functions are called as `api.checkin.<file>.<function>`.
+- Server: `convex/checkin/` (pass, read, attendance, quiz, prof). Functions are called as `api.checkin.<file>.<function>`. `pass.scan` also calls Live's `ensureGroup`, and the iOS app decodes `lateFeed` (docs/contracts.md).
+- Tests: `convex/checkin/*.test.ts` (every function, each staff-only one in `authMatrix`) and `src/teams/checkin/*.test.ts`.
 - Channel: `CHANNEL` from `src/blocks/deck.ts` (`"gdg"`).

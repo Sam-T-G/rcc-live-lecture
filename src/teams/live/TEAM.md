@@ -1,6 +1,6 @@
 # Team: Live slides
 
-The agent reads this before every change. Where it disagrees with the Status section of AGENTS.md, AGENTS.md wins. Sam's decisions (D6, D12 and the rest) are the source; the 10-29 Google Doc no longer is.
+The agent reads this before every change. Where it disagrees with the Status section of AGENTS.md, AGENTS.md wins. Sam's decisions (D6, D12 and the rest) are the source.
 
 **Goal:** a student in the room follows the professor's slides on their phone and takes part: they say when they're lost, ask and upvote questions, and play on a small team for extra credit.
 
@@ -11,8 +11,10 @@ The agent reads this before every change. Where it disagrees with the Status sec
 - Questions beside the slide: anonymous by default, by name if the student unticks it, or private ("Only the professor sees it"). Checked-in students upvote other people's public questions. Sorted by upvotes, then newest. The professor sorts, answers, shares an answer under a public question, deletes, and groups questions by topic with AI on #/host Questions.
 - Teams: each student joins a team when their pass is scanned. Teams lock 5 minutes after the class start or the first check-in, whichever is later, and the lock re-deals everyone into teams of 3 or 4 (the professor picks 3 or 4; fewer than 6 students stay on one team). After the lock a newcomer joins the smallest team, up to 5, and a new team opens only when every team has 5, so nobody is on a team of 1 (D12 l).
 - The board ranks teams by points per student (right answers on ended quizzes plus the professor's point changes, divided by members; D6). 1st place gets 5 extra credit, 2nd 3, 3rd 1; ties split the places they fill. #/live shows it on the phone and #/live/leaderboard on the projector.
-- End day (#/host Points or #/checkin/teacher) saves each student's extra credit and ends the class. The professor downloads it as a CSV.
+- End class (#/host Points or #/checkin/teacher) saves each student's extra credit and ends the class. The professor downloads it as a CSV.
 - Past quizzes and votes: once the professor ends one, the student sees the question, the counts, the right answer (quizzes) and their own pick.
+
+**Not doing:** showing who answered what or who tapped I'm lost: every board shows counts and totals only.
 
 ## What it sees
 

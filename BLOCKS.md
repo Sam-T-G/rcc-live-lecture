@@ -103,23 +103,49 @@ Indoors a phone is often 20 to 100 m off. Treat location as a soft check; pair i
         data-site="https://<deployment>.convex.site" defer></script>
 ```
 
-Then open the deck with `?bridge=<channel>.<DECK_BRIDGE_KEY>` on its URL (the key is in Convex env: `npx convex env get DECK_BRIDGE_KEY`). Without that parameter the script does nothing. It sends on every press: slide number, presses shown, slide count, the heading, and the slide's visible text in order. Never speaker notes, never beats not shown yet. Presenter, mirror, and remote windows don't send.
+Then open the deck with `?bridge=<channel>.<DECK_BRIDGE_KEY>` on its URL; in class that's the stage link (docs/runbook.md). Sam sends the key privately. Type it only in a tab the room can't see: the script takes it out of the address bar, but anyone who sees it can send any slide text to every phone and the iOS app. Without that parameter the script does nothing. It sends on every press: slide number, presses shown, slide count, the heading, and the slide's visible text in order. Never speaker notes, never beats not shown yet. Presenter, mirror, and remote windows don't send.
 
-**During a meeting, every lead's own backend.** Each lead runs their own dev deployment, so the presenting tab adds `&bridge-site=<name>,<name>` (deployment names, like `quaint-swan-637`) and sends to all of them instead of `data-site`. Each of those deployments needs the same `DECK_BRIDGE_KEY` (`npx convex env set DECK_BRIDGE_KEY <the value Sam gives you>`). The 10-29 deck sends on channel `gdg`.
+**More than one backend.** A tab that adds `&bridge-site=<name>,<name>` (deployment names, like `quaint-swan-637`) sends to each of them instead of `data-site`. Each of those deployments needs its own `DECK_BRIDGE_KEY` set to the value in the link (Sam sets it). Every deck sends on channel `gdg`, which is `CHANNEL` in `src/blocks/deck.ts`.
 
 **Reading, in the app:**
 
 ```tsx
-import { useDeckSlide } from "../blocks/deck";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { CHANNEL, useDeckSlide } from "../../blocks/deck";
 
-const slide = useDeckSlide("gdg-10-29"); // { index, beat, count, title, lines, at } | null | undefined
+const slide = useDeckSlide(CHANNEL);                             // { index, beat, count, title, lines, at } | null | undefined
+const shown = useQuery(api.deck.slides, { channel: CHANNEL });   // [{ index, beat, title, lines, at }], in slide order
 ```
 
-`index` is 0-based. Use `slide.index` as the key for anything per slide (reactions, questions, "I'm lost").
+`index` is 0-based. Use `slide.index` as the key for anything per slide (questions, "I'm lost"). `api.deck.current` (what `useDeckSlide` reads) is the slide the deck is on; `api.deck.slides` is every slide the deck has shown in this class, each at its fullest press, so a phone can page back but never ahead (#/live and #/portal do; `src/teams/live/Page.tsx` has the follow rule). Both return only this class's rows: before the deck's first press in a class, and after End class, `current` is null and `slides` is empty, so a page shows its waiting line instead of last class's slide. When a second deck tab starts sending mid-class, `slides` lists only that tab's slides. The iOS app decodes both answers field by field, so never add, rename or remove a field (docs/contracts.md).
 
-**Reading, on the server:** query the `deckChannels` table by the `by_channel` index, the way `convex/deck.ts` does.
+**Reading, on the server:** call the same rule `convex/deck.ts` uses, never a bare read of `deckChannels` or `deckSlides`. Their rows are replaced on every press and keep the first press's `_creationTime`, so compare each row's `at` with the class window's start (`lectureWindow`, below), the way `current` and `slides` do. `convex/live/lost.ts` (`shownThisClass`) checks that a slide index was shown in this class this way.
 
-A channel is just a name. A product that has sessions can store its channel on the session row.
+## Classes
+
+A class is one row in `lectures` on a channel. It opens when a professor's action starts class activity (a deck press, a pass scan, a saved start time, a quiz) and ends with End class (`live.groups.endDay`) or by itself 12 hours after it opened or after its saved start, whichever is later (`convex/lectures.ts`). No other table stores its class: a row belongs to the class whose window holds its `_creationTime`. The helpers are in `convex/lib.ts`:
+
+```ts
+import { checkedIn, ensureLecture, lectureWindow, notOpenYet } from "../lib";
+
+const { lecture, start, startsAt, graceMin } = await lectureWindow(ctx, channel); // queries and mutations
+const row = await ctx.db
+  .query("checkins")
+  .withIndex("by_channel_and_user", (q) => q.eq("channel", channel).eq("user", me.tokenIdentifier).gte("_creationTime", start))
+  .first();                                                     // never .unique()
+
+if (!(await checkedIn(ctx, channel, me.tokenIdentifier))) throw new ConvexError("Check in first.");
+
+const open = await ensureLecture(ctx, channel);                 // mutations, professor actions only
+if (notOpenYet(open, Date.now())) return null;                  // more than 45 minutes before its saved start
+```
+
+- **Every per-class read** adds `.gte("_creationTime", start)` after the index's equality fields. Between classes `start` is where the last class ended, so every per-class list is empty and every count is 0. Before the first class ever on a channel (`lecture` null, `start` 0), every row counts.
+- **A student's own row** (`checkins`, `groups`, `lost`) is one per class, so a student has one per class they came to: read it with `.first()`, never `.unique()`, which throws from the second class on.
+- **`checkedIn(ctx, channel, user)`** is the check students need for answers, posts, upvotes and I'm lost ("Check in first.").
+- **`ensureLecture`** opens a class when none is open, and closes one left open past its close time after saving its extra credit. Only a professor's action calls it, never a student's: students can't start a class. Call `notOpenYet` right after it, so a scan, press or quiz the evening before doesn't land in the next morning's class.
+- `startsAt` and `graceMin` decide late minutes (`convex/checkin/attendance.ts`); `endLecture` is only for End class.
 
 ## AI (Gemini)
 
@@ -219,25 +245,38 @@ export default function CheckinPage() {
 // pageUrl("checkin/student") is the full URL to put in a check-in QR (src/teams/checkin/Stage.tsx does).
 ```
 
-To hand a page a value, put it after "?" (`#/checkin/stage?deck=a`) and read it with `useHashParams().get("deck")`, never as an extra part of the path. A new sub-page gets a line in `src/pages/routes.test.ts`.
+To hand a page a value, put it after "?" (`#/checkin/stage?deck=a`) and read it with `useHashParams().get("deck")`, never as an extra part of the path. A new sub-page gets three lines: a link in `src/pages/Home.tsx`, its route in the `ROUTES` list in `src/pages/Home.test.ts` (that test fails when a routed part has no Home link), and its "No page" paths in `src/pages/routes.test.ts`. A new page of its own (`#/<name>`) also goes in `src/pages/index.ts`.
 
 ## Look
 
-`src/index.css` has the tokens (`--accent`, `--surface`, `--muted`, ...) and base styles for `.page`, `.panel`, `button`, `input`, light and dark. Use the classes and tokens; put team-only styles in your team folder.
+The design system is written up in [docs/design.md](docs/design.md): the tokens, every kit part with an example, and the rules for each screen (student phone, professor laptop, projector, door iPad). #/ui shows every part in every state, light and dark (#/ui/projector at projector size). Read it before changing a screen.
 
-Screen parts in `src/blocks/ui.tsx`, so every team's pages look like one app:
+- **Tokens** (colors, type sizes, spacing, radius, motion) are in `src/styles/tokens.css`, light and dark; `src/index.css` maps the app's older names (`--accent`, `--surface`, `--muted`, ...) onto them. Use the tokens; never add a color in a page's CSS. `src/styles/contrast.test.ts` checks every text and background pair.
+- **Kit parts** in `src/blocks/kit.tsx`: `Button`, `Field`, `Tabs`, `Segmented`, `Badge`, `Banner`, `BannerStack`, `Stat`, `EmptyState`, `Skeleton`, `ConfirmButton` (for what can't be undone, like End class and Remove) and `Projector`.
+- **Screen parts** in `src/blocks/ui.tsx`:
 
 ```tsx
-import { Screen, Big, Status, Card, Todo } from "../../blocks/ui";
-<Screen title="Professor view" wide>          {/* wide for a kiosk or projector, narrow for phones */}
-  <Big value={count} label="checked in" />    {/* one number, readable across a room */}
-  <Status kind="loading">Waiting for the slide…</Status>   {/* or "empty", "error": the designer's words */}
-  <Card title="Who's lost">…</Card>
+import { Big, Card, ErrorBoundary, Screen, Status } from "../../blocks/ui";
+import { Projector } from "../../blocks/kit";
+
+<Screen title="Professor view" wide>                 {/* wide for laptop pages, narrow for phones */}
+  <Big value={count} label="checked in" />           {/* one number, readable across a room */}
+  <Status kind="loading">Waiting for the slide…</Status>   {/* or "empty", "error" */}
+  <ErrorBoundary label="The leaderboard"><Leaderboard /></ErrorBoundary>
 </Screen>
+
+<Projector ledger="A-210 · slide 12 of 30" title="Team board">…</Projector>   {/* the room's screen */}
 ```
 
-`Todo` is the placeholder each team page starts with; delete it when the page is real.
+- **`ErrorBoundary`** goes around each part of a page that reads its own data. When a query there fails (a function a deploy renamed, a server limit), that part shows "The leaderboard didn't load." with Try again, and the rest of the page stays up; without it React empties the whole page, the slide included. `App.tsx` wraps every page in `<ErrorBoundary page>`, which shows "Something went wrong." with Reload and Go home.
+- **`Projector`** wraps a page for the room's screen (#/checkin/stage, #/live/leaderboard): 1920 x 1080 sizes scaled to the window, light theme. `Screen wide` is for laptop pages.
+
+Module-only styles go in the module's folder (`src/teams/<team>/*.css`), built from the tokens.
 
 ## Shared data between teams
 
-Tables and read functions the teams agreed on before the meeting: [docs/contracts.md](docs/contracts.md). Sample data for your own backend: `npx convex run dev/seed:fill '{"channel":"gdg"}'` (and `dev/seed:clear`). fill runs only on the dev backends in `DEV_HOSTS`, so first add your deployment's host to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 5), which also turns on typed test sign-ins and test roles there. The lecture's channel is `CHANNEL` from `src/blocks/deck.ts`.
+Every table, who writes and reads it, and the functions one module calls in another: [docs/contracts.md](docs/contracts.md). Sample data for your own backend: `npx convex run dev/seed:fill '{"channel":"gdg"}'` (and `dev/seed:clear`). fill runs only on the dev backends in `DEV_HOSTS`, so first add your deployment's host to `DEV_HOSTS` in `convex/checkin/prof.ts` and in `convex/auth.config.ts` (README step 5), which also turns on typed test sign-ins and test roles there. The lecture's channel is `CHANNEL` from `src/blocks/deck.ts`.
+
+## Tests
+
+`npm test` runs every `convex/**/*.test.ts` with convex-test (each Convex function against an in-memory backend, no deployment) and every `src/**/*.test.ts` in Node. Shared helpers are in `convex/test.helpers.ts`: `authMatrix` with `HOST_ONLY`, `ADMIN_ONLY` or `SCANNER` for every staff-only function (AGENTS.md status item 3), and the signed-in callers. `convex/coverage.test.ts` fails when a function has no test. `src/docs.test.ts` checks that these docs name only routes and functions that exist.

@@ -4,6 +4,8 @@ The agent reads this before every change to #/host. Sam's decisions (AGENTS.md "
 
 **Goal:** while teaching, the professor sees how many students checked in and who's lost on each slide, asks the room a quiz or a vote, answers students' questions, and runs the teams' points and extra credit.
 
+The professor approves everything students see. The AI drafts, sorts and summarizes, and never shares anything on its own.
+
 ## Must do
 
 - Header: the slide the deck is on, how many students checked in to this class, how many tapped "I'm lost" on this slide, and "Lost by slide" for every slide with taps this class. A link to Attendance (#/checkin/teacher).
@@ -14,6 +16,11 @@ The agent reads this before every change to #/host. Sam's decisions (AGENTS.md "
 
 Private questions (Sam's decision D12 e and f): a private question's answer can't be shared, so its row has no share button and `share()` throws "That question is private."; only the professor sees that answer. "Group by topic with AI" sends private question texts too, numbered, never with a name.
 
+## Not doing
+
+- Its own tables: since Sam's decision 1 (2026-10-30), #/host reads and writes Check-in's quiz and Live slides' teams and questions.
+- Voice answers, recordings and a textbook import: they need the microphone or a new store, so they wait for Sam.
+
 ## Who can open it
 
 Professors and admins on the staff list, through `<StaffGate>` (`src/teams/checkin/prof.tsx`). Admins give the role on #/admin. Signed out, the page shows the Google sign-in button; signed in without a role, it says to ask an admin. `HOST_EMAILS` opens nothing.
@@ -22,9 +29,9 @@ Professors and admins on the staff list, through `<StaffGate>` (`src/teams/check
 
 - Page: `src/teams/host/Page.tsx` (routed as "host" in `src/pages/index.ts`), with `AskRoom.tsx` and `Missing.tsx` (Now), `Boards.tsx`, `Team.tsx` and `csv.ts` (Points), and `QA.tsx` (Questions). Any other #/host/<part> shows "No page at #/host/<part>".
 - Server: #/host has no server folder of its own. It calls the modules students already use:
-  - `api.checkin.quiz.*` (`convex/checkin/quiz.ts`): `current`, `stats`, `ask`, `end`, `draftQuestion`, `missing`, `feedback`.
-  - `api.live.groups.*` (`convex/live/groups.ts`): `status`, `leaderboard`, `roster`, `setSize`, `adjust`, `removePoints`, `pointLog`, `endDay`, `results`.
-  - `api.live.questions.*` (`convex/live/questions.ts`): `forHost`, `setStatus`, `answer`, `share`, `remove`, `organize`.
+  - `convex/checkin/quiz.ts`: `current`, `stats`, `ask`, `end`, `draftQuestion`, `missing`, `feedback`.
+  - `convex/live/groups.ts`: `status`, `leaderboard`, `roster`, `setSize`, `adjust`, `removePoints`, `pointLog`, `endDay`, `results`.
+  - `convex/live/questions.ts`: `forHost`, `setStatus`, `answer`, `share`, `remove`, `organize`.
   - `api.live.read.lostCount` and `lostBySlide`, `api.checkin.read.count`, `api.checkin.attendance.lectures`, `api.deck.current`.
 - `convex/host/` takes no code: the old professor view's functions were deleted (UZ), and `convex/retired.test.ts` fails if a code file is added there. A new #/host feature goes in the module that owns its table, with its tests next to it.
 - Channel: `CHANNEL` from `src/blocks/deck.ts` (`"gdg"`).
