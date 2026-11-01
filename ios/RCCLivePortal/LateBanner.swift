@@ -170,39 +170,31 @@ final class LateBanner {
 }
 
 /// The banner's colors, the web's .late__item (src/teams/checkin/checkin.css): the --error fill
-/// with --surface words from src/styles/tokens.css, light and dark. RCCLivePortalTests checks
-/// each pair is at least 4.5:1.
+/// with --surface words, from Palette, light and dark. RCCLivePortalTests checks each pair is at
+/// least 4.5:1.
 enum LateColors {
-    static let fillLight: UInt32 = 0xC5150F
-    static let wordsLight: UInt32 = 0xFFFFFF
-    static let fillDark: UInt32 = 0xFFB3A8
-    static let wordsDark: UInt32 = 0x1B211C
+    static let fillLight = Palette.error.light
+    static let wordsLight = Palette.surface.light
+    static let fillDark = Palette.error.dark
+    static let wordsDark = Palette.surface.dark
 
-    static var fill: Color { dynamic(light: fillLight, dark: fillDark) }
-    static var words: Color { dynamic(light: wordsLight, dark: wordsDark) }
-
-    private static func dynamic(light: UInt32, dark: UInt32) -> Color {
-        Color(uiColor: UIColor { traits in rgb(traits.userInterfaceStyle == .dark ? dark : light) })
-    }
-
-    private static func rgb(_ hex: UInt32) -> UIColor {
-        UIColor(
-            red: CGFloat((hex >> 16) & 0xFF) / 255,
-            green: CGFloat((hex >> 8) & 0xFF) / 255,
-            blue: CGFloat(hex & 0xFF) / 255,
-            alpha: 1)
-    }
+    static var fill: Color { Palette.error.color }
+    static var words: Color { Palette.surface.color }
 }
 
-/// The banner over every screen of the app: one card per new late arrival.
+/// The banner at the bottom of the deck screen: one card per new late arrival, newest first.
+/// DeckView puts it in a bottom inset, so the slides and buttons move up above it and it covers
+/// nothing, like #/portal (src/portal/Page.tsx, --late-room).
 struct LateBannerView: View {
     let banner: LateBanner
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
+        let cards = LateBannerView.cards(banner.showing, accessibilitySize: typeSize.isAccessibilitySize)
         VStack(spacing: 8) {
-            ForEach(banner.showing) { arrival in
+            ForEach(cards) { arrival in
                 Text(LateLines.line(for: arrival))
                     .font(.title3.weight(.bold))
                     .multilineTextAlignment(.center)
@@ -211,15 +203,20 @@ struct LateBannerView: View {
                     .padding(.horizontal, 18)
                     .frame(maxWidth: .infinity)
                     .background(LateColors.fill, in: RoundedRectangle(cornerRadius: 12))
-                    .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
                     .frame(maxWidth: 640)
-                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.vertical, cards.isEmpty ? 0 : 8)
         // Taps reach the screen under the banner.
         .allowsHitTesting(false)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: banner.showing)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: cards)
+    }
+
+    /// The cards on screen. At the accessibility text sizes one card can fill a third of the
+    /// screen, so only the newest shows there; VoiceOver still reads every arrival out.
+    static func cards(_ showing: [LateArrival], accessibilitySize: Bool) -> [LateArrival] {
+        accessibilitySize ? Array(showing.prefix(1)) : showing
     }
 }

@@ -149,7 +149,11 @@ struct DeckView: View {
             }
         }
         .background(Color(.systemBackground))
-        .overlay(alignment: .top) { LateBannerView(banner: store.late) }
+        // The late banner takes its own room under the buttons, so it never covers the slide
+        // count, the Live badge, the bar or the slide (sweep1-ios-1). #/portal does the same.
+        .safeAreaInset(edge: .bottom, spacing: 0) { LateBannerView(banner: store.late) }
+        // Arrows and anything else that takes the tint: the web's green, never system blue.
+        .tint(Palette.accent.color)
         .onAppear { pendingStart = store.config.startOnSlide }
         .onChange(of: store.live?.slide.index, initial: true) { _, newLive in
             guard let newLive else { return }
@@ -204,6 +208,8 @@ struct DeckView: View {
             if let notice {
                 Text(notice)
                     .font(.subheadline.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
                     .padding(.top, 10)
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                     .accessibilityAddTraits(.updatesFrequently)
@@ -220,9 +226,10 @@ struct DeckView: View {
 
                 Spacer()
                 if !onLive {
+                    // Outlined while the professor is still on the slide the student left, the
+                    // main green button once the professor moves on, as on #/portal.
                     Button(Words.backToLive) { goToLive() }
-                        .buttonStyle(.borderedProminent)
-                        .tint(showNotice ? .red : .accentColor)
+                        .buttonStyle(PortalButtonStyle(filled: showNotice))
                 }
                 Spacer()
 
@@ -239,6 +246,9 @@ struct DeckView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
+        // The notice and Back to live wrap instead of cutting off at the large text sizes; the
+        // slide above takes what height is left (it scrolls).
+        .fixedSize(horizontal: false, vertical: true)
         .background(.bar)
         .onChange(of: showNotice) { _, shown in
             if shown, let notice {
@@ -315,14 +325,14 @@ struct SlidePage: View {
 struct LiveBadge: View {
     var body: some View {
         HStack(spacing: 6) {
-            Circle().fill(.white).frame(width: 7, height: 7)
+            Circle().fill(Palette.accentText.color).frame(width: 7, height: 7)
             Text(Words.live)
         }
         .font(.subheadline.weight(.bold))
-        .foregroundStyle(.white)
+        .foregroundStyle(Palette.accentText.color)
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
-        .background(Capsule().fill(Color.red))
+        .background(Capsule().fill(Palette.accent.color))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Words.live)
     }
@@ -339,7 +349,10 @@ struct NoticeBar: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .padding(.horizontal, 16)
-            .background(Color.orange.opacity(0.25))
+            .foregroundStyle(Palette.warnText.color)
+            .background(Palette.warn.color)
+            // A tinted fill that marks a state gets a --line-strong edge (docs/design.md).
+            .overlay(alignment: .bottom) { Palette.lineStrong.color.frame(height: 1) }
     }
 }
 

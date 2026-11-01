@@ -163,4 +163,21 @@ struct LateBannerTests {
         #expect(contrast(LateColors.wordsLight, LateColors.fillLight) >= 4.5)
         #expect(contrast(LateColors.wordsDark, LateColors.fillDark) >= 4.5)
     }
+
+    @Test("sweep1-ios-2 the deck screen's words on their fills are at least 4.5:1, light and dark")
+    func paletteContrast() {
+        for (words, fill) in [(Palette.accentText, Palette.accent), (Palette.warnText, Palette.warn)] {
+            #expect(contrast(words.light, fill.light) >= 4.5)
+            #expect(contrast(words.dark, fill.dark) >= 4.5)
+        }
+        #expect(LateColors.fillLight == Palette.error.light && LateColors.wordsDark == Palette.surface.dark)
+    }
+
+    @Test("sweep1-ios-1 at accessibility text sizes only the newest card shows; at other sizes, all")
+    func cardsAtLargeText() {
+        let showing = [cy, ben, ana]
+        #expect(LateBannerView.cards(showing, accessibilitySize: false) == showing)
+        #expect(LateBannerView.cards(showing, accessibilitySize: true) == [cy])
+        #expect(LateBannerView.cards([], accessibilitySize: true).isEmpty)
+    }
 }

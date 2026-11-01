@@ -243,7 +243,7 @@ iPhone Safari at 390 x 844, and 320 wide. One hand, a glance during a lecture. R
 
 ### iOS app
 
-The SwiftUI app in `ios/` doesn't read these stylesheets. Use the hex values in the color table, the system font, and the same phone rules. Never bundle Google Sans in the app: GDG `foundations.md` §3.1 says not to self-host it, because the club has no license it can point to for handing out the font file. If the app needs a bundled font, use Inter (OFL, in `google/fonts`, `foundations.md` §3.8).
+The SwiftUI app in `ios/` doesn't read these stylesheets. Use the hex values in the color table, the system font, and the same phone rules. The app's colors are in `ios/RCCLivePortal/Palette.swift`, one line per token; `src/styles/ios.test.ts` fails when one differs from `tokens.css` or a screen uses a system color (red, orange, blue or the unset AccentColor). Never bundle Google Sans in the app: GDG `foundations.md` §3.1 says not to self-host it, because the club has no license it can point to for handing out the font file. If the app needs a bundled font, use Inter (OFL, in `google/fonts`, `foundations.md` §3.8).
 
 ## Contrast
 
