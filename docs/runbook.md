@@ -32,6 +32,7 @@ What the professor and Sam do on a day the app runs in class, on the live site <
 
 - **End class**, on #/host Points or next to the status line on #/checkin/teacher, saves each student's extra credit for this class and ends the class. End any open quiz first; End class refuses while one is open. The next class starts with nobody checked in and new teams. A class nobody ends closes itself 12 hours after it opened or after its saved start.
 - **Attendance:** "Download attendance (CSV)" on #/checkin/teacher gives this class's list; Past classes has every earlier one. "Download extra credit (CSV)" on #/host Points gives the saved extra credit.
+- **Sign out before you leave the lectern:** press "Not you? Sign out" at the top of #/host, #/checkin/teacher or #/checkin/quiz. Closing the tab keeps you signed in on that computer, so the next person there would open those pages as you and see every student's name and email.
 
 ## When something breaks
 

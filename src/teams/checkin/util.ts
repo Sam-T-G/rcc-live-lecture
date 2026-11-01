@@ -18,6 +18,11 @@ export const EARLY_SCAN = "Scanning opens 45 minutes before class starts.";
 // (convex/checkin/attendance.ts STILL_OPEN; util.test.ts checks they match).
 export const STILL_OPEN = "This class is still open. Press End class, then save the next start.";
 
+// End class's question, on #/checkin/teacher (Teacher.tsx) and #/host Points (host/Boards.tsx):
+// both run live.groups.endDay, so both ask the same thing.
+export const END_CLASS_QUESTION =
+  "End this class? Each student gets their team's extra credit now. Next class, everyone checks in again and points start from 0. This can't be undone.";
+
 // When the class with this saved start takes scans, or null with no saved start.
 export const scanOpensAt = (startsAt: number | null | undefined) => (startsAt == null ? null : startsAt - EARLY_MS);
 

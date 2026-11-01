@@ -75,4 +75,11 @@ describe("sweep1-tests-5 F27 the 'Who got it wrong' card", () => {
     const rows = [...html.matchAll(/<tr>(.*?)<\/tr>/g)].map((m) => words(m[1]));
     expect(rows).toEqual(["Name Team Picked", "Sample student 1 Blue Current", "Sample student 2 No team Current"]);
   });
+
+  it("sweep2-host-5 a quiz nobody got wrong offers no 'Ask the AI'; one with a wrong answer does", () => {
+    answers["checkin/quiz:missing"] = quiz([]);
+    expect(words(card())).not.toContain("Ask the AI");
+    answers["checkin/quiz:missing"] = quiz([{ name: "Sample student 1", team: null, picked: "Current" }]);
+    expect(words(card())).toContain("Ask the AI");
+  });
 });

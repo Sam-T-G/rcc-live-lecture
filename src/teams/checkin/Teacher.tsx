@@ -34,7 +34,7 @@ import {
   timeOrDay,
   type ClassRow,
 } from "./sheet";
-import { STILL_OPEN, clock, scanError, scanOpensAt, why } from "./util";
+import { END_CLASS_QUESTION, STILL_OPEN, clock, scanError, scanOpensAt, why } from "./util";
 
 const MIN = 60_000;
 
@@ -140,7 +140,7 @@ export function EndClass() {
   if (open && open.lecture !== ended?.lecture)
     return (
       <ConfirmButton
-        question="End this class? Each student gets their team's extra credit now. Next class, everyone checks in again and points start from 0. This can't be undone."
+        question={END_CLASS_QUESTION}
         confirm="End class"
         onConfirm={async () => setEnded({ lecture: open.lecture, line: await endDay({ channel: CHANNEL }) })}
       >

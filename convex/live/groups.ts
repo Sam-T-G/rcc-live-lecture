@@ -70,9 +70,10 @@
 //   api.live.groups.setSize      { channel, size } -> null
 //       3 or 4 ("Pick teams of 3 or 4."). The size already set changes nothing; after the lock a
 //       new size re-deals everyone.
-//   api.live.groups.roster       { channel } -> [{ checkin, name, email, team, right, answered,
+//   api.live.groups.roster       { channel } -> [{ checkin, name, team, right, answered,
 //                                  changes, points, ec }]
-//       Every student checked in to this class, by points, then right answers, then name.
+//       Every student checked in to this class, by points, then right answers, then name. No
+//       email: #/host's Points tab doesn't show one (the extra credit CSV has them, from results).
 //       right, answered, changes and points are this class's; ec is all the extra credit End day
 //       saved for that student on this channel. team is null for a student with no team.
 //   api.live.groups.adjust       { channel, team? | checkin?, delta, reason? } -> Id<"groupPoints">
@@ -640,7 +641,6 @@ export const roster = query({
     v.object({
       checkin: v.id("checkins"),
       name: v.string(),
-      email: v.union(v.null(), v.string()),
       team: v.union(v.null(), teamInfo),
       right: v.number(), // right answers on quizzes ended in this class
       answered: v.number(), // quizzes and votes ended in this class that they answered
@@ -661,7 +661,6 @@ export const roster = query({
       return {
         checkin: c._id,
         name: c.name,
-        email: c.email ?? null,
         team: team === undefined ? null : describe(team),
         right: me.right,
         answered: me.answered,

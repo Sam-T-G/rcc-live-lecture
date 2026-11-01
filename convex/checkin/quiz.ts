@@ -27,6 +27,8 @@
 //   missing({ channel })        professors  "Who got it wrong" on #/host: see `missing` below
 //   draftQuestion({ channel })  professors  action: a question drafted by Gemini from the slide
 //   feedback({ channel })       professors  action: 2 or 3 sentences on what the room got wrong
+//                                           ("Nobody got it wrong." with no call to Gemini when
+//                                           every answer is right)
 //
 // Only slide text, the question, its choices, counts and team labels go to Gemini, never a name.
 import { action, mutation, query, type MutationCtx, type QueryCtx } from "../_generated/server";
@@ -472,6 +474,8 @@ export const feedback = action({
     const m: Missing = await ctx.runQuery(api.checkin.quiz.missing, { channel });
     if (!m || m.kind === "vote") throw new ConvexError("Ask the room a quiz question first.");
     if (m.answered === 0) throw new ConvexError("No answers yet.");
+    // Every answer right: there's no wrong choice for Gemini to name, so it isn't asked.
+    if (m.counts.every((n, i) => i === m.correct || n === 0)) return "Nobody got it wrong.";
     const lines = m.choices.map((c, i) => `${LETTERS[i]}. ${c}${i === m.correct ? " (right)" : ""}: ${m.counts[i]} picked`);
     const teams = m.byTeam.map((t) => `${t.label}: ${t.right} of ${t.answered} right`);
     return await gemini({

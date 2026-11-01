@@ -8,8 +8,9 @@ import { api } from "../../../convex/_generated/api";
 import { CHANNEL } from "../../blocks/deck";
 import { Card, Status } from "../../blocks/ui";
 import { Badge, Banner, Button, ConfirmButton, Field, Segmented } from "../../blocks/kit";
-import { TeamChip, errorText } from "./Team";
+import { NO_CLASS, TeamChip, errorText, useNoClass } from "./Team";
 import { localDate } from "../checkin/sheet";
+import { END_CLASS_QUESTION } from "../checkin/util";
 import { allResults, extraCreditCsv } from "./csv";
 import "./points.css";
 
@@ -141,6 +142,7 @@ function StudentsCard({ teams }: { teams: Teams | undefined }) {
   const { busy, error, run } = useChanges();
   const [pick, setPick] = useState<number | "all">("all");
   const [reason, setReason] = useState("");
+  const noClass = useNoClass();
   const filter = pick !== "all" && teams?.some((g) => g.team === pick) ? pick : "all";
   const shown = rows?.filter((r) => filter === "all" || r.team?.team === filter);
   // Places go by points: students with the same points share a place.
@@ -172,7 +174,7 @@ function StudentsCard({ teams }: { teams: Teams | undefined }) {
       {shown === undefined ? (
         <Status kind="loading">Loading the students…</Status>
       ) : shown.length === 0 ? (
-        <Status kind="empty">{filter === "all" ? "No students checked in to this class yet." : "Nobody on this team is checked in."}</Status>
+        <Status kind="empty">{filter !== "all" ? "Nobody on this team is checked in." : noClass ? NO_CLASS : "No students checked in to this class yet."}</Status>
       ) : (
         <div className="table-scroll">
           <table className="points-table">
@@ -224,12 +226,13 @@ function ChangesCard() {
   const log = useQuery(api.live.groups.pointLog, { channel: CHANNEL });
   const undo = useMutation(api.live.groups.removePoints);
   const { busy, error, run } = useChanges();
+  const noClass = useNoClass();
   return (
     <Card title="Point changes">
       {log === undefined ? (
         <Status kind="loading">Loading the point changes…</Status>
       ) : log.length === 0 ? (
-        <Status kind="empty">No point changes in this class yet.</Status>
+        <Status kind="empty">{noClass ? NO_CLASS : "No point changes in this class yet."}</Status>
       ) : (
         <ul className="list points-log">
           {log.map((c) => {
@@ -279,7 +282,7 @@ function EndCard() {
     <Card title="End of class">
       <div className="row">
         <ConfirmButton
-          question="End this class? Each student gets their team's extra credit now. Next class, everyone checks in again and points start from 0. This can't be undone."
+          question={END_CLASS_QUESTION}
           confirm="End class"
           onConfirm={async () => {
             const lecture = open?.lecture ?? null;

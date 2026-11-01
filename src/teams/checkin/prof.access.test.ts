@@ -113,7 +113,8 @@ describe("ROLES-UI-fixcheck-2 a professor page says when the sign-in ends", () =
   it("ROLES-UI-fixcheck-2 shows nothing extra when the sign-in isn't ending", () => {
     signIn({ iss: "https://accounts.google.com", email: "prof@example.edu", email_verified: true });
     results["staff:me"] = staff("prof@example.edu", "admin");
-    expect(page()).toBe("[the quiz page]");
+    // Only who is signed in, with Sign out (sweep2-host-1), above the page: no end time, no button.
+    expect(words(page()).trim()).toBe("[Signed in as prof@example.edu, Not you? Sign out] [the quiz page]");
   });
 });
 

@@ -4,6 +4,7 @@
 // returns shows only until the next class opens: Page.tsx keeps the Points panel mounted, so
 // without that the line from last class would sit under this class's board. The same stand-in
 // for React's hooks as src/teams/checkin/Teacher.endClass.test.ts. People are samples.
+import { readFileSync } from "node:fs";
 import { Fragment, createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,6 +50,7 @@ vi.mock("convex/react", () => ({
 }));
 
 const { PointsTab } = await import("./Boards");
+const { END_CLASS_QUESTION } = await import("../checkin/util");
 
 type Host = { type: string; props: Record<string, unknown>; children: Tree[] };
 type Tree = Host | string;
@@ -91,8 +93,8 @@ const endCard = (t: Tree[]) => {
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 const LINE = "Red came 1st with 4 points, 1.0 per student. Saved extra credit for 4 students. The next class starts from 0 points.";
-const QUESTION =
-  "End this class? Each student gets their team's extra credit now. Next class, everyone checks in again and points start from 0. This can't be undone.";
+// End class's one question, which #/checkin/teacher asks too (sweep2-host-10).
+const QUESTION = END_CLASS_QUESTION;
 const team = (label: string, members: number, points: number) => ({ team: 0, color: "red", label, members, correct: points, changes: 0, points, perStudent: points / members, rank: 1, ec: 5 });
 const at = Date.UTC(2026, 10, 5, 22, 20);
 const open = { lecture: "k1", open: true, startedAt: at, startsAt: at + 600_000, graceMin: 5, endedAt: null, count: 4 };
@@ -117,6 +119,17 @@ describe("#/host Points: End class", () => {
     press(page(), "End class");
     expect(endCard(page())).toBe(`End of class ${QUESTION} End class Cancel Download extra credit (CSV)`);
     expect(endCard(page())).not.toMatch(/End day|End the day/);
+  });
+
+  it("sweep2-host-10 #/host and #/checkin/teacher both ask END_CLASS_QUESTION, and neither types its own copy", () => {
+    expect(END_CLASS_QUESTION).toBe(
+      "End this class? Each student gets their team's extra credit now. Next class, everyone checks in again and points start from 0. This can't be undone.",
+    );
+    for (const file of ["../checkin/Teacher.tsx", "./Boards.tsx"]) {
+      const code = readFileSync(new URL(file, import.meta.url), "utf8");
+      expect(code, file).toContain("question={END_CLASS_QUESTION}");
+      expect(code, file).not.toContain("End this class?");
+    }
   });
 
   it("LX-spec-1 the line End day returns shows until the next class opens, and doesn't come back when that class ends", async () => {

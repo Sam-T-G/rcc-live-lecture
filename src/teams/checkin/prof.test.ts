@@ -13,6 +13,8 @@ import { DoorGate, StaffGate } from "./prof";
 const results: Record<string, unknown> = {};
 const asked: [string, unknown][] = []; // every query a render ran, with its args ("skip" left out)
 const auth = { loading: false };
+// The browser's sign-in, as useGoogleUser returns it (null: signed out).
+const google = { user: null as null | { name: string; email: string } };
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isLoading: auth.loading, isAuthenticated: false }),
   useQuery: (ref: FunctionReference<"query">, args: unknown) => {
@@ -25,8 +27,8 @@ vi.mock("convex/react", () => ({
 vi.mock("../../blocks/auth", () => ({
   SignInButton: () => "[Google button, typed sign-in under it]",
   GoogleButton: () => "[Google button]",
-  SignedInAs: () => null,
-  useGoogleUser: () => ({ user: null, signOut: () => {} }),
+  SignedInAs: () => "[Signed in as, Not you? Sign out]",
+  useGoogleUser: () => ({ user: google.user, signOut: () => {} }),
 }));
 
 const DEVICE = "rcc-live:door-device";
@@ -37,6 +39,7 @@ beforeEach(() => {
   for (const k of Object.keys(results)) delete results[k];
   asked.length = 0;
   auth.loading = false;
+  google.user = null;
   store = new Map();
   vi.stubGlobal("localStorage", {
     getItem: (k: string) => store.get(k) ?? null,
@@ -74,6 +77,18 @@ describe("ROLES StaffGate on every professor page", () => {
     for (const role of ["professor", "admin"] as const) {
       results["staff:me"] = staff("prof@example.edu", role);
       expect(page()).toBe("[the quiz page]");
+    }
+  });
+
+  // sweep2-host-1: a professor page on a shared lectern PC has to say who is signed in and offer
+  // Sign out, or the next person at the PC opens it as that professor.
+  it("sweep2-host-1 a professor page says who is signed in and has Sign out, above the page", () => {
+    for (const role of ["professor", "admin"] as const) {
+      results["staff:me"] = staff("prof@example.edu", role);
+      google.user = { name: "Sample professor", email: "prof@example.edu" };
+      const html = page();
+      expect(html, role).toContain("[Signed in as, Not you? Sign out]");
+      expect(html.indexOf("[Signed in as"), role).toBeLessThan(html.indexOf("[the quiz page]"));
     }
   });
 

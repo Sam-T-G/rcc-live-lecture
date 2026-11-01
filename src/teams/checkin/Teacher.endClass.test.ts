@@ -58,6 +58,7 @@ vi.mock("../../blocks/camera", () => ({ useCamera: () => ({ on: false, error: ""
 vi.mock("./qrRead", () => ({ makeQrReader: () => async () => null }));
 
 const { Scanner } = await import("./Teacher");
+const { END_CLASS_QUESTION } = await import("./util");
 
 // ---------- the page as plain data ----------
 
@@ -131,8 +132,9 @@ const settle = () => new Promise((r) => setTimeout(r, 0));
 
 const pst = (mo: number, d: number, h: number, mi = 0) => Date.UTC(2026, mo - 1, d, h + 8, mi);
 const NOW = pst(11, 5, 15, 30);
-const QUESTION =
-  "End this class? Each student gets their team's extra credit now. Next class, everyone checks in again and points start from 0. This can't be undone.";
+// End class's one question, which #/host Points asks too (sweep2-host-10; Boards.endCard.test.ts
+// checks its words).
+const QUESTION = END_CLASS_QUESTION;
 const LINE = "Red came 1st with 4 points, 1.0 per student. Saved extra credit for 4 students. The next class starts from 0 points.";
 
 // This class, running since 2:20 PM with its start at 2:30 PM, then the same class once it ended,

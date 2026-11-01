@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AskRoom from "./AskRoom";
 import { PointsTab } from "./Boards";
 import { Missing } from "./Missing";
-import HostPage, { Dashboard, type Tab } from "./Page";
+import HostPage, { Dashboard, tabKey, type Tab } from "./Page";
 import QA from "./QA";
 
 // A query's made-up result, or a function of its args that gives the result.
@@ -96,6 +96,14 @@ function placeOf(node: ReactNode, target: unknown, path: string[] = []): string[
   if (typeof component === "function" && !component.prototype?.isReactComponent) return placeOf(component(props), target, here);
   return placeOf(props.children, target, here);
 }
+// The props of every role="tab" button in a tree of elements, in order (components aren't run).
+function buttonsIn(node: ReactNode): { tabIndex?: number; onKeyDown?: unknown }[] {
+  if (Array.isArray(node)) return node.flatMap((n) => buttonsIn(n as ReactNode));
+  if (!isValidElement(node)) return [];
+  const props = node.props as { role?: string; children?: ReactNode; tabIndex?: number; onKeyDown?: unknown };
+  if (node.type === "button" && props.role === "tab") return [props];
+  return buttonsIn(props.children);
+}
 // The "Lost by slide" line's text, tags dropped.
 function lostLine(html: string) {
   const m = /<p class="host-lost">(.*?)<\/p>/.exec(html);
@@ -109,9 +117,9 @@ describe("#/host", () => {
 
   it("the page opens on Now, with Now, Points and Questions tab buttons", () => {
     const html = page();
-    expect(html).toContain('<button id="host-tab-Now" role="tab" aria-selected="true" aria-controls="host-panel-Now">Now</button>');
-    expect(html).toContain('<button id="host-tab-Points" role="tab" aria-selected="false" aria-controls="host-panel-Points">Points</button>');
-    expect(html).toContain('<button id="host-tab-Questions" role="tab" aria-selected="false" aria-controls="host-panel-Questions">Questions</button>');
+    expect(html).toContain('<button type="button" id="host-tab-Now" class="tabs__tab" role="tab" aria-selected="true" aria-controls="host-panel-Now" tabindex="0">Now</button>');
+    expect(html).toContain('<button type="button" id="host-tab-Points" class="tabs__tab" role="tab" aria-selected="false" aria-controls="host-panel-Points" tabindex="-1">Points</button>');
+    expect(html).toContain('<button type="button" id="host-tab-Questions" class="tabs__tab" role="tab" aria-selected="false" aria-controls="host-panel-Questions" tabindex="-1">Questions</button>');
     expect(panels(html).filter((p) => !p.hidden).map((p) => p.tab)).toEqual(["Now"]);
   });
 
@@ -119,7 +127,7 @@ describe("#/host", () => {
     for (const first of TABS) {
       const html = open(first);
       expect(panels(html), first).toEqual(TABS.map((tab) => ({ tab, mounted: true, hidden: tab !== first })));
-      expect(html, first).toContain('<button id="host-tab-' + first + '" role="tab" aria-selected="true"');
+      expect(html, first).toContain('id="host-tab-' + first + '" class="tabs__tab" role="tab" aria-selected="true"');
     }
   });
 
@@ -177,6 +185,61 @@ describe("#/host", () => {
     const html = open("Now");
     expect(html).toContain('<span class="big__value">4</span><span class="big__label">lost on this slide</span>');
     expect(html).toContain('<span class="big__value">30</span><span class="big__label">checked in</span>');
+  });
+
+  it("sweep2-host-4 the open page has an h1 'Professor view', its only h1", () => {
+    const html = open("Now");
+    expect(html.match(/<h1[ >]/g)).toHaveLength(1);
+    expect(html).toContain("<h1>Professor view</h1>");
+  });
+
+  it("sweep2-tests-8 F25.1 the header says 'Slide N of M' (index + 1) and the slide's title", () => {
+    results["deck:current"] = { index: 2, beat: 0, count: 10, title: "Recursion", lines: [], at: 0 };
+    const html = open("Now");
+    expect(html).toContain("Slide 3 of 10</p>");
+    expect(html).toContain("<h2>Recursion</h2>");
+    expect(html).not.toContain("Slide 2 of 10");
+  });
+
+  it("sweep2-tests-8 F25.6 the header says 'Loading...' while the deck loads and \"The deck hasn't sent a slide yet.\" before the first slide", () => {
+    delete results["deck:current"];
+    expect(open("Now")).toContain('<p class="status status--loading" role="status">Loading...</p>');
+    results["deck:current"] = null;
+    const html = open("Now");
+    expect(html).toContain("The deck hasn&#x27;t sent a slide yet.");
+    expect(html).not.toContain("Loading...</p>");
+  });
+
+  it("sweep2-host-2 the tabs are the kit's: one Tab stop (the open tab), arrow keys, Home and End", () => {
+    for (const first of TABS) {
+      const html = open(first);
+      expect(html, first).toContain('<div class="tabs__list" role="tablist" aria-label="Professor view">');
+      for (const t of TABS) {
+        const button = new RegExp(`<button[^>]*id="host-tab-${t}"[^>]*>`).exec(html)?.[0] ?? "";
+        expect(button, `${first}: ${t}`).toContain('class="tabs__tab"');
+        expect(button, `${first}: ${t}`).toContain(`tabindex="${t === first ? 0 : -1}"`);
+      }
+    }
+    // Which tab each key opens from each tab, the way the kit's Tabs do it.
+    const from = (key: string) => TABS.map((_, i) => tabKey(key, i, TABS.length));
+    expect(from("ArrowRight")).toEqual([1, 2, 0]);
+    expect(from("ArrowLeft")).toEqual([2, 0, 1]);
+    expect(from("Home")).toEqual([0, 0, 0]);
+    expect(from("End")).toEqual([2, 2, 2]);
+    expect(from("Enter")).toEqual([undefined, undefined, undefined]);
+    // Every tab button handles keys.
+    let tabs: { tabIndex?: number; onKeyDown?: unknown }[] = [];
+    function Probe() {
+      const tree = Dashboard({ first: "Points" });
+      tabs = buttonsIn(tree);
+      return tree;
+    }
+    renderToStaticMarkup(createElement(Probe));
+    expect(tabs.map((b) => [b.tabIndex, typeof b.onKeyDown])).toEqual([
+      [-1, "function"],
+      [0, "function"],
+      [-1, "function"],
+    ]);
   });
 
   it("#/host/<other> shows 'No page at #/host/<other>'", () => {

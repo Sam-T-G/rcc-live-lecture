@@ -11,7 +11,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Card, Status } from "../../blocks/ui";
 import { Badge, Button, Field, Segmented, Stat } from "../../blocks/kit";
 import { CHANNEL } from "../../blocks/deck";
-import { errorText } from "./Team";
+import { NO_CLASS, errorText, useNoClass } from "./Team";
 import "./ask.css";
 
 const LETTERS = ["A", "B", "C", "D"];
@@ -32,6 +32,7 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
   const [opening, setOpening] = useState(false); // the question is being opened
   const [error, setError] = useState("");
   const pollOpen = !!current?.open;
+  const noClass = useNoClass();
 
   async function draft() {
     setDrafting(true);
@@ -87,7 +88,7 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
   return (
     <Card title="Ask the room">
       {current === undefined && <Status kind="loading">Loading the quiz or vote...</Status>}
-      {current === null && !form && <Status kind="empty">No quiz or vote in this class yet.</Status>}
+      {current === null && !form && <Status kind="empty">{noClass ? NO_CLASS : "No quiz or vote in this class yet."}</Status>}
       {current && <Running key={current.id} poll={current} writing={!!form} />}
 
       {form ? (

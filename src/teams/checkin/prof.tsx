@@ -4,8 +4,9 @@
 //   useStaff()   the signed-in person: undefined while loading, null when signed out, else
 //                { email, role, canHoldRole } from api.staff.me (role: "admin", "professor",
 //                "scanner" or null).
-//   <StaffGate title="Live quiz">...</StaffGate>   the page, for professors and admins. Anyone
-//                else sees how to sign in, or why their sign-in doesn't open it.
+//   <StaffGate title="Live quiz">...</StaffGate>   the page, for professors and admins, under a
+//                "Signed in as" line with Sign out. Anyone else sees how to sign in, or why their
+//                sign-in doesn't open it.
 //   <SignInEnding />   for the 5 minutes before a Google sign-in ends, its end time and Google's
 //                button pinned to the bottom of the page (StaffGate and #/admin show it; #/live
 //                and #/checkin/student show it with line={STUDENT_ENDING}).
@@ -104,13 +105,21 @@ export function NotStaff({ me }: { me: StaffMe }) {
 }
 
 // A professor page: its children for professors and admins, the sign-in or the reason for
-// everyone else, under the page's title.
+// everyone else, under the page's title. An open page starts with who is signed in and Sign out:
+// the sign-in stays in the browser (and Chrome renews it with no click), so a professor on a
+// shared lectern PC signs out before leaving, or the next person there opens the page as them.
 export function StaffGate({ title, children }: { title: string; children: ReactNode }) {
   const me = useStaff();
+  const { user } = useGoogleUser();
   if (me && isProfRole(me.role))
     return (
       <>
         <SignInEnding />
+        {user && (
+          <div className="page page--wide" style={{ paddingBlockEnd: 0 }}>
+            <SignedInAs />
+          </div>
+        )}
         {children}
       </>
     );

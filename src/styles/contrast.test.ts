@@ -69,6 +69,36 @@ describe("contrast: every text/background token pair the app uses passes WCAG AA
     });
   }
 
+  it("sweep2-host-3 light and dark: #/host's 'Group by topic with AI' switch shows its edge and knob at 3:1 on the card when off, and its knob at 3:1 on the track when on", () => {
+    const rules = parse(SHEETS["teams/host/host.css"]);
+    // The last value `name` gets from a rule with exactly this selector, or "" when none sets it.
+    const value = (selector: string, name: string) =>
+      rules.filter((r) => r.selectors.includes(selector)).flatMap((r) => r.decls.filter(([k]) => k === name).map(([, v]) => v)).pop() ?? "";
+    // The color in a value like "2px solid var(--line-strong)" or "#fff".
+    const colorIn = (scope: Scope, text: string) => {
+      const found = /var\(\s*--[\w-]+\s*\)|#[0-9a-f]{3,8}\b/i.exec(text)?.[0];
+      const rgb = found ? parseColor(resolve(scope, found)) : null;
+      if (!rgb) throw new Error(`no solid color in "${text}"`);
+      return rgb;
+    };
+    const TRACK = ".host-switch__track";
+    const ON = ".host-switch input:checked + .host-switch__track";
+    const low: string[] = [];
+    for (const theme of ["light", "dark"] as const) {
+      const scope = THEMES[theme];
+      const card = color(scope, "--surface");
+      const check = (what: string, fg: Rgb, bg: Rgb) => {
+        const r = Math.floor(contrastRatio(fg, bg) * 100) / 100;
+        if (r < 3) low.push(`${theme}: ${what} ${r}:1`);
+      };
+      check("the off switch's edge on the card", colorIn(scope, value(TRACK, "border") || value(TRACK, "border-color") || value(TRACK, "background")), card);
+      check("the off switch's knob on the card", colorIn(scope, value(`${TRACK}::after`, "background")), card);
+      const knobOn = value(`${ON}::after`, "background") || value(`${TRACK}::after`, "background");
+      check("the on switch's knob on its track", colorIn(scope, knobOn), colorIn(scope, value(ON, "background")));
+    }
+    expect(low).toEqual([]);
+  });
+
   it("light and dark: every rule in src/**/*.css that sets both its words and its fill from tokens reaches 4.5:1", () => {
     const tokenOnly = /^var\(\s*(--[\w-]+)\s*\)$/;
     const low: string[] = [];

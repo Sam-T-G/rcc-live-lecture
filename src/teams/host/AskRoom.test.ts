@@ -94,6 +94,20 @@ describe("#/host Ask the room", () => {
     ]);
   });
 
+  it("sweep2-host-11 with no class running (none yet, or after End class), the card says so and what starts one", () => {
+    results["checkin/quiz:current"] = null;
+    const NONE = "No class is running. A class starts when you ask a quiz or vote, scan a pass or change slides.";
+    const ended = { lecture: "k1", open: false, startedAt: 0, startsAt: null, graceMin: 5, endedAt: 1, count: 3 };
+    for (const lectures of [[], [ended]]) {
+      results["checkin/attendance:lectures"] = lectures;
+      expect(card()).toContain(NONE);
+      expect(card()).not.toContain("in this class");
+    }
+    results["checkin/attendance:lectures"] = [{ ...ended, lecture: "k2", open: true, endedAt: null }, ended];
+    expect(card()).toContain("No quiz or vote in this class yet.");
+    expect(card()).not.toContain(NONE);
+  });
+
   it("UA-risk-3 the line under the form names the question or vote it opens", () => {
     const form = (kind: "quiz" | "vote") =>
       renderToStaticMarkup(

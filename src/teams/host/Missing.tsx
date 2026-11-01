@@ -1,7 +1,8 @@
 // The Now tab's "Who got it wrong" card, on Check-in's polls (checkin.quiz.missing): the newest quiz
 // with a right answer in this class, and each student who picked a wrong choice, with their team and
 // their pick. "Ask the AI" gets 2 or 3 sentences on which wrong choice most people picked and what
-// to explain again (checkin.quiz.feedback); no names go to the AI.
+// to explain again (checkin.quiz.feedback); no names go to the AI. It shows only once someone got
+// it wrong: with no wrong choice picked, the AI would name one nobody picked.
 import { useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -74,12 +75,16 @@ export function Missing() {
               </table>
             </div>
           )}
-          <div className="row ask-missing__ai">
-            <Button variant="secondary" small busy={asking} onClick={askAI}>
-              Ask the AI
-            </Button>
-          </div>
-          {note && (note.failed ? <Status kind="error">{note.text}</Status> : <p className="ask-note">{note.text}</p>)}
+          {data.wrong.length > 0 && (
+            <>
+              <div className="row ask-missing__ai">
+                <Button variant="secondary" small busy={asking} onClick={askAI}>
+                  Ask the AI
+                </Button>
+              </div>
+              {note && (note.failed ? <Status kind="error">{note.text}</Status> : <p className="ask-note">{note.text}</p>)}
+            </>
+          )}
         </>
       )}
     </Card>

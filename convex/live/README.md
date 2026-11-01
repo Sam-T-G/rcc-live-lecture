@@ -60,7 +60,7 @@ The contract other teams read (#/host). Counts include only students checked in 
 | `mine` (query) | `{ channel }` -> the caller's team `{ team, color, label }` or null | anyone (null signed out or not checked in) | `checkins`, `groups` | none |
 | `join` (mutation) | `{ channel }` -> the caller's team, or null when not checked in | signed in | `checkins`, `groups`, `groupSettings`, `groupPoints` | `groups`, `groupSettings` |
 | `setSize` (mutation) | `{ channel, size: 3 \| 4 }`; after the lock it re-deals everyone | professor | `groupSettings`, `checkins`, `groups`, `groupPoints` | `groupSettings`, `groups`, `groupPoints` |
-| `roster` (query) | `{ channel }` -> every checked-in student with name, email, team, right answers, changes, points and saved extra credit | professor | `checkins`, `groups`, `polls`, `pollAnswers`, `groupPoints`, `groupResults` | none |
+| `roster` (query) | `{ channel }` -> every checked-in student with name (no email), team, right answers, changes, points and saved extra credit | professor | `checkins`, `groups`, `polls`, `pollAnswers`, `groupPoints`, `groupResults` | none |
 | `adjust` (mutation) | `{ channel, team? \| checkin?, delta, reason? }`; `delta` 1 to 5 or -1 to -5; `reason` up to 80 characters | professor | `checkins`, `groups` | `groupPoints` |
 | `removePoints` (mutation) | `{ id }`; undo one change from this class | professor | `groupPoints` | `groupPoints` |
 | `pointLog` (query) | `{ channel }` -> this class's changes, newest first by time, at most 200 | professor | `groupPoints`, `checkins`, `groups` | none |

@@ -50,7 +50,6 @@ const team = (info: typeof RED, o: Record<string, number>) => ({ ...info, member
 const student = (n: number, info: typeof RED | null, points: number, o: Record<string, number> = {}) => ({
   checkin: `checkin${n}`,
   name: `Sample student ${n}`,
-  email: `student${n}@example.edu`,
   team: info,
   right: points,
   answered: 2,
@@ -179,5 +178,24 @@ describe("#/host Points", () => {
       "Teams lock 5 minutes after the first check-in.",
     ])
       expect(empty).toContain(line);
+  });
+
+  it("sweep2-host-11 with no class running, Students and Point changes say so and what starts one, not 'in this class'", () => {
+    const NONE = "No class is running. A class starts when you ask a quiz or vote, scan a pass or change slides.";
+    const ended = { lecture: "k1", open: false, startedAt: 0, startsAt: null, graceMin: 5, endedAt: 1, count: 3 };
+    Object.assign(results, {
+      "live/groups:leaderboard": { questions: 0, teams: [] },
+      "live/groups:roster": [],
+      "live/groups:pointLog": [],
+      "checkin/attendance:lectures": [ended],
+    });
+    const html = tab();
+    expect(texts(html, "status--empty").filter((t) => t === NONE)).toHaveLength(2);
+    expect(html).not.toContain("in this class yet.");
+    results["checkin/attendance:lectures"] = [{ ...ended, lecture: "k2", open: true, endedAt: null }, ended];
+    const open = tab();
+    expect(open).toContain("No students checked in to this class yet.");
+    expect(open).toContain("No point changes in this class yet.");
+    expect(open).not.toContain(NONE);
   });
 });

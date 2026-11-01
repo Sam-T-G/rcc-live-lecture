@@ -582,11 +582,14 @@ describe("F28 the professor's point changes", () => {
     await admin(t).mutation(api.live.groups.adjust, { channel: CH, team: 1, delta: -1 });
 
     const roster = await admin(t).query(api.live.groups.roster, { channel: CH });
-    expect(roster.map((r) => [r.name, r.email, r.team?.label, r.right, r.answered, r.changes, r.points, r.ec])).toEqual([
-      ["Sample student 2", "student2@example.edu", "Blue", 1, 1, 0, 1, 0], // same points as student 1, more right answers
-      ["Sample student 1", "student1@example.edu", "Red", 0, 1, 1, 1, 0],
-      ["Sample student 3", "student3@example.edu", "Yellow", 0, 1, 0, 0, 0],
+    expect(roster.map((r) => [r.name, r.team?.label, r.right, r.answered, r.changes, r.points, r.ec])).toEqual([
+      ["Sample student 2", "Blue", 1, 1, 0, 1, 0], // same points as student 1, more right answers
+      ["Sample student 1", "Red", 0, 1, 1, 1, 0],
+      ["Sample student 3", "Yellow", 0, 1, 0, 0, 0],
     ]);
+    // sweep2-host-7: no email, since #/host's Points tab never shows one.
+    for (const r of roster) expect(Object.keys(r)).not.toContain("email");
+    expect(JSON.stringify(roster)).not.toContain("example.edu");
     const log = await admin(t).query(api.live.groups.pointLog, { channel: CH });
     expect(log.map((c) => [c.delta, c.reason, c.team?.label, c.name])).toEqual([
       [-1, "Deduction", "Blue", null],

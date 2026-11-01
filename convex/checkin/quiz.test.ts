@@ -547,6 +547,18 @@ describe("F27 Who got it wrong, and the AI note, on polls", () => {
     expect(JSON.stringify(sent)).not.toMatch(/Sample student|example\.edu/);
   });
 
+  it("sweep2-host-5 feedback says 'Nobody got it wrong.' without calling Gemini when every answer is right", async () => {
+    const fetchMock = gemini("Most of the room picked B.");
+    const t = setup();
+    await openClass(t);
+    const [s1, s2] = await room(t, 2);
+    const quiz = await ask(t, "quiz", "Which one is a vowel?", ["A", "B"], 0);
+    await s1.mutation(api.checkin.quiz.answer, { poll: quiz, choice: 0 });
+    await s2.mutation(api.checkin.quiz.answer, { poll: quiz, choice: 0 });
+    expect(await admin(t).action(api.checkin.quiz.feedback, { channel: CH })).toBe("Nobody got it wrong.");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("F27.4 authMatrix(missing) and authMatrix(feedback): students, scanners, paired iPads and typed sign-ins on prod refused (feedback before fetch); professors and admins allowed", async () => {
     await authMatrix(HOST_ONLY, (as) => as.query(api.checkin.quiz.missing, { channel: CH }));
     const fetchMock = gemini("Most of the room picked B. Go over vowels again.");

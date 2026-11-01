@@ -6,8 +6,11 @@
 //   Three tabs: Now (ask the room, who is missing it), Points (teams and points) and Questions
 //     (the students' questions). All three panels stay mounted and only the open one shows, so a
 //     half-written question, the AI note and the "Group by topic" switch survive a tab switch.
+//     That's why the tab bar is built here instead of with the kit's <Tabs>, which renders only
+//     the open panel; it uses the kit's classes and keys (left and right arrows, Home and End,
+//     one Tab stop on the open tab).
 //   Any other #/host/<part> shows "No page at #/host/<part>".
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { CHANNEL, useDeckSlide } from "../../blocks/deck";
@@ -23,6 +26,13 @@ import "./lost.css";
 
 const TABS = ["Now", "Points", "Questions"] as const;
 export type Tab = (typeof TABS)[number];
+
+// The tab a key moves to from tab `at` of `n`, as in the kit's <Tabs>: left and right arrows go
+// round, Home and End go to the first and last. undefined for any other key.
+export function tabKey(key: string, at: number, n: number): number | undefined {
+  const moves: Record<string, number> = { ArrowRight: (at + 1) % n, ArrowLeft: (at - 1 + n) % n, Home: 0, End: n - 1 };
+  return moves[key];
+}
 
 export default function HostPage() {
   const [, part] = useRoute();
@@ -43,12 +53,21 @@ export default function HostPage() {
 // check which panel shows.
 export function Dashboard({ first = "Now" }: { first?: Tab }) {
   const [tab, setTab] = useState<Tab>(first);
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const slide = useDeckSlide(CHANNEL);
   const checkedIn = useQuery(api.checkin.read.count, { channel: CHANNEL });
   const lost = useQuery(api.live.read.lostCount, slide ? { channel: CHANNEL, index: slide.index } : "skip");
 
+  function onTabKey(e: KeyboardEvent, at: number) {
+    const next = tabKey(e.key, at, TABS.length);
+    if (next === undefined) return;
+    e.preventDefault();
+    tabRefs.current[next]?.focus();
+    setTab(TABS[next]);
+  }
+
   return (
-    <Screen wide>
+    <Screen title="Professor view" wide>
       <div className="host-root">
       <Card>
         <div className="host-head">
@@ -73,9 +92,23 @@ export function Dashboard({ first = "Now" }: { first?: Tab }) {
         </ErrorBoundary>
       </Card>
 
-      <div className="host-tabs" role="tablist" aria-label="Professor view">
-        {TABS.map((t) => (
-          <button key={t} id={`host-tab-${t}`} role="tab" aria-selected={tab === t} aria-controls={`host-panel-${t}`} onClick={() => setTab(t)}>
+      <div className="tabs__list" role="tablist" aria-label="Professor view">
+        {TABS.map((t, i) => (
+          <button
+            key={t}
+            ref={(el) => {
+              tabRefs.current[i] = el;
+            }}
+            type="button"
+            id={`host-tab-${t}`}
+            className="tabs__tab"
+            role="tab"
+            aria-selected={tab === t}
+            aria-controls={`host-panel-${t}`}
+            tabIndex={tab === t ? 0 : -1}
+            onClick={() => setTab(t)}
+            onKeyDown={(e) => onTabKey(e, i)}
+          >
             {t}
           </button>
         ))}
