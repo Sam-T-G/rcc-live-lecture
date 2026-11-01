@@ -17,10 +17,12 @@ import { CHANNEL } from "../../blocks/deck";
 import { useCamera } from "../../blocks/camera";
 import { makeQrReader } from "./qrRead";
 import { StaffGate } from "./prof";
-import { classFile, classLabel, dateFile, day, dayTime, hhmm, nearestStart, sameDay, saveCsv, timeOrDay, type ClassRow } from "./sheet";
+import { classDay, classFile, classLabel, dateFile, day, dayTime, hhmm, nearestStart, sameDay, saveCsv, timeOrDay, type ClassRow } from "./sheet";
 import { clock, why } from "./util";
 
 const MIN = 60_000;
+// setClassStart takes a start within 12 hours of now (START_RANGE_MS in convex/checkin/attendance.ts).
+const START_RANGE_MS = 12 * 60 * MIN;
 
 export function Teacher() {
   return (
@@ -81,11 +83,23 @@ function Counts() {
   );
 }
 
-// Whether a class is running, and since when.
+// Whether a class is running, and when it starts: its saved start (the time Past classes and
+// "Late after" use), else when it opened.
 function ClassStatus() {
   const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
   const open = classes?.find((c) => c.open);
-  return <span>{classes === undefined ? "Loading…" : open ? `Class started ${dayTime(open.startedAt)}` : "No class running."}</span>;
+  if (classes === undefined) return <span>Loading…</span>;
+  if (!open) return <span>No class running.</span>;
+  const at = classDay(open);
+  return <span>{`${at > Date.now() ? "Class starts" : "Class started"} ${dayTime(at)}`}</span>;
+}
+
+// The check-ins from before the first class ever ("earlier" in lectures) when they are what
+// read.names and sheet list as this class: no class in the list, open or past. They are that
+// day's record, so they download under their own date and get no Remove.
+function earlierOnly(classes: ClassRow[] | undefined) {
+  if (!classes || classes.some((c) => c.lecture !== "earlier")) return undefined;
+  return classes.find((c) => c.lecture === "earlier");
 }
 
 type Result = { ok: true; name: string; email: string; already: boolean } | { ok: false; text: string };
@@ -180,7 +194,9 @@ function ScanPasses() {
 }
 
 // When this class starts and how many minutes of grace come before "late". The fields show the
-// saved start; with none saved, the last class's time of day, ready to save for this one.
+// saved start; with none saved, the last class's time of day, ready to save for this one. Before
+// the first class ever, the saved start can be an old day's (the classStarts row), so Save then
+// uses its time of day nearest now: setClassStart refuses a start more than 12 hours away.
 export function ClassStart() {
   const start = useQuery(api.checkin.attendance.classStart, { channel: CHANNEL });
   const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
@@ -199,20 +215,23 @@ export function ClassStart() {
 
   async function save(e: FormEvent) {
     e.preventDefault();
-    // An unchanged time keeps the saved start's own day.
-    const startsAt = time === null && start ? start.startsAt : nearestStart(shownTime, Date.now());
+    // An unchanged time keeps the saved start's own day when setClassStart takes it.
+    const at = Date.now();
+    const keep = time === null && start && Math.abs(start.startsAt - at) <= START_RANGE_MS;
+    const startsAt = keep ? start.startsAt : nearestStart(shownTime, at);
     if (startsAt === null) {
       setErr("Pick the time class starts.");
       return;
     }
-    if (!shownGrace.trim()) {
-      setErr("Grace has to be 0 to 60 minutes.");
+    const graceMin = Number(shownGrace);
+    if (!shownGrace.trim() || !Number.isInteger(graceMin) || graceMin < 0 || graceMin > 60) {
+      setErr("Late after has to be a whole number from 0 to 60.");
       return;
     }
     setBusy(true);
     setErr("");
     try {
-      await set({ channel: CHANNEL, startsAt, graceMin: Number(shownGrace) });
+      await set({ channel: CHANNEL, startsAt, graceMin });
       setTime(null);
       setGrace(null);
     } catch (x) {
@@ -253,14 +272,15 @@ export function Download() {
   const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
   if (sheet === undefined) return null;
   const open = classes?.find((c) => c.open);
+  const earlier = earlierOnly(classes);
   const late = sheet.filter((r) => r.lateMin !== null).length;
   return (
     <p className="row">
       <Button
         variant="secondary"
         small
-        disabled={sheet.length === 0}
-        onClick={() => saveCsv(sheet, open ? classFile(open) : dateFile(Date.now()))}
+        disabled={sheet.length === 0 || classes === undefined}
+        onClick={() => saveCsv(sheet, open ? classFile(open) : earlier ? classFile(earlier) : dateFile(Date.now()))}
       >
         Download attendance (CSV)
       </Button>
@@ -270,10 +290,12 @@ export function Download() {
 }
 
 // Who checked in to this class, newest first. Remove takes a wrong check-in off, and that
-// student's phone shows the pass again.
+// student's phone shows the pass again. The check-ins from before the first class get no Remove.
 function Names() {
   const names = useQuery(api.checkin.read.names, { channel: CHANNEL });
+  const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
   const remove = useMutation(api.checkin.attendance.removeCheckin);
+  const canRemove = classes !== undefined && earlierOnly(classes) === undefined;
   if (names === undefined) return <Status kind="loading">Loading…</Status>;
   if (names.length === 0) return <Status kind="empty">No one yet.</Status>;
   return (
@@ -283,15 +305,17 @@ function Names() {
           <span className="att-row__main">
             <span className="att-row__name">{n.name}</span> <span className="muted">{clock(n.at)}</span>
           </span>
-          <span className="att-row__action">
-            <ConfirmButton
-              question={`Remove ${n.name} from this class? Their phone shows their pass again.`}
-              confirm="Remove"
-              onConfirm={() => remove({ checkin: n.id })}
-            >
-              Remove<span className="sr-only"> {n.name}</span>
-            </ConfirmButton>
-          </span>
+          {canRemove && (
+            <span className="att-row__action">
+              <ConfirmButton
+                question={`Remove ${n.name} from this class? Their phone shows their pass again.`}
+                confirm="Remove"
+                onConfirm={() => remove({ checkin: n.id })}
+              >
+                Remove<span className="sr-only"> {n.name}</span>
+              </ConfirmButton>
+            </span>
+          )}
         </li>
       ))}
     </ul>

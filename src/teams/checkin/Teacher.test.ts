@@ -67,9 +67,9 @@ describe("F13 the professor's scanner", () => {
     expect(words(html)).toContain("Check in");
   });
 
-  it("checkin-frontend-7 the status line says when this class started, with its date, or 'No class running.'", () => {
-    expect(words(page())).toContain(`Class started ${dayTime(open.startedAt)}`);
-    expect(words(page())).toMatch(/Class started Thu Nov 5, 2:28\sPM/);
+  it("checkin-frontend-7 CKA-check-1 the status line says when this class started (its saved start, as in Past classes), with its date, or 'No class running.'", () => {
+    expect(words(page())).toContain(`Class started ${dayTime(open.startsAt)}`);
+    expect(words(page())).toMatch(/Class started Thu Nov 5, 2:30\sPM/);
     results["checkin/attendance:lectures"] = [lastWeek];
     expect(words(page())).toContain("No class running.");
     expect(words(page())).not.toContain("Class started");
@@ -97,10 +97,11 @@ describe("F14 who checked in to this class", () => {
     expect(words(page())).toContain("No one yet.");
   });
 
-  it("removeCheckin on screen: each name has a Remove button that asks first; the counts show checked in and late", () => {
+  it("removeCheckin on screen: each name has a Remove button; the counts show checked in and late", () => {
     const html = page();
     for (const n of names) expect(words(html)).toContain(`Remove ${n.name}`);
-    // ConfirmButton: the first press only asks, so the page holds no question until then.
+    // No question shows before a press. That the first press only asks and the second removes is
+    // pressed for real in Teacher.press.test.ts (CKA-risk-4): this HTML looks the same either way.
     expect(words(html)).not.toContain("from this class?");
     expect(html.match(/btn--danger/g)).toHaveLength(2);
     expect(words(html)).toMatch(/2 checked in 1 late/);
