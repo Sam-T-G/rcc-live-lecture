@@ -78,15 +78,18 @@ describe("F15 the class start form's times", () => {
     expect(classLabel(aClass({ lecture: "earlier", startedAt: pdt(10, 29, 15, 0), endedAt: pdt(10, 29, 16, 0) }), "en-US")).toBe("Earlier check-ins, Oct 29");
   });
 
-  it("checkin-backend-4 a time saved for class picks the day that puts it nearest now, so it's always within 12 hours: '09:00' saved at 9 PM is tomorrow morning", () => {
+  it("checkin-backend-4 a time saved for class is its first moment from 6 hours ago on: '09:00' saved at 9 PM is tomorrow morning (CKA-spec-1: sheet.start.test.ts)", () => {
     expect(nearestStart("09:00", pst(11, 4, 21, 0))).toBe(pst(11, 5, 9, 0));
     expect(nearestStart("14:30", pst(11, 5, 14, 40))).toBe(pst(11, 5, 14, 30));
     expect(nearestStart("23:50", pst(11, 5, 0, 10))).toBe(pst(11, 4, 23, 50));
     expect(nearestStart("00:10", pst(11, 5, 23, 50))).toBe(pst(11, 6, 0, 10));
     for (let h = 0; h < 24; h++) {
       const now = pst(11, 5, h, 17);
-      for (const time of ["00:00", "06:45", "12:00", "17:30", "23:59"])
-        expect(Math.abs(nearestStart(time, now)! - now)).toBeLessThanOrEqual(12 * HOUR);
+      for (const time of ["00:00", "06:45", "12:00", "17:30", "23:59"]) {
+        const t = nearestStart(time, now)! - now;
+        expect(t).toBeGreaterThanOrEqual(-6 * HOUR);
+        expect(t).toBeLessThan(18 * HOUR);
+      }
     }
     expect(nearestStart("", pst(11, 5, 12))).toBeNull();
     expect(nearestStart("soon", pst(11, 5, 12))).toBeNull();

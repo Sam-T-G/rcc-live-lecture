@@ -38,21 +38,25 @@ export const dayTime = (ms: number, locale?: string) =>
 // A time with its day in front when it isn't today: "2:35 PM", or "Wed Nov 4, 2:35 PM".
 export const timeOrDay = (ms: number, now: number) => (sameDay(ms, now) ? clock(ms) : dayTime(ms));
 
-// The time of day `time` ("09:00") on the day that puts it nearest `now`: yesterday, today or
-// tomorrow, so it's always within the 12 hours setClassStart takes. "09:00" saved at 9 PM is
-// tomorrow morning; "14:30" saved at 2:40 PM is today. Null when `time` isn't a time.
+// How long ago a start can be and still be today's: a professor correcting the start during
+// class. A time that passed longer ago than this is the next day's.
+const LOOK_BACK_MS = 6 * 3_600_000;
+
+// The time of day `time` ("09:00") at its first moment from 6 hours ago on: yesterday, today or
+// tomorrow. "14:30" saved at 2:40 PM is today; "09:00" saved at 9 PM, or at 3:30 PM, is tomorrow
+// morning. A next-day start saved before 9 PM is then more than 12 hours away, and setClassStart
+// refuses it ("Pick a time within 12 hours of now.") instead of the form quietly saving this
+// morning's time. Null when `time` isn't a time.
 export function nearestStart(time: string, now: number): number | null {
   const m = /^(\d{1,2}):(\d{2})/.exec(time);
   if (!m) return null;
-  let best: number | null = null;
   for (const shift of [-1, 0, 1]) {
     const d = new Date(now);
     d.setDate(d.getDate() + shift);
     d.setHours(Number(m[1]), Number(m[2]), 0, 0);
-    const t = d.getTime();
-    if (best === null || Math.abs(t - now) <= Math.abs(best - now)) best = t;
+    if (d.getTime() >= now - LOOK_BACK_MS) return d.getTime();
   }
-  return best;
+  return null;
 }
 
 // One CSV cell, quoted. Names are whatever a student typed at sign-in, so a cell that starts with

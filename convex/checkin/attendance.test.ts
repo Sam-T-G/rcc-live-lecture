@@ -246,7 +246,7 @@ describe("F15 late from the class start plus grace minutes", () => {
     expect(await feed(t)).toEqual([]);
   });
 
-  it("rt-9 a start saved after arrivals marks them late in the sheet", async () => {
+  it("rt-9 a start saved after arrivals marks them late in the sheet; the late banner never announces them (CKA-risk-1)", async () => {
     const t = setup();
     // A deck press opens the class before anyone saves a start time.
     await openClass(t);
@@ -260,10 +260,8 @@ describe("F15 late from the class start plus grace minutes", () => {
     vi.setSystemTime(T0 + 6 * MIN);
     await setStart(t, 0);
     expect((await sheet(t)).map((r) => r.lateMin)).toEqual([2, 5]);
-    expect((await feed(t)).map((f) => [f.first, f.lateMin])).toEqual([
-      ["Sample", 5],
-      ["Sample", 2],
-    ]);
+    // They weren't late when they were scanned, so the banner doesn't announce them now.
+    expect(await feed(t)).toEqual([]);
     // A corrected start moves them again.
     await setStart(t, 0, T0 + 3 * MIN);
     expect((await sheet(t)).map((r) => r.lateMin)).toEqual([null, 2]);
