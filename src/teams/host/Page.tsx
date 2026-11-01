@@ -1,6 +1,9 @@
 // Professor view team: #/host, the screen the professor glances at while teaching. Professors
 // and admins only (StaffGate). Registered in src/pages/index.ts.
-//   The app bar: the page's name, the three tabs and the Attendance link.
+//   The app bar: the page's name, the three tabs, the Attendance link and who is signed in with
+//     "Not you? Sign out" (SignedInAs). StaffGate draws its own "Signed in as" strip above its
+//     page; host.css hides that strip here, so the words show once, in the bar, and the live
+//     view keeps its 1280 x 800 fit.
 //   The slide track under it, the same on every tab: the slide the deck is on, how many students
 //     tapped "I'm lost" on each slide this class (live.read.lostBySlide; students tap on #/live),
 //     drawn over the deck's slides, and how many checked in. Screen readers get the same as
@@ -17,6 +20,7 @@
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { SignedInAs } from "../../blocks/auth";
 import { CHANNEL, useDeckSlide } from "../../blocks/deck";
 import { Link, useRoute } from "../../blocks/router";
 import { Big, ErrorBoundary, Screen, Status } from "../../blocks/ui";
@@ -48,14 +52,15 @@ export default function HostPage() {
     );
   return (
     <StaffGate title="Professor view">
-      <Dashboard />
+      <Dashboard whoami={<SignedInAs />} />
     </StaffGate>
   );
 }
 
 // `first` is the tab it opens on ("Now" on the page); Page.test.ts opens each tab this way to
-// check which panel shows.
-export function Dashboard({ first = "Now" }: { first?: Tab }) {
+// check which panel shows. `whoami` is who is signed in, at the bar's end (the page passes
+// <SignedInAs />; none when left out).
+export function Dashboard({ first = "Now", whoami }: { first?: Tab; whoami?: ReactNode }) {
   const [tab, setTab] = useState<Tab>(first);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const slide = useDeckSlide(CHANNEL);
@@ -96,6 +101,7 @@ export function Dashboard({ first = "Now" }: { first?: Tab }) {
           ))}
         </div>
         <p className="host-links"><Link to="checkin/teacher">Attendance</Link></p>
+        {whoami && <div className="whoami">{whoami}</div>}
       </header>
 
       <div className="band track host-track">

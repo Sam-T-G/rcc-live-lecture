@@ -19,6 +19,13 @@ describe("host.css", () => {
     expect(unused).toEqual([]);
   });
 
+  // StaffGate (prof.tsx) opens with its own "Signed in as" strip, a page--wide block right before
+  // the host page. The host bar carries those words, so the strip is hidden only there.
+  it("DS-HOST-design-2 hides StaffGate's whoami strip right before .host-root, and only there", () => {
+    const body = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(body).toMatch(/(^|\n)\.page--wide:has\(\+ \.host-root\) \{ display: none; \}/);
+  });
+
   it("its header names src/styles/tokens.css as where the colors come from", () => {
     expect(CSS.slice(0, CSS.indexOf("*/"))).toContain("src/styles/tokens.css");
   });

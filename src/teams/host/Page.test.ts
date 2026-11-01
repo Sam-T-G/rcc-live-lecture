@@ -55,6 +55,12 @@ vi.mock("convex/react", () => ({
   },
 }));
 vi.mock("../checkin/prof", () => ({ StaffGate: ({ children }: { children: ReactNode }) => children }));
+// SignedInAs reads the Google sign-in (AuthProvider); a stand-in prints its name, so the test
+// checks only where Page.tsx puts it.
+vi.mock("../../blocks/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../blocks/auth")>()),
+  SignedInAs: () => "[signed in as]",
+}));
 vi.mock("./AskRoom", () => ({ default: () => "[ask the room]" }));
 vi.mock("./Missing", () => ({ Missing: () => "[who is missing it]" }));
 vi.mock("./Boards", () => ({ PointsTab: () => "[points tab]" }));
@@ -315,6 +321,14 @@ describe("#/host", () => {
         '<section data-boundary="The Now tab">[who is missing it]</section>' +
         "</div>",
     );
+  });
+
+  it("DS-HOST-design-2 the app bar ends with who is signed in and Sign out, after Attendance", () => {
+    const html = page();
+    const bar = html.slice(html.indexOf('<header class="bar host-bar">'), html.indexOf("</header>"));
+    expect(bar).toContain('<div class="whoami">[signed in as]</div>');
+    expect(bar.indexOf("[signed in as]")).toBeGreaterThan(bar.indexOf("Attendance"));
+    expect(html.match(/\[signed in as\]/g)).toHaveLength(1);
   });
 
   it("sweep2-host-4 the open page has an h1 'Professor view', its only h1", () => {

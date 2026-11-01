@@ -21,6 +21,12 @@
 .host-links a { display: inline-flex; align-items: center; min-height: var(--btn-sm); color: var(--muted); font-size: var(--t-small);
   font-weight: var(--w-head); text-decoration: none; white-space: nowrap; }
 .host-links a:is(:hover, :focus-visible) { color: var(--text); text-decoration: underline; text-decoration-thickness: 1px; }
+/* Who is signed in, at the bar's end on the page margin (the kit's .whoami line). */
+.host-bar .whoami > p { margin: 0; gap: var(--s1) var(--s3); }
+/* StaffGate (src/teams/checkin/prof.tsx) draws its own "Signed in as" strip, a .page--wide block
+   right before its page. On #/host the bar says it, so the strip would only push the live view
+   84px under the 800 fold. */
+.page--wide:has(+ .host-root) { display: none; }
 
 /* ------------------------------------------------------------ the slide track */
 /* The kit's band and track: the slide and its title start on the card text line, the lane ends on
