@@ -77,10 +77,13 @@ export function LiveSlides({ pin = null }: { pin?: number | null }) {
   }
 
   // The phone frame (checkin.css .ph): the page's name with who is signed in and their team, the
-  // slide card, then the quiz, the team leaderboard, questions and past quizzes. The action bar at
-  // the bottom holds the late banner, then Back, I'm lost (the filled main button) and Next in one
-  // row while a slide is up; while the deck loads or before the slides start it holds only the late
-  // banner, and empty it draws nothing (live.css).
+  // slide card, then the quiz, the team leaderboard, questions and past quizzes. The slide card
+  // ends with Back to live (paged back only) and I'm lost's line. The sticky action bar at the
+  // bottom holds the late banner, then Back, I'm lost (the filled main button) and Next in one row
+  // while a slide is up, and under the row only I'm lost's error or "Your sign-in ended."; while the
+  // deck loads or before the slides start it holds only the late banner, and empty it draws nothing
+  // (live.css). DS-PHONE-design-2: the line and Back to live in the bar made it a third of a 320
+  // phone's height.
   return (
     <div className="ph ph--live" data-surface="phone">
       <header className="bar bar--static ph-head">
@@ -118,6 +121,12 @@ export function LiveSlides({ pin = null }: { pin?: number | null }) {
                   ))}
                 </ul>
                 {looking && live && <p className="slide__live muted">The professor is on slide {live.index + 1} now.</p>}
+                {looking && (
+                  <Button variant="secondary" block className="ph-tolive" onClick={() => setPinned(null)}>Back to live</Button>
+                )}
+                <ErrorBoundary key={slide.index}>
+                  <LostNote index={slide.index} />
+                </ErrorBoundary>
               </>
             )}
           </section>
@@ -150,7 +159,6 @@ export function LiveSlides({ pin = null }: { pin?: number | null }) {
               <Lost index={slide.index} />
             </ErrorBoundary>
             <Button variant="neutral" className="ph-next" disabled={!looking} onClick={next}>Next →</Button>
-            {looking && <Button className="ph-tolive" onClick={() => setPinned(null)}>Back to live</Button>}
           </>
         )}
       </div>
@@ -195,7 +203,8 @@ function CheckInFirst() {
 // signed out ("Your sign-in ended." over "Sign in again to tap I'm lost" when the sign-in ran out
 // on this page). A signed-in student who isn't checked in gets nothing here: CheckInFirst sits
 // above the slide. The professor's #/host shows the count for each slide. live.css places the
-// button between Back and Next and its line under the row.
+// button between Back and Next and its error under the row; the line about it is LostNote, in the
+// slide card.
 function Lost({ index }: { index: number }) {
   const { user, ended } = useGoogleUser();
   const checkedIn = useQuery(api.checkin.read.me, user ? { channel: CHANNEL } : "skip");
@@ -233,12 +242,24 @@ function Lost({ index }: { index: number }) {
       <Button block className="lost__button" aria-pressed={mine === true} busy={busy} onClick={() => void tap()}>
         {mine && <span aria-hidden="true">✓ </span>}I’m lost
       </Button>
-      <p className="lost__note muted">
-        {mine
-          ? `You’re counted as lost on slide ${index + 1}. Tap again to undo.`
-          : "The professor sees how many people are lost on each slide. Your name isn’t shown."}
-      </p>
       {error && <Status kind="error">{error}</Status>}
     </div>
+  );
+}
+
+// I'm lost's line, at the end of the slide card, for a checked-in student: what the professor sees,
+// or that they're counted as lost on this slide. It reads the same queries as Lost (Convex shares
+// one subscription), and nothing while signed out, not checked in or loading, the same as Lost.
+function LostNote({ index }: { index: number }) {
+  const { user } = useGoogleUser();
+  const checkedIn = useQuery(api.checkin.read.me, user ? { channel: CHANNEL } : "skip");
+  const mine = useQuery(api.live.read.mine, user && checkedIn ? { channel: CHANNEL, index } : "skip");
+  if (!user || !checkedIn) return null;
+  return (
+    <p className="lost__note muted">
+      {mine
+        ? `You’re counted as lost on slide ${index + 1}. Tap again to undo.`
+        : "The professor sees how many people are lost on each slide. Your name isn’t shown."}
+    </p>
   );
 }

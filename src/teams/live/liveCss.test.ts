@@ -45,15 +45,19 @@ describe("#/live: focus stops above the sticky action bar (DS-PHONE-check-2, ris
     expect(v).toContain("var(--banner-stack-space, 0px)");
     expect(v).toContain("56px");
     expect(v).toContain("env(safe-area-inset-bottom, 0px)");
-    for (const part of ["--pha-late", "--pha-note", "--pha-err", "--pha-tolive"]) expect(v).toContain(`var(${part}, 0px)`);
+    for (const part of ["--pha-late", "--pha-note", "--pha-err"]) expect(v).toContain(`var(${part}, 0px)`);
   });
 
-  it("adds each other part the bar can hold: late strips, I'm lost's line, its error, Back to live", () => {
+  it("adds each other part the bar can hold: late strips, 'Your sign-in ended.', I'm lost's error", () => {
     const set = (prop: string) => decls(prop).map(([s]) => s);
     expect(set("--pha-late").some((s) => s.includes(".late__item"))).toBe(true);
     expect(set("--pha-late").some((s) => s.includes(".late__item ~ .late__item"))).toBe(true);
     expect(set("--pha-note")).toContain("html:has(.ph--live > .ph-actions > .lost > p:not(.status))");
     expect(set("--pha-err")).toContain("html:has(.ph--live > .ph-actions > .lost > .status)");
-    expect(set("--pha-tolive")).toContain("html:has(.ph--live > .ph-actions > .ph-tolive)");
+  });
+
+  it("DS-PHONE-design-2 Back to live and I'm lost's line sit in the slide card, so no bar rule places or counts them", () => {
+    for (const r of rules) for (const s of r.selectors) expect(s).not.toMatch(/\.ph-actions[^,]*(\.ph-tolive|\.lost__note)/);
+    expect(decls("min-height")).toContainEqual([".livestate > .ph-tolive", "48px"]);
   });
 });

@@ -99,7 +99,8 @@ describe("#/live paging, pressed (F19.2)", () => {
     expect(disabled("Next →")).toBe(true); // nothing ahead of the professor
 
     press("← Back");
-    expect(screen()).toEqual({ title: "A5", notice: "The professor is on slide 6 now.", buttons: ["← Back", "Next →", "Back to live"] });
+    // Back to live sits in the slide card, above the action bar's ← Back and Next → (DS-PHONE-design-2).
+    expect(screen()).toEqual({ title: "A5", notice: "The professor is on slide 6 now.", buttons: ["Back to live", "← Back", "Next →"] });
     press("← Back");
     press("← Back");
     expect(screen().title).toBe("A3");

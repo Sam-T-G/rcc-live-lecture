@@ -131,10 +131,12 @@ const CHECKIN_BOX =
 function checkinBox(html: string) {
   return /<div class="live-checkin">.*?<\/a><\/div>/.exec(html)?.[0] ?? null;
 }
-// The text of the page's I'm lost slot, tags dropped.
+// The text of the page's I'm lost slot (the button in the action bar, then its line, which sits at
+// the end of the slide card since DS-PHONE-design-2), tags dropped.
 function lostSlot(html: string) {
   const inner = boundary(html, "The I’m lost button");
-  return inner === null ? null : inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const note = /<p class="lost__note[^"]*">.*?<\/p>/.exec(html)?.[0] ?? "";
+  return inner === null ? null : `${inner} ${note}`.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 describe("#/live/leaderboard, the room's board", () => {
@@ -278,11 +280,31 @@ describe("#/live, the student phone", () => {
     }
   });
 
+  it("DS-PHONE-design-2 the sticky action bar keeps only the late banner and the button row: I'm lost's line and Back to live sit in the slide card", () => {
+    deckOn(6);
+    auth.user = STUDENT;
+    results["checkin/read:me"] = true;
+    results["live/read:mine"] = false;
+    const bar = (html: string) => html.slice(html.indexOf('<div class="phone-actions ph-actions">'));
+    const card = (html: string) => html.slice(html.indexOf('<section class="livestate">'), html.indexOf('<div class="live__side">'));
+    // Paged back to slide 4 while the professor is on slide 7.
+    const html = renderToStaticMarkup(createElement(LiveSlides, { pin: 3 }));
+    expect(bar(html)).toContain("lost__button");
+    expect(bar(html)).not.toContain("lost__note");
+    expect(bar(html)).not.toContain("Back to live");
+    expect(card(html)).toContain('<p class="lost__note muted">The professor sees how many people are lost on each slide. Your name isn’t shown.</p>');
+    expect(card(html)).toContain("Back to live");
+    // Back to live comes right after the line that says where the professor is.
+    expect(card(html).indexOf("The professor is on slide 7 now.")).toBeLessThan(card(html).indexOf("Back to live"));
+  });
+
   it("LIVE-risk-1 I'm lost reads and taps the slide on screen: the live one, or the one the student paged back to", async () => {
     auth.user = STUDENT;
     results["checkin/read:me"] = true;
     results["live/read:mine"] = false;
-    const mineArgs = () => calls.queries.filter((q) => q.name === "live/read:mine").map((q) => q.args);
+    // Each slide read once: the button and its line (in the slide card) both read it, and Convex
+    // shares one subscription for the same args.
+    const mineArgs = () => [...new Set(calls.queries.filter((q) => q.name === "live/read:mine").map((q) => JSON.stringify(q.args)))].map((a) => JSON.parse(a));
     // Press the I'm lost button the last render drew, and return what it sent.
     async function press() {
       const button = calls.buttons.filter((b) => b.className?.includes("lost__button")).at(-1);
