@@ -325,3 +325,32 @@ describe("docs: the 2026-10-31 docs fix check", () => {
     expect(line).toMatch(/no `\?bridge=`[^.]*no warning/);
   });
 });
+
+// The 2026-11-01 check of the 10-31 docs fixes (these ids are that round's findings).
+describe("docs: the 2026-11-01 docs fix check", () => {
+  // live.questions.list is open to anyone, signed out too, and a by-name post carries the whole
+  // check-in name (convex/live/questions.test.ts pins it), so no privacy line may say full names
+  // reach only professors plus the door iPad.
+  it("sweep1-docs-fixcheck-1 the privacy rules name questions by name as a second place a full name reaches students", () => {
+    const rules = [
+      ["docs/runbook.md", "**What stays private:**"],
+      ["AGENTS.md", "Who sees names:"],
+      ["docs/contracts.md", "**Privacy:**"],
+    ];
+    for (const [path, start] of rules) {
+      const line = lines(path).find((l) => l.includes(start)) ?? "";
+      expect([path, /question[^.]*by name[^.]*full|full[^.]*question[^.]*by name/i.test(line)]).toEqual([path, true]);
+      expect([path, /one exception|(emails and full names|other full names and all emails) show only/i.test(line)]).toEqual([path, false]);
+    }
+    const contractsLine = lines("docs/contracts.md").find((l) => l.includes("**Privacy:**")) ?? "";
+    expect(contractsLine).toContain("`live.questions.list`");
+  });
+
+  it("sweep1-docs-fixcheck-2 BLOCKS.md doesn't list 'after a class ends' as a way deckFrom differs from lectureWindow", () => {
+    const rule = lines("BLOCKS.md").find((l) => l.startsWith("**Reading, on the server:**")) ?? "";
+    const differs = rule.slice(rule.indexOf("It differs from"));
+    expect(differs.startsWith("It differs from")).toBe(true);
+    expect(differs.split(".")[0] + ".").not.toMatch(/after a class ends it is the time it ended/);
+    expect(differs).toMatch(/before a channel's first class it is 12 hours ago/);
+  });
+});

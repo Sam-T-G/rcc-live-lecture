@@ -267,6 +267,18 @@ describe("live-frontend-17 names on by-name posts", () => {
     for (const r of stored) expect(r.name).not.toContain("@");
     expect(JSON.stringify(await forHost(await professor(t)))).not.toContain("@");
   });
+
+  // The privacy lines in AGENTS.md, docs/contracts.md and docs/runbook.md say this: list is open to
+  // anyone, signed out too, and a by-name post carries the whole check-in name, not a first name.
+  // Change those three lines in the same commit as shownName.
+  it("sweep1-docs-fixcheck-1 a by-name post shows the full check-in name to a signed-out reader", async () => {
+    const t = setup();
+    await slide(t, CH, 3);
+    const s = typed(t, "Sample Middle Student", "sample.middle@example.edu");
+    await checkIn(t, s);
+    await post(s, "Is this on the exam?", { anonymous: false });
+    expect((await list(t)).map((q) => q.name)).toEqual(["Sample Middle Student"]);
+  });
 });
 
 describe("F30 the professor's Questions tab on #/host", () => {
