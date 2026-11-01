@@ -182,7 +182,7 @@ export const scan = mutation({
     // No lateMin: attendance.sheet and lateFeed work lateness out from `at` and the class's start
     // and grace when read, so a start saved or moved later still counts.
     if (!row) await ctx.db.insert("checkins", { channel, user: p.user, name, email: p.email, at: now });
-    await ensureGroup(ctx, channel, p.user); // Live slides: deals a team in arrival order (Red, Blue, Yellow, ...)
+    await ensureGroup(ctx, channel, p.user, !row); // Live slides: deals a team in arrival order (Red, Blue, Yellow, ...)
     const email = isProf(await staffRole(ctx)) ? p.email : "";
     return { name, email, already: row !== null };
   },

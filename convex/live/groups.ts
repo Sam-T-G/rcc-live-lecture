@@ -307,21 +307,25 @@ async function splitChanges(
 }
 
 // Give a student a team in this class if they don't have one, and return it. The caller has just
-// checked them in (checkin.pass.scan, on every scan).
+// checked them in (checkin.pass.scan, on every scan); `fresh` is true when that scan wrote their
+// check-in row, false for a second scan of a student already checked in.
 //
-// A student who already has a team keeps it, with one exception after the lock: when nobody else
-// checked in is on their team. That happens when the professor removed their check-in before the
-// lock (the lock re-dealt everyone else and left their row behind) or before a new size re-dealt
-// the class, and then they were scanned again. They then join the smallest team, the way a late
-// arrival does, so they never make a team of 1 (Sam's decision D12 l). When every team already has
-// 5 they stay where they are, so a second scan of a student who opened a new team never moves them.
-export async function ensureGroup(ctx: MutationCtx, channel: string, user: string): Promise<number> {
+// A student who already has a team keeps it, with one exception after the lock: a fresh check-in
+// when nobody else checked in is on their team. That happens when the professor removed their
+// check-in before the lock (the lock re-dealt everyone else and left their row behind) or before a
+// new size re-dealt the class, and then they were scanned again. They then join the smallest team,
+// the way a late arrival does, so they never make a team of 1 (Sam's decision D12 l), and their old
+// team's point changes go with them as changes for them alone (they're the only student on it, the
+// way splitChanges gives a team's changes to the students on it), so no change is left counting for
+// nobody. When every team already has 5 they stay where they are, so a second scan of a student who
+// opened a new team never moves them. A second scan (not fresh) never moves anyone.
+export async function ensureGroup(ctx: MutationCtx, channel: string, user: string, fresh = false): Promise<number> {
   const win = await lectureWindow(ctx, channel);
   const groups = await classGroups(ctx, channel, win.start);
   const had = groups.get(user);
   const set = await classSettings(ctx, channel, win.start);
   const locked = !!set.row?.lockedAt;
-  if (had && !locked) return had.team;
+  if (had && (!locked || !fresh)) return had.team;
   const here = new Set((await classCheckins(ctx, channel, win.start)).map((c) => c.user));
   const teamOf = new Map([...groups].filter(([u]) => u !== user).map(([u, g]) => [u, g.team]));
   const count = memberCounts(teamOf, here);
@@ -329,6 +333,11 @@ export async function ensureGroup(ctx: MutationCtx, channel: string, user: strin
     if (count.has(had.team)) return had.team; // someone else checked in is on their team
     const team = pickTeam(count, true, set.size, -1);
     if (team === -1) return had.team; // every team has 5: pickTeam would open a new team
+    for (const c of await classChanges(ctx, channel, win.start)) {
+      if (c.team !== had.team) continue;
+      await ctx.db.insert("groupPoints", { channel, user, delta: c.delta, reason: c.reason, at: c.at });
+      await ctx.db.delete("groupPoints", c._id);
+    }
     await ctx.db.patch("groups", had._id, { team });
     return team;
   }
