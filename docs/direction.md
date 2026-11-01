@@ -10,7 +10,7 @@ GDG on Campus RCC set the goal at the 10-29 meeting: students take part during a
 4. **The professor's view.** #/host: the slide, the check-in count and how many are lost on it; Now (ask the room, with an AI-drafted question from the slide, then who got it wrong and an AI note on what to explain again); Points (teams, bonuses and deductions with a reason, End class, the extra credit CSV); Questions (sort, type an answer, share it, group by topic with AI).
 5. **Late banner.** When a student checks in after the start plus grace, their first name shows on the projector, #/live, #/portal and the iOS app for 8 seconds, with a line like "⏰ Sam walked in 6 min late." Each student can turn it off on their pass.
 
-Access is by email role (admin, professor, scanner), set on #/admin; a door iPad pairs with a 6-digit code. Every table and who reads it: [contracts.md](contracts.md).
+Access is by email role (admin, professor, scanner), set on #/admin; a door iPad pairs with the code it shows (6 digits, or 8 while open requests hold every 6-digit code). Every table and who reads it: [contracts.md](contracts.md).
 
 ## How the data moves
 

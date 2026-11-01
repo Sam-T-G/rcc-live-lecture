@@ -12,7 +12,7 @@ The agent reads this before every change to `src/teams/checkin/` or `convex/chec
 |---|---|---|
 | #/checkin/student (also #/checkin/join and #/checkin) | students | Google sign-in, then the QR pass until a scan checks them in, then "You're checked in." The quiz card and the late banner show here too, and the switch that keeps their name off the late banner. |
 | #/checkin/teacher | professors and admins (`StaffGate`) | The laptop camera reads passes, or the professor types the code from a student's phone. Lists who checked in with a Remove for each, the class start and "Late after (minutes)", Download attendance (CSV) for this class and every past one, and End class. |
-| #/checkin/kiosk | a paired door iPad, or a scanner signed in (`DoorGate`) | The iPad's front camera reads passes, or a student types the code on their pass. Shows the count and, for 3 s after each scan, that student's name. No list of names. Without a pairing it shows "Pair this iPad" and a 6-digit code, which a professor or admin types on #/admin. |
+| #/checkin/kiosk | a paired door iPad, or a scanner signed in (`DoorGate`) | The iPad's front camera reads passes, or a student types the code on their pass. Shows the count and, for 3 s after each scan, that student's name. No list of names. Without a pairing it shows "Pair this iPad" and a pairing code (6 digits, or 8 while open requests hold every 6-digit code), which a professor or admin types on #/admin. |
 | #/checkin/quiz | professors and admins (`StaffGate`) | Ask a quiz (optional right answer, answers lock) or a vote (no right answer, picks change until it ends), watch "answered / checked in", end it, and see the bars, % right and median time. |
 | #/checkin/stage?deck=…&bridge=… | the projector | The deck full screen with the check-in QR, the count, the newest quiz or vote and the late banner. Hands `DECK_BRIDGE_KEY` only to a deck on the origin the key came with. |
 
@@ -35,7 +35,7 @@ Writes `passes` (one per student: name, email, the current and previous code, th
 
 ## The door iPad on class day
 
-- Pair it: open #/checkin/kiosk on the iPad, and type the 6-digit code it shows on #/admin (Pair a door iPad) from your own laptop or phone. A pairing lasts until someone unpairs it on #/admin.
+- Pair it: open #/checkin/kiosk on the iPad, and type the pairing code it shows (6 digits, or 8 while open requests hold every 6-digit code) on #/admin (Pair a door iPad) from your own laptop or phone. A pairing lasts until someone unpairs it on #/admin.
 - Nobody signs in to Google on the door iPad, not even to pair it. Google keeps its own sign-in in Safari after the app's Sign out, and its account list would sign anyone in line in as that person with one tap. If a staff account did sign in there, sign it out of Google in Safari too.
 - Turn on Guided Access (Settings, Accessibility, Guided Access) so nobody in line can leave the kiosk page or type another address.
 - A scanner can scan from their own phone instead: sign in on #/admin, then open #/checkin/kiosk. That sign-in ends in under an hour (the kiosk shows the end time), so for a whole class, pair the iPad.

@@ -250,4 +250,23 @@ describe("F8 classes and the live slide", () => {
     await t.mutation(internal.deck.set, { ...ok, index: 999, beat: 999, count: 999 });
     expect(await current(t)).toMatchObject({ index: 999, beat: 999, count: 999 });
   });
+
+  it("sweep2-server-fixcheck-1 a bad page-back row from before slideNumbers stays when a new deck tab presses that slide, and End class drops it", async () => {
+    const t = setup();
+    await set(t, 2, 0, ["Loops"], "Slide 3", { run: "A", seq: 1 });
+    // Only a row written before set checked slide numbers can hold one the iOS app can't read.
+    await t.run(async (ctx) => {
+      const row = await ctx.db.query("deckSlides").withIndex("by_channel_and_index", (q) => q.eq("channel", CH).eq("index", 2)).unique();
+      await ctx.db.patch("deckSlides", row!._id, { beat: 1e300 });
+    });
+    vi.setSystemTime(T0 + MIN);
+    await set(t, 2, 0, ["Loops"], "Slide 3", { run: "B", seq: 1 });
+    await set(t, 3, 0, ["While"], "Slide 4", { run: "B", seq: 2 });
+    expect((await shown(t)).map((s) => [s.index, s.beat])).toEqual([[2, 1e300], [3, 0]]);
+
+    await endDay(t);
+    vi.setSystemTime(T0 + 2 * MIN);
+    await set(t, 2, 0, ["Loops"], "Slide 3", { run: "B", seq: 3 });
+    expect((await shown(t)).map((s) => [s.index, s.beat])).toEqual([[2, 0]]);
+  });
 });

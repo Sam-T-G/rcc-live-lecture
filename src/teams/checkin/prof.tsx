@@ -152,10 +152,10 @@ export function SignInEnding({ line = "Sign in with Google again before then to 
 // ---------- The door iPad ----------
 // A door iPad doesn't sign in. The first time it opens #/checkin/kiosk it makes a device token
 // (32 random bytes from crypto.getRandomValues, as 64 lower-case hex characters) and keeps it in
-// localStorage, so a reload keeps its pairing. It asks the server for a 6-digit code; a professor
-// or admin types that code on #/admin, and the iPad's status query flips to paired. The server
-// keeps only the token's SHA-256. Unpairing on #/admin stops the token at once and brings this
-// screen back.
+// localStorage, so a reload keeps its pairing. It asks the server for a pairing code (6 digits,
+// or 8 while open requests hold every 6-digit code); a professor or admin types that code on
+// #/admin, and the iPad's status query flips to paired. The server keeps only the token's
+// SHA-256. Unpairing on #/admin stops the token at once and brings this screen back.
 
 const DEVICE = "rcc-live:door-device";
 const TOKEN = /^[0-9a-f]{64}$/;

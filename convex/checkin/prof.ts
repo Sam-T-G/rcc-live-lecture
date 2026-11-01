@@ -17,9 +17,10 @@
 // only as long as its own role, and a door iPad it pairs scans only while its role lasts.
 // staff:devRevoke ends all of that at once.
 //
-// A door iPad doesn't sign in. It pairs once: its screen shows a 6-digit code, and a professor
-// or admin types that code on #/admin (convex/staff.ts). After that it sends its device token
-// with every scan. The server keeps only the token's SHA-256.
+// A door iPad doesn't sign in. It pairs once: its screen shows a pairing code (6 digits, or
+// 8 while open requests hold every 6-digit code), and a professor or admin types that code on
+// #/admin (convex/staff.ts). After that it sends its device token with every scan. The server
+// keeps only the token's SHA-256.
 //
 // Every host-only function calls requireProf(ctx) first (requireAdmin(ctx) for the staff list),
 // in queries, mutations and actions alike. Keys open nothing: PROFESSOR_KEY, KIOSK_KEY and

@@ -499,3 +499,23 @@ describe("docs: the 2026-11-01 second sweep", () => {
       expect([w, row.includes(w)]).toEqual([w, true]);
   });
 });
+
+// The 2026-11-01 check of the second server sweep (these ids are that round's findings).
+describe("docs: the 2026-11-01 server sweep check", () => {
+  // Open requests can hold every 6-digit code, and then the door iPad shows 8 digits
+  // (convex/staff.ts requestPairing), so no doc or comment may promise 6 digits alone.
+  it("sweep2-server-fixcheck-2 sweep2-server-check-docs-1 every line that gives the pairing code 6 digits also says it can have 8", () => {
+    for (const path of [...CURRENT, "convex/checkin/prof.ts", "src/teams/checkin/prof.tsx"])
+      for (const l of lines(path)) if (/6-digit (pairing )?code/.test(l)) expect([path, l, /\b8\b|8-digit/.test(l)]).toEqual([path, l, true]);
+  });
+
+  // A bad page-back row (written before slideNumbers) stays when a new deck tab presses that
+  // slide (convex/deck.test.ts pins it), and the iOS app keeps the list it already had.
+  it("sweep2-server-fixcheck-1 deck.ts and http.ts don't say a new run clears a bad page-back row, or that page-back goes empty", () => {
+    for (const path of ["convex/deck.ts", "convex/http.ts"]) {
+      const text = doc(path).replace(/\n\/\/ /g, " ");
+      expect([path, /until a new run|leaves page-back empty|page-back\s+stays empty/.test(text)]).toEqual([path, false]);
+      expect([path, /stops updating/.test(text)]).toEqual([path, true]);
+    }
+  });
+});

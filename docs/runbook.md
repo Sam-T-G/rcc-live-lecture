@@ -5,7 +5,7 @@ What the professor and Sam do on a day the app runs in class, on the live site <
 ## Before class (once per term, or when something changes)
 
 - **Staff.** An admin adds each professor's Google account as `professor` on #/admin (and a TA as `scanner` if they'll scan at the door). Admins in `ADMIN_EMAILS` are there already.
-- **Door iPad.** Open #/checkin/kiosk on the iPad, signed out: it shows a 6-digit code for 10 minutes. A professor types it on #/admin under "Pair a door iPad" with a label like "A-210 door". The iPad stays paired until someone presses Unpair on #/admin. Set the iPad's Auto-Lock to Never if the kiosk page says it can't keep the screen on.
+- **Door iPad.** Open #/checkin/kiosk on the iPad, signed out: it shows a pairing code for 10 minutes (6 digits, or 8 while open requests hold every 6-digit code). A professor types it on #/admin under "Pair a door iPad" with a label like "A-210 door". The iPad stays paired until someone presses Unpair on #/admin. Set the iPad's Auto-Lock to Never if the kiosk page says it can't keep the screen on.
 - **Deploys.** Sam deploys only between classes, never while one is running: `scripts/deploy.sh` pushes Convex first and GitHub Pages about a minute later, and a tab opened before the deploy keeps the old page until it reloads. After a deploy, reload #/host, #/checkin/teacher, #/checkin/stage and the door iPad. The first deploy with classes also needs Sam's one-time prod runs from AGENTS.md status item 4 (`staff:importHostEmails`, `lectures:endEarlier`) before the next class.
 
 ## Setting up the room (10 minutes before)

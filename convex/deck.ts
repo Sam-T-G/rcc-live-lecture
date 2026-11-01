@@ -18,8 +18,11 @@
 //   tab, `set` doesn't change the live slide (page-back still gets the slide it showed).
 // - Slide numbers are whole numbers: index and beat 0 to 999, count 1 to 999 (slideNumbers). The
 //   iOS app turns each one into a Swift Int (ios/RCCLivePortal/DeckStore.swift). A bad number in
-//   the live slide shows "Can't load the slides." until a good press replaces it; a bad row in the
-//   page-back list leaves page-back empty, with no message, until a new run or End day.
+//   the live slide shows "Can't load the slides." until a good press replaces it. A bad row in the
+//   page-back list (only a row written before set checked slideNumbers can have one) means the
+//   app's page-back list stops updating, with no message: a phone keeps the list it had, and a
+//   phone opened after it has no earlier slides. That lasts until End class, or until the live
+//   deck tab is one that never pressed that slide; a new tab that presses it keeps the bad row.
 //
 // `current` and `slides` return only this class's rows (lib.deckFrom). After End day, and
 // in a new class before the deck sends, `current` is null and `slides` is empty, so #/live,
