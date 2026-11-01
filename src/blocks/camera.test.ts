@@ -51,8 +51,9 @@ describe("F44: phones stop downloading @mediapipe/tasks-vision", () => {
     const main = staticReach("src/main.tsx");
     expect(main.has("src/teams/checkin/Page.tsx")).toBe(true); // the walk reached the pages
     expect(main.get(VISION)?.join(" > ") ?? "not reached").toBe("not reached");
-    // #/lab Vision: Lab.tsx loads LabVision.tsx with import(), and LabVision.tsx imports vision.ts.
-    expect(readFileSync(join(ROOT, "src/pages/Lab.tsx"), "utf8")).toMatch(/lazy\(\(\) => import\("\.\/LabVision"\)\)/);
+    // #/lab Vision: Lab.tsx loads LabVision.tsx with import() (through retryLazy, a React.lazy that
+    // can load again after a failed import), and LabVision.tsx imports vision.ts.
+    expect(readFileSync(join(ROOT, "src/pages/Lab.tsx"), "utf8")).toMatch(/retryLazy\(\(\) => import\("\.\/LabVision"\)\)/);
     expect(main.has("src/pages/LabVision.tsx")).toBe(false);
     expect(staticReach("src/pages/LabVision.tsx").get(VISION)).toEqual(["src/pages/LabVision.tsx", "src/blocks/vision.ts", VISION]);
   });

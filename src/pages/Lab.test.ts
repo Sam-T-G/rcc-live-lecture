@@ -12,6 +12,7 @@ import { getFunctionName, type FunctionReference } from "convex/server";
 import { ConvexError } from "convex/values";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Lab, { Ai, Sync } from "./Lab";
+import { retryLazy } from "./retryLazy";
 import Vision from "./LabVision";
 
 const hooks = vi.hoisted(() => ({ slots: [] as unknown[], at: 0 }));
@@ -116,7 +117,16 @@ async function press(component: () => ReactNode, label: string) {
   await button!.props.onClick!();
 }
 
-const PING_LINE = "Only professors and admins can press Ping, since each press saves a row on the server.";
+// A refused call as the Convex client throws it (convex/dist/esm/browser/logging.js,
+// createHybridErrorStacktrace and forwardData): the message has the function name, a request ID
+// and "Called by client" around the server's words, and only `data` is the server's words. A
+// page that shows `.message` instead of `.data` fails the tests that use it.
+const clientError = (fn: string, words: string) =>
+  Object.assign(new ConvexError(`[CONVEX ${fn}] [Request ID: 1a2b3c4d] Server Error\nUncaught ConvexError: ${words}\n  Called by client`), {
+    data: words,
+  });
+
+const PING_LINE ="Only professors and admins can press Ping, since each press saves a row on the server.";
 const AI_LINE = "Only professors and admins can ask the AI, since each question uses the app's Gemini key.";
 const SIGN_IN_LINE = "Sign in with the Google account your admin added.";
 
@@ -206,7 +216,7 @@ describe("#/lab", () => {
   it("F45.2 a refused Ping shows the server's words as a Status error (role=alert), and a Ping that works clears them", async () => {
     signIn("Sample professor", "prof@example.edu", "professor");
     render(Sync, true);
-    ping.mockRejectedValueOnce(new ConvexError("Only professors can do that."));
+    ping.mockRejectedValueOnce(clientError("M(lab:ping)", "Only professors can do that."));
     await press(Sync, "Ping");
     expect(alerts(render(Sync))).toEqual(["Only professors can do that."]);
 
@@ -223,11 +233,46 @@ describe("#/lab", () => {
     expect(html).toContain("Gemini answered: <b>the AI block works.</b>");
     expect(alerts(html)).toEqual([]);
 
-    aiPing.mockRejectedValueOnce(new ConvexError("The AI is busy. Try again in a minute."));
+    aiPing.mockRejectedValueOnce(clientError("A(lab:aiPing)", "The AI is busy. Try again in a minute."));
     await press(Ai, "Ask the AI");
     html = render(Ai);
     expect(alerts(html)).toEqual(["The AI is busy. Try again in a minute."]);
     expect(html).not.toContain("Gemini answered");
+  });
+
+  it("LAB-spec-1 when the vision chunk fails to load, the next mount of the panel (the boundary's Try again) runs the import again and the panel loads", async () => {
+    // The first import fails (a deploy deleted the old chunk, or the phone was offline); any
+    // later one works. React.lazy keeps a failed import and throws it on every later render, so
+    // Try again has to get a new lazy component that imports again.
+    let imports = 0;
+    const pick = retryLazy(async () => {
+      imports++;
+      if (imports === 1) throw new TypeError("Failed to fetch dynamically imported module");
+      return { default: () => "[vision panel]" };
+    });
+    // One mount of the panel: renders the component `pick` gives, waits for its import, and
+    // renders it again. A render that throws returns the error's words.
+    const settle = () => new Promise((r) => setTimeout(r, 0));
+    async function mount() {
+      const C = pick();
+      const show = () => {
+        try {
+          return renderToStaticMarkup(createElement(C));
+        } catch (e) {
+          return `threw: ${(e as Error).message}`;
+        }
+      };
+      show();
+      await settle();
+      return show();
+    }
+
+    expect(await mount()).toBe("threw: Failed to fetch dynamically imported module");
+    expect(await mount()).toBe("[vision panel]");
+    expect(imports).toBe(2);
+    // Once it has loaded, later mounts reuse it without importing again.
+    expect(await mount()).toBe("[vision panel]");
+    expect(imports).toBe(2);
   });
 
   it("blocks-frontend-21 the vision panel shows a blocked camera and a model that didn't load as Status errors (role=alert)", async () => {

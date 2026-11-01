@@ -4,7 +4,7 @@
 // and admins, because the server lets only them call lab.ping and lab.aiPing (convex/lab.ts says
 // why), so everyone else sees a line saying so in those two panels. Each panel that reads from
 // the server has its own ErrorBoundary, so a block that breaks leaves the other panels up.
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { SignInButton, useGoogleUser } from "../blocks/auth";
@@ -16,11 +16,25 @@ import { pageUrl } from "../blocks/router";
 import { Card, ErrorBoundary, Screen, Status } from "../blocks/ui";
 import { useStaff } from "../teams/checkin/prof";
 import { why } from "../teams/checkin/util";
+import { retryLazy } from "./retryLazy";
 // The vision panel loads only when the lab opens. LabVision.tsx is the one file that imports the
 // vision block (src/blocks/vision.ts, which brings in MediaPipe, about 160 KB), and pages that only
 // need the camera import src/blocks/camera.ts instead, so phones on other pages never download
 // MediaPipe. src/blocks/camera.test.ts fails if a static import ever brings it back.
-const Vision = lazy(() => import("./LabVision"));
+// retryLazy instead of React.lazy, so the panel's Try again imports the chunk again after a
+// failed load (src/pages/retryLazy.ts says why).
+const pickVision = retryLazy(() => import("./LabVision"));
+
+// Each mount picks the vision component once. The ErrorBoundary's Try again mounts this again,
+// which gets a new import after a failed one.
+function VisionPanel() {
+  const [Vision] = useState(pickVision);
+  return (
+    <Suspense fallback={<Status kind="loading">Loading vision…</Status>}>
+      <Vision />
+    </Suspense>
+  );
+}
 
 export default function Lab() {
   return (
@@ -40,9 +54,7 @@ export default function Lab() {
         <Ai />
       </ErrorBoundary>
       <ErrorBoundary label="The vision panel">
-        <Suspense fallback={<Status kind="loading">Loading vision…</Status>}>
-          <Vision />
-        </Suspense>
+        <VisionPanel />
       </ErrorBoundary>
     </Screen>
   );

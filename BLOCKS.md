@@ -56,9 +56,11 @@ Any `useQuery` re-renders on its own when the data changes, on every device. Tha
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
-const count = useQuery(api.lab.pings);   // undefined while loading
-const ping = useMutation(api.lab.ping);
+const last = useQuery(api.lab.lastPing);   // undefined while loading, null before the first ping
+const ping = useMutation(api.lab.ping);       // professors and admins only
 ```
+
+`lab.lastPing` is open to anyone. `lab.ping` refuses everyone but professors and admins ("Only professors can do that."), so never put it on a student page; a student page calls its own team's mutation. `lab.pings` is a count that stops at 500 and stays only for #/lab tabs opened before `lastPing` existed: don't use it.
 
 Errors thrown as `new ConvexError("text")` arrive in the browser as `e.data`; show that text.
 
