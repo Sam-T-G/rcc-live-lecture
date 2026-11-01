@@ -38,9 +38,9 @@
 //       Newest first. lastUsedAt is the iPad's last scan, or null. A test sign-in sees only the
 //       iPads test sign-ins paired.
 //   api.staff.approvePairing  { code, label } -> Id<"devices">                            professor
-//       code: the 6 digits on the iPad (spaces and dashes are ignored). label: a name like
-//       "A-210 door", 1 to 40 characters. An iPad a typed test sign-in pairs scans only while
-//       that test role lasts (2 hours, or until staff:devRevoke).
+//       code: the 6 digits on the iPad, or 8 (see requestPairing); spaces and dashes are
+//       ignored. label: a name like "A-210 door", 1 to 40 characters. An iPad a typed test
+//       sign-in pairs scans only while that test role lasts (2 hours, or until staff:devRevoke).
 //   api.staff.unpair          { device: Id<"devices"> } -> null                           professor
 //       The iPad's token stops working at once and its screen goes back to pairing. A test
 //       sign-in can unpair only the iPads test sign-ins paired.
@@ -51,8 +51,11 @@
 //                                       | { status: "paired", label }                    anyone
 //       Gets a 6-digit code that works for 10 minutes. Asking again with the same token gives
 //       the same code until it expires. No request ends another one, so requests from
-//       signed-out callers never end a code an iPad is showing. The 6th digit checks the first
-//       5, so a professor's one-digit typo or swapped neighbors never match another open code.
+//       signed-out callers never end a code an iPad is showing. The last digit checks the
+//       others, so a professor's one-digit typo or swapped neighbors never match another open
+//       code. When 20 random 6-digit codes are all held by open requests (a flood of signed-out
+//       requests can hold all 100,000), the code has 8 digits instead, so a flood can't keep a
+//       door iPad from pairing.
 //   api.staff.deviceStatus    { token } -> { status: "none" } | { status: "waiting", code,
 //                                          expiresAt } | { status: "paired", label }       anyone
 //       Live: "paired" once a professor approves the code; "none" once the code expires (call
@@ -122,7 +125,7 @@ function cleanEmail(raw: string) {
   return email;
 }
 
-// Damm check digits: the 6th digit of a pairing code checks the first 5. Every one-digit
+// Damm check digits: the last digit of a pairing code checks the others. Every one-digit
 // change and every swap of two neighboring digits fails the check, so a professor's typo is
 // refused instead of pairing whichever iPad holds that code. Open codes don't need a cap to
 // keep typos safe, so no request ever ends another one (a flood of signed-out requests can't
@@ -140,9 +143,10 @@ const DAMM = [
   [2, 5, 8, 1, 4, 3, 6, 7, 9, 0],
 ];
 const damm = (digits: string) => [...digits].reduce((acc, d) => DAMM[acc][Number(d)], 0);
-// True for 6 digits whose last digit checks the first 5.
+const CODE_SHAPE = /^(\d{6}|\d{8})$/;
+// True for 6 or 8 digits whose last digit checks the others.
 export function pairingCodeOk(code: string) {
-  return /^\d{6}$/.test(code) && damm(code) === 0;
+  return CODE_SHAPE.test(code) && damm(code) === 0;
 }
 
 // A test sign-in (a typed sign-in on a dev backend; no Google account has a test email) may add,
@@ -348,7 +352,7 @@ export const approvePairing = mutation({
   handler: async (ctx, { code: rawCode, label: rawLabel }): Promise<Id<"devices">> => {
     const me = await requireProf(ctx);
     const code = rawCode.replace(/[\s-]/g, "");
-    if (!/^\d{6}$/.test(code)) throw new ConvexError("Type the 6-digit code from the iPad.");
+    if (!CODE_SHAPE.test(code)) throw new ConvexError("Type every digit of the code on the iPad.");
     const wrong = "That code is wrong or expired. Check the code on the iPad.";
     if (!pairingCodeOk(code)) throw new ConvexError(wrong);
     const label = rawLabel.trim().replace(/\s+/g, " ");
@@ -398,16 +402,21 @@ async function openPairing(ctx: QueryCtx | MutationCtx, hash: string, now: numbe
   return rows.find((p) => p.expiresAt > now) ?? null;
 }
 
-// A 6-digit code no open request is using: 5 random digits and their check digit.
+// A code no open request is using: 5 random digits and their check digit, or, when 20 of those
+// are all taken, 7 random digits and theirs. Only 100,000 6-digit codes exist, so signed-out
+// requests can hold nearly all of them for 10 minutes; holding the 10,000,000 8-digit ones too
+// takes about 17,000 requests a second.
 async function freeCode(ctx: MutationCtx, now: number) {
-  for (let i = 0; i < 20; i++) {
-    const five = randomCode(5, "0123456789");
-    const code = five + String(damm(five));
-    const same = await ctx.db
-      .query("pairings")
-      .withIndex("by_code", (q) => q.eq("code", code))
-      .take(10);
-    if (!same.some((p) => p.expiresAt > now)) return code;
+  for (const random of [5, 7]) {
+    for (let i = 0; i < 20; i++) {
+      const digits = randomCode(random, "0123456789");
+      const code = digits + String(damm(digits));
+      const same = await ctx.db
+        .query("pairings")
+        .withIndex("by_code", (q) => q.eq("code", code))
+        .take(10);
+      if (!same.some((p) => p.expiresAt > now)) return code;
+    }
   }
   throw new ConvexError("Couldn't find an unused code. Try again.");
 }

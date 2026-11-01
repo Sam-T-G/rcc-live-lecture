@@ -78,10 +78,10 @@ export default defineSchema({
     lastUsedAt: v.optional(v.number()), // the last scan it made
   }).index("by_tokenHash", ["tokenHash"]),
 
-  // Block: access. A door iPad waiting to pair: the 6-digit code its screen shows, for 10
-  // minutes. Approving the code (or the code expiring) deletes the row.
+  // Block: access. A door iPad waiting to pair: the code its screen shows, for 10 minutes.
+  // Approving the code (or the code expiring) deletes the row.
   pairings: defineTable({
-    code: v.string(), // 6 digits (the 6th checks the first 5), unique among the codes still open
+    code: v.string(), // 6 digits, or 8 while open requests hold every 6-digit code; the last checks the others; unique among open codes
     tokenHash: v.string(), // SHA-256 of the iPad's device token, as hex
     expiresAt: v.number(),
   })
@@ -246,9 +246,10 @@ export default defineSchema({
     .index("by_channel_and_user", ["channel", "user"]),
 
   // team: live. How many students per team the professor chose: 3 or 4 (no row means 4), and when
-  // the teams were locked. Teams lock 5 minutes after class starts (or after the first check-in when
-  // no start time is set); `scheduled` means that lock is already queued. Each class gets its own
-  // row, with the size carried over from the class before.
+  // the teams were locked. Teams lock 5 minutes after the later of the saved start time and the
+  // class's first check-in (with no start saved, 5 minutes after the first check-in); `scheduled`
+  // means that lock is already queued. Each class gets its own row, with the size carried over
+  // from the class before.
   groupSettings: defineTable({
     channel: v.string(),
     size: v.number(),
@@ -258,7 +259,10 @@ export default defineSchema({
 
   // team: live. Points the professor adds or takes off by hand, with a reason. A row for one
   // student (`user`) counts for that student's current team, like a right answer; a row for a
-  // team (`team`) stays with that team. Only rows from the current class count.
+  // team (`team`) stays with that team until a re-deal (the lock, a new size, or a scan that moves
+  // a returning student off it) changes who is on it: then it is spread over that team's students
+  // as per-student rows and deleted (live/groups.ts splitChanges, spread). Only rows from the
+  // current class count.
   groupPoints: defineTable({
     channel: v.string(),
     user: v.optional(v.string()), // identity.tokenIdentifier; never returned by a query

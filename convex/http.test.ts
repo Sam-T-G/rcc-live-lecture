@@ -78,8 +78,9 @@ describe("F7 POST /deck", () => {
     vi.stubEnv("DECK_BRIDGE_KEY", BRIDGE);
     const t = setup();
     const ok = { key: BRIDGE, channel: CH, index: 3, beat: 0, count: 10, title: "Loops", lines: ["for"] };
-    // The iOS app turns each number into a Swift Int, which crashes it on 1e20; the web showed
-    // "Slide -4 of 0" for the rest. A missing number or one sent as text is refused too.
+    // The iOS app turns each number into a Swift Int, can't read 1e20 and shows "Can't load the
+    // slides."; the web showed "Slide -4 of 0" for the rest. A missing number or one sent as text
+    // is refused too.
     const bad: Record<string, unknown>[] = [
       { index: 1e20 },
       { index: -5 },

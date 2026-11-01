@@ -126,6 +126,13 @@ describe("ROLES DoorGate and the pairing screen on #/checkin/kiosk", () => {
     expect(asked).toContainEqual(["staff:deviceStatus", { token: TOKEN }]);
   });
 
+  it("sweep2-access-1 an 8-digit code (every 6-digit one held by open requests) shows as two groups of 4", () => {
+    store.set(DEVICE, TOKEN);
+    results["staff:me"] = null;
+    results["staff:deviceStatus"] = { status: "waiting", code: "48291305", expiresAt: Date.now() + 9 * 60_000 };
+    expect(kiosk()).toContain('<span class="big__value">4829 1305</span>');
+  });
+
   it("ROLES a paired iPad opens the scanner, which scans with the iPad's device token", () => {
     store.set(DEVICE, TOKEN);
     results["staff:me"] = null;

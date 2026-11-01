@@ -10,7 +10,8 @@ import { slideNumbers } from "./deck";
 // "server error" when deck.set fails (logged here). Every answer carries the CORS headers, so the
 // deck reads the status instead of a blocked request.
 // "bad slide": index and beat must be whole numbers from 0 to 999 and count from 1 to 999
-// (deck.ts slideNumbers), since the iOS app crashes on a number it can't turn into an Int.
+// (deck.ts slideNumbers), since the iOS app can't read a number it can't turn into an Int and
+// shows "Can't load the slides." instead.
 // Text is cut to fit: channel 64 UTF-16 units, title 300, at most 12 lines of 400 each. Convex
 // stores only valid Unicode, so a cut never keeps half of an emoji, and a lone half sent in the
 // JSON becomes U+FFFD.

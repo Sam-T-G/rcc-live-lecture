@@ -361,8 +361,12 @@ const SIGN_IN_DROP_MS = 60_000;
 type Code = { code: string; expiresAt: number };
 type Unpaired = { status: "none" } | ({ status: "waiting" } & Code);
 
-// "482913" as "482 913", easier to read across a room. #/admin ignores the space.
-const spaced = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
+// "482913" as "482 913" and "48291305" as "4829 1305", easier to read across a room. #/admin
+// ignores the space. A code has 8 digits only while open requests hold every 6-digit one.
+const spaced = (code: string) => {
+  const half = code.length / 2;
+  return `${code.slice(0, half)} ${code.slice(half)}`;
+};
 
 // True once `at` has passed. Renders again at that moment.
 function usePassed(at: number | undefined) {

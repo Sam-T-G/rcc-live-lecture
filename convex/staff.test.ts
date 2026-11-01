@@ -61,7 +61,7 @@ const rows = (t: T) =>
     devices: await ctx.db.query("devices").take(100),
     pairings: await ctx.db.query("pairings").take(100),
   }));
-// The 6-digit code an iPad with this token gets.
+// The pairing code an iPad with this token gets.
 async function codeFor(t: T, token: string) {
   const r = await t.mutation(api.staff.requestPairing, { token });
   if (r.status !== "waiting") throw new Error("codeFor: that iPad is paired already");
@@ -382,7 +382,7 @@ describe("ROLES pairing: expiry, single use, unpair revokes, only staff approve,
 
     const professorAs = await professor(t);
     for (const typo of ["", "12345", "1234567", "abcdef", "12 34 5"])
-      await expect(professorAs.mutation(api.staff.approvePairing, { code: typo, label: "A-210 door" })).rejects.toThrow("Type the 6-digit code from the iPad.");
+      await expect(professorAs.mutation(api.staff.approvePairing, { code: typo, label: "A-210 door" })).rejects.toThrow("Type every digit of the code on the iPad.");
     await expect(professorAs.mutation(api.staff.approvePairing, { code, label: "   " })).rejects.toThrow("Name the iPad, for example A-210 door.");
     await expect(professorAs.mutation(api.staff.approvePairing, { code, label: "x".repeat(41) })).rejects.toThrow("Keep the name to 40 characters.");
     await professorAs.mutation(api.staff.approvePairing, { code: `${code.slice(0, 3)}-${code.slice(3)}`, label: "x".repeat(40) });
@@ -415,7 +415,8 @@ describe("ROLES pairing: expiry, single use, unpair revokes, only staff approve,
     }
   });
 
-  it("ROLES pairing: codes are unique among open requests, and throwaway requests from a signed-out caller never keep a door iPad from getting a code", async () => {
+  // A flood that holds every 6-digit code is the sweep2-access-1 test below.
+  it("ROLES pairing: codes are unique among open requests, and 230 throwaway requests from a signed-out caller don't keep a door iPad from getting a code", async () => {
     const t = setup();
     const first = await codeFor(t, tokenN(0));
     expect(pairingCodeOk(first)).toBe(true);
@@ -460,6 +461,49 @@ describe("ROLES pairing: expiry, single use, unpair revokes, only staff approve,
     for (let n = 200; n < 230; n++) await codeFor(t, tokenN(n));
     expect(pairingCodeOk(await codeFor(t, OTHER_TOKEN))).toBe(true);
     expect(await pairingCount(t)).toBe(231);
+  });
+
+  it("sweep2-access-1 with every 6-digit code open (about 100,000 signed-out requests), the door iPad gets an 8-digit code and a professor pairs it", async () => {
+    const t = setup();
+    // One open request, and every 6-digit draw lands on its code: what the door iPad sees when a
+    // flood holds all 100,000 6-digit codes, without writing 100,000 rows.
+    const held = await codeFor(t, tokenN(0));
+    const real = crypto.getRandomValues.bind(crypto);
+    let fives = 0;
+    const spy = vi.spyOn(crypto, "getRandomValues").mockImplementation(((array: ArrayBufferView) => {
+      if (!ArrayBuffer.isView(array) || array.byteLength !== 5) return real(array as Uint8Array);
+      fives++;
+      const bytes = new Uint8Array(array.buffer, array.byteOffset, 5);
+      for (let i = 0; i < 5; i++) bytes[i] = Number(held[i]);
+      return array;
+    }) as typeof crypto.getRandomValues);
+    let door: string;
+    try {
+      door = await codeFor(t, DEVICE_TOKEN);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(fives).toBe(20);
+    expect(door).toMatch(/^\d{8}$/);
+    expect(pairingCodeOk(door)).toBe(true);
+    // The 8th digit checks the first 7: a one-digit typo or swapped neighbors is refused.
+    const typo = door.slice(0, 7) + String((Number(door[7]) + 1) % 10);
+    expect(pairingCodeOk(typo)).toBe(false);
+    for (let i = 0; i < 7; i++) {
+      if (door[i] === door[i + 1]) continue;
+      expect(pairingCodeOk(door.slice(0, i) + door[i + 1] + door[i] + door.slice(i + 2))).toBe(false);
+    }
+    const professorAs = await professor(t);
+    await expect(professorAs.mutation(api.staff.approvePairing, { code: door.slice(0, 7), label: "A-210 door" })).rejects.toThrow(
+      "Type every digit of the code on the iPad.",
+    );
+    await expect(professorAs.mutation(api.staff.approvePairing, { code: typo, label: "A-210 door" })).rejects.toThrow(
+      "That code is wrong or expired. Check the code on the iPad.",
+    );
+    // Typed with the space the kiosk shows ("1234 5678"), it pairs the door iPad, not the held one.
+    await professorAs.mutation(api.staff.approvePairing, { code: `${door.slice(0, 4)} ${door.slice(4)}`, label: "A-210 door" });
+    expect(await t.query(api.staff.deviceStatus, { token: DEVICE_TOKEN })).toEqual({ status: "paired", label: "A-210 door" });
+    expect(await t.query(api.staff.deviceStatus, { token: tokenN(0) })).toMatchObject({ status: "waiting", code: held });
   });
 });
 
