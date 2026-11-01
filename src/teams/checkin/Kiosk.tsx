@@ -14,6 +14,11 @@
 // the page says to set Auto-Lock to Never. Stop camera lets the screen sleep again. If the camera
 // stops without a tap on Stop camera (another app took it, the iPad was locked), Start check-in
 // comes back with "The camera stopped. Tap Start check-in."
+// The look (docs/design.md "kiosk", kiosk.css): one layout in every state. The bar holds the
+// count and Stop camera; the panel under it is the status band over the camera window, and the
+// typed code is the strip at the bottom. A result floods the whole panel for its 3 s (Checked in
+// green, Already checked in pale green, a refusal red), and so does a camera that can't read
+// passes, so nothing moves between states: only the fill, the glyph and the words change.
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -26,8 +31,17 @@ import { DoorGate } from "./prof";
 import { scanError, why } from "./util";
 import "./kiosk.css";
 
+// The route sets the door iPad's sizes (data-surface="kiosk": 56 targets, 22 body text) for every
+// screen DoorGate shows, and has its own page boundary so "Something went wrong." with Reload and
+// Go home also comes at the iPad's sizes. It acts as App's does.
 export default function Kiosk() {
-  return <DoorGate>{(device) => <KioskScanner device={device} />}</DoorGate>;
+  return (
+    <div className="kiosk-route" data-surface="kiosk">
+      <ErrorBoundary page>
+        <DoorGate>{(device) => <KioskScanner device={device} />}</DoorGate>
+      </ErrorBoundary>
+    </div>
+  );
 }
 
 type Result = { kind: "ok" | "again" | "error"; text: string };
@@ -239,27 +253,35 @@ export function KioskScanner({ device }: { device: string | undefined }) {
     }
   }
 
+  // What fills the panel: a result for its 3 s, else a camera that can't read passes (its line
+  // shows in the band), else nothing. The camera lines stay in the page during a result; kiosk.css
+  // hides them under the result's fill and they show again when it ends.
+  const reading = cam.on && !noScanner;
+  const problem = !!cam.error || (cam.on && noScanner) || (stopped && !cam.on);
+  const fill = result ? { ok: "in", again: "already", error: "stop" }[result.kind] : problem ? "stop" : null;
+  const panel = ["door__panel", "kiosk__result", fill && `door__panel--${fill}`, result ? `kiosk__result--${result.kind}` : problem && "kiosk__result--camera"]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <main className="kiosk">
-      <div className="kiosk__left">
-        <div className="kiosk__cam">
-          <video ref={cam.video} className={cam.on ? "kiosk__video" : "kiosk__video kiosk__video--off"} muted playsInline autoPlay />
-          {!cam.on && (
-            <Button className="kiosk__start" busy={starting} onClick={() => void begin()}>Start check-in</Button>
-          )}
+    <main className="kiosk door">
+      <header className="k-bar kiosk__bar">
+        <div className="kiosk__total">
+          <ErrorBoundary label="The check-in count"><Count /></ErrorBoundary>
         </div>
-        {cam.error && <Status kind="error">{cam.error}</Status>}
-        {cam.on && noScanner && <Status kind="error">{SCANNER_DIDNT_LOAD}</Status>}
-        {stopped && !cam.on && <Status kind="error">The camera stopped. Tap Start check-in.</Status>}
         {cam.on && <Button variant="secondary" className="kiosk__stop" onClick={end}>Stop camera</Button>}
-        {awake.failed && (
-          <p className="muted kiosk__awake">This browser can't keep the screen on. Set Auto-Lock to Never in Settings, under Display &amp; Brightness.</p>
-        )}
-      </div>
-      <div className="kiosk__right">
-        <div className={"kiosk__result" + (result ? " kiosk__result--" + result.kind : "")}>
+      </header>
+      <div className={panel}>
+        <div className="door__status kiosk__band">
+          {cam.error && <Status kind="error">{cam.error}</Status>}
+          {cam.on && noScanner && <Status kind="error">{SCANNER_DIDNT_LOAD}</Status>}
+          {stopped && !cam.on && <Status kind="error">The camera stopped. Tap Start check-in.</Status>}
           <div role="status">
-            {!result && <p className="kiosk__prompt">{cam.on && !noScanner ? "Hold your pass up to the camera" : "Type the code on your pass"}</p>}
+            {!result && (
+              <p className={reading ? "kiosk__prompt door__prompt kiosk__prompt--lead" : "kiosk__prompt door__prompt"}>
+                {reading ? "Hold your pass up to the camera" : "Type the code on your pass"}
+              </p>
+            )}
             {result && result.kind !== "error" && (
               <>
                 <p className="kiosk__label">{result.kind === "ok" ? "Checked in" : "Already checked in"}</p>
@@ -268,29 +290,46 @@ export function KioskScanner({ device }: { device: string | undefined }) {
             )}
           </div>
           {result?.kind === "error" && <p className="kiosk__error" role="alert">{result.text}</p>}
+          {awake.failed && (
+            <p className="muted kiosk__awake">This browser can't keep the screen on. Set Auto-Lock to Never in Settings, under Display &amp; Brightness.</p>
+          )}
         </div>
-        <div className="kiosk__total">
-          <ErrorBoundary label="The check-in count"><Count /></ErrorBoundary>
+        <div className="door__cam kiosk__cam">
+          <video ref={cam.video} className={cam.on ? "kiosk__video" : "kiosk__video kiosk__video--off"} muted playsInline autoPlay />
+          {cam.on && (
+            <span className="target" aria-hidden="true">
+              <svg viewBox="0 0 100 100" focusable="false">
+                <polyline points="0 22 0 0 22 0" />
+                <polyline points="78 0 100 0 100 22" />
+                <polyline points="100 78 100 100 78 100" />
+                <polyline points="22 100 0 100 0 78" />
+              </svg>
+            </span>
+          )}
+          {!cam.on && (
+            <Button className="kiosk__start camstart" busy={starting} onClick={() => void begin()}>Start check-in</Button>
+          )}
         </div>
-        <form className="kiosk__type" onSubmit={checkInTyped}>
-          <Field label="Code on your pass">
-            {(f) => (
-              <input
-                {...f}
-                ref={field}
-                value={typed}
-                onChange={(e) => setTyped(e.target.value)}
-                autoCapitalize="characters"
-                autoComplete="off"
-                autoCorrect="off"
-                spellCheck={false}
-                enterKeyHint="go"
-              />
-            )}
-          </Field>
-          <Button type="submit" variant="secondary" busy={sending} disabled={!typed.trim()}>Check in</Button>
-        </form>
       </div>
+      <form className="door__strip codein kiosk__type" onSubmit={checkInTyped}>
+        <Field label="Code on your pass">
+          {(f) => (
+            <input
+              {...f}
+              ref={field}
+              className="input input--code"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              autoCapitalize="characters"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="go"
+            />
+          )}
+        </Field>
+        <Button type="submit" variant="secondary" busy={sending} disabled={!typed.trim()}>Check in</Button>
+      </form>
     </main>
   );
 }

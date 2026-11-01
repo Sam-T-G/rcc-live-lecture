@@ -16,12 +16,16 @@
 //                scanner is signed in, the scanner shows who, when the sign-in ends (Google's
 //                renewal never runs on the kiosk route) and a Sign out button.
 //   <PairScreen me={me} token={token} status={status} />   the pairing code an unpaired iPad shows.
+// The look is in kiosk.css (Kiosk.tsx imports it): "Checking this iPad…" draws the scanner's
+// frame empty (bar, band, camera window, the typed-code strip disabled), so a paired iPad's
+// scanner opens in place; the pairing screen is the bar with its title, the code at 144 in the
+// middle of the page and what scanners and signed-in staff do at its foot.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { SignedInAs, useGoogleUser } from "../../blocks/auth";
-import { Button } from "../../blocks/kit";
-import { Big, Card, Screen, Status } from "../../blocks/ui";
+import { Button, Field, Icon } from "../../blocks/kit";
+import { Big, Status } from "../../blocks/ui";
 import { isProfRole, KioskScreen, NotStaff, useStaff, type StaffMe } from "./prof";
 import { clock, why } from "./util";
 
@@ -186,12 +190,7 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
   if (token && status?.status === "paired") return <WhoIsSignedIn>{children(token)}</WhoIsSignedIn>;
   if (me?.role === "scanner") return <WhoIsSignedIn ends>{children(undefined)}</WhoIsSignedIn>;
   // (status can't be "paired" here; saying so lets TypeScript narrow it for PairScreen.)
-  if (me === undefined || !token || status === undefined || status.status === "paired")
-    return (
-      <KioskScreen>
-        <Status kind="loading">Checking this iPad…</Status>
-      </KioskScreen>
-    );
+  if (me === undefined || !token || status === undefined || status.status === "paired") return <Checking />;
   // A sign-in ran out here: on this page (`ended`), or a scanner's on this device before a reload
   // (ranOut). Google's renewal never runs on this route. This can be the scanner's own phone or
   // the door iPad (a scanner can sign in on an unpaired one), so it says to sign in on your own
@@ -223,19 +222,43 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
 // the door can see the sign-in and end it. `ends`: the scanner opened for this sign-in, so it also
 // says when the sign-in ends. Google's renewal never runs on #/checkin/kiosk (auth.tsx noPromptHere),
 // so the scanner closes then with no other warning.
+// The line sits over the scanner's bar on the bar's fill, and the two share the iPad's height
+// (kiosk.css .kiosk-who), so the scanner never scrolls.
 function WhoIsSignedIn({ ends, children }: { ends?: boolean; children: ReactNode }) {
   const { user } = useGoogleUser();
   if (!user) return <>{children}</>;
   return (
-    <>
-      <div style={{ padding: "8px 24px 0" }}>
+    <div className="kiosk-who">
+      <div className="kiosk-who__line">
         <SignedInAs />
         {ends && typeof user.exp === "number" && (
           <p className="muted">Your sign-in ends at {clock(user.exp - SIGN_IN_DROP_MS)}. After that, sign in again on #/admin.</p>
         )}
       </div>
       {children}
-    </>
+    </div>
+  );
+}
+
+// "Checking this iPad…" while the sign-in and this iPad's pairing load: the scanner's own frame
+// with nothing in it yet and the typed code disabled, so a paired iPad's scanner opens in place.
+function Checking() {
+  return (
+    <main className="kiosk door" aria-busy="true">
+      <header className="k-bar kiosk__bar">
+        <h1>Check-in kiosk</h1>
+      </header>
+      <div className="door__panel kiosk__result">
+        <div className="door__status kiosk__band">
+          <Status kind="loading">Checking this iPad…</Status>
+        </div>
+        <div className="door__cam camstart camstart--wait kiosk__cam" />
+      </div>
+      <form className="door__strip codein kiosk__type" onSubmit={(e) => e.preventDefault()}>
+        <Field label="Code on your pass">{(f) => <input {...f} className="input input--code" disabled />}</Field>
+        <Button type="submit" variant="secondary" disabled>Check in</Button>
+      </form>
+    </main>
   );
 }
 
@@ -351,59 +374,78 @@ export function PairScreen({ me, token, status }: { me: StaffMe; token: string; 
   const live = status.status === "waiting" && !expired ? status : null;
   const unsure = status.status === "waiting" && expired && !known;
 
+  // The code's slot: the code with its label over it, the time it works until and how to pair, as
+  // wide as the code; or the step that stands in for it. An 8-digit code sets smaller, so it fits
+  // the iPad's width.
+  const slot = ["kiosk-pair__slot", live && "kiosk-pair__slot--code", live && live.code.length > 6 && "kiosk-pair__slot--long"].filter(Boolean).join(" ");
   return (
-    <Screen title="Pair this iPad" wide>
-      {live ? (
-        <>
-          <Big value={spaced(live.code)} label="pairing code" />
-          <p>A professor or admin types this code on #/admin, under Pair a door iPad. Then this iPad scans passes.</p>
-          <p className="muted">The code works until {clock(live.expiresAt + ahead)}.</p>
-        </>
-      ) : phase === "error" ? (
-        <>
-          <Status kind="error">{error}</Status>
-          <p>
-            <Button onClick={() => void ask()}>Try again</Button>
-          </p>
-        </>
-      ) : !unsure && (phase === "expired" || (phase === "showing" && status.status === "waiting")) ? (
-        <>
-          <p>The code expired.</p>
-          <p>
-            <Button onClick={() => void ask()}>Get a new code</Button>
-          </p>
-        </>
-      ) : (
-        <Status kind="loading">Getting a code…</Status>
-      )}
-      {me !== null && isProfRole(me.role) ? (
-        <Card title="Signed in on this iPad">
-          <p>
-            {me.email} is signed in as {me.role === "admin" ? "an admin" : "a professor"}. The door iPad opens the scanner only once it's paired or a
-            scanner signs in, so nobody in line can open #/admin or the attendance list on your account.
-          </p>
-          <p>
-            Sign out here. Then sign out of Google in Safari too (google.com, your picture, Sign out): Google keeps its own sign-in, and anyone in line
-            could pick your account from Google's list to sign in as you. Then type the code above on #/admin, under Pair a door iPad, from your own
-            laptop or phone.
-          </p>
-          <p>
-            <Button variant="secondary" onClick={signOut}>Sign out</Button>
-          </p>
-        </Card>
-      ) : (
-        <Card title="Scanners">
-          {me === null ? (
+    <div className="kiosk-pair">
+      <header className="k-bar kiosk-pair__bar">
+        <h1>Pair this iPad</h1>
+      </header>
+      <main className="kiosk-pair__body">
+        <div className={slot}>
+          {live ? (
             <>
-              <p>On your own phone, sign in on #/admin, then open #/checkin/kiosk there.</p>
-              <p className="muted">A scanner's sign-in ends in under an hour. A paired iPad scans for the whole class.</p>
-              <p className="muted">Nobody signs in to Google on this iPad. Google keeps the account in Safari, and anyone in line could sign in with it.</p>
+              <Big value={spaced(live.code)} label="pairing code" />
+              <p className="kiosk-pair__until">
+                <Icon name="clock" />
+                The code works until {clock(live.expiresAt + ahead)}.
+              </p>
+              <p className="kiosk-pair__how">A professor or admin types this code on #/admin, under Pair a door iPad. Then this iPad scans passes.</p>
+            </>
+          ) : phase === "error" ? (
+            <>
+              <Status kind="error">{error}</Status>
+              <p className="kiosk-pair__act">
+                <Button className="btn--k" onClick={() => void ask()}>Try again</Button>
+              </p>
+            </>
+          ) : !unsure && (phase === "expired" || (phase === "showing" && status.status === "waiting")) ? (
+            <>
+              <p className="kiosk-pair__expired">
+                <Icon name="x" className="icon--d" />
+                The code expired.
+              </p>
+              <p className="kiosk-pair__act">
+                <Button className="btn--k" onClick={() => void ask()}>Get a new code</Button>
+              </p>
             </>
           ) : (
-            <NotStaff me={me} />
+            <Status kind="loading">Getting a code…</Status>
           )}
-        </Card>
-      )}
-    </Screen>
+        </div>
+        {me !== null && isProfRole(me.role) ? (
+          <section className="kiosk-pair__foot">
+            <h2>Signed in on this iPad</h2>
+            <p>
+              {me.email} is signed in as {me.role === "admin" ? "an admin" : "a professor"}. The door iPad opens the scanner only once it's paired or a
+              scanner signs in, so nobody in line can open #/admin or the attendance list on your account.
+            </p>
+            <p>
+              Sign out here. Then sign out of Google in Safari too (google.com, your picture, Sign out): Google keeps its own sign-in, and anyone in line
+              could pick your account from Google's list to sign in as you. Then type the code above on #/admin, under Pair a door iPad, from your own
+              laptop or phone.
+            </p>
+            <p>
+              <Button variant="secondary" onClick={signOut}>Sign out</Button>
+            </p>
+          </section>
+        ) : (
+          <section className="kiosk-pair__foot">
+            <h2>Scanners</h2>
+            {me === null ? (
+              <>
+                <p>On your own phone, sign in on #/admin, then open #/checkin/kiosk there.</p>
+                <p className="muted">A scanner's sign-in ends in under an hour. A paired iPad scans for the whole class.</p>
+                <p className="muted">Nobody signs in to Google on this iPad. Google keeps the account in Safari, and anyone in line could sign in with it.</p>
+              </>
+            ) : (
+              <NotStaff me={me} />
+            )}
+          </section>
+        )}
+      </main>
+    </div>
   );
 }

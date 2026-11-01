@@ -4,7 +4,7 @@
 // stand-ins are `setup` (fixtures/kiosk/door.ts). Class: 38 students, 23 in so far.
 import { api } from "../../../convex/_generated/api";
 import { at, fails, fx, hangs, refuses, type Fixtures, type Scenario } from "../lib/types";
-import { both, cameraEnds, cameraHangs, wakeLock } from "../fixtures/kiosk/door";
+import { both, cameraEnds, cameraHangs, scannerSignInEnded, staffSignedOutHere, wakeLock } from "../fixtures/kiosk/door";
 
 const NOW = "2026-11-05T14:27:00-08:00";
 const IN = 23;
@@ -57,6 +57,15 @@ export const scenarios: Scenario[] = [
     title: "KI-03 Pairing code 482 913 showing, 7 minutes left",
     now: NOW,
     fixtures: { ...waiting(7) },
+  },
+  {
+    id: "kiosk-pair-code-long",
+    area: "kiosk",
+    route: "checkin/kiosk",
+    role: "signedout",
+    title: "KI-03 An 8-digit pairing code (open requests hold every 6-digit one) fits the iPad's width",
+    now: NOW,
+    fixtures: { ...fx(api.staff.deviceStatus, { status: "waiting", code: "48291305", expiresAt: at(NOW, 7) }) },
   },
   {
     id: "kiosk-pair-expired",
@@ -116,6 +125,26 @@ export const scenarios: Scenario[] = [
     now: NOW,
     setup: awake,
     fixtures: door(fx(api.staff.deviceStatus, { status: "paired", label: "A-210 door" })),
+  },
+  {
+    id: "kiosk-paired-signed-out",
+    area: "kiosk",
+    route: "checkin/kiosk",
+    role: "door",
+    title: "KI-08 Professor signed out on the paired iPad: sign out of Google too, then Open the scanner",
+    now: NOW,
+    setup: both(awake, staffSignedOutHere("quill@example.edu")),
+    fixtures: door(),
+  },
+  {
+    id: "kiosk-signin-ended",
+    area: "kiosk",
+    route: "checkin/kiosk",
+    role: "signedout",
+    title: "KI-19 A scanner's sign-in ran out on this device: sign in again on your own phone, or show a pairing code",
+    now: NOW,
+    setup: scannerSignInEnded(at(NOW, -5)),
+    fixtures: { ...fx(api.staff.deviceStatus, { status: "none" }) },
   },
 
   // Scanner (KioskScanner in src/teams/checkin/Kiosk.tsx)

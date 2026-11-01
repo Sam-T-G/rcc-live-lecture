@@ -1,34 +1,195 @@
-/* Door kiosk (#/checkin/kiosk, Kiosk.tsx): the door iPad, read from about 1 m. Two columns in
-   landscape, one in portrait (820 x 1180), so the camera takes the full width there.
-   kiosk.surfaces.test.ts checks Start check-in and the portrait column. */
-.kiosk { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; padding: 24px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; align-content: start; }
-.kiosk__left { position: relative; }
-.kiosk__video { width: 100%; border-radius: 16px; background: #000; transform: scaleX(-1); display: block; }
-.kiosk__video--off { aspect-ratio: 4 / 3; }
-.kiosk__start { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); white-space: nowrap; font-size: min(2rem, 7vw); padding: 20px 40px; min-height: 72px; width: max-content; max-width: calc(100% - 32px); }
-.kiosk__result { min-height: 200px; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; justify-content: center; border: 4px solid var(--line); }
-.kiosk__result--ok { border-color: #137333; background: rgba(19, 115, 51, 0.12); }
-.kiosk__result--again { border-color: var(--muted); }
-.kiosk__result--error { border-color: var(--error); }
-.kiosk__prompt { font-size: 2.2rem; font-weight: 600; margin: 0; }
-.kiosk__label { font-size: 1.6rem; margin: 0; color: var(--muted); }
-.kiosk__result--ok .kiosk__label, .kiosk__result--ok .kiosk__name { color: #137333; }
-.kiosk__name { font-size: 3.2rem; font-weight: 700; line-height: 1.1; margin: 8px 0 0; overflow-wrap: anywhere; }
-.kiosk__error { font-size: 2rem; font-weight: 600; color: var(--error); margin: 0; }
-.kiosk__count { font-size: 1.6rem; color: var(--muted); margin: 24px 0 8px; }
-.kiosk__count span { font-size: 5rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; margin-right: 12px; }
-.kiosk__names { list-style: none; padding: 0; margin: 0; font-size: 1.6rem; }
-.kiosk__names li { padding: 6px 0; border-bottom: 1px solid var(--line); }
-.kiosk__stop { margin-top: 16px; }
-@media (prefers-color-scheme: dark) { .kiosk__result--ok .kiosk__label, .kiosk__result--ok .kiosk__name { color: #81c995; } .kiosk__result--ok { border-color: #81c995; } }
-@media (max-width: 720px), (orientation: portrait) { .kiosk { grid-template-columns: 1fr; } }
-/* The box that keeps Start check-in centered on the camera whatever error shows under it, the
-   space around the count, and the "Code on your pass" form. */
-.kiosk__cam { position: relative; }
-.kiosk__awake { margin: var(--rcc-space-3) 0 0; }
-.kiosk__total { margin-top: var(--rcc-space-6); }
-/* The field and Check in on one line, their bottoms lined up. */
-.kiosk__type { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--rcc-space-3); margin-top: var(--rcc-space-6); }
+/* Door kiosk (#/checkin/kiosk, Kiosk.tsx and door.tsx): the door iPad, 820 x 1180 portrait, read
+   from about 1 m in about 3 seconds (docs/design.md "kiosk"). The parts are the kit's door parts
+   (src/styles/kit.css: .k-bar, .door, .door__panel, .door__status, .door__cam, .target, .camstart,
+   .door__strip, .codein); this file puts the app's own markup in them and sizes what the kit
+   doesn't. One layout in every state: the bar, the panel (status band over the camera window),
+   the typed-code strip; a result or a camera that can't read passes floods the whole panel.
+   Older door iPads: no blur, filter, loop or ambient motion here. Corners and shadows are the
+   kit's own. kiosk.surfaces.test.ts checks the rules it names. */
+
+/* ------------------------------------------------------------------- the route */
+/* Kiosk.tsx's wrapper carries data-surface="kiosk" (56 targets, 22 body text). The result
+   glyphs are masks drawn to the kit's construction (256 grid, round caps and joins, stroke 32
+   beside 700 words): the app's lines can't hold an svg (Kiosk.test.ts reads them whole). */
+.kiosk-route {
+  --k-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M40 144l56 56L216 80' fill='none' stroke='%23000' stroke-width='32' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --k-again: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M24 128a72 72 0 0 1 72-72h136M200 24l32 32-32 32M232 128a72 72 0 0 1-72 72H24M56 232l-32-32 32-32' fill='none' stroke='%23000' stroke-width='32' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --k-x: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M200 56L56 200M200 200L56 56' fill='none' stroke='%23000' stroke-width='32' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --k-go: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M40 128h176M144 56l72 72-72 72' fill='none' stroke='%23000' stroke-width='18' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* ------------------------------------------------------------------- the door */
+/* The scanner fills the iPad's height and never scrolls. The height is definite, so the camera
+   window's row gets what the bar, the band and the strip leave. */
+.kiosk.door { height: 100vh; height: 100dvh; }
+.kiosk__bar { padding-inline: max(var(--k-gutter), env(safe-area-inset-left)) max(var(--k-gutter), env(safe-area-inset-right)); }
+.kiosk__bar > h1 { margin: 0; font-size: calc(28 * var(--k-u)); line-height: 1.2; font-weight: var(--w-head); }
+/* The count as the room count: 64 / 700 in a 2ch tabular slot, "checked in" 28 on its baseline,
+   both in ink (green stays on Start check-in and Checked in). */
+.kiosk__total { min-width: 0; }
+.kiosk__total .big { flex-direction: row; align-items: baseline; gap: calc(12 * var(--k-u)); }
+.kiosk__total .big__value { min-width: 2ch; font-size: calc(64 * var(--k-u)); letter-spacing: -0.02em; color: var(--text); }
+.kiosk__total .big__label { font-size: calc(28 * var(--k-u)); font-weight: var(--w-head); color: var(--text); }
+.kiosk__total .status { padding-block: 0; }
+/* The count that didn't load: the warning glyph and the sentence take the count's slot, Try
+   again beside them, no filled box (the slot is the count's own). */
+.kiosk__total .status--error { margin-block: 0; background: none; color: var(--text); }
+.kiosk__stop { margin-inline-start: auto; }
+
+/* The panel: the status band (432, taller only when a long line needs it) over the camera
+   window, which takes the rest. */
+.kiosk__result { grid-template-rows: minmax(var(--k-door), auto) minmax(0, 1fr); }
+
+/* --------------------------------------------------------------- the status band */
+/* Waiting: the prompt in the middle of the band. A result: its lines at the band's foot, so the
+   name lands at one height whether the word takes one line or two. */
+.kiosk__band { min-width: 0; grid-template-columns: minmax(0, 1fr); align-content: center; row-gap: calc(16 * var(--k-u));
+  padding: calc(32 * var(--k-u)) max(var(--k-gutter), env(safe-area-inset-right)) calc(32 * var(--k-u)) max(var(--k-gutter), env(safe-area-inset-left)); }
+.kiosk__result--ok > .kiosk__band, .kiosk__result--again > .kiosk__band, .kiosk__result--error > .kiosk__band { align-content: end; padding-bottom: calc(40 * var(--k-u)); }
+.kiosk__band > div[role="status"] { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: calc(8 * var(--k-u)); }
+.kiosk__band > .status--loading { padding-block: 0; font-size: calc(72 * var(--k-u)); line-height: 1.08; font-weight: var(--w-head); }
+
+/* The prompt: 48 while the camera is off, so the camera window's Start check-in leads; 72 while
+   the camera reads passes and nothing else asks for a tap. */
+.kiosk__prompt { margin: 0; max-width: 14em; text-wrap: balance; }
+.kiosk__prompt--lead { font-size: calc(72 * var(--k-u)); line-height: 1.08; max-width: 11em; }
+
+/* A result's word at 96 with its glyph hanging before it (the check for Checked in, the repeat
+   for Already checked in), then the name at 80 on one line. A refusal is the app's sentence at 56
+   with the x. The words take the panel fill's color. */
+.kiosk__result--ok { --k-glyph: var(--k-check); }
+.kiosk__result--again { --k-glyph: var(--k-again); }
+.kiosk__result--error { --k-glyph: var(--k-x); }
+.kiosk__label, .kiosk__error { position: relative; margin: 0; padding-inline-start: 1.04em; font-weight: var(--w-loud); }
+.kiosk__label::before, .kiosk__error::before { content: ""; position: absolute; left: 0; top: calc((1lh - .82em) / 2); width: .82em; height: .82em;
+  background: currentColor; -webkit-mask: var(--k-glyph) center / contain no-repeat; mask: var(--k-glyph) center / contain no-repeat; }
+@supports not (height: 1lh) { .kiosk__label::before, .kiosk__error::before { top: .1em; } }
+.kiosk__result--again .kiosk__label::before { background: var(--st-in-mark); }
+.kiosk__label { font-size: var(--k-status); line-height: 1.02; letter-spacing: -0.01em; text-wrap: balance; }
+.kiosk__name { margin: 0; font-size: var(--k-name); line-height: 1.1; font-weight: var(--w-head); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kiosk__error { font-size: calc(56 * var(--k-u)); line-height: 1.1; text-wrap: pretty; }
+
+/* A camera that can't read passes (blocked, stopped, the reader didn't load): its line leads the
+   band on the red fill with the x, in the fill's words, and the prompt under it says to type the
+   code. Under a result's 3 s fill the line and the screen-lock note step aside. */
+.kiosk__band > .status--error { margin: 0; padding-block: 0; border-inline-width: 1.04em 0; background: none; color: inherit;
+  font-size: calc(56 * var(--k-u)); line-height: 1.1; font-weight: var(--w-loud); text-wrap: pretty; }
+.kiosk__band > .status--error::before { left: -1.04em; top: calc((1lh - .82em) / 2); width: .82em; height: .82em; background: currentColor;
+  -webkit-mask-image: var(--k-x); mask-image: var(--k-x); }
+@supports not (height: 1lh) { .kiosk__band > .status--error::before { top: .1em; } }
+.kiosk__awake { margin: 0; max-width: 34em; font-size: var(--k-body); line-height: 1.35; }
+.kiosk__result--camera .kiosk__awake { color: inherit; }
+.kiosk__result--ok .kiosk__band > .status--error, .kiosk__result--again .kiosk__band > .status--error, .kiosk__result--error .kiosk__band > .status--error,
+.kiosk__result--ok .kiosk__awake, .kiosk__result--again .kiosk__awake, .kiosk__result--error .kiosk__awake { display: none; }
+
+/* -------------------------------------------------------------- the camera window */
+/* The live picture fills the window (mirrored: the front camera), the target corners over it. */
+.kiosk__cam { min-width: 0; margin-inline: max(var(--k-gutter), env(safe-area-inset-left)) max(var(--k-gutter), env(safe-area-inset-right)); }
+.kiosk__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.kiosk__video--off { visibility: hidden; }
+/* Start check-in is the camera window itself (kit .camstart) while the camera is off: the glyph
+   over the words, one line. Starting, the kit's busy spinner takes the words' place. */
+.kiosk__start { white-space: nowrap; }
+.kiosk__start.camstart { position: absolute; inset: 0; margin: 0; min-height: 0; }
+.kiosk__start::before { content: ""; width: calc(128 * var(--k-u)); height: calc(128 * var(--k-u)); background: currentColor;
+  -webkit-mask: var(--k-go) center / contain no-repeat; mask: var(--k-go) center / contain no-repeat; }
+.kiosk__start[aria-busy="true"]::before { visibility: hidden; }
+.kiosk__start .btn__spinner { font-size: calc(48 * var(--k-u)); }
+/* The window clips what spills past its corners, so the focus ring sits inside it, in white. */
+.kiosk__start:focus-visible { outline-color: var(--cam-mark); outline-offset: calc(-12 * var(--k-u)); }
+
+/* ---------------------------------------------------------- the typed-code strip */
+/* "Code on your pass" over the field (kit .codein: 64 tall, the code face), Check in beside it,
+   their bottoms lined up. The code shows in capitals, as the pass prints it. */
+.kiosk__type { align-items: end; padding-inline: max(var(--k-gutter), env(safe-area-inset-left)) max(var(--k-gutter), env(safe-area-inset-right)); }
 .kiosk__type .field { margin: 0; }
-/* The code as the pass shows it: capitals, in the code face. */
-.kiosk__type input { font-family: var(--rcc-font-code); text-transform: uppercase; letter-spacing: 0.1em; }
+.kiosk__type .field__label { font-size: calc(24 * var(--k-u)); font-weight: var(--w-head); }
+.kiosk__type .input { text-transform: uppercase; letter-spacing: .1em; }
+
+/* ------------------------------------------------- who is signed in (door.tsx) */
+/* A scanner signed in at the door: the line sits over the bar on the bar's fill, and the two
+   share the iPad's height with the scanner, which never scrolls. */
+.kiosk-who { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+.kiosk-who > .kiosk { flex: 1 1 0; height: auto; min-height: 0; }
+.kiosk-who__line { flex: none; display: grid; row-gap: calc(4 * var(--k-u)); background: var(--chrome); color: var(--muted);
+  padding: calc(12 * var(--k-u)) max(var(--k-gutter), env(safe-area-inset-right)) 0 max(var(--k-gutter), env(safe-area-inset-left)); }
+.kiosk-who__line > p { margin: 0; }
+.kiosk-who__line .btn { font-size: var(--k-label); }
+
+/* ------------------------------------------------------ the pairing screen (door.tsx) */
+/* The bar with the page's name; the code at 144 in the code face with its label over it and the
+   time it works until under it, in the middle of the page; what scanners and signed-in staff do
+   at the foot. No card: the page is the surface, on the 24 gutter. */
+.kiosk-pair { display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: var(--page); color: var(--text); }
+.kiosk-pair__bar { flex: none; padding-inline: max(var(--k-gutter), env(safe-area-inset-left)) max(var(--k-gutter), env(safe-area-inset-right)); }
+.kiosk-pair__bar > h1 { margin: 0; font-size: calc(28 * var(--k-u)); line-height: 1.2; font-weight: var(--w-head); }
+.kiosk-pair__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: grid; grid-template-rows: 1fr auto; row-gap: calc(48 * var(--k-u));
+  padding: calc(48 * var(--k-u)) max(var(--k-gutter), env(safe-area-inset-right)) calc(24 * var(--k-u) + env(safe-area-inset-bottom)) max(var(--k-gutter), env(safe-area-inset-left)); }
+.kiosk-pair__slot { align-self: center; min-width: 0; display: grid; justify-items: start; row-gap: calc(16 * var(--k-u)); }
+.kiosk-pair__slot > * { margin: 0; }
+/* With a code showing, the lines under it wrap to the code's width, so the group reads as one block. */
+.kiosk-pair__slot--code { width: max-content; max-width: 100%; }
+.kiosk-pair__slot--code > :not(.big) { inline-size: 0; min-inline-size: 100%; }
+/* Big as the pairing code: 144 in the code face, in ink, "pairing code" over it. An 8-digit code
+   sets smaller so it fits the width. */
+.kiosk-pair .big { flex-direction: column-reverse; gap: calc(4 * var(--k-u)); }
+.kiosk-pair .big__value { font-family: var(--font-code); font-size: min(var(--k-code), calc((100vw - 2 * var(--k-gutter)) / 4.4));
+  font-weight: var(--w-loud); letter-spacing: .02em; color: var(--text); white-space: nowrap; font-variant-ligatures: none; }
+.kiosk-pair__slot--long .big__value { font-size: min(var(--k-code), calc((100vw - 2 * var(--k-gutter)) / 5.8)); }
+.kiosk-pair .big__label { font-size: calc(40 * var(--k-u)); line-height: 1.4; font-weight: var(--w-head); color: var(--muted); }
+.kiosk-pair__until { font-size: calc(28 * var(--k-u)); line-height: 1.35; font-weight: var(--w-head); font-variant-numeric: tabular-nums; }
+.kiosk-pair__until > .icon { width: .9em; height: .9em; vertical-align: -0.12em; margin-inline-end: .25em; color: var(--muted); }
+.kiosk-pair__how { margin-top: calc(16 * var(--k-u)); font-size: calc(32 * var(--k-u)); line-height: 1.3; }
+/* The steps that stand in for the code: the line at 40 (the glyph before it), the action under it. */
+.kiosk-pair__expired { font-size: calc(40 * var(--k-u)); line-height: 1.2; font-weight: var(--w-loud); }
+.kiosk-pair__expired > .icon { width: .82em; height: .82em; vertical-align: -0.08em; margin-inline-end: .22em; color: var(--st-stop-mark); }
+.kiosk-pair__slot > .status { padding-block: 0; font-size: calc(40 * var(--k-u)); line-height: 1.2; }
+.kiosk-pair__slot > .status--loading { font-weight: var(--w-head); }
+.kiosk-pair__slot > .status--error { border-inline-width: calc(1.1em + var(--rcc-space-2)) 0; background: none; color: var(--text); font-weight: var(--w-loud); }
+.kiosk-pair__foot { display: grid; row-gap: calc(8 * var(--k-u)); padding-top: calc(24 * var(--k-u)); border-top: 1px solid var(--line); font-size: calc(20 * var(--k-u)); line-height: 1.4; }
+.kiosk-pair__foot > h2 { margin: 0; font-size: calc(24 * var(--k-u)); line-height: 1.3; }
+.kiosk-pair__foot p { margin: 0; max-width: 42em; }
+.kiosk-pair__foot .btn { font-size: var(--k-label); }
+
+/* ------------------------------------------- the other door screens (KioskScreen) */
+/* Signing a professor out, a sign-in that ended, and "Something went wrong.": the page on the
+   door's gutter, its buttons at the iPad's sizes. */
+.kiosk-route > .page { max-width: none; padding-inline: max(var(--k-gutter), env(safe-area-inset-left)) max(var(--k-gutter), env(safe-area-inset-right)); }
+.kiosk-route > .page > :is(p, .status) { max-width: 34em; }
+.kiosk-route > .page :is(button, .btn) { font-size: var(--k-label); }
+
+/* ---------------------------------------------------------- other windows */
+/* A phone (a scanner on their own phone) or a short window: the page scrolls, the band takes its
+   words' height and the camera window a 4:3 picture, and the big lines set smaller. */
+@media (max-width: 599px), (max-height: 959px) {
+  .kiosk.door, .kiosk-who, .kiosk-pair { height: auto; min-height: 100vh; min-height: 100dvh; }
+  .kiosk-who > .kiosk { flex: 1 0 auto; min-height: 0; }
+  .kiosk__bar { flex-wrap: wrap; row-gap: calc(8 * var(--k-u)); padding-block: calc(8 * var(--k-u)); }
+  .kiosk__total .big__value { font-size: clamp(40px, 12vw, calc(64 * var(--k-u))); }
+  .kiosk__result { grid-template-rows: auto auto; }
+  .kiosk__band { padding-block: calc(24 * var(--k-u)); }
+  .kiosk__cam { aspect-ratio: 4 / 3; }
+  .kiosk__cam .target { width: 60%; height: auto; aspect-ratio: 1; }
+  .kiosk__band > .status--loading { font-size: clamp(32px, 9vw, calc(72 * var(--k-u))); }
+  .kiosk__prompt--lead { font-size: clamp(32px, 9vw, calc(72 * var(--k-u))); }
+  .kiosk__label { font-size: clamp(40px, 12vw, var(--k-status)); }
+  .kiosk__name { font-size: clamp(32px, 10vw, var(--k-name)); }
+  .kiosk__error, .kiosk__band > .status--error { font-size: clamp(28px, 7.5vw, calc(56 * var(--k-u))); }
+  .kiosk__start.camstart > .btn__label { font-size: clamp(28px, 9vw, calc(64 * var(--k-u))); }
+  .kiosk__start::before { width: clamp(56px, 16vw, calc(128 * var(--k-u))); height: clamp(56px, 16vw, calc(128 * var(--k-u))); }
+  .kiosk-pair__body { overflow-y: visible; }
+}
+/* A phone: Check in under the field, both the strip's full width. */
+@media (max-width: 599px) { .kiosk__type { grid-template-columns: minmax(0, 1fr); } }
+/* A landscape iPad or a laptop: the band beside the camera window, both the panel's full height. */
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 600px) {
+  .kiosk.door, .kiosk-who, .kiosk-pair { height: 100vh; height: 100dvh; }
+  .kiosk-who > .kiosk { flex: 1 1 0; height: auto; min-height: 0; }
+  .kiosk__result { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .kiosk__band { padding-block: calc(32 * var(--k-u)); }
+  .kiosk__cam { aspect-ratio: auto; margin: var(--k-gutter) max(var(--k-gutter), env(safe-area-inset-right)) var(--k-gutter) 0; }
+  .kiosk__cam .target { width: calc(320 * var(--k-u)); height: calc(320 * var(--k-u)); aspect-ratio: auto; }
+  .kiosk-pair__body { overflow-y: auto; }
+}
+/* Portrait: one column, so the camera window takes the full width under the band. */
+@media (orientation: portrait) { .kiosk__result { grid-template-columns: 1fr; } }

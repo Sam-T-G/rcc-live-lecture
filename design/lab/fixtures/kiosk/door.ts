@@ -33,6 +33,18 @@ export function cameraHangs(): Setup {
   };
 }
 
+// A scanner's sign-in on this device ran out at `at` (ms) while the tab was closed: DoorGate keeps
+// that time in localStorage (door.tsx SCANNER_ENDS) and shows "Your sign-in ended." on the reload.
+export function scannerSignInEnded(at: number): Setup {
+  return (w) => w.localStorage.setItem("rcc-live:kiosk-scanner-ends", String(at));
+}
+
+// DoorGate signed this professor out on the paired iPad and waits for Open the scanner
+// (door.tsx SIGNED_OUT, in sessionStorage so a reload keeps it).
+export function staffSignedOutHere(email: string): Setup {
+  return (w) => w.sessionStorage.setItem("rcc-live:door-signed-out", email);
+}
+
 // The camera's track ends on its own (another app took the camera) once the picture is on.
 export function cameraEnds(): Setup {
   return (w) => {
