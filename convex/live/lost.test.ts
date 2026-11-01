@@ -166,6 +166,25 @@ describe("F21 only checked-in students tap I'm lost", () => {
     expect(await toggle(s, 3)).toBe(true);
     expect(await mine(s, 3)).toBe(true);
   });
+
+  it("LIVE-fixcheck-1 a slide shown with fewer presses than last class, then left, still takes a tap and shows on page-back", async () => {
+    const t = setup();
+    await openClass(t);
+    await slide(t, CH, 3, { beat: 2 }); // last class showed slide 4 through its 3rd press
+    later(60 * MIN);
+    await endClass(t);
+    later(DAY);
+    await showSlides(t, 4); // the deck opens this class and shows slides 1 to 5, first press each
+    const s = student(t, 1);
+    await checkIn(t, s);
+
+    // Slide 4's stored press is this class's, so page-back lists it although the deck moved on.
+    const shown = await t.query(api.deck.slides, { channel: CH });
+    expect(shown.map((r) => r.index)).toContain(3);
+    expect(shown.find((r) => r.index === 3)).toMatchObject({ beat: 0 });
+    expect(await toggle(s, 3)).toBe(true);
+    expect(await mine(s, 3)).toBe(true);
+  });
 });
 
 describe("F8 I'm lost in each class", () => {

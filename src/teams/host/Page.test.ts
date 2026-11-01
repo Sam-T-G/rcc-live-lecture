@@ -61,15 +61,20 @@ function panels(html: string) {
     return { tab, mounted: m !== null, hidden: m !== null && m[1] !== undefined };
   });
 }
-// The element tree Dashboard returns when it opens on `first` (its hooks run inside Probe).
-function dashboardTree(first: Tab): ReactNode {
-  let tree: ReactNode = null;
+// Where `card` sits in what Dashboard renders when it opens on `first`, or null when it isn't
+// there. Each function component on the way (Panel, Screen, Card, the stand-in boundaries) is
+// called and its output walked too, so a key or wrapper that changes per tab inside one of them
+// shows up, not only one in Dashboard's own elements. The walk runs inside a render (Probe), so a
+// hook in one of those components runs where React allows it.
+function placeIn(first: Tab, card: unknown): string[] | null {
+  let place: string[] | null = null;
   function Probe() {
-    tree = Dashboard({ first });
+    const tree = Dashboard({ first });
+    place = placeOf(tree, card);
     return tree;
   }
   renderToStaticMarkup(createElement(Probe));
-  return tree;
+  return place;
 }
 // Where `target` sits in `node`: the type, key and place among its siblings of every element from
 // the top down to it, or null when it isn't there.
@@ -85,7 +90,11 @@ function placeOf(node: ReactNode, target: unknown, path: string[] = []): string[
   const type = node.type as string | { name?: string };
   const here = [...path, `${typeof type === "string" ? type : (type.name ?? "?")}#${node.key ?? ""}`];
   if (node.type === target) return here;
-  return placeOf((node.props as { children?: ReactNode }).children, target, here);
+  const props = node.props as { children?: ReactNode };
+  // A function component: walk what it returns. A class component or a tag: walk its children.
+  const component = node.type as ((p: unknown) => ReactNode) & { prototype?: { isReactComponent?: unknown } };
+  if (typeof component === "function" && !component.prototype?.isReactComponent) return placeOf(component(props), target, here);
+  return placeOf(props.children, target, here);
 }
 // The "Lost by slide" line's text, tags dropped.
 function lostLine(html: string) {
@@ -116,13 +125,15 @@ describe("#/host", () => {
 
   it("LIVE-risk-4 switching tabs keeps each tab's cards where they are, so React keeps them mounted", () => {
     // React keeps a component and its state (a half-written question) across renders only when
-    // every element above it keeps its type, key and place. Dashboard's element tree for each open
-    // tab has to put each card at the same place.
-    const at = (first: Tab, card: unknown) => placeOf(dashboardTree(first), card);
+    // every element above it keeps its type, key and place. What Dashboard renders for each open
+    // tab, down through Panel (the component that hides each tab), has to put each card at the
+    // same place.
     for (const card of [AskRoom, Missing, PointsTab, QA]) {
-      const now = at("Now", card);
-      expect(now, String(card)).not.toBeNull();
-      for (const tab of TABS) expect(at(tab, card), `${tab}`).toEqual(now);
+      const now = placeIn("Now", card);
+      // The walk went inside Panel: the path has Panel and then the div Panel returns.
+      expect(now, String(card)).toContain("Panel#");
+      expect(now!.slice(now!.findIndex((p) => p === "Panel#") + 1)[0], String(card)).toBe("div#");
+      for (const tab of TABS) expect(placeIn(tab, card), `${tab}`).toEqual(now);
     }
   });
 
