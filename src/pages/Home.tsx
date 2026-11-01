@@ -31,7 +31,7 @@ const GROUPS: Group[] = [
     links: [
       { to: "checkin/stage", name: "Projector", what: "Today’s deck full screen with the check-in QR, the check-in count and the open quiz." },
       { to: "live/leaderboard", name: "Team board", what: "The team leaderboard, big enough to read from the back of the room." },
-      { to: "checkin/kiosk", name: "iPad at the door", what: "The iPad shows a 6-digit code. Type it on #/admin once, and the iPad scans passes." },
+      { to: "checkin/kiosk", name: "iPad at the door", what: "The iPad shows a pairing code. Type it on #/admin once, and the iPad scans passes." },
     ],
   },
   {

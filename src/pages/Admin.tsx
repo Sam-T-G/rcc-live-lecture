@@ -305,7 +305,7 @@ function PairDevice() {
 
   return (
     <Card title="Pair a door iPad">
-      <p className="muted">Open the Kiosk page on the iPad at the door to get a 6-digit code. Each code works for 10 minutes.</p>
+      <p className="muted">Open the Kiosk page on the iPad at the door to get a pairing code. Each code works for 10 minutes.</p>
       <form onSubmit={submit}>
         <Field label="Code on the iPad">
           {(f) => (

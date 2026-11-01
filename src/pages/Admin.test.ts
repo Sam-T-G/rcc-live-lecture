@@ -114,6 +114,13 @@ describe("ROLES #/admin as an admin", () => {
     expect(pair).toContain("Where the iPad is, like A-210 door.");
   });
 
+  it("sweep2-server-check-1 Pair a door iPad names no digit count, since a code has 8 digits while 6-digit ones are full", () => {
+    const html = open(ADMIN, staff("admin@example.edu", "admin"));
+    const pair = words(html.slice(html.indexOf("<h2>Pair a door iPad</h2>"), html.indexOf("<h2>Door iPads</h2>")));
+    expect(pair).not.toMatch(/\d-digit/);
+    expect(pair).toContain("Open the Kiosk page on the iPad at the door to get a pairing code. Each code works for 10 minutes.");
+  });
+
   it("ROLES Changes lists each change as a sentence, newest first", () => {
     const html = words(open(ADMIN, staff("admin@example.edu", "admin")));
     const role = html.indexOf("admin@example.edu changed door@example.edu from professor to scanner.");

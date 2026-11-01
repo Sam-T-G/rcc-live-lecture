@@ -64,7 +64,8 @@ describe("Home", () => {
   it("rt-19 each line says what the page does now: the door iPad scans the pass, no door code, no professor key", () => {
     expect(html).not.toMatch(/code at the door|after scanning|Hosts only|professor key|when you.re lost/i);
     expect(html).toContain("Sign in and get your pass for the door.");
-    expect(html).toContain("The iPad shows a 6-digit code. Type it on #/admin once, and the iPad scans passes.");
+    expect(html).not.toMatch(/\d-digit/);
+    expect(html).toContain("The iPad shows a pairing code. Type it on #/admin once, and the iPad scans passes.");
   });
 
   it("lists every page as a quiet button link whose words line up with the line under it (btn--flush, DCHK-3)", () => {
