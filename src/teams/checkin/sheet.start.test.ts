@@ -1,10 +1,11 @@
 // @vitest-environment node
 // CKA-spec-1: the class start time the form sends (sheet.ts nearestStart). A time that passed
 // today more than 6 hours ago is tomorrow's, so a next-day start saved in the afternoon or evening
-// never turns into this morning's: the server then refuses one more than 12 hours away ("Pick a
-// time within 12 hours of now."), and the professor sees why. Pacific time, like sheet.test.ts.
+// never turns into this morning's. When that is more than 12 hours away, the form offers the same
+// time a day earlier (dayEarlier, CKA-fixcheck), so this morning's start can still be filled in
+// during the afternoon. Pacific time, like sheet.test.ts.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { nearestStart } from "./sheet";
+import { dayEarlier, nearestStart } from "./sheet";
 
 const pst = (mo: number, d: number, h: number, mi = 0) => Date.UTC(2026, mo - 1, d, h + 8, mi);
 const HOUR = 3_600_000;
@@ -25,6 +26,21 @@ describe("CKA-spec-1 nearestStart never moves a next-day start to this morning",
     expect(nearestStart("09:00", pst(11, 5, 15, 1))).toBe(pst(11, 6, 9, 0));
     expect(nearestStart("23:50", pst(11, 5, 0, 10))).toBe(pst(11, 4, 23, 50));
     expect(nearestStart("09:00", pst(11, 4, 21, 0))).toBe(pst(11, 5, 9, 0));
+  });
+
+  it("CKA-fixcheck dayEarlier offers the same time a day earlier only when nearestStart's pick is more than 12 hours away", () => {
+    const now = pst(11, 5, 15, 30);
+    expect(dayEarlier(nearestStart("09:00", now)!, now)).toBe(pst(11, 5, 9, 0));
+    expect(dayEarlier(nearestStart("15:00", now)!, now)).toBeNull();
+    expect(dayEarlier(nearestStart("23:00", now)!, now)).toBeNull();
+    expect(dayEarlier(nearestStart("18:00", pst(11, 6, 0, 30))!, pst(11, 6, 0, 30))).toBe(pst(11, 5, 18, 0));
+    for (let h = 0; h < 24; h++) {
+      const at = pst(11, 5, h, 17);
+      for (const time of ["00:00", "06:45", "12:00", "17:30", "23:59"]) {
+        const offer = dayEarlier(nearestStart(time, at)!, at);
+        if (offer !== null) expect(Math.abs(offer - at)).toBeLessThanOrEqual(12 * HOUR);
+      }
+    }
   });
 
   it("every time of day lands from 6 hours ago to 18 hours ahead, at the first such moment", () => {

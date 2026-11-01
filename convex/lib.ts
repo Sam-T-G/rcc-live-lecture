@@ -187,3 +187,14 @@ export function cleanName(raw: string | null | undefined, fallback = "Student") 
   const name = Array.from(kept.join(" ")).slice(0, NAME_MAX).join("").trim();
   return VISIBLE.test(name) ? name : fallback;
 }
+
+// Whether cleanName(raw) is the part of an email address before the "@": the name was typed as
+// one email-looking word ("jdoe1234@gmail.com" -> "jdoe1234"). Shared screens show such a name
+// as "Someone" (checkin.attendance.lateFeed), since it can be the student's personal address.
+export function nameIsEmail(raw: string | null | undefined) {
+  const words = (raw ?? "")
+    .split(/\s+/)
+    .map((w) => w.replace(HIDDEN, ""))
+    .filter(Boolean);
+  return words.length === 1 && words[0].includes("@");
+}

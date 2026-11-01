@@ -14,9 +14,11 @@
 // corrects the start after they walked in never show up as if they just arrived.
 //
 // A start belongs to the class still open only while that class's check-ins are near it: when
-// the open class has a check-in and the new start is more than 2 hours after its newest one (the
-// next class's start, saved before End day), setClassStart refuses it, so it never rewrites that
-// class's late minutes or merges the next class's check-ins into it.
+// the open class has a check-in more than 45 minutes before the new start (the next section's or
+// the next day's start, saved before End day), setClassStart refuses it, so it never rewrites that
+// class's late minutes or merges the next class's check-ins into it. A start moved to when the
+// students actually came (9:00 saved by mistake, check-ins from 9:50, start moved to 10:00) still
+// applies.
 //
 // Who calls what:
 //   classStart({ channel })               anyone: this class's start time and grace, or null
@@ -47,8 +49,10 @@ const MIN = 60_000;
 const START_RANGE_MS = 12 * 60 * MIN;
 // Teams lock this long after class starts (convex/live/groups.ts).
 const TEAM_LOCK_MS = 5 * MIN;
-// A start more than this long after the open class's newest check-in is the next class's start.
-const SAME_CLASS_MS = 2 * 60 * MIN;
+// A start more than this long after the open class's first check-in is the next class's start:
+// back-to-back sections start 60 to 90 minutes apart, and students rarely check in more than 45
+// minutes before class.
+const EARLY_MS = 45 * MIN;
 // lectures: how many classes it lists at most, how many `lectures` rows it looks through to find
 // them (rows for classes nobody checked in to are skipped), and how many check-ins it reads to
 // count them. A function may read about 16,000 documents; a class of 40 students over a semester
@@ -110,12 +114,13 @@ function lateMinutes(at: number, startsAt: number | null, graceMin: number): num
 const lateOf = (row: Doc<"checkins">, span: Span) => (span.legacy ? (row.lateMin ?? null) : lateMinutes(row.at, span.startsAt, span.graceMin));
 
 // The first word of a name, for the late banner on shared screens: "Someone" when it holds an "@"
-// or nothing that shows, and when the whole name is the part of the student's own email before
-// the "@" (any case): lib.cleanName stores a name typed as an email address that way
-// ("jane.doe@example.edu" -> "jane.doe"), and emails are for professors only. A student whose
-// email is their first name ("Ana", ana@example.edu) shows as "Someone" too. lib.cleanName drops
-// hidden characters.
-function firstName(name: string, email: string | undefined) {
+// or nothing that shows, when the student's pass says the name was typed as an email address
+// (`fromEmail`, passes.nameFromEmail: lib.cleanName stores "jdoe1234@gmail.com" as "jdoe1234"),
+// and when the whole name is the part of the student's own email before the "@" (any case), for a
+// pass that predates that flag. Emails are for professors only. A student whose email is their
+// first name ("Ana", ana@example.edu) shows as "Someone" too. lib.cleanName drops hidden characters.
+function firstName(name: string, email: string | undefined, fromEmail: boolean) {
+  if (fromEmail) return "Someone";
   const whole = name.trim();
   const local = (email ?? "").split("@")[0].trim();
   if (local !== "" && whole.toLowerCase() === local.toLowerCase()) return "Someone";
@@ -147,10 +152,10 @@ export const classStart = query({
 
 // A professor or admin sets when class starts (ms) and how many whole minutes of grace (0 to 60)
 // come before "late". The time has to be within 12 hours of now. Opens the class when none is open
-// (lib.ensureLecture), so the start belongs to this class only. While the open class has check-ins,
-// a start more than 2 hours after its newest one is the next class's, so it's refused until End
-// day ends this class (a class with no check-ins yet, like one a deck rehearsal opened the evening
-// before, takes it). Unless this class's teams are
+// (lib.ensureLecture), so the start belongs to this class only. While the open class has a
+// check-in more than 45 minutes before the new start, the start is the next class's, so it's
+// refused until End day ends this class (a class with no check-ins yet, like one a deck rehearsal
+// opened the evening before, takes it). Unless this class's teams are
 // locked already, it queues the team lock for 5 minutes after the start: a start moved earlier
 // locks the teams earlier (live.groups.lock checks the time itself, so a lock queued for the old
 // start does nothing extra).
@@ -163,8 +168,8 @@ export const setClassStart = mutation({
     if (!Number.isInteger(graceMin)) throw new ConvexError("Grace has to be a whole number of minutes.");
     if (graceMin < 0 || graceMin > 60) throw new ConvexError("Grace has to be 0 to 60 minutes.");
     const lecture = await ensureLecture(ctx, channel);
-    const newest = await checkinsIn(ctx, channel, classSpan(lecture)).order("desc").first();
-    if (newest && startsAt > newest.at + SAME_CLASS_MS)
+    const first = await checkinsIn(ctx, channel, classSpan(lecture)).first();
+    if (first && startsAt > first.at + EARLY_MS)
       throw new ConvexError("This class is still open. Press End day on #/host, then save the next start.");
     await ctx.db.patch("lectures", lecture._id, { startsAt, graceMin });
     // The channel's legacy classStarts row too, replaced so its _creationTime says when the start
@@ -333,7 +338,9 @@ export const lateFeed = query({
         .withIndex("by_user", (q) => q.eq("user", r.user))
         .first();
       if (pass?.hideLate) continue;
-      out.push({ id: r._id, first: firstName(r.name, r.email), lateMin, at: r.at });
+      // A pass from before names were cleaned can still hold the email itself.
+      const fromEmail = !!pass && (pass.nameFromEmail === true || pass.name.includes("@"));
+      out.push({ id: r._id, first: firstName(r.name, r.email, fromEmail), lateMin, at: r.at });
       if (out.length === 5) break;
     }
     return out;

@@ -147,15 +147,17 @@ describe("CKA-convex-1 / CKA-risk-3 a start for a later class never lands on the
     expect((await sheet(t)).map((r) => r.lateMin)).toEqual([7]);
   });
 
-  it("a start corrected within the class still applies: a start saved an hour after the check-ins, or moved earlier", async () => {
+  it("a start corrected within the class still applies: a start up to 45 minutes after the first check-in, or moved earlier", async () => {
     const t = setup();
     await t.run((ctx) => ensureLecture(ctx, CH));
     vi.setSystemTime(T0 - 5 * MIN);
     await checkIn(t, student(t, "Ana"));
     vi.setSystemTime(T0 + 20 * MIN);
     await checkIn(t, student(t, "Bo"));
-    // A later section's start an hour after the last check-in is still this class.
-    await setStart(t, T0 + 80 * MIN);
+    // A start 40 minutes after Ana's check-in is still this class; one 50 minutes after it, a
+    // later section's start (CKA-fixcheck), is refused.
+    await setStart(t, T0 + 35 * MIN);
+    await expect(setStart(t, T0 + 45 * MIN)).rejects.toThrow(/still open/);
     vi.setSystemTime(T0 + 25 * MIN);
     await setStart(t, T0);
     expect((await sheet(t)).map((r) => r.lateMin)).toEqual([null, 20]);
@@ -186,5 +188,109 @@ describe("CKA-convex-2 saving the start queues no lock once this class's teams l
       vi.setSystemTime(start + 2 * HOUR);
       await t.run((ctx) => endLecture(ctx, CH));
     }
+  });
+});
+
+// Fix check after CKA's review fixes:
+// - the guard in setClassStart: the next section's start, saved within 2 hours of the open class's
+//   last check-in, still landed on the open class. Now a start is refused while the open class has
+//   a check-in more than 45 minutes before it.
+// - privacy: a name typed as any email address, not only the student's own, shows as "Someone" in
+//   the public late feed.
+describe("CKA-fixcheck the next section's start never lands on the class still open, even within 2 hours", () => {
+  const NINE = at(2026, 11, 9, 9, 0);
+
+  it("P1: 11:00 saved at 10:50 for the next section is refused; the 9:00 class keeps Bo's 20 minutes late", async () => {
+    const t = setup();
+    vi.setSystemTime(NINE - 10 * MIN);
+    await setStart(t, NINE);
+    vi.setSystemTime(NINE + 2 * MIN);
+    await checkIn(t, student(t, "Ana"));
+    vi.setSystemTime(NINE + 20 * MIN);
+    const bo = student(t, "Bo");
+    await checkIn(t, bo);
+    vi.setSystemTime(NINE + 110 * MIN);
+    await expect(setStart(t, NINE + 2 * HOUR)).rejects.toThrow("This class is still open. Press End day on #/host, then save the next start.");
+    expect((await sheet(t)).map((r) => [r.name, r.lateMin])).toEqual([
+      ["Ana Sample", null],
+      ["Bo Sample", 20],
+    ]);
+    // After End day the same save opens the 11:00 class, and Bo can check in to it.
+    await t.run((ctx) => endLecture(ctx, CH));
+    await setStart(t, NINE + 2 * HOUR);
+    vi.setSystemTime(NINE + 130 * MIN);
+    expect((await checkIn(t, bo)).already).toBe(false);
+    expect((await lectures(t)).map((l) => [l.open, l.count])).toEqual([
+      [true, 1],
+      [false, 2],
+    ]);
+  });
+
+  it("back-to-back: 10:30 saved at 10:20 with only Bo's 9:20 check-in is refused", async () => {
+    const t = setup();
+    vi.setSystemTime(NINE - 10 * MIN);
+    await setStart(t, NINE);
+    vi.setSystemTime(NINE + 20 * MIN);
+    await checkIn(t, student(t, "Bo"));
+    vi.setSystemTime(NINE + 80 * MIN);
+    await expect(setStart(t, NINE + 90 * MIN)).rejects.toThrow(/still open/);
+    expect((await sheet(t)).map((r) => r.lateMin)).toEqual([20]);
+  });
+
+  it("a start corrected to when the students came still applies: 9:00 saved by mistake, check-ins from 9:50, start moved to 10:00", async () => {
+    const t = setup();
+    vi.setSystemTime(NINE - 10 * MIN);
+    await setStart(t, NINE);
+    vi.setSystemTime(NINE + 50 * MIN);
+    await checkIn(t, student(t, "Ana"));
+    vi.setSystemTime(NINE + 70 * MIN);
+    await checkIn(t, student(t, "Bo"));
+    await setStart(t, NINE + HOUR);
+    expect((await sheet(t)).map((r) => r.lateMin)).toEqual([null, 10]);
+    expect(await lectures(t)).toHaveLength(1);
+  });
+});
+
+describe("CKA-fixcheck a name typed as any email address shows as 'Someone' in the public late feed", () => {
+  it("'jdoe1234@gmail.com' typed by jane@example.edu never shows 'jdoe1234'; the professor's sheet still has it", async () => {
+    const t = setup();
+    await setStart(t, T0, 0);
+    vi.setSystemTime(T0 + 11 * MIN);
+    await checkIn(t, typed(t, "jdoe1234@gmail.com", "jane@example.edu"));
+    vi.setSystemTime(T0 + 12 * MIN);
+    await checkIn(t, typed(t, "Mia Sample", "mia@example.edu"));
+    const out = await feed(t);
+    expect(out.map((f) => [f.first, f.lateMin])).toEqual([
+      ["Mia", 12],
+      ["Someone", 11],
+    ]);
+    expect(JSON.stringify(out)).not.toMatch(/jdoe|1234|@/i);
+    expect((await sheet(t)).map((r) => r.name)).toEqual(["jdoe1234", "Mia Sample"]);
+  });
+
+  it("a pass named from an email before this fix gets marked on its next refresh", async () => {
+    const t = setup();
+    const jo = typed(t, "jdoe1234@gmail.com", "jane@example.edu");
+    await jo.mutation(api.checkin.pass.refresh, {});
+    // The pass row as it was stored before this fix.
+    await t.run(async (ctx) => {
+      const p = (await ctx.db.query("passes").take(1))[0];
+      await ctx.db.replace("passes", p._id, { user: p.user, name: p.name, email: p.email, code: p.code, prevCode: p.prevCode, at: p.at });
+    });
+    await setStart(t, T0, 0);
+    vi.setSystemTime(T0 + 11 * MIN);
+    await checkIn(t, jo);
+    expect((await feed(t)).map((f) => f.first)).toEqual(["Someone"]);
+  });
+
+  it("a student who signs in again with a real name before the scan shows that name", async () => {
+    const t = setup();
+    await typed(t, "jdoe1234@gmail.com", "jane@example.edu").mutation(api.checkin.pass.refresh, { channel: CH });
+    await setStart(t, T0, 0);
+    vi.setSystemTime(T0 + 11 * MIN);
+    const jane = typed(t, "Jane Doe", "jane@example.edu");
+    await jane.mutation(api.checkin.pass.refresh, { channel: CH });
+    await checkIn(t, jane);
+    expect((await feed(t)).map((f) => f.first)).toEqual(["Jane"]);
   });
 });

@@ -42,11 +42,15 @@ export const timeOrDay = (ms: number, now: number) => (sameDay(ms, now) ? clock(
 // class. A time that passed longer ago than this is the next day's.
 const LOOK_BACK_MS = 6 * 3_600_000;
 
+// setClassStart takes a start within 12 hours of now (START_RANGE_MS in convex/checkin/attendance.ts).
+export const START_RANGE_MS = 12 * 3_600_000;
+
 // The time of day `time` ("09:00") at its first moment from 6 hours ago on: yesterday, today or
 // tomorrow. "14:30" saved at 2:40 PM is today; "09:00" saved at 9 PM, or at 3:30 PM, is tomorrow
-// morning. A next-day start saved before 9 PM is then more than 12 hours away, and setClassStart
-// refuses it ("Pick a time within 12 hours of now.") instead of the form quietly saving this
-// morning's time. Null when `time` isn't a time.
+// morning. A next-day start saved before 9 PM is then more than 12 hours away, so the form never
+// quietly saves this morning's time: it says so and offers the same time a day earlier
+// (dayEarlier), for a professor filling in this morning's start in the afternoon. Null when
+// `time` isn't a time.
 export function nearestStart(time: string, now: number): number | null {
   const m = /^(\d{1,2}):(\d{2})/.exec(time);
   if (!m) return null;
@@ -57,6 +61,16 @@ export function nearestStart(time: string, now: number): number | null {
     if (d.getTime() >= now - LOOK_BACK_MS) return d.getTime();
   }
   return null;
+}
+
+// When `startsAt` (from nearestStart) is more than 12 hours away, the same time a day earlier,
+// which is then 6 to 12 hours ago: "09:00" typed at 3:30 PM is tomorrow 9:00 (17.5 hours away)
+// and this offers today's 9:00. Null when `startsAt` is within 12 hours, or the day earlier isn't.
+export function dayEarlier(startsAt: number, now: number): number | null {
+  if (startsAt - now <= START_RANGE_MS) return null;
+  const d = new Date(startsAt);
+  d.setDate(d.getDate() - 1);
+  return Math.abs(d.getTime() - now) <= START_RANGE_MS ? d.getTime() : null;
 }
 
 // One CSV cell, quoted. Names are whatever a student typed at sign-in, so a cell that starts with

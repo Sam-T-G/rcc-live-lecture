@@ -29,7 +29,7 @@
 import { mutation, query, type MutationCtx } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
-import { checkedIn, cleanName, ensureLecture, lectureStart, randomCode, requireUser } from "../lib";
+import { checkedIn, cleanName, ensureLecture, lectureStart, nameIsEmail, randomCode, requireUser } from "../lib";
 import { isProf, pairedDevice, requireScanner, staffRole } from "./prof";
 import { ensureGroup } from "../live/groups";
 
@@ -107,13 +107,17 @@ export const refresh = mutation({
     const me = await requireUser(ctx);
     const now = Date.now();
     const name = cleanName(me.name);
+    const fromEmail = nameIsEmail(me.name);
     const p = await ctx.db.query("passes").withIndex("by_user", (q) => q.eq("user", me.tokenIdentifier)).unique();
     if (!p) {
-      await ctx.db.insert("passes", { user: me.tokenIdentifier, name, email: me.email ?? "", code: await freshCode(ctx), prevCode: "", at: now });
+      await ctx.db.insert("passes", { user: me.tokenIdentifier, name, email: me.email ?? "", code: await freshCode(ctx), prevCode: "", at: now, nameFromEmail: fromEmail });
       return null;
     }
-    const change: { name?: string; code?: string; prevCode?: string; at?: number; prevAt?: number } = {};
+    const change: { name?: string; nameFromEmail?: boolean; code?: string; prevCode?: string; at?: number; prevAt?: number } = {};
     if (name !== p.name && channel !== undefined && !(await checkedInNow(ctx, channel, me.tokenIdentifier))) change.name = name;
+    // Whether the pass's name was typed as an email follows the name it holds (also for a pass made
+    // before the field existed, whose name is unchanged).
+    if ((change.name ?? p.name) === name && (p.nameFromEmail ?? false) !== fromEmail) change.nameFromEmail = fromEmail;
     if (now - p.at >= EVERY) {
       // The replaced code becomes the code before this one, with when it was made: it scans until
       // it's 60 s old (passFor), and after that a scan of it says "That code is old."

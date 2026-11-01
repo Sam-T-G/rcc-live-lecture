@@ -17,12 +17,25 @@ import { CHANNEL } from "../../blocks/deck";
 import { useCamera } from "../../blocks/camera";
 import { makeQrReader } from "./qrRead";
 import { StaffGate } from "./prof";
-import { classDay, classFile, classLabel, dateFile, day, dayTime, hhmm, nearestStart, sameDay, saveCsv, timeOrDay, type ClassRow } from "./sheet";
+import {
+  START_RANGE_MS,
+  classDay,
+  classFile,
+  classLabel,
+  dateFile,
+  day,
+  dayEarlier,
+  dayTime,
+  hhmm,
+  nearestStart,
+  sameDay,
+  saveCsv,
+  timeOrDay,
+  type ClassRow,
+} from "./sheet";
 import { clock, why } from "./util";
 
 const MIN = 60_000;
-// setClassStart takes a start within 12 hours of now (START_RANGE_MS in convex/checkin/attendance.ts).
-const START_RANGE_MS = 12 * 60 * MIN;
 
 export function Teacher() {
   return (
@@ -84,13 +97,22 @@ function Counts() {
 }
 
 // Whether a class is running, and when it starts: its saved start (the time Past classes and
-// "Late after" use), else when it opened.
-function ClassStatus() {
+// "Late after" use), else when it opened. A start still ahead re-renders the line at that time,
+// so "Class starts" turns to "Class started" even when no one checks in after it.
+export function ClassStatus() {
   const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
   const open = classes?.find((c) => c.open);
+  const at = open ? classDay(open) : null;
+  const [, rerender] = useState(0);
+  useEffect(() => {
+    const wait = at === null ? 0 : at - Date.now();
+    if (wait <= 0) return;
+    // setTimeout fires at once for a wait over 2^31 - 1 ms (about 24 days).
+    const t = setTimeout(() => rerender((n) => n + 1), Math.min(wait, 2 ** 31 - 1));
+    return () => clearTimeout(t);
+  }, [at]);
   if (classes === undefined) return <span>Loading…</span>;
-  if (!open) return <span>No class running.</span>;
-  const at = classDay(open);
+  if (at === null) return <span>No class running.</span>;
   return <span>{`${at > Date.now() ? "Class starts" : "Class started"} ${dayTime(at)}`}</span>;
 }
 
@@ -196,7 +218,10 @@ function ScanPasses() {
 // When this class starts and how many minutes of grace come before "late". The fields show the
 // saved start; with none saved, the last class's time of day, ready to save for this one. Before
 // the first class ever, the saved start can be an old day's (the classStarts row), so Save then
-// uses its time of day nearest now: setClassStart refuses a start more than 12 hours away.
+// uses its time of day nearest now: setClassStart refuses a start more than 12 hours away. A time
+// that passed more than 6 hours ago is the next day's (nearestStart); when that is more than 12
+// hours away, Save sends nothing and offers the same time a day earlier ("Save Thu Nov 5, 9:00
+// AM"), for this morning's start filled in during the afternoon.
 export function ClassStart() {
   const start = useQuery(api.checkin.attendance.classStart, { channel: CHANNEL });
   const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
@@ -206,6 +231,8 @@ export function ClassStart() {
   const [grace, setGrace] = useState<string | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  // The same time a day earlier, offered when the time typed is more than 12 hours away.
+  const [offer, setOffer] = useState<number | null>(null);
 
   const lastClass = classes?.find((c) => !c.open && c.startsAt !== null);
   const base = start ?? (lastClass && lastClass.startsAt !== null ? { startsAt: lastClass.startsAt, graceMin: lastClass.graceMin } : null);
@@ -213,16 +240,8 @@ export function ClassStart() {
   const shownGrace = grace ?? String(base?.graceMin ?? 5);
   const now = Date.now();
 
-  async function save(e: FormEvent) {
-    e.preventDefault();
-    // An unchanged time keeps the saved start's own day when setClassStart takes it.
-    const at = Date.now();
-    const keep = time === null && start && Math.abs(start.startsAt - at) <= START_RANGE_MS;
-    const startsAt = keep ? start.startsAt : nearestStart(shownTime, at);
-    if (startsAt === null) {
-      setErr("Pick the time class starts.");
-      return;
-    }
+  async function send(startsAt: number) {
+    setOffer(null);
     const graceMin = Number(shownGrace);
     if (!shownGrace.trim() || !Number.isInteger(graceMin) || graceMin < 0 || graceMin > 60) {
       setErr("Late after has to be a whole number from 0 to 60.");
@@ -241,12 +260,42 @@ export function ClassStart() {
     }
   }
 
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    // An unchanged time keeps the saved start's own day when setClassStart takes it.
+    const at = Date.now();
+    const keep = time === null && start && Math.abs(start.startsAt - at) <= START_RANGE_MS;
+    const startsAt = keep ? start.startsAt : nearestStart(shownTime, at);
+    if (startsAt === null) {
+      setOffer(null);
+      setErr("Pick the time class starts.");
+      return;
+    }
+    const earlier = dayEarlier(startsAt, at);
+    if (earlier !== null) {
+      setOffer(earlier);
+      setErr(`${dayTime(startsAt)} is more than 12 hours away.`);
+      return;
+    }
+    await send(startsAt);
+  }
+
   return (
     <Card title="Class start">
       <form onSubmit={save}>
         <fieldset className="att-start" disabled={start === undefined}>
           <Field label="Class starts" hint={start && !sameDay(start.startsAt, now) ? day(start.startsAt) : undefined}>
-            {(f) => <input {...f} type="time" value={shownTime} onChange={(e) => setTime(e.target.value)} />}
+            {(f) => (
+              <input
+                {...f}
+                type="time"
+                value={shownTime}
+                onChange={(e) => {
+                  setTime(e.target.value);
+                  setOffer(null);
+                }}
+              />
+            )}
           </Field>
           <Field label="Late after (minutes)">
             {(f) => <input {...f} type="number" min={0} max={60} step={1} inputMode="numeric" value={shownGrace} onChange={(e) => setGrace(e.target.value)} />}
@@ -262,6 +311,13 @@ export function ClassStart() {
         </p>
       )}
       {err && <Status kind="error">{err}</Status>}
+      {offer !== null && (
+        <p className="row">
+          <Button variant="secondary" small busy={busy} onClick={() => void send(offer)}>
+            {`Save ${dayTime(offer)}`}
+          </Button>
+        </p>
+      )}
     </Card>
   );
 }

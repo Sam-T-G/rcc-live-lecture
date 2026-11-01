@@ -131,6 +131,7 @@ export default defineSchema({
     at: v.number(), // when `code` was made
     prevAt: v.optional(v.number()), // when `prevCode` was made (missing on passes from before 2026-11)
     hideLate: v.optional(v.boolean()), // the student turned off the late banner for themselves
+    nameFromEmail: v.optional(v.boolean()), // `name` is the part of an email before the "@" (lib.nameIsEmail), so the late banner shows "Someone"
   })
     .index("by_user", ["user"])
     .index("by_code", ["code"])

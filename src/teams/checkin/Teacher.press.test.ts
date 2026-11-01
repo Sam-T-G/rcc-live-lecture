@@ -220,6 +220,42 @@ describe("F15 Save on the class start form", () => {
     expect(sent("checkin/attendance:setClassStart").map((s) => s.args)).toEqual([{ channel: "gdg", startsAt: evening, graceMin: 7 }]);
   });
 
+  it("CKA-fixcheck a morning start typed in the afternoon offers today's time instead of sending tomorrow's, which the server refuses", () => {
+    // A deck press opened the 9:00 class with no start saved. At 3:30 PM the professor types 09:00.
+    vi.setSystemTime(pst(11, 5, 15, 30));
+    server.results["checkin/attendance:lectures"] = [{ ...open, startedAt: pst(11, 5, 8, 55), startsAt: null }];
+    server.results["checkin/attendance:classStart"] = null;
+    typeIn(form, "Class starts", "09:00");
+    press(form(), "Save");
+    expect(sent("checkin/attendance:setClassStart")).toEqual([]);
+    expect(alertText(form())).toBe("Fri Nov 6, 9:00 AM is more than 12 hours away.");
+    expect(press(form(), "Save Thu Nov 5, 9:00 AM")).toBe("clicked");
+    expect(sent("checkin/attendance:setClassStart").map((s) => s.args)).toEqual([{ channel: "gdg", startsAt: pst(11, 5, 9, 0), graceMin: 5 }]);
+  });
+
+  it("CKA-fixcheck a night class's start corrected after midnight offers last night's time", () => {
+    vi.setSystemTime(pst(11, 6, 0, 30));
+    server.results["checkin/attendance:lectures"] = [{ ...open, startedAt: pst(11, 5, 17, 55), startsAt: null }];
+    server.results["checkin/attendance:classStart"] = null;
+    typeIn(form, "Class starts", "18:00");
+    press(form(), "Save");
+    expect(sent("checkin/attendance:setClassStart")).toEqual([]);
+    expect(alertText(form())).toBe("Fri Nov 6, 6:00 PM is more than 12 hours away.");
+    press(form(), "Save Thu Nov 5, 6:00 PM");
+    expect(sent("checkin/attendance:setClassStart").map((s) => s.args)).toEqual([{ channel: "gdg", startsAt: pst(11, 5, 18, 0), graceMin: 5 }]);
+  });
+
+  it("CKA-fixcheck typing a new time takes the offer away; a time within 12 hours saves at once", () => {
+    vi.setSystemTime(pst(11, 5, 15, 30));
+    typeIn(form, "Class starts", "09:00");
+    press(form(), "Save");
+    expect(buttons(form(), /^Save Thu/)).toHaveLength(1);
+    typeIn(form, "Class starts", "15:00");
+    expect(buttons(form(), /^Save Thu/)).toEqual([]);
+    press(form(), "Save");
+    expect(sent("checkin/attendance:setClassStart").map((s) => s.args.startsAt)).toEqual([pst(11, 5, 15, 0)]);
+  });
+
   it("CKA-risk-5 a bad 'Late after' says 'Late after', never 'Grace', and sends nothing", () => {
     for (const bad of ["", "61", "-1", "2.5"]) {
       hooks.slots = new Map();
