@@ -34,7 +34,7 @@ import { ConvexError, v, type Infer } from "convex/values";
 import { api } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { gemini } from "../ai";
-import { checkedIn, cleanName, ensureLecture, lectureStart, lectureWindow, notOpenYet, requireUser } from "../lib";
+import { checkedIn, cleanName, ensureLecture, lectureStart, lectureWindow, notOpenYet, requireUser, slidesFrom } from "../lib";
 import { describe, teamInfo } from "../live/groups";
 import { requireProf } from "./prof";
 
@@ -104,8 +104,8 @@ export function medianSec(secs: number[]): number | null {
 }
 
 // The slide the deck is on in this class, or undefined. The deck's row counts only when it was
-// sent at or after `start` (deck.current's rule for the class window), so a question asked
-// before the deck sends anything in a new class never gets last class's slide.
+// sent at or after `start` (lib.slidesFrom, deck.current's cutoff), so a question asked before
+// the deck sends anything in a new class never gets last class's slide.
 async function deckSlide(ctx: Ctx, channel: string, start: number) {
   const row = await ctx.db
     .query("deckChannels")
@@ -196,7 +196,7 @@ export const ask = mutation({
       if (same && prev._creationTime >= start && now - prev.at < SAME_ASK_MS) return prev._id;
       await close(ctx, prev, now);
     }
-    const slide = index !== undefined && Number.isSafeInteger(index) && index >= 0 ? index : await deckSlide(ctx, channel, start);
+    const slide = index !== undefined && Number.isSafeInteger(index) && index >= 0 ? index : await deckSlide(ctx, channel, slidesFrom(lecture));
     return await ctx.db.insert("polls", {
       channel,
       question: q,

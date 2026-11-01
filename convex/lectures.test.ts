@@ -660,6 +660,17 @@ describe("LX-convex-1 a class opened by saving the next morning's start takes no
     // Tuesday 8:00 and 8:30, before the deck sends anything: no slide.
     vi.setSystemTime(TUE_9AM - HOUR);
     expect(await read()).toEqual({ deck: null, slides: [] });
+    // sweep1-server-fixcheck-1: 8:20, a student checks in and the professor asks a quiz with no
+    // slide. Every reader of the deck uses the same cutoff as deck.current: the quiz gets no slide
+    // number, and a question or "I'm lost" on Monday's slide 8 (or any slide) is refused.
+    vi.setSystemTime(TUE_9AM - 40 * MIN);
+    await checkIn(t, s1);
+    const poll = await prof.mutation(api.checkin.quiz.ask, { channel: CH, kind: "quiz", question: QUIZ, choices: ["A", "B"] });
+    expect((await t.run((ctx) => ctx.db.get(poll)))?.index).toBeUndefined();
+    await expect(s1.mutation(api.live.questions.ask, { channel: CH, index: 5, text: QUESTION, anonymous: false })).rejects.toThrow(
+      "That slide hasn't been shown yet.",
+    );
+    await expect(s1.mutation(api.live.lost.toggle, { channel: CH, index: 7 })).rejects.toThrow("That slide hasn't been shown yet.");
     vi.setSystemTime(TUE_9AM - 30 * MIN);
     expect(await read()).toEqual({ deck: null, slides: [] });
     // 8:31: the deck shows slide 8 from its first press; page-back shows that press, not Monday's.
@@ -667,5 +678,39 @@ describe("LX-convex-1 a class opened by saving the next morning's start takes no
     await slide(t, CH, 7, { title: "Monday wrap-up", beat: 0, lines: ["a"] });
     expect(await read()).toEqual({ deck: "Monday wrap-up", slides: ["Monday wrap-up 0"] });
     expect(await openClass(t)).toBe(tuesday);
+    // Now slide 8 is Tuesday's: a quiz gets its number, and a question and "I'm lost" on it work.
+    const second = await prof.mutation(api.checkin.quiz.ask, { channel: CH, kind: "vote", question: VOTE, choices: ["1", "2"] });
+    expect((await t.run((ctx) => ctx.db.get(second)))?.index).toBe(7);
+    await s1.mutation(api.live.questions.ask, { channel: CH, index: 7, text: QUESTION, anonymous: false });
+    expect(await s1.mutation(api.live.lost.toggle, { channel: CH, index: 7 })).toBe(true);
+  });
+
+  // sweep1-server-fixcheck-2: a start moved later in the middle of class. 9:00 saved at 8:10 opens
+  // the class, the title slide shows at 8:20, a student checks in at 8:25, and at 8:30 the
+  // professor corrects the start to 9:10. The title slide was pressed after a start was saved, so
+  // it stays on every phone, and questions and "I'm lost" on it still work.
+  it("moving the start later mid-class keeps the slides already shown", async () => {
+    const t = setup();
+    const prof = await professor(t);
+    const s1 = student(t, 1);
+    const setStart = (startsAt: number) => prof.mutation(api.checkin.attendance.setClassStart, { channel: CH, startsAt, graceMin: 5 });
+    vi.setSystemTime(TUE_9AM - 50 * MIN);
+    await setStart(TUE_9AM);
+    vi.setSystemTime(TUE_9AM - 40 * MIN);
+    await slide(t, CH, 0, { title: "Title" });
+    vi.setSystemTime(TUE_9AM - 35 * MIN);
+    await checkIn(t, s1);
+    const read = async () => ({
+      deck: (await s1.query(api.deck.current, { channel: CH }))?.title ?? null,
+      slides: (await s1.query(api.deck.slides, { channel: CH })).map((s) => s.title),
+    });
+    expect(await read()).toEqual({ deck: "Title", slides: ["Title"] });
+    vi.setSystemTime(TUE_9AM - 30 * MIN);
+    await setStart(TUE_9AM + 10 * MIN);
+    expect(await read()).toEqual({ deck: "Title", slides: ["Title"] });
+    const poll = await prof.mutation(api.checkin.quiz.ask, { channel: CH, kind: "quiz", question: QUIZ, choices: ["A", "B"] });
+    expect((await t.run((ctx) => ctx.db.get(poll)))?.index).toBe(0);
+    await s1.mutation(api.live.questions.ask, { channel: CH, index: 0, text: QUESTION, anonymous: false });
+    expect(await s1.mutation(api.live.lost.toggle, { channel: CH, index: 0 })).toBe(true);
   });
 });

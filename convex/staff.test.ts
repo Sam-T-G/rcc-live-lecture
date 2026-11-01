@@ -720,6 +720,27 @@ describe("ROLES-API-fixcheck pairing floods, test sign-ins leave nothing behind,
     expect(await t.query(api.checkin.pass.canScan, { device: DEVICE_TOKEN })).toBe(false);
   });
 
+  // sweep1-server-fixcheck-3: a test email a real admin added shows the test admin "A staff
+  // member" as who added it, never the real admin's email. Test emails and the devGrant and
+  // import markers still show as they are.
+  it("sweep1-server-fixcheck-3 a test sign-in never sees the real admin who added a test email", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
+    const t = setup();
+    await admin(t).mutation(api.staff.add, { email: "prof2@test.local", role: "professor" });
+    await t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "admin" });
+    const tester = typed(t, "Sample professor 1", TEST_PROF);
+    await tester.mutation(api.staff.add, { email: "prof3@test.local", role: "scanner" });
+    const seen = (await tester.query(api.staff.people, {})).map((p) => [p.email, p.addedBy]);
+    expect(seen).toEqual([
+      [TEST_PROF, TEST_SETUP],
+      ["prof2@test.local", "A staff member"],
+      ["prof3@test.local", TEST_PROF],
+    ]);
+    expect(JSON.stringify(await tester.query(api.staff.people, {}))).not.toContain(ADMIN_EMAIL);
+    // A real admin still sees who added it.
+    expect((await admin(t).query(api.staff.people, {})).find((p) => p.email === "prof2@test.local")?.addedBy).toBe(ADMIN_EMAIL);
+  });
+
   it("ROLES-API-fixcheck-2 devRevoke ends every role and door iPad a test sign-in gave, and nothing a test sign-in gave outlasts its own 2 hours", async () => {
     vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
     const t = setup();

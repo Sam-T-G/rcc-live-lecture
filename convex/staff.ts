@@ -25,7 +25,8 @@
 //       added, changed or removed here. A test email (@test.local) holds its role for 2 hours,
 //       then its row is removed. A typed test sign-in (dev only) adds, changes and removes only
 //       test emails, and a test email it adds keeps its role only as long as its own role lasts.
-//       People shows a test sign-in only test emails.
+//       People shows a test sign-in only test emails, and "A staff member" as addedBy where a
+//       real admin added one.
 //   api.staff.changes         {} -> the last 50 changes, newest first                     admin
 //       [{ _id, at, by, action, email, role, oldRole, label, text }]: action is "add", "role",
 //       "remove", "pair" or "unpair"; fields that don't apply are null; text is the change as
@@ -154,9 +155,14 @@ function onlyTestEmails(me: Staff, email: string) {
 
 // What a test sign-in sees on #/admin (sweep1-access-2). The typed signing key is public, so on
 // dev anyone can be a test admin or professor while a devGrant lasts. People shows it only test
-// emails, Door iPads only the iPads a test sign-in paired, and Changes only changes a test
-// sign-in or devGrant made to test emails or those iPads, so no real staff email reaches it.
+// emails (with a real admin who added one shown as "A staff member"), Door iPads only the iPads a
+// test sign-in paired, and Changes only changes a test sign-in or devGrant made to test emails or
+// those iPads, so no real staff email reaches it.
 const seenByTest = (email: string | undefined) => email === undefined || isTestEmail(email);
+// Who added a test email, for a test sign-in's People list: a test email, devGrant or the import
+// as they are, and anyone else (a real admin who added a test email) as "A staff member"
+// (sweep1-server-fixcheck-3).
+const addedByForTest = (by: string) => (isTestEmail(by) || by === IMPORT || by === DEV_GRANT ? shownAs(by) : "A staff member");
 const testChange = (e: Doc<"staffEvents">) => (isTestEmail(e.by) || e.by === DEV_GRANT) && seenByTest(e.email);
 // Rows Changes reads for a test sign-in before it picks the test ones: dev only, and enough that
 // a test sign-in's last 50 changes show even with real changes in between.
@@ -223,7 +229,7 @@ export const people = query({
         .map((email) => ({ email, role: "admin" as const, addedBy: ENV_ADMIN_BY, at: null, locked: true })),
       ...rows
         .filter((r) => !locked.includes(r.email) && (!test || isTestEmail(r.email)))
-        .map((r) => ({ email: r.email, role: r.role, addedBy: shownAs(r.addedBy), at: r.at, locked: false })),
+        .map((r) => ({ email: r.email, role: r.role, addedBy: test ? addedByForTest(r.addedBy) : shownAs(r.addedBy), at: r.at, locked: false })),
     ];
   },
 });

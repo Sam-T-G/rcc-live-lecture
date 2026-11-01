@@ -13,14 +13,17 @@
 // has shown: see shownThisClass).
 import { ConvexError, v } from "convex/values";
 import { mutation, type MutationCtx } from "../_generated/server";
-import { checkedIn, lectureWindow, requireUser } from "../lib";
+import { checkedIn, deckFrom, lectureWindow, requireUser } from "../lib";
 
 // Whether `index` is a slide this class has shown, so a student can tap only a slide their phone
-// can show: a page-back row (deckSlides, what deck.slides lists) sent since the class started, or
-// the slide the deck is on now (deckChannels, what deck.current returns) when the deck sent it
-// since the class started. A whole number from 0 up; anything else was never a slide.
-async function shownThisClass(ctx: MutationCtx, channel: string, index: number, start: number) {
+// can show: a page-back row (deckSlides, what deck.slides lists) sent since the class's deck
+// cutoff, or the slide the deck is on now (deckChannels, what deck.current returns) when the deck
+// sent it since then. The cutoff is lib.deckFrom, the one deck.current and deck.slides use, so a
+// slide pressed Monday night before Tuesday's start was saved isn't Tuesday's. A whole number from
+// 0 up; anything else was never a slide.
+async function shownThisClass(ctx: MutationCtx, channel: string, index: number) {
   if (!Number.isInteger(index) || index < 0) return false;
+  const start = await deckFrom(ctx, channel);
   const shown = await ctx.db
     .query("deckSlides")
     .withIndex("by_channel_and_index", (q) => q.eq("channel", channel).eq("index", index))
@@ -42,7 +45,7 @@ export const toggle = mutation({
     const me = await requireUser(ctx);
     if (!(await checkedIn(ctx, channel, me.tokenIdentifier))) throw new ConvexError("Check in first.");
     const { start } = await lectureWindow(ctx, channel);
-    if (!(await shownThisClass(ctx, channel, index, start))) throw new ConvexError("That slide hasn't been shown yet.");
+    if (!(await shownThisClass(ctx, channel, index))) throw new ConvexError("That slide hasn't been shown yet.");
     const row = await ctx.db
       .query("lost")
       .withIndex("by_channel_and_index_and_user", (q) =>

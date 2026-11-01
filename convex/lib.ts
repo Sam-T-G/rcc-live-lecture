@@ -156,6 +156,32 @@ export async function ensureLecture(ctx: MutationCtx, channel: string): Promise<
   return lecture;
 }
 
+// The earliest `at` a deck row (deckChannels, deckSlides) can have and still count in the open
+// class `lecture`. Every reader of those tables uses it: deck.current, deck.slides and deck.set,
+// checkin.quiz.ask's slide number, and the slide checks in live.questions.ask and live.lost.toggle.
+// It is the class's start, except that a press made before the class's first saved start counts
+// only from 45 minutes before that start: End class Monday, one more slide at 21:31 (it opens a
+// class with no start), then Tuesday 9:00 saved at 21:32, and Tuesday's phones wait for Tuesday's
+// slides. A press made after a start was saved always counts, so moving the start later mid-class
+// (9:00 saved at 8:10, title slide at 8:20, start moved to 9:10 at 8:30) keeps the title slide.
+// A class from before startSavedAt existed cuts at 45 minutes before its start.
+export function slidesFrom(lecture: Doc<"lectures">) {
+  const start = lectureStart(lecture);
+  if (lecture.startsAt === undefined) return start;
+  const early = lecture.startsAt - EARLY_MS;
+  return Math.max(start, lecture.startSavedAt === undefined ? early : Math.min(early, lecture.startSavedAt));
+}
+
+// slidesFrom for the class on a channel: the open class's cutoff, the end of the last class
+// between classes, or 12 hours ago before the first class ever, so the 10-29 deck's slides
+// don't show as Live in the first class.
+export async function deckFrom(ctx: Ctx, channel: string): Promise<number> {
+  const last = await newestLecture(ctx, channel);
+  if (last === null) return Date.now() - LECTURE_MS;
+  if (last.endedAt !== undefined) return last.endedAt;
+  return slidesFrom(last);
+}
+
 // Ends the open class now (End day) and returns it with its endedAt, or null when no class is
 // open. The next class starts from nothing: new check-ins, new teams, an empty board.
 export async function endLecture(ctx: MutationCtx, channel: string): Promise<Doc<"lectures"> | null> {

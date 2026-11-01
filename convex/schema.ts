@@ -157,6 +157,7 @@ export default defineSchema({
     channel: v.string(),
     startedAt: v.number(), // when the class opened
     startsAt: v.optional(v.number()), // when class starts, set by the professor; missing = nobody is late
+    startSavedAt: v.optional(v.number()), // when a start was first saved for this class (lib.deckFrom); missing on classes from before it existed
     graceMin: v.optional(v.number()), // minutes after startsAt before a check-in counts as late
     endedAt: v.optional(v.number()), // when End day ended it, or lib.lectureClosesAt for a class nobody ended; missing = still open
   }).index("by_channel", ["channel"]),

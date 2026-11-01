@@ -170,7 +170,10 @@ export const setClassStart = mutation({
     const first = await checkinsIn(ctx, channel, classSpan(lecture)).first();
     if (first && startsAt > first.at + EARLY_MS)
       throw new ConvexError("This class is still open. Press End class, then save the next start.");
-    await ctx.db.patch("lectures", lecture._id, { startsAt, graceMin });
+    // The first start saved for this class also records when, so deck slides pressed after it
+    // keep counting when the start moves later (lib.slidesFrom).
+    const firstSave = lecture.startsAt === undefined ? { startSavedAt: Date.now() } : {};
+    await ctx.db.patch("lectures", lecture._id, { startsAt, graceMin, ...firstSave });
     // The channel's legacy classStarts row too, replaced so its _creationTime says when the start
     // was saved. Two things read it: startSavedAt (for lateFeed), and lib.lectureWindow only while
     // no class exists (a class exists from here on).

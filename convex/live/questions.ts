@@ -61,7 +61,7 @@ import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { action, internalMutation, mutation, query, type MutationCtx } from "../_generated/server";
 import { gemini } from "../ai";
-import { checkedIn, cleanName, lectureWindow, requireUser } from "../lib";
+import { checkedIn, cleanName, deckFrom, lectureWindow, requireUser } from "../lib";
 import { isProf, requireProf, staffRole } from "../checkin/prof";
 
 const MAX_LENGTH = 280; // a question or comment, in characters
@@ -160,11 +160,14 @@ export const list = query({
   },
 });
 
-// Whether the deck has shown slide `index` in the class that started at `start`: a whole number
-// from 0 up to the slide the deck is on now, or a slide it showed earlier in this class and then
-// went back from. Between classes the deck's slide is last class's, so nothing counts.
-async function shownThisClass(ctx: MutationCtx, channel: string, index: number, start: number) {
+// Whether the deck has shown slide `index` in this class: a whole number from 0 up to the slide
+// the deck is on now, or a slide it showed earlier in this class and then went back from. "This
+// class" uses lib.deckFrom, the cutoff deck.current and deck.slides use, so a slide pressed Monday
+// night before Tuesday's start was saved isn't Tuesday's. Between classes the deck's slide is last
+// class's, so nothing counts.
+async function shownThisClass(ctx: MutationCtx, channel: string, index: number) {
   if (!Number.isInteger(index) || index < 0) return false;
+  const start = await deckFrom(ctx, channel);
   const now = await ctx.db
     .query("deckChannels")
     .withIndex("by_channel", (q) => q.eq("channel", channel))
@@ -191,7 +194,7 @@ export const ask = mutation({
       .withIndex("by_channel_and_user", (q) => q.eq("channel", channel).eq("user", me.tokenIdentifier).gte("_creationTime", start))
       .first();
     if (!checkin) throw new ConvexError("Check in first.");
-    if (!(await shownThisClass(ctx, channel, index, start))) throw new ConvexError("That slide hasn't been shown yet.");
+    if (!(await shownThisClass(ctx, channel, index))) throw new ConvexError("That slide hasn't been shown yet.");
     const clean = text.trim();
     if (!clean) throw new ConvexError("Write something first.");
     if (clean.length > MAX_LENGTH) throw new ConvexError(`${MAX_LENGTH} characters at most.`);
