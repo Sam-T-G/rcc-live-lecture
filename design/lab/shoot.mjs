@@ -18,7 +18,7 @@
 // (sideways scroll, axe serious or critical, small text, small targets, page errors) go in the
 // manifest and exit 0, since the baseline records today's screens; --strict makes them exit 1 too.
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { homedir } from 'node:os';
@@ -70,6 +70,8 @@ if (!port || !out || args.length) {
 }
 if ([5173, 5174, 47123, 47124].includes(port)) { console.error(`port ${port} belongs to the app's own build`); process.exit(3); }
 mkdirSync(out, { recursive: true });
+// A rerun into the same folder must not keep the last run's failure file.
+rmSync(join(out, 'fatal.json'), { force: true });
 
 const inPage = {
   text: (floor) => {

@@ -1,6 +1,6 @@
 // Host screens: the professor's laptop at the lectern, 1440 x 900 and 1280. Route: #/host, every tab.
 // README.md says how to add a scenario. The class data is in fixtures/host/class.ts.
-// IDs in titles (HO-, SH-) are the states in the design run's INVENTORY.md.
+// IDs in titles (HO-, SH-) are the states in design/system/INVENTORY.md.
 import { api } from "../../../convex/_generated/api";
 import { fails, fx, hangs, refuses, type Fixtures, type Scenario } from "../lib/types";
 import * as C from "../fixtures/host/class";

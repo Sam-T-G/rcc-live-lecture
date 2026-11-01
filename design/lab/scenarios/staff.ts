@@ -1,5 +1,5 @@
 // Staff screens: laptop. Routes: #/admin, #/checkin/teacher, #/checkin/quiz, attendance, #/lab, laptop sign-in screens.
-// README.md says how to add a scenario. State ids (SH-, ST-) are from the design run's INVENTORY.md.
+// README.md says how to add a scenario. State ids (SH-, ST-) are from design/system/INVENTORY.md.
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { at, fails, fx, hangs, refuses, type Fixtures, type Scenario } from "../lib/types";
@@ -52,7 +52,7 @@ const stats = (answered: number, counts: number[]) => ({
 // ---------- Admin (#/admin) ----------
 
 const people = [
-  { email: "wren@example.edu", role: "admin" as const, addedBy: "server settings", at: null, locked: true },
+  { email: "wren@example.edu", role: "admin" as const, addedBy: "Server settings", at: null, locked: true },
   { email: "quill@example.edu", role: "professor" as const, addedBy: "wren@example.edu", at: at(NOW, -9 * 24 * 60), locked: false },
   { email: "juniper.sample@example.edu", role: "professor" as const, addedBy: "wren@example.edu", at: at(NOW, -6 * 24 * 60), locked: false },
   { email: "bram.testwood@example.edu", role: "scanner" as const, addedBy: "quill@example.edu", at: at(NOW, -2 * 24 * 60), locked: false },
@@ -71,9 +71,9 @@ const ev = (n: number, minsAgo: number, rest: Partial<{ action: "add" | "role" |
 });
 const changes = [
   ev(6, 45, { action: "add", email: "tansy.mockley@example.edu", role: "scanner" }, "wren@example.edu added tansy.mockley@example.edu as scanner."),
-  ev(5, 70, { action: "pair", label: "A-210 door" }, "quill@example.edu paired A-210 door."),
+  ev(5, 70, { action: "pair", label: "A-210 door" }, "quill@example.edu paired the door iPad \"A-210 door\"."),
   ev(4, 2 * 24 * 60, { action: "role", email: "bram.testwood@example.edu", role: "scanner", oldRole: "professor" }, "wren@example.edu changed bram.testwood@example.edu from professor to scanner."),
-  ev(3, 3 * 24 * 60, { action: "unpair", label: "A-212 door" }, "quill@example.edu unpaired A-212 door."),
+  ev(3, 3 * 24 * 60, { action: "unpair", label: "A-212 door" }, "quill@example.edu unpaired the door iPad \"A-212 door\"."),
   ev(2, 6 * 24 * 60, { action: "add", email: "juniper.sample@example.edu", role: "professor" }, "wren@example.edu added juniper.sample@example.edu as professor."),
   ev(1, 9 * 24 * 60, { action: "add", email: "quill@example.edu", role: "professor" }, "wren@example.edu added quill@example.edu as professor."),
 ];
@@ -659,7 +659,7 @@ export const scenarios: Scenario[] = [
       ...fx(api.lab.whoami, { name: "Quill Example", email: "quill@example.edu", isHost: true, role: "professor" }),
       ...fx(api.lab.lastPing, at(NOW, -2)),
       ...fx(api.deck.current, deckSlide),
-      ...fx(api.lab.aiPing, "Pong from Gemini."),
+      ...fx(api.lab.aiPing, "the AI block works."),
     },
   },
   {
@@ -673,7 +673,7 @@ export const scenarios: Scenario[] = [
       ...fx(api.lab.whoami, { name: "Quill Example", email: "quill@example.edu", isHost: true, role: "professor" }),
       ...fx(api.lab.lastPing, at(NOW, -2)),
       ...fx(api.deck.current, deckSlide),
-      ...fx(api.lab.aiPing, "Pong from Gemini."),
+      ...fx(api.lab.aiPing, "the AI block works."),
     },
     clicks: ['button:has-text("Ask the AI")'],
     later: settle,

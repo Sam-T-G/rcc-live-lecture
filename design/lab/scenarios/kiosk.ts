@@ -1,5 +1,5 @@
 // Kiosk screens: the door iPad, 820 x 1180 portrait. Route: #/checkin/kiosk (pairing, scanner, results).
-// README.md says how to add a scenario. State ids (KI-..) are from the design run's INVENTORY.md.
+// README.md says how to add a scenario. State ids (KI-..) are from design/system/INVENTORY.md.
 // A pass in front of the camera is `qr`, a typed code is `type`, and the wake lock and camera
 // stand-ins are `setup` (fixtures/kiosk/door.ts). Class: 38 students, 23 in so far.
 import { api } from "../../../convex/_generated/api";

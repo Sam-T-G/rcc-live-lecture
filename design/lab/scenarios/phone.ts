@@ -303,7 +303,7 @@ const list: S[] = [
     fixtures: livePage({
       ...fx(api.checkin.quiz.current, quizOpen),
       ...fx(api.checkin.quiz.mine, null),
-      ...fx(api.checkin.quiz.answer, refuses("The professor ended this question.")),
+      ...fx(api.checkin.quiz.answer, refuses("The professor ended this quiz.")),
     }),
     clicks: ["button.quiz__pick >> nth=1"],
     scrollTo: QUIZ_CARD,

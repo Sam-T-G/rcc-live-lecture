@@ -1,6 +1,6 @@
 // Projector screens: 1920 x 1080, read from the back of a lecture hall. Routes: #/checkin/stage,
 // #/live/leaderboard, the late banner. README.md says how to add a scenario.
-// One scenario per state in INVENTORY.md section 4 (PR-01 to PR-30). The class is made up: 38
+// One scenario per state in design/system/INVENTORY.md section 4 (PR-01 to PR-30). The class is made up: 38
 // students checked in, 8 teams, 12 questions so far.
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
