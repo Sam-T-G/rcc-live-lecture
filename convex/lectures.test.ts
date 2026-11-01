@@ -630,4 +630,42 @@ describe("LX-convex-1 a class opened by saving the next morning's start takes no
     expect(await read()).toEqual({ deck: "Tuesday", slides: ["Tuesday"], quiz: "Ready?", past: [] });
     expect(await openClass(t)).toBe(tuesday);
   });
+
+  // sweep1-core-2: the other order. The press at 21:31 opens a class with no start yet, so
+  // deck.set keeps it; Tuesday 9:00 is saved a minute later. Tuesday's phones still show no
+  // slide until the deck sends one from 8:15, and a later, fuller press of the same slide number
+  // from Monday doesn't stand in for Tuesday's first press of it.
+  it("a deck press Monday at 21:31, before Tuesday's start is saved, stays out of Tuesday's class", async () => {
+    const t = setup();
+    const prof = await professor(t);
+    const s1 = student(t, 1);
+    const setStart = (startsAt: number) => prof.mutation(api.checkin.attendance.setClassStart, { channel: CH, startsAt, graceMin: 5 });
+    vi.setSystemTime(MON_6PM - 10 * MIN);
+    await setStart(MON_6PM);
+    vi.setSystemTime(MON_6PM + 20 * MIN);
+    await checkIn(t, s1);
+    vi.setSystemTime(MON_6PM + 3.5 * HOUR);
+    await prof.mutation(api.live.groups.endDay, { channel: CH });
+    // 21:31: one more slide opens a class with no start; 21:32: Tuesday 9:00 saved.
+    vi.setSystemTime(MON_6PM + 3.5 * HOUR + MIN);
+    await slide(t, CH, 7, { title: "Monday wrap-up", beat: 3, lines: ["a", "b", "c", "d"] });
+    vi.setSystemTime(MON_6PM + 3.5 * HOUR + 2 * MIN);
+    await setStart(TUE_9AM);
+    const tuesday = await openClass(t);
+    expect(tuesday).not.toBeNull();
+    const read = async () => ({
+      deck: (await s1.query(api.deck.current, { channel: CH }))?.title ?? null,
+      slides: (await s1.query(api.deck.slides, { channel: CH })).map((s) => `${s.title} ${s.beat}`),
+    });
+    // Tuesday 8:00 and 8:30, before the deck sends anything: no slide.
+    vi.setSystemTime(TUE_9AM - HOUR);
+    expect(await read()).toEqual({ deck: null, slides: [] });
+    vi.setSystemTime(TUE_9AM - 30 * MIN);
+    expect(await read()).toEqual({ deck: null, slides: [] });
+    // 8:31: the deck shows slide 8 from its first press; page-back shows that press, not Monday's.
+    vi.setSystemTime(TUE_9AM - 29 * MIN);
+    await slide(t, CH, 7, { title: "Monday wrap-up", beat: 0, lines: ["a"] });
+    expect(await read()).toEqual({ deck: "Monday wrap-up", slides: ["Monday wrap-up 0"] });
+    expect(await openClass(t)).toBe(tuesday);
+  });
 });

@@ -132,7 +132,10 @@ describe("ROLES authMatrix by role for every host-only function", () => {
 
   it("ROLES authMatrix for staff.unpair", async () => {
     await authMatrix(HOST_ONLY, async (as, t) => {
+      // Paired by a test email, so the typed test professor may unpair it too (a test sign-in
+      // can't unpair a real professor's iPad: sweep1-access-2 below).
       const device = await pairDevice(t, OTHER_TOKEN, "Spare door");
+      await t.run((ctx) => ctx.db.patch("devices", device, { pairedBy: "door1@test.local" }));
       await as.mutation(api.staff.unpair, { device });
     });
   });
@@ -300,11 +303,14 @@ describe("ROLES pairing: expiry, single use, unpair revokes, only staff approve,
     const again = await t.mutation(api.staff.requestPairing, { token: DEVICE_TOKEN });
     expect(again).toMatchObject({ status: "waiting", expiresAt: T0 + 20 * MIN });
 
-    // A request past its time counts as expired even before the job drops it.
+    // A request past its time counts as expired even before the job drops it. The code passes the
+    // check digit, so approvePairing gets as far as reading the request (sweep1-tests-1).
+    const stale = "123459";
+    expect(pairingCodeOk(stale)).toBe(true);
     await t.run(async (ctx) => {
-      await ctx.db.insert("pairings", { code: "123456", tokenHash: await sha256(tokenN(7)), expiresAt: Date.now() - 1 });
+      await ctx.db.insert("pairings", { code: stale, tokenHash: await sha256(tokenN(7)), expiresAt: Date.now() - 1 });
     });
-    await expect(professorAs.mutation(api.staff.approvePairing, { code: "123456", label: "C-300 door" })).rejects.toThrow("That code is wrong or expired.");
+    await expect(professorAs.mutation(api.staff.approvePairing, { code: stale, label: "C-300 door" })).rejects.toThrow("That code is wrong or expired.");
     expect(await t.query(api.staff.deviceStatus, { token: tokenN(7) })).toEqual({ status: "none" });
     expect(await t.mutation(api.staff.requestPairing, { token: tokenN(7) })).toMatchObject({ status: "waiting", expiresAt: Date.now() + 10 * MIN });
   });
@@ -477,8 +483,8 @@ describe("ROLES devGrant and importHostEmails (CLI only)", () => {
       "prof1@test.local is professor already. The 2 hours start again now.",
     );
     expect(await t.mutation(internal.staff.devGrant, { email: "prof1@test.local", role: "admin" })).toBe("prof1@test.local is admin now, for 2 hours.");
+    // A test sign-in sees only test emails (sweep1-access-2): the ADMIN_EMAILS admin is left out.
     expect(await tester.query(api.staff.people, {})).toEqual([
-      { email: ADMIN_EMAIL, role: "admin", addedBy: SETTINGS, at: null, locked: true },
       { email: "prof1@test.local", role: "admin", addedBy: TEST_SETUP, at: T0, locked: false },
     ]);
     expect((await tester.query(api.staff.changes, {})).map((c) => c.text)).toEqual([
@@ -673,6 +679,45 @@ describe("ROLES-API-fixcheck pairing floods, test sign-ins leave nothing behind,
     expect(await typed(t, "Sample professor 2", "prof2@test.local").query(api.checkin.pass.amHost, {})).toBe(true);
     await tester.mutation(api.staff.remove, { email: "prof2@test.local" });
     expect(await typed(t, "Sample professor 2", "prof2@test.local").query(api.checkin.pass.amHost, {})).toBe(false);
+  });
+
+  // sweep1-access-2: the typed signing key is public, so anyone can be a test admin on dev while a
+  // devGrant lasts. A test sign-in sees only test emails and the iPads test sign-ins paired, and
+  // can't unpair a real professor's iPad.
+  it("sweep1-access-2 a test sign-in sees no real staff email and can't unpair a real professor's iPad", async () => {
+    vi.stubEnv("CONVEX_CLOUD_URL", DEV_URL);
+    const t = setup();
+    await admin(t).mutation(api.staff.add, { email: PROF_EMAIL, role: "professor" });
+    const prof = google(t, "Sample professor", PROF_EMAIL);
+    const door = await prof.mutation(api.staff.approvePairing, { code: await codeFor(t, DEVICE_TOKEN), label: "A-210 door" });
+    await t.mutation(internal.staff.devGrant, { email: TEST_PROF, role: "admin" });
+    const tester = typed(t, "Sample professor 1", TEST_PROF);
+    const mine = await tester.mutation(api.staff.approvePairing, { code: await codeFor(t, OTHER_TOKEN), label: "Test door" });
+    await tester.mutation(api.staff.add, { email: "prof2@test.local", role: "scanner" });
+
+    expect((await tester.query(api.staff.people, {})).map((p) => p.email)).toEqual([TEST_PROF, "prof2@test.local"]);
+    expect((await tester.query(api.staff.devices, {})).map((d) => [d.label, d.pairedBy])).toEqual([["Test door", TEST_PROF]]);
+    expect((await tester.query(api.staff.changes, {})).map((c) => c.text)).toEqual([
+      `${TEST_PROF} added prof2@test.local as scanner.`,
+      `${TEST_PROF} paired the door iPad "Test door".`,
+      `${TEST_SETUP} added ${TEST_PROF} as admin.`,
+    ]);
+    await expect(tester.mutation(api.staff.unpair, { device: door })).rejects.toThrow("A test sign-in can unpair only the iPads a test sign-in paired.");
+    expect(await t.query(api.checkin.pass.canScan, { device: DEVICE_TOKEN })).toBe(true);
+    // A test professor sees the same door iPads.
+    await t.mutation(internal.staff.devGrant, { email: "prof3@test.local", role: "professor" });
+    expect((await typed(t, "Sample professor 3", "prof3@test.local").query(api.staff.devices, {})).map((d) => d.label)).toEqual(["Test door"]);
+    // Its own iPad unpairs.
+    await tester.mutation(api.staff.unpair, { device: mine });
+    expect(await t.query(api.checkin.pass.canScan, { device: OTHER_TOKEN })).toBe(false);
+
+    // A real admin still sees and manages everything.
+    const real = admin(t);
+    expect((await real.query(api.staff.people, {})).map((p) => p.email)).toEqual([ADMIN_EMAIL, TEST_PROF, "prof2@test.local", "prof3@test.local", PROF_EMAIL]);
+    expect((await real.query(api.staff.devices, {})).map((d) => d.label)).toEqual(["A-210 door"]);
+    expect(await real.query(api.staff.changes, {})).toHaveLength(7);
+    await real.mutation(api.staff.unpair, { device: door });
+    expect(await t.query(api.checkin.pass.canScan, { device: DEVICE_TOKEN })).toBe(false);
   });
 
   it("ROLES-API-fixcheck-2 devRevoke ends every role and door iPad a test sign-in gave, and nothing a test sign-in gave outlasts its own 2 hours", async () => {

@@ -137,9 +137,11 @@ export default defineSchema({
     .index("by_code", ["code"])
     .index("by_prevCode", ["prevCode"]),
 
-  // team: checkin. When class starts on a channel, set by a host. A check-in after
-  // startsAt + graceMin counts as late. Legacy: read only while no lectures row exists
-  // (lib.lectureWindow); from the first class on, each class keeps its own start in `lectures`.
+  // team: checkin. When class starts on a channel. Every attendance.setClassStart replaces the
+  // channel's row (each class also keeps its own start in `lectures`). lib.lectureWindow reads its
+  // startsAt and graceMin (a check-in after startsAt + graceMin is late) only before the first
+  // class; attendance.startSavedAt reads its _creationTime (when the start was last saved) for
+  // lateFeed in every class, so keep the write in setClassStart.
   classStarts: defineTable({
     channel: v.string(),
     startsAt: v.number(),

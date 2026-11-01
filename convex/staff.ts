@@ -25,20 +25,24 @@
 //       added, changed or removed here. A test email (@test.local) holds its role for 2 hours,
 //       then its row is removed. A typed test sign-in (dev only) adds, changes and removes only
 //       test emails, and a test email it adds keeps its role only as long as its own role lasts.
+//       People shows a test sign-in only test emails.
 //   api.staff.changes         {} -> the last 50 changes, newest first                     admin
 //       [{ _id, at, by, action, email, role, oldRole, label, text }]: action is "add", "role",
 //       "remove", "pair" or "unpair"; fields that don't apply are null; text is the change as
-//       one sentence ("admin@example.edu added prof@example.edu as professor.").
+//       one sentence ("admin@example.edu added prof@example.edu as professor."). A test sign-in
+//       sees only the changes a test sign-in or devGrant made to test emails or their iPads.
 //
 //   #/admin, Door iPads and Pair a door iPad:
 //   api.staff.devices         {} -> [{ _id, label, pairedBy, pairedAt, lastUsedAt }]       professor
-//       Newest first. lastUsedAt is the iPad's last scan, or null.
+//       Newest first. lastUsedAt is the iPad's last scan, or null. A test sign-in sees only the
+//       iPads test sign-ins paired.
 //   api.staff.approvePairing  { code, label } -> Id<"devices">                            professor
 //       code: the 6 digits on the iPad (spaces and dashes are ignored). label: a name like
 //       "A-210 door", 1 to 40 characters. An iPad a typed test sign-in pairs scans only while
 //       that test role lasts (2 hours, or until staff:devRevoke).
 //   api.staff.unpair          { device: Id<"devices"> } -> null                           professor
-//       The iPad's token stops working at once and its screen goes back to pairing.
+//       The iPad's token stops working at once and its screen goes back to pairing. A test
+//       sign-in can unpair only the iPads test sign-ins paired.
 //
 //   The door iPad, signed out. Its device token is 32 bytes from crypto.getRandomValues as 64
 //   lower-case hex characters, kept in localStorage.
@@ -148,6 +152,16 @@ function onlyTestEmails(me: Staff, email: string) {
   }
 }
 
+// What a test sign-in sees on #/admin (sweep1-access-2). The typed signing key is public, so on
+// dev anyone can be a test admin or professor while a devGrant lasts. People shows it only test
+// emails, Door iPads only the iPads a test sign-in paired, and Changes only changes a test
+// sign-in or devGrant made to test emails or those iPads, so no real staff email reaches it.
+const seenByTest = (email: string | undefined) => email === undefined || isTestEmail(email);
+const testChange = (e: Doc<"staffEvents">) => (isTestEmail(e.by) || e.by === DEV_GRANT) && seenByTest(e.email);
+// Rows Changes reads for a test sign-in before it picks the test ones: dev only, and enough that
+// a test sign-in's last 50 changes show even with real changes in between.
+const TEST_CHANGES_READ = 1000;
+
 // When a test email's 2 hours start: `from`, or for one a test sign-in adds or changes, no later
 // than the start of that sign-in's own 2 hours, so it ends when the test sign-in's role does.
 async function testStart(ctx: MutationCtx, me: Staff, from: number) {
@@ -199,13 +213,16 @@ export const people = query({
     v.object({ email: v.string(), role: roleValidator, addedBy: v.string(), at: v.union(v.number(), v.null()), locked: v.boolean() }),
   ),
   handler: async (ctx) => {
-    await requireAdmin(ctx);
+    const me = await requireAdmin(ctx);
+    const test = isTestEmail(me.email);
     const locked = envAdmins();
     const rows = await ctx.db.query("staff").withIndex("by_email").take(STAFF_MAX);
     return [
-      ...locked.map((email) => ({ email, role: "admin" as const, addedBy: ENV_ADMIN_BY, at: null, locked: true })),
+      ...locked
+        .filter((email) => !test || isTestEmail(email))
+        .map((email) => ({ email, role: "admin" as const, addedBy: ENV_ADMIN_BY, at: null, locked: true })),
       ...rows
-        .filter((r) => !locked.includes(r.email))
+        .filter((r) => !locked.includes(r.email) && (!test || isTestEmail(r.email)))
         .map((r) => ({ email: r.email, role: r.role, addedBy: shownAs(r.addedBy), at: r.at, locked: false })),
     ];
   },
@@ -283,8 +300,13 @@ export const changes = query({
     }),
   ),
   handler: async (ctx) => {
-    await requireAdmin(ctx);
-    const rows = await ctx.db.query("staffEvents").order("desc").take(CHANGES);
+    const me = await requireAdmin(ctx);
+    const test = isTestEmail(me.email);
+    const read = await ctx.db
+      .query("staffEvents")
+      .order("desc")
+      .take(test ? TEST_CHANGES_READ : CHANGES);
+    const rows = test ? read.filter(testChange).slice(0, CHANGES) : read;
     return rows.map((e) => ({
       _id: e._id,
       at: e.at,
@@ -307,8 +329,9 @@ export const devices = query({
     v.object({ _id: v.id("devices"), label: v.string(), pairedBy: v.string(), pairedAt: v.number(), lastUsedAt: v.union(v.number(), v.null()) }),
   ),
   handler: async (ctx) => {
-    await requireProf(ctx);
-    const rows = await ctx.db.query("devices").order("desc").take(100);
+    const me = await requireProf(ctx);
+    const read = await ctx.db.query("devices").order("desc").take(100);
+    const rows = isTestEmail(me.email) ? read.filter((d) => isTestEmail(d.pairedBy)) : read;
     return rows.map((d) => ({ _id: d._id, label: d.label, pairedBy: d.pairedBy, pairedAt: d.pairedAt, lastUsedAt: d.lastUsedAt ?? null }));
   },
 });
@@ -349,6 +372,9 @@ export const unpair = mutation({
     const me = await requireProf(ctx);
     const row = await ctx.db.get("devices", device);
     if (!row) return null;
+    if (isTestEmail(me.email) && !isTestEmail(row.pairedBy)) {
+      throw new ConvexError("A test sign-in can unpair only the iPads a test sign-in paired.");
+    }
     await ctx.db.delete("devices", device);
     await log(ctx, { by: me.email, action: "unpair", device, label: row.label });
     return null;

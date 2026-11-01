@@ -12,6 +12,9 @@ import { modules } from "./test.setup";
 const SOURCES = import.meta.glob<string>("./**/*.test.ts", { query: "?raw", import: "default", eager: true });
 // Every Convex test file, this one included, for the skip check.
 const ALL_SOURCES: Record<string, string> = { ...SOURCES, "./coverage.test.ts": SELF };
+// Every src/**/*.test.ts as text (the "src" project in vitest.config.ts), for the same skip check:
+// a describe.skip there keeps `vitest run` at exit 0 too (sweep1-tests-6).
+const SRC_SOURCES = import.meta.glob<string>("../src/**/*.test.ts", { query: "?raw", import: "default", eager: true });
 // Every Convex module's source as text: the same files test.setup.ts loads, minus _generated/.
 const MODULE_SOURCES = import.meta.glob<string>("./**/!(*.*.*)*.ts", { query: "?raw", import: "default", eager: true });
 // The staff checks: a function whose handler calls one of these, or calls a function in its own
@@ -484,6 +487,13 @@ describe("F39.2 every Convex test runs", () => {
     expect(ALL_SOURCES["./coverage.test.ts"]).toContain(`describe("F39.2 every Convex test runs"`);
     expect(Object.keys(ALL_SOURCES).length).toBe(Object.keys(SOURCES).length + 1);
     const found = Object.entries(ALL_SOURCES).flatMap(([file, src]) => skipWords(src).map((at) => `${file.replace(/^\.\//, "")}:${at}`));
+    expect(found).toEqual([]);
+  });
+
+  it("F39.2 no src test file skips a test, marks one todo, runs one alone or expects one to fail", () => {
+    // The glob reads the src project's files: the CSV formula tests (F14.5) and the app's own.
+    expect(Object.keys(SRC_SOURCES)).toEqual(expect.arrayContaining(["../src/App.test.ts", "../src/teams/checkin/sheet.test.ts"]));
+    const found = Object.entries(SRC_SOURCES).flatMap(([file, src]) => skipWords(src).map((at) => `${file.replace(/^\.\.\//, "")}:${at}`));
     expect(found).toEqual([]);
   });
 

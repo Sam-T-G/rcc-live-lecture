@@ -9,7 +9,8 @@
 //   A press more than 45 minutes before the open class's saved start (lib.notOpenYet: End class
 //   Monday night, then Tuesday 9:00 saved, opens Tuesday's class at once) is dropped, so Tuesday's
 //   phones don't show Monday night's slide as Tuesday's. POST /deck still answers "ok", and the
-//   bridge sends again on the next press.
+//   bridge sends again on the next press. A press made before the start was saved (Monday 21:31,
+//   then Tuesday 9:00 saved at 21:32) is kept but doesn't count either (classFrom).
 // - Each press from the current bridge carries `run`, an id the deck's browser tab stores for it,
 //   and `seq`, a number that goes up with every send from that tab. Two quick arrow presses can
 //   reach the server in either order, so when a press arrives after a newer one from the same
@@ -27,7 +28,7 @@
 // The iOS app decodes both answers field by field, so don't add, rename or remove a field.
 import { ConvexError, v } from "convex/values";
 import { internalMutation, query, type QueryCtx } from "./_generated/server";
-import { ensureLecture, LECTURE_MS, lectureStart, lectureWindow, notOpenYet } from "./lib";
+import { EARLY_MS, ensureLecture, LECTURE_MS, lectureStart, lectureWindow, notOpenYet } from "./lib";
 
 // The biggest slide number and press count a press may carry. deckSlides has one row per slide
 // number on a channel, so a channel never has more than SLIDE_MAX + 1 of them.
@@ -42,11 +43,21 @@ export function slideNumbers(press: { index?: unknown; beat?: unknown; count?: u
   return whole(index, 0) && whole(beat, 0) && whole(count, 1) ? { index, beat, count } : null;
 }
 
-// The earliest `at` a deck row can have and still count: the class window's start, or 12 hours
-// ago before the first class ever (no class, start 0).
+// The earliest `at` a deck row can have and still count in an open class: the class's start, or
+// 45 minutes before its saved start when that is later. `set` drops a press made before then
+// (notOpenYet), and this leaves out a press made before the start was saved the same way: End class
+// Monday, one more slide at 21:31 (it opens a class with no start), then Tuesday 9:00 saved at
+// 21:32. Tuesday's phones wait for Tuesday's slides either way round.
+function classFrom(start: number, startsAt: number | null | undefined) {
+  return startsAt === null || startsAt === undefined ? start : Math.max(start, startsAt - EARLY_MS);
+}
+
+// The earliest `at` a deck row can have and still count: classFrom in an open class, the end of
+// the last class between classes, or 12 hours ago before the first class ever (no class, start 0).
 async function deckStart(ctx: QueryCtx, channel: string) {
-  const { lecture, start } = await lectureWindow(ctx, channel);
-  return lecture === null && start === 0 ? Date.now() - LECTURE_MS : start;
+  const { lecture, start, startsAt } = await lectureWindow(ctx, channel);
+  if (lecture === null) return start === 0 ? Date.now() - LECTURE_MS : start;
+  return classFrom(start, startsAt);
 }
 
 const slideShape = v.object({
@@ -138,7 +149,7 @@ export const set = internalMutation({
     const lecture = await ensureLecture(ctx, a.channel);
     const at = Date.now();
     if (notOpenYet(lecture, at)) return null;
-    const start = lectureStart(lecture);
+    const start = classFrom(lectureStart(lecture), lecture.startsAt);
 
     const row = await ctx.db
       .query("deckChannels")
