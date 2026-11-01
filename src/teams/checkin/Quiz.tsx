@@ -222,7 +222,7 @@ function History() {
       {past === undefined ? (
         <Status kind="loading">Loading…</Status>
       ) : past.length === 0 ? (
-        <Status kind="empty">No questions yet.</Status>
+        <Status kind="empty">No quiz or vote yet.</Status>
       ) : (
         <ul className="scanner__names">
           {past.map((p) => (
@@ -291,7 +291,7 @@ function Answer({ poll, mine, here, signedIn }: { poll: Poll; mine: number | nul
 
   const how = (signedIn ? "Check in to " : "Sign in and check in to ") + (vote ? "vote." : "answer.");
   return (
-    <Card title={vote ? "Vote now" : "Question"}>
+    <Card title={vote ? "Vote now" : "Quiz now"}>
       <p className="quiz__q">{poll.question}</p>
       {here ? (
         <div className="quiz__picks">
@@ -310,7 +310,7 @@ function Answer({ poll, mine, here, signedIn }: { poll: Poll; mine: number | nul
           <Link to="checkin/student" className="btn btn--quiet btn--flush">Check in</Link>
         </>
       )}
-      {here && locked && <p className="muted">Answer sent. Results show when the professor ends the question.</p>}
+      {here && locked && <p className="muted">Answer sent. Results show when the professor ends the quiz.</p>}
       {here && vote && mine !== null && mine !== undefined && <p className="muted">You picked {LETTERS[mine]}. Tap another to change it.</p>}
       {err && <Status kind="error">{err}</Status>}
     </Card>

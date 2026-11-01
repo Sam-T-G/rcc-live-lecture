@@ -57,14 +57,41 @@ describe("#/checkin/quiz, ended quiz", () => {
 });
 
 describe("#/checkin/quiz, 'This class'", () => {
-  it("F41.1 says 'Loading…' while the list loads, and 'No questions yet.' only once it's empty", () => {
+  it("F41.1 QUI-fixcheck-1 says 'Loading…' while the list loads, and 'No quiz or vote yet.' only once it's empty", () => {
     answers["checkin/quiz:current"] = null;
     const loading = page();
     const side = (html: string) => html.slice(html.indexOf("<h2>This class</h2>"));
     expect(side(loading)).toContain('<p class="status status--loading" role="status">Loading…</p>');
-    expect(side(loading)).not.toContain("No questions yet.");
+    expect(side(loading)).not.toContain("No quiz or vote yet.");
     answers["checkin/quiz:history"] = [];
-    expect(side(page())).toContain('<p class="status status--empty" role="status">No questions yet.</p>');
+    expect(side(page())).toContain('<p class="status status--empty" role="status">No quiz or vote yet.</p>');
+    expect(side(page())).not.toMatch(/question/i);
+  });
+});
+
+describe("the quiz card on #/live never says 'question' (that word is for students' posts)", () => {
+  // The poll's own text is left out: a professor may type the word in it.
+  const words = (html: string) => html.replace("Which law gives V = IR?", "").replace("What does a capacitor store?", "");
+
+  it("QUI-fixcheck-1 an open quiz is titled 'Quiz now' ('Vote now' on a vote), and an answered quiz says it waits for the professor to end the quiz", () => {
+    who.user = { name: "Ada Lovelace", email: "ada@example.edu" };
+    Object.assign(answers, { "checkin/quiz:current": open("quiz"), "checkin/quiz:mine": null, "checkin/read:me": true });
+    let html = card();
+    expect(html).toContain(">Quiz now<");
+    expect(words(html)).not.toMatch(/question/i);
+
+    answers["checkin/quiz:mine"] = 0;
+    html = card();
+    expect(html).toContain("Answer sent. Results show when the professor ends the quiz.");
+    expect(words(html)).not.toMatch(/question/i);
+
+    answers["checkin/quiz:current"] = open("vote");
+    html = card();
+    expect(html).toContain(">Vote now<");
+    expect(words(html)).not.toMatch(/question/i);
+
+    answers["checkin/quiz:current"] = { ...ended, results: { counts: [1, 0], correct: 0 } };
+    expect(words(card())).not.toMatch(/question/i);
   });
 });
 
