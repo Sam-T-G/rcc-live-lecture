@@ -11,13 +11,16 @@
 // form. The lock re-deals everyone in check-in order so every team has 3 or 4 (as near the
 // professor's choice as the class size allows; under 6 students, one team). After the lock a late
 // arrival joins the smallest team: up to 4, then up to 5 once every team has 4, and only when
-// every team has 5 does a new team open.
+// every team has 5 does a new team open, with a number no team in this class has had, so it never
+// starts with an old team's points.
 //
 // Points. A team's points are its members' right answers on quizzes the professor ended in this
 // class (an open quiz counts for nothing, so the board can't give the answer away, and a vote
 // never counts) plus the points the professor added or took off (groupPoints). A change for a
 // team stays with that team; a change for a student counts for that student's current team, the
-// way their right answers do. Teams rank by points per student (points / members, Sam's decision
+// way their right answers do. When the lock or a new size re-deals into fewer teams, a change for
+// a team that goes away becomes changes for the students who were on it, split as evenly as whole
+// points allow (first checked in first), so the points follow them to their new teams. Teams rank by points per student (points / members, Sam's decision
 // D6), so a team of 3 and a team of 4 that answer equally well tie. Extra credit: 1st place 5,
 // 2nd 3, 3rd 1, the rest 0. Teams with the same points per student share the places they fill
 // (two tied for 1st get 4 each). A team with no students, or with 0 points or fewer, gets none,
@@ -190,19 +193,34 @@ function memberCounts(teamOf: Map<string, number>, here: Set<string>) {
 // The team for the next student. Before the lock the newest three teams fill evenly, lowest
 // number first on a tie, so it deals Red, Blue, Yellow, Red...; when all three hold `size`, the
 // next three open. After the lock the smallest team takes them, lowest number first on a tie, so
-// teams fill to 4 first, then to 5; when every team has MOST, a new team opens.
-function pickTeam(count: Map<number, number>, locked: boolean, size: number): number {
+// teams fill to 4 first, then to 5; when every team has MOST, team `next` opens (see nextTeam).
+function pickTeam(count: Map<number, number>, locked: boolean, size: number, next: number): number {
   const teams = [...count.entries()];
   if (locked) {
-    if (teams.length === 0) return 0;
+    if (teams.length === 0) return next;
     const [smallest, n] = teams.sort((a, b) => a[1] - b[1] || a[0] - b[0])[0];
-    return n < MOST ? smallest : Math.max(...count.keys()) + 1;
+    return n < MOST ? smallest : next;
   }
   const newest = teams.reduce((m, [t]) => Math.max(m, t), -1);
   let first = Math.floor(Math.max(newest, 0) / 3) * 3;
   if ([first, first + 1, first + 2].every((t) => (count.get(t) ?? 0) >= size)) first += 3;
   const batch = [first, first + 1, first + 2];
   return batch.reduce((best, t) => ((count.get(t) ?? 0) < (count.get(best) ?? 0) ? t : best), batch[0]);
+}
+
+// This class's point changes, oldest first.
+async function classChanges(ctx: Ctx, channel: string, start: number): Promise<Doc<"groupPoints">[]> {
+  return await ctx.db
+    .query("groupPoints")
+    .withIndex("by_channel", (q) => q.eq("channel", channel).gte("_creationTime", start))
+    .collect();
+}
+
+// The number a new team gets after the lock: one past every team dealt in this class (students
+// who left included) or given a change, so a new team never starts with an emptied team's points.
+async function nextTeam(ctx: Ctx, channel: string, start: number, groups: Map<string, Doc<"groups">>) {
+  const used = [...[...groups.values()].map((g) => g.team), ...(await classChanges(ctx, channel, start)).map((c) => c.team ?? -1)];
+  return used.reduce((m, t) => Math.max(m, t), -1) + 1;
 }
 
 // The first student dealt in a class queues the lock and marks the class's settings row
@@ -221,10 +239,37 @@ async function rebalance(ctx: MutationCtx, channel: string, start: number, size:
   const checkins = await classCheckins(ctx, channel, start);
   const groups = await classGroups(ctx, channel, start);
   const t = teamsFor(checkins.length, size);
+  await splitChanges(ctx, channel, start, checkins, groups, t);
   for (const [i, c] of checkins.entries()) {
     const had = groups.get(c.user);
     if (!had) await ctx.db.insert("groups", { channel, user: c.user, team: i % t });
     else if (had.team !== i % t) await ctx.db.patch("groups", had._id, { team: i % t });
+  }
+}
+
+// Before a re-deal into `t` teams (numbers 0 to t - 1): each change for a team numbered t or
+// higher, which the re-deal breaks up, becomes changes for that team's students checked in to this
+// class, the delta split as evenly as whole points allow (first checked in gets the extra), with
+// the same reason and time. A team with no students left keeps its change; it counts for nobody.
+async function splitChanges(
+  ctx: MutationCtx,
+  channel: string,
+  start: number,
+  checkins: Doc<"checkins">[],
+  groups: Map<string, Doc<"groups">>,
+  t: number,
+) {
+  for (const c of await classChanges(ctx, channel, start)) {
+    if (c.team === undefined || c.team < t) continue;
+    const members = checkins.filter((k) => groups.get(k.user)?.team === c.team);
+    if (members.length === 0) continue;
+    const each = Math.trunc(Math.abs(c.delta) / members.length);
+    const extra = Math.abs(c.delta) % members.length;
+    for (const [i, m] of members.entries()) {
+      const delta = Math.sign(c.delta) * (each + (i < extra ? 1 : 0));
+      if (delta !== 0) await ctx.db.insert("groupPoints", { channel, user: m.user, delta, reason: c.reason, at: c.at });
+    }
+    await ctx.db.delete("groupPoints", c._id);
   }
 }
 
@@ -238,7 +283,9 @@ export async function ensureGroup(ctx: MutationCtx, channel: string, user: strin
   const set = await classSettings(ctx, channel, win.start);
   const here = new Set((await classCheckins(ctx, channel, win.start)).map((c) => c.user));
   const teamOf = new Map([...groups].map(([u, g]) => [u, g.team]));
-  const team = pickTeam(memberCounts(teamOf, here), !!set.row?.lockedAt, set.size);
+  const locked = !!set.row?.lockedAt;
+  const next = locked ? await nextTeam(ctx, channel, win.start, groups) : 0;
+  const team = pickTeam(memberCounts(teamOf, here), locked, set.size, next);
   await ctx.db.insert("groups", { channel, user, team });
   await queueLock(ctx, channel, win, set);
   return team;
@@ -341,16 +388,20 @@ export const join = mutation({
     const win = await lectureWindow(ctx, channel);
     const checkins = await classCheckins(ctx, channel, win.start);
     if (!checkins.some((c) => c.user === me.tokenIdentifier)) return null;
-    const teamOf = new Map([...(await classGroups(ctx, channel, win.start))].map(([u, g]) => [u, g.team]));
+    const groups = await classGroups(ctx, channel, win.start);
+    const teamOf = new Map([...groups].map(([u, g]) => [u, g.team]));
     const set = await classSettings(ctx, channel, win.start);
+    const locked = !!set.row?.lockedAt;
     const count = memberCounts(teamOf, new Set(checkins.map((c) => c.user)));
+    let next = locked && checkins.some((c) => !teamOf.has(c.user)) ? await nextTeam(ctx, channel, win.start, groups) : 0;
     let dealt = false;
     for (const c of checkins) {
       if (teamOf.has(c.user)) continue;
-      const team = pickTeam(count, !!set.row?.lockedAt, set.size);
+      const team = pickTeam(count, locked, set.size, next);
       await ctx.db.insert("groups", { channel, user: c.user, team });
       teamOf.set(c.user, team);
       count.set(team, (count.get(team) ?? 0) + 1);
+      next = Math.max(next, team + 1);
       dealt = true;
     }
     if (dealt) await queueLock(ctx, channel, win, set);
@@ -438,10 +489,7 @@ export async function scoreDay(ctx: Ctx, channel: string): Promise<ClassScores> 
     }
   }
 
-  const changes = await ctx.db
-    .query("groupPoints")
-    .withIndex("by_channel", (q) => q.eq("channel", channel).gte("_creationTime", win.start))
-    .collect();
+  const changes = await classChanges(ctx, channel, win.start);
   for (const c of changes) {
     if (c.team !== undefined) add(changed, c.team, c.delta);
     else if (c.user !== undefined) {
@@ -451,9 +499,9 @@ export async function scoreDay(ctx: Ctx, channel: string): Promise<ClassScores> 
     }
   }
 
-  // Every team dealt in this class, Red, Blue and Yellow first. Teams with students are ranked;
-  // the rest come after them.
-  const highest = [...groups.values()].reduce((m, g) => Math.max(m, g.team), -1);
+  // Every team dealt in this class or given a change, Red, Blue and Yellow first, so no change
+  // pointLog lists is left off the board. Teams with students are ranked; the rest come after them.
+  const highest = [...[...groups.values()].map((g) => g.team), ...changed.keys()].reduce((m, t) => Math.max(m, t), -1);
   const all = Array.from({ length: highest + 1 }, (_, team) => {
     const n = members.get(team) ?? 0;
     const right = correct.get(team) ?? 0;

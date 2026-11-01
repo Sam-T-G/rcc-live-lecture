@@ -463,6 +463,86 @@ describe("F28 the professor's point changes", () => {
     expect(roster.find((r) => r.name === "Sample student 6")).toMatchObject({ team: { label: "Blue" }, changes: 2, points: 2 });
   });
 
+  it("F28.3 a dealt team whose students all left the class is refused ('No team with that number.')", async () => {
+    const t = setup();
+    await openClass(t);
+    await arrive(t, 1, 3); // Red: 1, Blue: 2, Yellow: 3
+    await t.run(async (ctx) => {
+      const row = await ctx.db.query("checkins").withIndex("by_channel_and_user", (q) => q.eq("channel", CH).eq("user", userOf(1))).first();
+      await ctx.db.delete("checkins", row!._id);
+    });
+    await expect(admin(t).mutation(api.live.groups.adjust, { channel: CH, team: 0, delta: 1 })).rejects.toThrow("No team with that number.");
+    expect(await admin(t).mutation(api.live.groups.adjust, { channel: CH, team: 1, delta: 1 })).toBeTruthy();
+  });
+
+  // Every change the board counts and every change pointLog lists, added up.
+  async function changeTotals(t: T) {
+    const b = await board(t);
+    const log = await admin(t).query(api.live.groups.pointLog, { channel: CH });
+    return { board: b.teams.reduce((sum, g) => sum + g.changes, 0), log: log.reduce((sum, c) => sum + c.delta, 0) };
+  }
+
+  it("UB-convex-1 a change for a team the lock deals away follows that team's students, so nothing drops off the board", async () => {
+    const t = setup();
+    await openClass(t);
+    const ss = await arrive(t, 1, 7); // Red: 1, 4, 7; Blue: 2, 5; Yellow: 3, 6
+    await admin(t).mutation(api.live.groups.adjust, { channel: CH, team: 2, delta: 2, reason: "Helped out" });
+    expect(await changeTotals(t)).toEqual({ board: 2, log: 2 });
+    // The lock re-deals 7 students into 2 teams: Yellow is gone; student 3 lands on Red, 6 on Blue.
+    await t.mutation(internal.live.groups.lock, { channel: CH, force: true });
+    expect([await teamOf(ss[2]), await teamOf(ss[5])]).toEqual([0, 1]);
+    expect(await changeTotals(t)).toEqual({ board: 2, log: 2 });
+    expect((await board(t)).teams.map((g) => [g.label, g.members, g.changes])).toEqual([
+      ["Blue", 3, 1], // 1 / 3 a student
+      ["Red", 4, 1], // 1 / 4
+    ]);
+    const log = await admin(t).query(api.live.groups.pointLog, { channel: CH });
+    expect(log.map((c) => [c.name, c.team?.label, c.delta, c.reason]).sort()).toEqual([
+      ["Sample student 3", "Red", 1, "Helped out"],
+      ["Sample student 6", "Blue", 1, "Helped out"],
+    ]);
+    const roster = await admin(t).query(api.live.groups.roster, { channel: CH });
+    expect(roster.filter((r) => r.changes !== 0).map((r) => [r.name, r.changes]).sort()).toEqual([
+      ["Sample student 3", 1],
+      ["Sample student 6", 1],
+    ]);
+  });
+
+  it("UB-convex-1 a new size after the lock keeps every team change, and a new team never takes an emptied team's points", async () => {
+    const t = setup();
+    await openClass(t);
+    await admin(t).mutation(api.live.groups.setSize, { channel: CH, size: 3 });
+    const ss = await arrive(t, 1, 12);
+    await t.mutation(internal.live.groups.lock, { channel: CH, force: true });
+    expect(await sizes(ss)).toEqual([3, 3, 3, 3]);
+    await admin(t).mutation(api.live.groups.adjust, { channel: CH, team: 3, delta: 5 }); // Green
+    await admin(t).mutation(api.live.groups.adjust, { channel: CH, team: 3, delta: -1 });
+    await admin(t).mutation(api.live.groups.setSize, { channel: CH, size: 4 }); // teamsFor(12, 4) = 3: Green is gone
+    expect(await sizes(ss)).toEqual([4, 4, 4]);
+    expect(await changeTotals(t)).toEqual({ board: 4, log: 4 });
+    expect((await board(t)).teams.map((g) => g.label)).not.toContain("Green");
+
+    // 6 students lock into Red and Blue; Blue gets 5 points, then all of Blue's check-ins are removed.
+    const u = setup();
+    await openClass(u);
+    const six = await arrive(u, 1, 6);
+    await u.mutation(internal.live.groups.lock, { channel: CH, force: true });
+    expect(await sizes(six)).toEqual([3, 3]);
+    await admin(u).mutation(api.live.groups.adjust, { channel: CH, team: 1, delta: 5 });
+    await u.run(async (ctx) => {
+      for (const n of [2, 4, 6]) {
+        const row = await ctx.db.query("checkins").withIndex("by_channel_and_user", (q) => q.eq("channel", CH).eq("user", userOf(n))).first();
+        await ctx.db.delete("checkins", row!._id);
+      }
+    });
+    // Red fills to 5, then the next arrival opens a new team: Yellow, not Blue with Blue's 5 points.
+    const late = await arrive(u, 7, 9);
+    expect(await Promise.all(late.map(teamOf))).toEqual([0, 0, 2]);
+    const yellow = (await board(u)).teams.find((g) => g.label === "Yellow")!;
+    expect(yellow).toMatchObject({ members: 1, changes: 0, points: 0 });
+    expect((await board(u)).teams.find((g) => g.label === "Blue")).toMatchObject({ members: 0, changes: 5, ec: 0 });
+  });
+
   it("F28.4 removePoints restores the totals from before; a change from an ended class is refused; a missing id returns null", async () => {
     const t = setup();
     await openClass(t);
