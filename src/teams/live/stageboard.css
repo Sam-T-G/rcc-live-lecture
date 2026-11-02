@@ -160,29 +160,39 @@ ol.board.board--many:has(> :nth-child(9)) { grid-template-rows: repeat(5, auto);
 .board__more { margin: 0; color: var(--muted); }
 
 /* The late banner on #/live/leaderboard: the stage's strip (120 tall, words at 48, the --warn fill
-   alone) in the bottom-left lane over the board. The wrapper takes no space in the page's grid. */
+   alone) on the frame's bottom edge, from its left. The wrapper takes no space in the page's grid.
+   The ledger ends 208 above the frame's bottom at 13 teams, so the strips sit side by side in one
+   row (one is 1080 wide, two share the frame's width): one or two arrivals stay under the ledger's
+   last row on the 5-, 8- and 13-team boards (IT1-PROJECTOR-check-1). The scoring line under the board
+   gives the strips its spot while they show, so no line shows cut in half behind them. */
 .live-board__late { display: contents; }
 .live-board__late .late {
   left: var(--p-margin);
-  right: auto;
+  right: var(--p-margin);
   bottom: var(--p-margin);
-  width: calc(1080 * var(--stage-u));
-  max-width: calc(1080 * var(--stage-u));
+  width: auto;
+  max-width: none;
+  flex-direction: row;
   align-items: stretch;
   gap: calc(16 * var(--stage-u));
 }
+.projector:has(> .live-board__late .late__item) > .lbfoot { visibility: hidden; }
 .live-board__late .late__item {
   box-sizing: border-box;
   display: flex;
+  flex: 1 1 0;
   align-items: center;
   width: auto;
-  max-width: 100%;
+  min-width: 0;
+  max-width: calc(1080 * var(--stage-u));
   min-height: calc(120 * var(--stage-u));
   margin: 0;
   padding: calc(16 * var(--stage-u)) calc(40 * var(--stage-u));
   border-radius: calc(16 * var(--stage-u));
   font-size: var(--p-body);
   line-height: 1.2;
+  /* Two strips side by side take two lines each: even lines keep "7 min" together. */
+  text-wrap: balance;
 }
 
 /* ------------------------------------------------------------------ board reorder
@@ -207,8 +217,14 @@ ol.board.board--many:has(> :nth-child(9)) { grid-template-rows: repeat(5, auto);
   pointer-events: none;
   transition: opacity var(--fx-slow) var(--ease);
 }
-.board--many .pledger__row::after { inset-inline: 0; border-radius: var(--p-radius); }
-.board--many:not(.board--tied) > .pledger__row:first-child::after { box-shadow: inset 0 0 0 var(--p-rule) var(--on-field); }
+/* Past six teams the rows keep only 6 of padding, so the ring lies on the row's two rules (its own
+   above, the next row's below, which it paints over) and clears the words' ascent and descent
+   (IT1-PROJECTOR-check-3). The green leader row's ring stays on its fill, which has no rules. */
+.board--many .pledger__row::after { inset-block: calc(-6 * var(--stage-u)); inset-inline: 0; z-index: 1; border-radius: var(--p-radius); }
+.board--many:not(.board--tied) > .pledger__row:first-child::after { inset-block: 0; box-shadow: inset 0 0 0 var(--p-rule) var(--on-field); }
+/* Its words sit 4 higher in the same height, so its name and its numbers' descenders both clear
+   that ring by about 3. */
+.board--many:not(.board--tied) > .pledger__row:first-child { padding-block: calc(2 * var(--stage-u)) calc(10 * var(--stage-u)); }
 .board--big .pledger__row--moved::after { opacity: 1; transition-duration: var(--fx-fast); }
 /* The rising team's plate (StageBoard.tsx useReorder adds it for one move and removes it): its
    row's text band, behind the team's words and over the falling team's. Its fill is set by script

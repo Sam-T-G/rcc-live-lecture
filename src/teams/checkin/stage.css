@@ -71,10 +71,12 @@ body.stage-body { margin: 0; overflow: hidden; }
   font-size: var(--p-count);
   font-weight: var(--w-loud);
   line-height: 0.8;
-  letter-spacing: -0.03em;
-  margin-inline-start: -0.04em;
   /* Proportional on purpose: tabular digits at 240 make "38" 323 wide, and "checked in" then wraps
-     under the numeral in the card's 512. */
+     under the numeral in the card's 512. At -0.03em "40", the widest pair, took 512.06 of the 512
+     and wrapped; at -0.045em every count from 0 to 99 keeps "checked in" on the numeral's
+     baseline with 7 to spare (IT1-PROJECTOR-check-2). */
+  letter-spacing: -0.045em;
+  margin-inline-start: -0.04em;
   font-variant-numeric: lining-nums proportional-nums;
 }
 /* Loading: "…" holds the numeral's slot at the numeral's size, muted, on the same baseline. */
@@ -319,10 +321,6 @@ body.stage-body { margin: 0; overflow: hidden; }
   line-height: 1.2;
   text-align: start;
 }
-/* While a quiz or vote shows, the lane keeps only the newest strip (LateBanner puts it first), so
-   the panel above it always has the room for its choices. The others stay in the live region and
-   leave on their own 8 s timer, as before. */
-.stage:has(.stage__poll) .stage__late .late__item ~ .late__item { display: none; }
 
 /* A part that didn't load (ErrorBoundary in ui.tsx): its error line and Try again at projector
    size on the presenter note's ground, where the presenter looks for it: the bottom-left lane,

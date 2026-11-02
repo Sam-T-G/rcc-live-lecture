@@ -230,6 +230,48 @@ export const scenarios: Scenario[] = [
     ],
   },
   {
+    // IT1-PROJECTOR-check-2: a two-digit count with wide digits keeps "checked in" on its baseline.
+    id: "projector-stage-quiz-ended-forty",
+    area: "projector",
+    route: DECK,
+    role: "signedout",
+    title: "PR-06 Stage card with 40 checked in after the quiz ended",
+    now: NOW,
+    fixtures: stage({
+      ...fx(api.checkin.read.count, 40),
+      ...fx(api.checkin.quiz.current, {
+        id: pollId(12),
+        kind: "quiz",
+        question: "Which hook runs after every render by default?",
+        choices: ["useMemo", "useEffect", "useRef", "useId"],
+        open: false,
+        answered: 36,
+        results: { counts: [7, 22, 5, 2], correct: 1 },
+      }),
+    }),
+  },
+  {
+    // IT1-PROJECTOR-risk-1: two arrivals inside 8 s while the ended quiz stays up; both names show.
+    id: "projector-stage-quiz-ended-late-two",
+    area: "projector",
+    route: DECK,
+    role: "signedout",
+    title: "PR-09 Stage with the ended quiz up and two late arrivals at once",
+    now: NOW,
+    fixtures: stage(
+      fx(api.checkin.quiz.current, {
+        id: pollId(12),
+        kind: "quiz",
+        question: "Which hook runs after every render by default?",
+        choices: ["useMemo", "useEffect", "useRef", "useId"],
+        open: false,
+        answered: 36,
+        results: { counts: [7, 22, 5, 2], correct: 1 },
+      }),
+    ),
+    later: [{ afterMs: 600, fixtures: fx(api.checkin.attendance.lateFeed, arrived(["lab-late-2", "Quill", 6], ["lab-late-3", "Juniper", 7])) }],
+  },
+  {
     id: "projector-stage-vote-ended",
     area: "projector",
     route: DECK,
@@ -479,6 +521,73 @@ export const scenarios: Scenario[] = [
     now: NOW,
     fixtures: board(EIGHT),
     later: [{ afterMs: 600, fixtures: fx(api.checkin.attendance.lateFeed, arrived(["lab-late-5", "Marlo", 11])) }],
+  },
+  {
+    // IT1-PROJECTOR-check-1: two arrivals inside 8 s on the 8-team board; the strips never cover a row.
+    id: "projector-leaderboard-late-two",
+    area: "projector",
+    route: "live/leaderboard",
+    role: "signedout",
+    title: "PR-25 Team leaderboard, 8 teams, two late arrivals at once",
+    now: NOW,
+    fixtures: board(EIGHT),
+    later: [{ afterMs: 600, fixtures: fx(api.checkin.attendance.lateFeed, arrived(["lab-late-6", "Quill", 6], ["lab-late-7", "Juniper", 7])) }],
+  },
+  {
+    id: "projector-leaderboard-five-late-two",
+    area: "projector",
+    route: "live/leaderboard",
+    role: "signedout",
+    title: "PR-25 Team leaderboard, 5 teams, two late arrivals at once",
+    now: NOW,
+    fixtures: board(EIGHT.slice(0, 5), 12),
+    later: [{ afterMs: 600, fixtures: fx(api.checkin.attendance.lateFeed, arrived(["lab-late-6", "Quill", 6], ["lab-late-7", "Juniper", 7])) }],
+  },
+  {
+    id: "projector-leaderboard-thirteen-late",
+    area: "projector",
+    route: "live/leaderboard",
+    role: "signedout",
+    title: "PR-25 Team leaderboard, 13 teams, one late arrival",
+    now: NOW,
+    fixtures: board(THIRTEEN),
+    later: [{ afterMs: 600, fixtures: fx(api.checkin.attendance.lateFeed, arrived(["lab-late-5", "Marlo", 11])) }],
+  },
+  {
+    id: "projector-leaderboard-thirteen-late-two",
+    area: "projector",
+    route: "live/leaderboard",
+    role: "signedout",
+    title: "PR-25 Team leaderboard, 13 teams, two late arrivals at once",
+    now: NOW,
+    fixtures: board(THIRTEEN),
+    later: [{ afterMs: 600, fixtures: fx(api.checkin.attendance.lateFeed, arrived(["lab-late-6", "Quill", 6], ["lab-late-7", "Juniper", 7])) }],
+  },
+  {
+    // IT1-PROJECTOR-check-3: on the two-column board Green passes Orange; the moved-row ring
+    // clears the numbers line's descenders. The shot is the end state.
+    id: "projector-leaderboard-eight-reorder",
+    area: "projector",
+    route: "live/leaderboard",
+    role: "signedout",
+    title: "Team leaderboard, 8 teams, after a quiz moves Green to 1st and Purple to 3rd (board-reorder)",
+    now: NOW,
+    fixtures: board(EIGHT),
+    later: [
+      {
+        afterMs: 800,
+        fixtures: fx(api.live.groups.leaderboard, {
+          questions: 13,
+          teams: [
+            team({ ...EIGHT[1], correct: 53, rank: 1, ec: 5 }),
+            team({ ...EIGHT[0], rank: 2, ec: 3 }),
+            team({ ...EIGHT[3], correct: 36, rank: 3, ec: 1 }),
+            team({ ...EIGHT[2], rank: 4, ec: 0 }),
+            ...EIGHT.slice(4),
+          ],
+        }),
+      },
+    ],
   },
   {
     id: "projector-leaderboard-error",

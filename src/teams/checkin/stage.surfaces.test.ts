@@ -67,6 +67,16 @@ describe("projector (#/checkin/stage and #/live/leaderboard at 1920 x 1080)", ()
     expect(bad).toEqual([]);
   });
 
+  it("IT1-PROJECTOR-check-2 the count's numeral at 240 is tracked tight enough that '40', the widest two digits, keeps 'checked in' on its line", () => {
+    // Measured at 1920 x 1080 in Google Sans: at -0.03em "40" needed 512.06 of the card's 512 and
+    // "checked in" wrapped under it; at -0.045em every count from 0 to 99 fits with 7 to spare. The
+    // browser check: set the count's <b> to each of 0 to 99 and see "checked in" start right of it.
+    const em = parseFloat(value(stage, ".stage__count b", "letter-spacing") ?? "0");
+    expect(em).toBeLessThanOrEqual(-0.045);
+    expect(value(stage, ".stage__count b", "font-variant-numeric")).toContain("proportional-nums");
+    expect(value(stage, ".stage__count", "column-gap")).toBe("calc(24 * var(--stage-u))");
+  });
+
   it("the 'Check-in' button that brings the card back keeps its green fill (DESIGN-fixcheck-1)", () => {
     // Stage.tsx puts data-theme="light" on it. The base `[data-theme] { background-color: var(--bg) }`
     // outranks the base `button { background-color: var(--accent) }` in the same layer, so without
@@ -183,9 +193,14 @@ describe("projector (#/checkin/stage and #/live/leaderboard at 1920 x 1080)", ()
     expect(value(board, ".board--many .pledger__place", "font-size")).toMatch(/^var\(--proj-/);
   });
 
-  it("IT1-PROJECTOR while a quiz or vote shows, the lane keeps only the newest late strip, so the panel keeps all its choices", () => {
-    // LateBanner puts the newest arrival first; the rest stay in its live region on their own timer.
-    expect(value(stage, ".stage:has(.stage__poll) .stage__late .late__item ~ .late__item", "display")).toBe("none");
+  it("IT1-PROJECTOR-risk-1 every late strip shows, a quiz or vote on screen or not: no rule hides one", () => {
+    // Each arrival leaves on its own 8 s timer (LateBanner.tsx), so a hidden older strip never came
+    // back. The ended panel stays up for the rest of class and makes room through the anchors.
+    const hides = (r: Rule) => r.decls.some(([k, v]) => (k === "display" && v === "none") || (k === "visibility" && v === "hidden") || (k === "opacity" && v === "0"));
+    // The selector's subject (its last compound, :has(...) taken out) is a strip or the strips' stack.
+    const subject = (s: string) => s.replace(/:has\((?:[^()]|\([^()]*\))*\)/g, "").trim().split(/\s*[\s>+~]\s*/).pop() ?? "";
+    const bad = [...stage, ...board].filter((r) => r.selectors.some((s) => /\.late(__item)?(?![\w-])/.test(subject(s))) && hides(r)).map((r) => r.selectors.join(", "));
+    expect(bad).toEqual([]);
     // Every strip is one full-width lower third, whatever its words.
     expect(value(stage, ".stage__late", "align-self")).toBe("stretch");
     expect(value(stage, ".stage__late .late", "align-items")).toBe("stretch");

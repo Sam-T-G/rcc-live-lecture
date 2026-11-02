@@ -86,6 +86,16 @@ function Swap({ text }: { text: string }) {
   );
 }
 
+// Each row's spot inside its list, by team.
+function spots(rows: Map<number, HTMLLIElement>) {
+  const at = new Map<number, { x: number; y: number }>();
+  rows.forEach((el, team) => {
+    const list = el.parentElement;
+    at.set(team, { x: el.offsetLeft - (list?.offsetLeft ?? 0), y: el.offsetTop - (list?.offsetTop ?? 0) });
+  });
+  return at;
+}
+
 // The ledger's rows by team, and the move when their order changes. `order` is the teams' ids in
 // the ledger's order; the returned function gives each row its ref. After a render whose order
 // changed, each team that left its slot travels from where its row was (a FLIP on transform), the
@@ -93,18 +103,18 @@ function Swap({ text }: { text: string }) {
 // falling one (40 ms behind) never shows through its words, then its row gets .pledger__row--moved
 // for HOLD_MARK. A team that moves between the two columns, or into or out of the ledger, doesn't
 // travel: travel stays inside one column. Holds are timers from the change, never transitionend.
+// Where each row starts from is read in the render that brings the new order, while the page
+// still shows the old one, so a window resize, a font that finished loading or a new line since
+// the last move never makes a team travel the wrong distance (IT1-PROJECTOR-risk-3).
 function useReorder(order: number[]) {
   const rows = useRef(new Map<number, HTMLLIElement>());
   const was = useRef<{ order: number[]; at: Map<number, { x: number; y: number }> } | null>(null);
   const timers = useRef<number[]>([]);
   const key = order.join(",");
+  if (was.current && was.current.order.join(",") !== key) was.current = { order: was.current.order, at: spots(rows.current) };
   useLayoutEffect(() => {
     const now = key ? key.split(",").map(Number) : [];
-    const at = new Map<number, { x: number; y: number }>();
-    rows.current.forEach((el, team) => {
-      const list = el.parentElement;
-      at.set(team, { x: el.offsetLeft - (list?.offsetLeft ?? 0), y: el.offsetTop - (list?.offsetTop ?? 0) });
-    });
+    const at = spots(rows.current);
     const before = was.current;
     was.current = { order: now, at };
     if (!before || before.order.join(",") === key) return;

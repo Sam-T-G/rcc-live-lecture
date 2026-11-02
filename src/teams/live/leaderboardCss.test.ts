@@ -45,6 +45,36 @@ describe("#/live/leaderboard's ledger rows, 7 or more teams included", () => {
     for (const s of firstRow) expect(s, s).toMatch(/\.board--many:not\(\.board--tied\)/);
   });
 
+  it("IT1-PROJECTOR-check-1 late strips sit side by side in one row on the frame's bottom and take the scoring line's spot, so two never reach a ledger row", () => {
+    // Measured at 1920 x 1080: the ledger ends at y 776 with 13 teams, 662 with 8, and the 1st
+    // place block at 812 with 5. One strip is 120 tall (y 864); two side by side are 147 (y 837).
+    // Stacked, two reached y 728 and covered the 5th row of both columns.
+    expect(decls("flex-direction", ".live-board__late", ".late").at(-1)).toBe("row");
+    expect(decls("left", ".live-board__late", ".late").at(-1)).toBe("var(--p-margin)");
+    expect(decls("right", ".live-board__late", ".late").at(-1)).toBe("var(--p-margin)");
+    expect(decls("bottom", ".live-board__late", ".late").at(-1)).toBe("var(--p-margin)");
+    expect(decls("flex", ".live-board__late", ".late__item").at(-1)).toBe("1 1 0");
+    expect(decls("max-width", ".live-board__late", ".late__item").at(-1)).toBe("calc(1080 * var(--stage-u))");
+    expect(decls("min-height", ".live-board__late", ".late__item").at(-1)).toBe("calc(120 * var(--stage-u))");
+    // The scoring line gives way while a strip shows, so it never shows cut in half behind one.
+    const foot = rules.filter((r) => r.selectors.some((s) => s.includes(".late__item") && /> \.lbfoot$/.test(s)));
+    expect(foot.flatMap((r) => r.decls)).toContainEqual(["visibility", "hidden"]);
+  });
+
+  it("IT1-PROJECTOR-check-3 past six teams the moved-row ring lies on the row's rules, clear of its words; the green leader's ring stays on its fill", () => {
+    // The compact rows have 6 of padding: a ring 4 inside them ran 7 into the words' ascent and
+    // descent. On the rules (-6, over the next row's rule) it clears them by 3.
+    const ring = (sel: string, prop: string) =>
+      rules.filter((r) => r.at.length === 0 && r.selectors.includes(sel)).flatMap((r) => r.decls.filter(([k]) => k === prop).map(([, v]) => v)).at(-1);
+    expect(ring(".board--many .pledger__row::after", "inset-block")).toBe("calc(-6 * var(--stage-u))");
+    expect(ring(".board--many .pledger__row::after", "z-index")).toBe("1");
+    const LEAD = ".board--many:not(.board--tied) > .pledger__row:first-child";
+    expect(ring(LEAD + "::after", "inset-block")).toBe("0");
+    // The leader's words sit 4 higher in the same 12 of padding.
+    expect(ring(LEAD, "padding-block")).toBe("calc(2 * var(--stage-u)) calc(10 * var(--stage-u))");
+    expect(ring(".board--many .pledger__row", "padding-block")).toBe("calc(6 * var(--stage-u))");
+  });
+
   it("a long name ends in '...' in its own column instead of pushing the credit off the row", () => {
     expect(decls("text-overflow", ".board--big", ".board__name").at(-1)).toBe("ellipsis");
     expect(decls("white-space", ".board--big", ".board__name").at(-1)).toBe("nowrap");
