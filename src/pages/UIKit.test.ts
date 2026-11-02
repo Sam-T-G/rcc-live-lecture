@@ -194,3 +194,13 @@ describe("TK-COPY-spec-2 the #/ui choice samples show Sending and Sent", () => {
     expect(readFileSync(new URL("./UIKit.tsx", import.meta.url), "utf8")).not.toContain("come with the COPY pass");
   });
 });
+
+// IT1-KIT-risk-1: the place badge sample shows a place the points board already prints
+// (Boards.test.ts host-frontend-23 pins "1st, tied"), so the gallery adds no new words.
+describe("IT1-KIT-risk-1 the #/ui place badge uses a place the app already prints", () => {
+  it("IT1-KIT-risk-1 every badge--place on #/ui reads 1st, tied", () => {
+    const places = [...open("#/ui").matchAll(/<span class="badge badge--place">([^<]*)<\/span>/g)].map((m) => m[1]);
+    expect(places.length).toBeGreaterThan(0);
+    expect(new Set(places)).toEqual(new Set(["1st, tied"]));
+  });
+});

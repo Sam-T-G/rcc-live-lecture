@@ -654,7 +654,7 @@ function BadgesAndBanners() {
         <Badge tone="live">Live</Badge>
         <Badge tone="warn">5 min late</Badge>
         <Badge tone="error">Not checked in</Badge>
-        <Badge tone="place">2nd, tied</Badge>
+        <Badge tone="place">1st, tied</Badge>
       </p>
       <p className="row">
         <StateChip tone="in" glyph="check">
