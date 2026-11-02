@@ -107,10 +107,10 @@
 @media (min-width: 901px) {
   .host-page > [role="tabpanel"] > .row:has(> .status[role="alert"]) { max-width: calc(100% - var(--aside-w) - var(--s6)); }
   /* The aside stays under the bar and the slide track while the main column scrolls, so its rows
-     (Undo, Ask the AI) never slide under the sticky band; a tall aside scrolls inside itself. The
-     inline padding keeps focus rings inside the scroll box. */
-  .host-desk > .host-side { position: sticky; top: calc(var(--bar-h) + 88px + var(--s4)); max-height: calc(100svh - var(--bar-h) - 88px - 2 * var(--s4));
-    overflow-y: auto; overscroll-behavior: contain; margin-inline: calc(-1 * var(--s2)); padding-inline: var(--s2); padding-bottom: var(--s2); }
+     (Undo, Ask the AI) never slide under the sticky band. A tall aside scrolls with the page, never
+     inside a box of its own, so a page scroll always reaches the Ask the AI note. */
+  .host-desk > .host-side { position: sticky; top: calc(var(--bar-h) + 88px + var(--s4)); margin-inline: calc(-1 * var(--s2));
+    padding-inline: var(--s2); padding-bottom: var(--s2); }
 }
 
 /* A busy button on #/host shows a still clock after 0.4s, never a turning ring: nothing loops on

@@ -31,13 +31,6 @@
 /* Delete's confirm opens on its own line under the actions (which keep their place), as one step
    of fill on the card with its glyph on the question's text edge; Delete is its one red fill. */
 .qa-q__confirm { flex: 0 0 calc(100% - 2 * var(--s3)); max-width: none; margin: var(--s2) var(--s3) 0; background: var(--on-raised); box-shadow: none; }
-/* With a mouse, a row's actions show while the pointer or keyboard focus is on that row (or its
-   delete confirm is open); at rest the questions and their chips carry the list. Opacity only:
-   the buttons keep their place, size and tab order, and touch screens always show them. */
-@media (hover: hover) and (pointer: fine) {
-  .qa-q__actions { transition: opacity var(--fx-fast) var(--ease); }
-  .qa-q:not(:hover, :focus-within, :has(.qa-q__confirm, [aria-busy="true"])) .qa-q__actions { opacity: 0; }
-}
 
 /* Grouped by topic: each topic's heading with its count, then its groups. */
 .qa-topic { display: grid; gap: var(--s2); margin-top: var(--s2); }
