@@ -1,0 +1,7 @@
+/* The student's quiz tiles (Quiz.tsx) on a phone under 360 wide: the state word at the end of a
+   tile (the clock and Sending, or the check and Sent) drops to 15px with a 16px glyph, so the
+   answer keeps room for whole words (comp phone-quiz-sending). */
+@media (max-width: 359px) {
+  .qfield .choice__state { font-size: var(--t-small); }
+  .qfield .choice__state .icon { width: 16px; height: 16px; }
+}

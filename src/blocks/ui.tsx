@@ -66,7 +66,9 @@ export function Card({ title, children }: { title?: string; children: ReactNode 
 // and Go home instead of going blank, for example on a tab still open from before a deploy that
 // removed a function it calls. It tries the page again when the URL's hash changes, so Go home or
 // any link clears it.
-type BoundaryProps = { label?: string; children?: ReactNode; page?: boolean };
+//
+// `prefix` opens the error line, before those words (the stage's "For the presenter:").
+type BoundaryProps = { label?: string; children?: ReactNode; page?: boolean; prefix?: ReactNode };
 
 export class ErrorBoundary extends Component<BoundaryProps, { failed: boolean }> {
   state = { failed: false };
@@ -103,9 +105,10 @@ export class ErrorBoundary extends Component<BoundaryProps, { failed: boolean }>
           </p>
         </Screen>
       );
+    const line = `${this.props.label || "This part of the page"} didn't load.`;
     return (
       <div className="row">
-        <Status kind="error">{`${this.props.label || "This part of the page"} didn't load.`}</Status>
+        <Status kind="error">{this.props.prefix ? <>{this.props.prefix} {line}</> : line}</Status>
         <button type="button" className="btn btn--quiet" onClick={this.retry}>Try again</button>
       </div>
     );

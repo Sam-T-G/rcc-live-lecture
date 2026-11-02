@@ -13,6 +13,7 @@
 // double click asks the room once and a double tap sends one answer.
 import { useRef, useState } from "react";
 import "./checkin.css";
+import "./quiz.css";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Status } from "../../blocks/ui";

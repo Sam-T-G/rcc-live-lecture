@@ -168,6 +168,12 @@ describe("projector (#/checkin/stage and #/live/leaderboard at 1920 x 1080)", ()
     expect(value(kit, ".pnote .icon", "color")).toBe("var(--st-open-mark)");
   });
 
+  it("TK-COPY-spec-1 the count's and the quiz's error lines show the label in the same color and weight, on the error's own line (the row keeps its height)", () => {
+    expect(value(stage, ".stage .row > .status--error > .pnote__who", "color")).toBe("var(--st-open-mark)");
+    expect(value(stage, ".stage .row > .status--error > .pnote__who", "font-weight")).toBe("var(--w-head)");
+    expect(value(stage, ".stage .row > .status--error > .pnote__who", "display")).toBeUndefined();
+  });
+
   it("past six teams the big board's rows are tighter, so ten teams fit 1080 tall (DESIGN-fixcheck-2)", () => {
     // StageBoard.tsx adds .board--many past six and lists at most ten (Page.test.ts): two columns
     // of rows at 40, the place on the name's first line.

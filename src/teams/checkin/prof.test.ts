@@ -214,6 +214,17 @@ describe("TK-COPY the staff sign-in screen's GDG on Campus logo and independence
     expect(display('[data-theme="dark"] .staff-gate .gate__logo-l', false)).toBe("none");
     expect(display('[data-theme="dark"] .staff-gate .gate__logo-d', false)).toBe("block");
   });
+
+  it("TKC-1 the logo and sentence block runs 640 wide, past the 560 column, so the sentence breaks into two even lines at 15px", () => {
+    // The sentence measures 1127px on one line in Google Sans at 15px (Chrome, the lab at 1280):
+    // at 560 balance spreads it over three lines; at 640 it takes two of about 565.
+    const rules = parse(readFileSync(new URL("./teacher.css", import.meta.url), "utf8"));
+    const last = (sel: string, prop: string) =>
+      rules.filter((r) => r.selectors.includes(sel) && !r.at.length).flatMap((r) => r.decls.filter(([k]) => k === prop).map(([, v]) => v)).at(-1);
+    expect(last(".staff-gate > .page > *", "max-width")).toBe("560px");
+    expect(last(".staff-gate > .page > .staff-gate__brand", "max-width")).toBe("640px");
+    expect(last(".staff-gate .page .indep", "text-wrap")).toBe("balance");
+  });
 });
 
 describe("ROLES DoorGate and the pairing screen on #/checkin/kiosk", () => {

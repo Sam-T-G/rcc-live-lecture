@@ -44,6 +44,16 @@ describe("the stage's left column: lane, count error and quiz panel never overla
     expect(plain.map((d) => d.v)).toContain("calc(var(--p-margin) + 144 * var(--stage-u))");
   });
 
+  it("TK-COPY-risk-2 without anchor positioning, a presenter note (196 tall with 'For the presenter:') gets 220 reserved, not 144", () => {
+    const NOTE = ".stage:has(> .stage__lane .pnote)";
+    const plain = (sel: string, prop: string) =>
+      values(sel, prop).filter((d) => d.at.some((a) => a.startsWith("@supports not (anchor-name"))).at(-1)?.v;
+    expect(plain(`${NOTE} .stage__card .stage__poll`, "bottom")).toBe("calc(var(--p-margin) + 220 * var(--stage-u))");
+    expect(plain(`${NOTE} ${COUNT_ROW}`, "bottom")).toBe("calc(var(--p-margin) + 220 * var(--stage-u))");
+    expect(plain(`${NOTE} .stage__card .stage__poll:has(.stage__bars)`, "max-height")).toBe("calc(668 * var(--stage-u))");
+    expect(plain(`${NOTE} ${COUNT_ERR} .stage__poll`, "bottom")).toBe("calc(var(--p-margin) + 364 * var(--stage-u))");
+  });
+
   it("a shortened panel never clips its question, count or choices: it keeps at least its content's height", () => {
     expect(last(`${LANE_FULL} .stage__card .stage__poll`, "min-height")?.v).toBe("min-content");
     // The tracks count every row's words, so min-content is the whole panel (an overflow:hidden

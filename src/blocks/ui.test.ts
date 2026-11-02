@@ -3,7 +3,7 @@
 // have no browser DOM, so they call, one at a time, what React calls when a part throws
 // (getDerivedStateFromError, then render, then componentDidCatch) and the Try again handler.
 import { readFileSync } from "node:fs";
-import { type ReactElement } from "react";
+import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ErrorBoundary } from "./ui";
@@ -33,6 +33,18 @@ describe("ErrorBoundary", () => {
 
   it("with a label, the line names the part: 'The leaderboard didn't load.'", () => {
     expect(renderToStaticMarkup(failed("The leaderboard").render() as ReactElement)).toContain("The leaderboard didn&#x27;t load.");
+  });
+
+  it("TK-COPY-spec-1 a `prefix` opens the error line, before the label's words; without one the line is what it was", () => {
+    const prefix = createElement("span", { className: "pnote__who" }, "For the presenter:");
+    const boundary = new ErrorBoundary({ label: "The quiz", prefix, children: "[the part]" });
+    boundary.state = { failed: true };
+    expect(renderToStaticMarkup(boundary.render() as ReactElement)).toBe(
+      '<div class="row"><p class="status status--error" role="alert"><span class="pnote__who">For the presenter:</span> The quiz didn&#x27;t load.</p><button type="button" class="btn btn--quiet">Try again</button></div>',
+    );
+    expect(renderToStaticMarkup(failed("The quiz").render() as ReactElement)).toBe(
+      '<div class="row"><p class="status status--error" role="alert">The quiz didn&#x27;t load.</p><button type="button" class="btn btn--quiet">Try again</button></div>',
+    );
   });
 
   it("logs the error with the label", () => {

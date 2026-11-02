@@ -28,7 +28,9 @@
 /* StaffGate's screen: the GDG on Campus logo and GDG's independence sentence above the title
    (comp staff-gate). The horizontal lockup 360 wide in light, the stacked one 144 tall in dark,
    each with its mark's ink on the text edge; the sentence 16 under the logo, its lines balanced
-   in the 560 column (two at 15px). */
+   into two at 15px. The sentence runs about 1127 on one line, so this block takes 640, past the
+   560 column (at 560 balance makes three lines). */
+.staff-gate > .page > .staff-gate__brand { max-width: 640px; }
 .staff-gate__brand { display: grid; gap: var(--s4); justify-items: start; margin-bottom: var(--s6); }
 .staff-gate .gate__logo-l { display: block; width: 360px; height: auto; margin-inline-start: -18px; }
 .staff-gate .gate__logo-d { display: none; width: auto; height: 144px; margin-inline-start: -13px; }

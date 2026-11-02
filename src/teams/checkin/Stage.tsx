@@ -59,7 +59,8 @@ import { SAVED, bindTo, bridgeIn, deckAddress, frameSrc, keyFor, savedBridge, ta
 const LETTERS = ["A", "B", "C", "D"];
 
 // Each presenter note opens with this on its own line beside the warning glyph (stage.css; comp
-// projector-stage-setup), so the room can tell which lines are for whoever runs the screen.
+// projector-stage-setup), so the room can tell which lines are for whoever runs the screen. The
+// count's and the quiz's error lines open with it too, on the same line (ErrorBoundary prefix).
 const FOR_PRESENTER = <span className="pnote__who">For the presenter:</span>;
 
 export default function Stage() {
@@ -130,11 +131,11 @@ export default function Stage() {
               <Icon name="x" />
             </button>
             <QR value={pageUrl("checkin/student")} size={150} />
-            <ErrorBoundary label="The check-in count">
+            <ErrorBoundary label="The check-in count" prefix={FOR_PRESENTER}>
               <Count />
             </ErrorBoundary>
             <p className="stage__hint">Scan to check in</p>
-            <ErrorBoundary label="The quiz">
+            <ErrorBoundary label="The quiz" prefix={FOR_PRESENTER}>
               <Poll />
             </ErrorBoundary>
           </div>

@@ -3,7 +3,7 @@
 // in stageLink.ts. The late banner is a stand-in that prints its name and each ErrorBoundary prints
 // its label, so a test can see where they sit. useHashParams is the real one unless a test hands
 // the stage its own parameters.
-import { createElement, type ReactNode } from "react";
+import { createElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,11 +20,16 @@ vi.mock("../../blocks/qr", async () => {
   const { createElement: h } = await import("react");
   return { QR: ({ value }: { value: string }) => h("figure", { className: "qr", "data-value": value }) };
 });
+// Each boundary's `prefix` (what opens its error line), by label, as the last render passed it.
+const prefixes = vi.hoisted(() => new Map<string | undefined, unknown>());
 vi.mock("../../blocks/ui", async (importOriginal) => {
   const { createElement: h } = await import("react");
   return {
     ...(await importOriginal<typeof import("../../blocks/ui")>()),
-    ErrorBoundary: ({ label, children }: { label?: string; children?: ReactNode }) => h("div", { "data-boundary": label }, children),
+    ErrorBoundary: ({ label, prefix, children }: { label?: string; prefix?: ReactNode; children?: ReactNode }) => {
+      prefixes.set(label, prefix);
+      return h("div", { "data-boundary": label }, children);
+    },
   };
 });
 const given = vi.hoisted(() => ({ params: null as URLSearchParams | null }));
@@ -472,6 +477,19 @@ describe("TK-COPY the stage's presenter notes start with 'For the presenter:'", 
       expect(html.split(WHO).length - 1, hash).toBe(notes);
       expect(html.match(OPENS)?.length, hash).toBe(notes);
     }
+  });
+
+  it("TK-COPY-spec-1 the count's and the quiz's error lines open with the label too (comps projector-stage-checkin--error, -quiz-ended--error); the late banner's doesn't", () => {
+    prefixes.clear();
+    open(`#/checkin/stage?deck=${DECK}`);
+    const html = (label: string) => {
+      const p = prefixes.get(label);
+      return p ? renderToStaticMarkup(p as ReactElement) : null;
+    };
+    expect(html("The check-in count")).toBe('<span class="pnote__who">For the presenter:</span>');
+    expect(html("The quiz")).toBe('<span class="pnote__who">For the presenter:</span>');
+    expect(prefixes.has("The late banner")).toBe(true);
+    expect(html("The late banner")).toBeNull();
   });
 
   it("TK-COPY a stage whose deck loads shows no note and no label", () => {

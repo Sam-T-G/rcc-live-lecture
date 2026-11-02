@@ -1049,8 +1049,7 @@ function ChoicesAndBars() {
           <Choice letter="B" state="picked" aria-pressed>
             Current
           </Choice>
-          {/* The state words (Sending, Sent) come with the COPY pass. */}
-          <Choice letter="C" state="sending">
+          <Choice letter="C" state="sending" word="Sending">
             Resistance
           </Choice>
           <Choice letter="D" state="error" word={<>Try again</>}>
@@ -1060,7 +1059,7 @@ function ChoicesAndBars() {
       </div>
       <div className="qfield uikit-qfield">
         <div className="choices">
-          <Choice letter="A" state="sent" word={<Icon name="check" />}>
+          <Choice letter="A" state="sent" word={<><Icon name="check" />Sent</>}>
             Charge
           </Choice>
           <Choice letter="B" state="out">

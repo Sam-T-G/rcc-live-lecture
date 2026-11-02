@@ -268,6 +268,9 @@ body.stage-body { margin: 0; overflow: hidden; }
    the glyph's color (comp projector-stage-setup), so the room can tell which lines are for
    whoever runs the screen. */
 .stage__lane .pnote__who { display: block; color: var(--st-open-mark); font-weight: var(--w-head); }
+/* The count's and the quiz's error lines (their ErrorBoundary's prefix) open with it too, on the
+   same line: on its own line the row grows 52 and the stack below has no room for that. */
+.stage .row > .status--error > .pnote__who { color: var(--st-open-mark); font-weight: var(--w-head); }
 /* A ?bridge=saved link opened in a tab with no saved key (Stage.tsx): the note tells the presenter
    that phones aren't following the slides. */
 .stage__warn { margin: 0; background: none; }
@@ -317,11 +320,11 @@ body.stage-body { margin: 0; overflow: hidden; }
 /* ------------------------------------------------------------------ the left column's stack
    Nothing in the left column overlaps: from the bottom up, the lane (late strips and notes),
    the count's error row, then the quiz panel, 24 apart. Each one's bottom sits on the top of
-   the box under it (CSS anchor positioning), so 1 to 3 late strips or a 2-line note push the
+   the box under it (CSS anchor positioning), so 1 to 3 late strips or a presenter note push the
    panel up instead of covering its last choices. With an empty lane and no count error, the
    panel and the row keep their bottom on the frame (.stage__poll above). The count's row
    (Count's ErrorBoundary) is the .row right before "Scan to check in". A browser without anchor
-   positioning reserves one 120 strip instead. */
+   positioning reserves one 120 strip instead, or one 196 note (@supports not, below). */
 .stage__lane { anchor-name: --stage-lane, --stage-foot; }
 .stage__card > .stage-card > .row:has(+ .stage__hint) { anchor-name: --stage-foot; }
 .stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card > .row:has(+ .stage__hint) {
@@ -340,7 +343,7 @@ body.stage-body { margin: 0; overflow: hidden; }
 }
 /* With the panel shortened, its rows drop their inner padding (the 6 rules still part them) and
    the question stops at 2 lines, so the question, the count and four choices fit above one late
-   strip, a 2-line note or the count's error. Two or more of those at once can still run past it. */
+   strip, a presenter note or the count's error. Two or more of those at once can still run past it. */
 .stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card :is(.stage__choice, .stage__bar),
 .stage__card > .stage-card:has(> .row + .stage__hint) :is(.stage__choice, .stage__bar) {
   padding-block: calc(2 * var(--stage-u));
@@ -352,6 +355,20 @@ body.stage-body { margin: 0; overflow: hidden; }
 }
 .stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card:has(> .row + .stage__hint) .stage__poll {
   bottom: calc(var(--p-margin) + 288 * var(--stage-u));
+}
+/* A presenter note is 196 tall ("For the presenter:" on its own line, then two lines), so a
+   browser without anchor positioning reserves 196 plus the 24 gap above one instead of 144. */
+@supports not (anchor-name: --a) {
+  .stage:has(> .stage__lane .pnote) .stage__card > .stage-card > .row:has(+ .stage__hint),
+  .stage:has(> .stage__lane .pnote) .stage__card .stage__poll {
+    bottom: calc(var(--p-margin) + 220 * var(--stage-u));
+  }
+  .stage:has(> .stage__lane .pnote) .stage__card .stage__poll:has(.stage__bars) {
+    max-height: calc(668 * var(--stage-u));
+  }
+  .stage:has(> .stage__lane .pnote) .stage__card > .stage-card:has(> .row + .stage__hint) .stage__poll {
+    bottom: calc(var(--p-margin) + 364 * var(--stage-u));
+  }
 }
 @supports (anchor-name: --a) {
   .stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card > .row:has(+ .stage__hint) {

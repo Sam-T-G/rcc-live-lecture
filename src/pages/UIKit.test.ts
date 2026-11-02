@@ -139,10 +139,12 @@ describe("DS-KIT-design-2 #/ui shows the checked-in stub, the heading line and t
 });
 
 describe("DS-KIT-risk-5 #/ui adds no on-screen words the app doesn't have yet", () => {
-  it("no Sent, Sending, Offline, Show slide or See all teams on #/ui or #/ui/projector", () => {
+  // Sent and Sending left this list with the COPY pass (TK-COPY), which put them on the phone's
+  // quiz tiles; the kit's samples show them now (TK-COPY-spec-2 below).
+  it("no Offline, Show slide or See all teams on #/ui or #/ui/projector", () => {
     for (const hash of ["#/ui", "#/ui/projector"]) {
       const text = words(open(hash));
-      for (const w of [/\bSent\b/, /\bSending\b/, /\bOffline\b/, /Show slide/, /See all teams/]) expect(text, `${hash} ${w}`).not.toMatch(w);
+      for (const w of [/\bOffline\b/, /Show slide/, /See all teams/]) expect(text, `${hash} ${w}`).not.toMatch(w);
     }
   });
 
@@ -174,5 +176,21 @@ describe("e2e-ui-gallery-sideways #/ui never scrolls sideways at phone width", (
     const css = parse(readFileSync(new URL("../styles/uikit.css", import.meta.url), "utf8"));
     const rule = css.find((r) => r.selectors.includes(".uikit-trackscroll > .track") && r.at.length === 0);
     expect(rule?.decls).toContainEqual(["min-width", "max-content"]);
+  });
+});
+
+// TK-COPY-spec-2: the kit's quiz tiles carry the same state words the phone shows (Quiz.tsx;
+// comps phone-quiz-sending and phone-quiz-sent): the clock and "Sending" on the tile that's
+// sending, the check and "Sent" on the answer that's in.
+describe("TK-COPY-spec-2 the #/ui choice samples show Sending and Sent", () => {
+  it("TK-COPY-spec-2 C (sending) ends with the clock and Sending; A (sent) with the check and Sent", () => {
+    const html = open("#/ui");
+    expect(html).toMatch(
+      /<button type="button" class="choice" aria-busy="true"><span class="letter">C<\/span><span>Resistance<\/span><span class="choice__state"><svg class="icon choice__clock"[^>]*>(?:(?!<\/svg>).)*<\/svg>Sending<\/span><\/button>/,
+    );
+    expect(html).toMatch(
+      /<button type="button" class="choice is-picked is-locked"><span class="letter">A<\/span><span>Charge<\/span><span class="choice__state"><svg class="icon"[^>]*>(?:(?!<\/svg>).)*<\/svg>Sent<\/span><\/button>/,
+    );
+    expect(readFileSync(new URL("./UIKit.tsx", import.meta.url), "utf8")).not.toContain("come with the COPY pass");
   });
 });
