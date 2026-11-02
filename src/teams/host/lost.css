@@ -20,3 +20,16 @@
 .host-lane--words .host-lost { flex-wrap: wrap; column-gap: var(--s5); }
 .host-lane--words .host-lost__label { flex: none; }
 .host-track:has(> .host-lane--words) { height: auto; min-height: 88px; }
+
+/* The counts: past slides' counts in --muted, the current slide's in --text, so the count that
+   matters now leads at the same size and weight (emphasis is color). */
+.host-lane .track__n { position: relative; isolation: isolate; color: var(--muted); }
+.host-lane .track__n--now:not(.track__n--zero) { color: var(--text); }
+
+/* A new "I'm lost" tap on the current slide (MOTION.md lost-tap): the count swaps at once and a
+   --st-open tint behind it fades in on --fx-fast, holds 8s (Page.tsx runs the hold from the tap,
+   capped at 15s from the first tap), and fades out on --fx-slow. Opacity only, so the
+   reduced-motion form is the same; the number, segment and slide number never move. */
+.host-lane .track__n::before { content: ""; position: absolute; z-index: -1; inset: -7px 2px -1px; border-radius: var(--r-xs);
+  background: var(--st-open); opacity: 0; transition: opacity var(--fx-slow) var(--ease); pointer-events: none; }
+.host-lane .track__n.is-marked::before { opacity: 1; transition-duration: var(--fx-fast); }

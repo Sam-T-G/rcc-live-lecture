@@ -17,7 +17,7 @@
 //     the open panel; it uses the kit's classes and keys (left and right arrows, Home and End,
 //     one Tab stop on the open tab).
 //   Any other #/host/<part> shows "No page at #/host/<part>".
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { SignedInAs } from "../../blocks/auth";
@@ -178,6 +178,63 @@ const laneFits = (count: number) => count <= LANE_MAX;
 
 type Slide = ReturnType<typeof useDeckSlide>;
 
+// The lost-tap mark (MOTION.md lost-tap): how long a new tap's tint stays behind the current
+// slide's count. A professor glances at the laptop every 10 to 30 seconds, so the tint holds 8s
+// (plus its 90ms fade-in); more taps push the end out, never past 15s from the first tap. After a
+// capped clear, taps in the next 8s change only the number, so a steady stream can't blink the
+// tint back on every 15s.
+export const HOLD_GLANCE = 8000;
+export const HOLD_GLANCE_MAX = 15000;
+const FADE_IN = 90;
+export type Glance = { first: number | null; restUntil: number };
+export const NO_GLANCE: Glance = { first: null, restUntil: 0 };
+
+// A tap at `now`: the mark's next state and when to clear it (null: during the rest, no mark).
+// `capped` says the clear comes from the 15s cap, so a rest follows it.
+export function glanceTap(g: Glance, now: number): { g: Glance; clearAt: number; capped: boolean } | null {
+  if (now < g.restUntil) return null;
+  const first = g.first ?? now;
+  const hold = now + FADE_IN + HOLD_GLANCE;
+  const cap = first + HOLD_GLANCE_MAX;
+  return { g: { first, restUntil: 0 }, clearAt: Math.min(hold, cap), capped: hold > cap };
+}
+
+// The mark cleared at `now`: a rest follows a capped clear.
+export const glanceClear = (capped: boolean, now: number): Glance => ({ first: null, restUntil: capped ? now + HOLD_GLANCE : 0 });
+
+// Whether the current slide's count shows the tint: on when its count goes up on the same slide
+// (a new tap), off at the clear time, on a slide change, or when the lane goes. The clear timer
+// starts at the tap, never on transitionend, so a cancelled fade can't leave the tint on.
+function useLostMark(at: number, n: number | null): boolean {
+  const [marked, setMarked] = useState(false);
+  const glance = useRef<Glance>(NO_GLANCE);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const prev = useRef({ at, n });
+  useEffect(() => {
+    const p = prev.current;
+    prev.current = { at, n };
+    if (p.at !== at || n === null) {
+      clearTimeout(timer.current);
+      glance.current = NO_GLANCE;
+      setMarked(false);
+      return;
+    }
+    if (p.n === null || n <= p.n) return;
+    const now = Date.now();
+    const tap = glanceTap(glance.current, now);
+    if (!tap) return;
+    glance.current = tap.g;
+    setMarked(true);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      glance.current = glanceClear(tap.capped, Date.now());
+      setMarked(false);
+    }, Math.max(0, tap.clearAt - now));
+  }, [at, n]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return marked;
+}
+
 // "Lost by slide": how many students tapped "I'm lost" on each slide this class. The lane draws one
 // segment per slide (the current one filled, its number bold) with each slide's count over it: a
 // slide already shown with no taps prints a quiet 0, a slide not reached yet prints nothing. The
@@ -190,6 +247,9 @@ function LostBySlide({ slide }: { slide: Slide }) {
   const lane = !!slide && laneFits(slides);
   const counted = lane && rows !== undefined && rows.length > 0;
   const count = (i: number) => rows?.find((r) => r.index === i)?.count ?? (i <= at ? 0 : null);
+  // The current slide's count once the counts have loaded (null before, or with no lane), for the
+  // lost-tap mark: 0 with no taps yet, so the class's first tap is marked too.
+  const marked = useLostMark(at, lane && rows !== undefined ? count(at) : null);
   return (
     <div className={lane ? "track__lane host-lane" : "host-lane host-lane--words"} style={{ "--slides": Math.max(slides, 1) } as CSSProperties}>
       <p className="host-lost">
@@ -210,8 +270,9 @@ function LostBySlide({ slide }: { slide: Slide }) {
         Array.from({ length: slides }, (_, i) => {
           const n = count(i);
           if (n === null) return null;
+          const cls = ["track__n", n === 0 && "track__n--zero", i === at && "track__n--now", i === at && marked && "is-marked"];
           return (
-            <span key={`n${i}`} className={n === 0 ? "track__n track__n--zero" : "track__n"} style={{ gridRow: 1, gridColumn: i + 2 }} aria-hidden="true">
+            <span key={`n${i}`} className={cls.filter(Boolean).join(" ")} style={{ gridRow: 1, gridColumn: i + 2 }} aria-hidden="true">
               {n}
             </span>
           );

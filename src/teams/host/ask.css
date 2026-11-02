@@ -4,9 +4,15 @@
    the kit's (src/styles/kit.css), and this sheet places them. */
 
 /* ------------------------------------------------------------ Ask the room */
-/* The empty card: its sentence in --text at the card-title size, under the heading row. */
-.ask > .status--empty { padding-block: 0; font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.4; color: var(--text); }
+/* The empty card: its sentence in --text one step over the card title, under the heading row, and
+   the card keeps the focal card's weight (280 tall) before the class's first question. */
+.ask > .status--empty { padding-block: 0; font-size: var(--t-h2); font-weight: var(--w-head); line-height: 1.35; color: var(--text); }
+.ask:has(> .status--empty) { min-height: 280px; }
 .ask > .status--error { margin-block: 0; }
+/* Draft with AI while the AI writes: its words stay, and the still clock leads them inside the
+   button's own padding, so the button keeps its width. */
+.ask__draft[aria-busy="true"] .btn__label { opacity: 1; }
+.ask__draft .btn__spinner { inset: 0 auto 0 var(--s2); width: 1.1em; height: 1.1em; margin: auto 0; }
 /* Loading: the step named, then three still blocks where the question will be. */
 .ask__load { display: grid; gap: var(--s2); }
 .ask__load > .status { padding-block: 0; }
@@ -21,6 +27,9 @@
 
 /* The bars: the kit's ruled chart on the card (letter, words over the track, count then %). */
 .ask-bars { list-style: none; margin: 0; padding: 0; }
+/* On the card the rows drop the well's inset: letters start on the card's text edge (x 80) in
+   draft, open and ended, and the % ends on its right edge. */
+.ask-bars > .ruled__row { padding-inline: 0; }
 .ask-bar__text { min-width: 0; overflow-wrap: anywhere; }
 /* "top pick" on a vote: plain words on the label line; green stays on a quiz's right answer. */
 .ask-bar__top { color: var(--text); }
@@ -68,8 +77,12 @@
 .ask-run__q { flex: 1 1 16em; min-width: 0; margin: 0; font-size: var(--t-body); font-weight: var(--w-head); line-height: 1.4; overflow-wrap: anywhere; }
 
 /* ------------------------------------------------------ Who got it wrong */
-.ask-wrong__q { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--s3); font-size: var(--t-body); font-weight: var(--w-head); line-height: 1.4;
-  overflow-wrap: anywhere; }
+/* The question the list is about: a muted caption under the heading (the card beside it shows it
+   in full), its state word ending the first line. The card's Open stays the one green word. */
+.ask-wrong .host-sec__head { margin-bottom: var(--s2); }
+.ask-wrong__q { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--s3); align-items: first baseline;
+  font-size: var(--t-small); font-weight: var(--w-body); line-height: var(--lh-small); color: var(--muted); overflow-wrap: anywhere; }
+.ask-wrong__q .stateword { color: var(--muted); }
 .ask-wrong__sum { font-size: var(--t-body); line-height: 1.5; color: var(--muted); }
 /* The well before anyone is listed: the table's head over one row with the line that says why. */
 .ask-wrong__wait { --rcols: 37% 33% minmax(0, 1fr); }
@@ -87,3 +100,16 @@
 .ask-wrong__table td:nth-child(2) { overflow: hidden; }
 /* The AI's note: the kit's answer well, under the table. */
 .ask-note { margin: 0; font-size: var(--t-body); line-height: 1.5; white-space: pre-wrap; }
+
+/* ------------------------------------------------- the question ending (MOTION.md question-ended) */
+/* AskRoom puts .ask--ending on the card for 700ms after the open question ends. The state word,
+   the header's buttons and the counts change in the same frame with no motion (the word's ink
+   snaps with it). The old count leaves at once; the % right (a quiz with a right answer), the
+   right answer's tag and each % fade in on --fx-slow after a --fx-fast wait, so two values never
+   share a slot. A vote keeps its count, still. The right row's fill steps to green on --fx-slow;
+   its letter tile snaps fill and ink together (an inverting part never fades). Bars keep their
+   widths. Effects only (opacity, background-color), so the reduced-motion form is the same. */
+@keyframes ask-arrive { from { opacity: 0; } }
+.ask--ending :is(.ask__tally.tally--accent, .rbar__tag, .rbar__pct) { animation: ask-arrive var(--fx-slow) var(--ease) var(--fx-fast) backwards; }
+.ask--ending .ask-bars .rbar__fill { transition: background-color var(--fx-slow) var(--ease); }
+.ask--ending .stateword { transition: none; }

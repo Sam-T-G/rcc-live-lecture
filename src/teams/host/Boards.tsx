@@ -117,7 +117,7 @@ function TeamsCard({ teams }: { teams: Teams | undefined }) {
             return (
               <li key={g.team} className="ruled__row points-team">
                 <span className="points-team__place">
-                  <Badge>{ordinal(g.rank) + (tied ? ", tied" : "")}</Badge>
+                  <Badge tone="place">{ordinal(g.rank) + (tied ? ", tied" : "")}</Badge>
                 </span>
                 <div className="points-team__main">
                   <p className="points-team__head">
@@ -300,6 +300,7 @@ function EndCard() {
       <h2>End of class</h2>
       <div className="points-end__acts">
         <ConfirmButton
+          openerVariant="outline"
           question={END_CLASS_QUESTION}
           confirm="End class"
           onConfirm={async () => {

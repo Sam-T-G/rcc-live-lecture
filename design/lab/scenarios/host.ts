@@ -227,6 +227,27 @@ export const scenarios: Scenario[] = [
     title: "HO-17 HO-24 Quiz ended: 71% right, 10 wrong listed",
     fixtures: { ...live, ...quizEnded },
   }),
+  // Motion: the professor's End lands 300ms after the page opens, so the shot (taken after the
+  // last step) shows the question-ended moment's end state; motion/MOTION.md question-ended.
+  host({
+    id: "host-now-quiz-just-ended",
+    title: "HO-17 motion: the open quiz ends while the page is open",
+    fixtures: { ...live, ...quizOpen },
+    later: [{ afterMs: 300, fixtures: { ...live, ...quizEnded } }],
+  }),
+  // Motion: a student taps I'm lost on the current slide (4) after the page opens, so its count
+  // goes 3 to 4 and the tint holds behind it; motion/MOTION.md lost-tap.
+  host({
+    id: "host-now-lost-tap",
+    title: "HO-03 motion: a new I'm lost tap on slide 4",
+    fixtures: { ...live, ...quizOpen },
+    later: [
+      {
+        afterMs: 300,
+        fixtures: { ...live, ...quizOpen, ...fx(api.live.read.lostCount, 4), ...fx(api.live.read.lostBySlide, C.lostBySlide.map((r) => (r.index === 3 ? { ...r, count: 4 } : r))) },
+      },
+    ],
+  }),
   host({
     id: "host-now-vote-ended",
     title: "HO-17 HO-22 Vote ended: top pick, no right answer (comp host-quiz-ended--vote)",

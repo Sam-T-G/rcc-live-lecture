@@ -11,7 +11,7 @@
 // the room and Cancel take the heading row's action slot, and an existing question folds to its
 // heading (and, while it's open, its question with End), so the form opens where the professor
 // pressed Draft with AI or Write my own.
-import { useId, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
@@ -42,6 +42,7 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
   const pollOpen = !!current?.open;
   const noClass = useNoClass();
   const loading = current === undefined;
+  const ending = useEnding(current ? { id: current.id, open: current.open } : null);
 
   async function draft() {
     setDrafting(true);
@@ -100,7 +101,7 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
   // while the class's question loads, and step aside while a new question is being written.
   const start = form ? null : (
     <>
-      <Button variant={current ? "outline" : "primary"} size="lg" busy={drafting} disabled={loading} onClick={draft}>
+      <Button className="ask__draft" variant={current ? "outline" : "primary"} size="lg" busy={drafting} disabled={loading} onClick={draft}>
         Draft with AI
       </Button>
       <Button variant="outline" size="lg" onClick={writeOwn} disabled={loading || drafting}>
@@ -110,7 +111,7 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
   );
 
   return (
-    <section className={form ? "hcard ask ask--draft" : "hcard ask"}>
+    <section className={["hcard ask", form && "ask--draft", ending && "ask--ending"].filter(Boolean).join(" ")}>
       {current ? <Running key={current.id} poll={current} writing={!!form} actions={start} /> : <Head actions={start} />}
       {loading && (
         <div className="ask__load">
@@ -141,6 +142,36 @@ export default function AskRoom({ slideIndex }: { slideIndex: number | null }) {
       {error && <Status kind="error">{error}</Status>}
     </section>
   );
+}
+
+// How long the card keeps .ask--ending after the open question ends: the whole moment (ask.css,
+// MOTION.md question-ended) is over by 310ms, and no animation runs past 700ms.
+export const ENDING_MS = 700;
+
+// Whether `next` is the same question as `prev`, just ended: the moment the professor's End lands.
+// A different question, the first look at a question, or one that's still open is not.
+export function justEnded(prev: { id: string; open: boolean } | null, next: { id: string; open: boolean } | null): boolean {
+  return !!prev && !!next && prev.id === next.id && prev.open && !next.open;
+}
+
+// True for ENDING_MS after the class's question goes from open to ended, so ask.css can play the
+// question-ended moment. It turns on in the same render as the ended question (React's "state from
+// the previous render" pattern), so the new numbers and the moment's first frame land together; a
+// question that loads already ended never plays it.
+function useEnding(poll: { id: string; open: boolean } | null): boolean {
+  const [prev, setPrev] = useState(poll);
+  const [ending, setEnding] = useState(0);
+  if (prev?.id !== poll?.id || prev?.open !== poll?.open) {
+    setPrev(poll);
+    if (justEnded(prev, poll)) setEnding((n) => n + 1);
+    else if (ending) setEnding(0);
+  }
+  useEffect(() => {
+    if (!ending) return;
+    const t = setTimeout(() => setEnding(0), ENDING_MS);
+    return () => clearTimeout(t);
+  }, [ending]);
+  return ending > 0;
 }
 
 // The card's heading row: "Ask the room" with the question's state word beside it, its facts
@@ -290,7 +321,7 @@ function Running({ poll, writing, actions }: { poll: Poll; writing: boolean; act
 function Tally({ open, stats }: { open: boolean; stats: Stats | null | undefined }) {
   if (!stats)
     return (
-      <div className="tally ask__tally">
+      <div key="wait" className="tally ask__tally">
         <span className="tally__lead n-hero">
           <span className="skel skel--num" aria-hidden="true" />
         </span>
@@ -300,7 +331,7 @@ function Tally({ open, stats }: { open: boolean; stats: Stats | null | undefined
   const median = !open && stats.medianSec !== null;
   if (!open && stats.rightPct !== null)
     return (
-      <div className="tally tally--accent ask__tally">
+      <div key="right" className="tally tally--accent ask__tally">
         <span className="tally__lead n-hero">
           {stats.rightPct}
           <span className="num__unit">%</span>
@@ -317,7 +348,7 @@ function Tally({ open, stats }: { open: boolean; stats: Stats | null | undefined
       </div>
     );
   return (
-    <div className="tally ask__tally">
+    <div key="count" className="tally ask__tally">
       <span className="sr-only">{`${stats.answered} of ${stats.checkedIn} answered`}</span>
       <span className="tally__lead n-hero" aria-hidden="true">
         {stats.answered}

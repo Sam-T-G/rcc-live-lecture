@@ -68,7 +68,10 @@
 .host-desk > * { min-width: 0; }
 /* The focal card's heading row holds its size in every state, with or without an action. */
 .host-head { min-height: 56px; }
-.host-head .hline__t { align-self: start; margin: 0; flex-wrap: wrap; line-height: 1.3; letter-spacing: 0; }
+/* The title centers on the 56 action slot; a title with a facts line under it stays one block
+   centered on the slot, and a lone title spans both rows so it centers on the whole slot. */
+.host-head .hline__t { align-self: center; margin: 0; flex-wrap: wrap; line-height: 1.3; letter-spacing: 0; }
+.host-head:not(:has(> .facts)) .hline__t { grid-row: 1 / span 2; }
 .host-head .facts { margin: 0; }
 .host-head .hline__end { flex-wrap: wrap; justify-content: flex-end; }
 
@@ -82,6 +85,38 @@
 .host-sec__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--s2) var(--s3); }
 .host-sec__head > .btn { margin-block: calc(-1 * var(--s2)); }
 .host-sec > p { margin: 0; }
+
+/* An error inside a card or the aside: the warning glyph hangs on the text edge in --st-stop-mark
+   and the words are --text, with no fill, so a one-line error never outranks the card's content. */
+.host-page :is(.hcard, .host-side) .status[role="alert"] { margin-block: 0; border-radius: 0; background: none; color: var(--text);
+  border-inline-width: calc(1.1em + var(--s2)) 0; }
+
+/* A part that fails (ErrorBoundary's .row: the line and Try again) keeps the frame of the part it
+   replaces: a failed Ask the room, or a whole failed tab, is the focal card at its empty size; a
+   failed aside is the aside's well. Same words, same Try again. */
+.host-desk > .row:first-child:has(> .status[role="alert"]),
+.host-page > [role="tabpanel"] > .row:has(> .status[role="alert"]) { align-items: center; align-content: flex-start; justify-content: space-between;
+  gap: var(--s4); min-height: 280px; padding: var(--s6) var(--s8); border-radius: var(--r-xl); background: var(--focal-fill);
+  box-shadow: var(--hl), var(--shadow-1); }
+.host-desk > .row:last-child:not(:first-child):has(> .status[role="alert"]) { align-items: center; align-content: flex-start;
+  justify-content: space-between; gap: var(--s3); min-height: 96px; margin-top: var(--s6); padding: var(--s4); border-radius: var(--r-xl);
+  background: var(--well); }
+:is(.host-desk, [role="tabpanel"]) > .row > .status[role="alert"] { margin: 0; font-weight: var(--w-head); }
+.host-desk > .row:first-child > .status[role="alert"],
+.host-page > [role="tabpanel"] > .row > .status[role="alert"] { font-size: var(--t-h3); }
+@media (min-width: 901px) {
+  .host-page > [role="tabpanel"] > .row:has(> .status[role="alert"]) { max-width: calc(100% - var(--aside-w) - var(--s6)); }
+  /* The aside stays under the bar and the slide track while the main column scrolls, so its rows
+     (Undo, Ask the AI) never slide under the sticky band; a tall aside scrolls inside itself. The
+     inline padding keeps focus rings inside the scroll box. */
+  .host-desk > .host-side { position: sticky; top: calc(var(--bar-h) + 88px + var(--s4)); max-height: calc(100svh - var(--bar-h) - 88px - 2 * var(--s4));
+    overflow-y: auto; overscroll-behavior: contain; margin-inline: calc(-1 * var(--s2)); padding-inline: var(--s2); padding-bottom: var(--s2); }
+}
+
+/* A busy button on #/host shows a still clock after 0.4s, never a turning ring: nothing loops on
+   the lectern screen. */
+.host-root .btn__spinner { animation: rcc-show 1ms linear 400ms forwards; border: 0; border-radius: 0; background: currentColor;
+  -webkit-mask: var(--clock-glyph) center / contain no-repeat; mask: var(--clock-glyph) center / contain no-repeat; }
 
 /* -------------------------------------------- "Group by topic with AI" (QA.tsx) */
 /* A switch for one setting that applies at once, drawn as the kit's .switch: off, a 2px
