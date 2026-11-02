@@ -323,7 +323,8 @@ describe("the quiz card, answering", () => {
     expect(sent("checkin/quiz:answer")).toHaveLength(1);
     const sending = card();
     expect(choices(sending).map((b) => b.props.disabled)).toEqual([true, true, true]);
-    expect(press(sending, "B Current")).toBe("disabled");
+    // The tapped tile ends with "Sending" while it sends (TK-COPY).
+    expect(press(sending, "B Current Sending")).toBe("disabled");
 
     // The first answer lands; any other send comes back "You already answered."
     const [first, ...more] = sent("checkin/quiz:answer");
@@ -350,6 +351,41 @@ describe("the quiz card, answering", () => {
     expect(words(after)).toContain("You picked A. Tap another to change it.");
     expect(press(after, "B Current")).toBe("clicked");
     expect(sent("checkin/quiz:answer").map((s) => s.args.choice)).toEqual([0, 1]);
+  });
+
+  // TK-COPY (Sam's call T14): the tapped tile carries its state word at its end, as comps
+  // phone-quiz-sending and phone-quiz-sent draw it.
+  const stateWord = (tile: Host) => {
+    const state = tile.children.find((c): c is Host => typeof c !== "string" && c.props.className === "choice__state");
+    return state?.children.map((c) => (typeof c === "string" ? c : `<${c.type} class="${String(c.props.className)}">`));
+  };
+
+  it("TK-COPY while an answer sends, its tile says 'Sending' after the clock glyph; once the quiz answer is in, it says 'Sent' after the check", async () => {
+    press(card(), "B Current");
+    const sending = card();
+    expect(stateWord(button(sending, "B Current Sending").el)).toEqual(['<svg class="icon choice__clock">', "Sending"]);
+    expect(stateWord(button(sending, "A Charge").el)).toBeUndefined();
+    expect(stateWord(button(sending, "C Voltage").el)).toBeUndefined();
+
+    sent("checkin/quiz:answer")[0].resolve(null);
+    server.results["checkin/quiz:mine"] = 1;
+    await settle();
+    const after = card();
+    expect(stateWord(button(after, "B Current Sent").el)).toEqual(['<svg class="icon icon--d">', "Sent"]);
+    expect(stateWord(button(after, "A Charge").el)).toBeUndefined();
+    expect(words(after)).not.toContain("Sending");
+  });
+
+  it("TK-COPY a vote's tile says 'Sending' while the pick sends, and no 'Sent' once it lands, since the pick can still change", async () => {
+    server.results["checkin/quiz:current"] = open("p1", "vote");
+    press(card(), "A Charge");
+    expect(button(card(), "A Charge Sending").el.props.disabled).toBe(true);
+    sent("checkin/quiz:answer")[0].resolve(null);
+    server.results["checkin/quiz:mine"] = 0;
+    await settle();
+    const after = card();
+    expect(button(after, "A Charge").el.props["aria-pressed"]).toBe(true);
+    expect(words(after)).not.toMatch(/\bSent\b|Sending/);
   });
 
   it("checkin-frontend-17 a failed answer's error goes away when the professor asks the next question", async () => {

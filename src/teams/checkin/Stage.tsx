@@ -58,6 +58,10 @@ import { SAVED, bindTo, bridgeIn, deckAddress, frameSrc, keyFor, savedBridge, ta
 
 const LETTERS = ["A", "B", "C", "D"];
 
+// Each presenter note opens with this on its own line beside the warning glyph (stage.css; comp
+// projector-stage-setup), so the room can tell which lines are for whoever runs the screen.
+const FOR_PRESENTER = <span className="pnote__who">For the presenter:</span>;
+
 export default function Stage() {
   const params = useHashParams();
   const link = (params.get("deck") ?? "").trim();
@@ -101,11 +105,11 @@ export default function Stage() {
             <Icon name="warning" />
             {link ? (
               <span>
-                <b>That deck link didn't work.</b> Put your deck's address after <code>?deck=</code> in this page's link.
+                {FOR_PRESENTER} <b>That deck link didn't work.</b> Put your deck's address after <code>?deck=</code> in this page's link.
               </span>
             ) : (
               <span>
-                Add <code>{"?deck=<your deck's address>"}</code> to this page's link.
+                {FOR_PRESENTER} Add <code>{"?deck=<your deck's address>"}</code> to this page's link.
               </span>
             )}
           </p>
@@ -114,7 +118,7 @@ export default function Stage() {
           <p className="stage__warn" data-theme="light" role="alert">
             <span className="pnote" data-surface="projector">
               <Icon name="warning" />
-              <span>Phones aren't getting these slides. Open this page from the full link again.</span>
+              <span>{FOR_PRESENTER} Phones aren't getting these slides. Open this page from the full link again.</span>
             </span>
           </p>
         )}

@@ -8,7 +8,8 @@ import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DoorGate, StaffGate } from "./prof";
+import { parse } from "../../styles/cssRules";
+import { DoorGate, SignInScreen, StaffGate } from "./prof";
 
 const results: Record<string, unknown> = {};
 const asked: [string, unknown][] = []; // every query a render ran, with its args ("skip" left out)
@@ -134,6 +135,84 @@ describe("ROLES StaffGate on every professor page", () => {
     auth.loading = false;
     expect(page()).toBe("[the quiz page]");
     expect(asked).toEqual([["staff:me", {}]]);
+  });
+});
+
+// TK-COPY (Sam's call T14): the staff sign-in screen carries the GDG on Campus logo and GDG's
+// independence sentence above the page's title, as comp design/comps/staff/staff-gate.html has
+// them: the horizontal lockup in light, the stacked one in dark. The files sit in public/, so each
+// address starts with Vite's base path (/rcc-live-lecture/ on GitHub Pages, / in dev).
+describe("TK-COPY the staff sign-in screen's GDG on Campus logo and independence sentence", () => {
+  const INDEP =
+    "GDG on Campus Riverside City College is an independent group; our activities and the opinions expressed here should in no way be linked to Google, the corporation.";
+  const LOGOS = ["gdg-on-campus-horizontal-light.svg", "gdg-on-campus-stacked-dark.svg"];
+  const ROOT = new URL("../../../", import.meta.url);
+  // Everything the screen draws before the page's title.
+  const top = (html: string) => html.slice(0, html.indexOf("<h1>"));
+
+  it("TK-COPY signed out: the light logo, the dark logo and the sentence come before the title, and Google's button after it", () => {
+    results["staff:me"] = null;
+    const html = page();
+    expect(top(html)).toContain(
+      '<img class="gate__logo-l" src="/gdg-on-campus-horizontal-light.svg" alt="GDG on Campus Riverside City College" width="360" height="73"/>',
+    );
+    expect(top(html)).toContain(
+      '<img class="gate__logo-d" src="/gdg-on-campus-stacked-dark.svg" alt="GDG on Campus Riverside City College" width="104" height="144"/>',
+    );
+    expect(top(html)).toContain(`<p class="indep">${INDEP}</p>`);
+    expect(html).toContain("<h1>Live quiz</h1>");
+    expect(html.indexOf("<h1>Live quiz</h1>")).toBeLessThan(html.indexOf("[Google button, typed sign-in under it]"));
+  });
+
+  it("TK-COPY each logo's address starts with the app's base path, so it loads under /rcc-live-lecture/ on GitHub Pages", () => {
+    vi.stubEnv("BASE_URL", "/rcc-live-lecture/");
+    results["staff:me"] = null;
+    const srcs = [...page().matchAll(/<img [^>]*src="([^"]*)"/g)].map((m) => m[1]);
+    expect(srcs).toEqual(LOGOS.map((f) => `/rcc-live-lecture/${f}`));
+  });
+
+  it("TK-COPY checking and a sign-in the page doesn't open for keep the logo and the sentence, so the title stays put when the check lands", () => {
+    auth.loading = true;
+    expect(top(page())).toContain(`<p class="indep">${INDEP}</p>`);
+    auth.loading = false;
+    results["staff:me"] = staff("student1@example.edu", null);
+    const refused = page();
+    expect(top(refused)).toContain('class="gate__logo-l"');
+    expect(top(refused)).toContain(`<p class="indep">${INDEP}</p>`);
+    expect(words(refused)).toContain("student1@example.edu isn't on the staff list.");
+  });
+
+  it("TK-COPY a professor's open page shows neither, and SignInScreen without `brand` (#/admin) draws what it drew before", () => {
+    results["staff:me"] = staff("prof@example.edu", "professor");
+    expect(page()).toBe("[the quiz page]");
+    expect(renderToStaticMarkup(createElement(SignInScreen, { title: "Admin", children: "[the reason]" }))).toBe(
+      '<div class="staff-gate"><main class="page page--wide"><h1>Admin</h1>[the reason]</main></div>',
+    );
+  });
+
+  it("TK-COPY the sentence is word for word the comp's, and public/ has both logos byte for byte as design/system/assets has them", () => {
+    const comp = readFileSync(new URL("design/comps/staff/staff-gate.html", ROOT), "utf8");
+    expect(comp).toContain(`<p class="indep">${INDEP}</p>`);
+    for (const f of LOGOS) {
+      const shipped = readFileSync(new URL(`public/${f}`, ROOT));
+      expect(shipped.equals(readFileSync(new URL(`design/system/assets/${f}`, ROOT))), f).toBe(true);
+    }
+  });
+
+  it("TK-COPY teacher.css shows the light logo in light and the dark logo in dark, by the system setting or data-theme", () => {
+    const rules = parse(readFileSync(new URL("./teacher.css", import.meta.url), "utf8"));
+    // The last display each selector gets, with the at-rules around it.
+    const display = (sel: string, media: boolean) =>
+      rules
+        .filter((r) => r.selectors.includes(sel) && r.at.some((a) => /prefers-color-scheme:\s*dark/.test(a)) === media)
+        .flatMap((r) => r.decls.filter(([k]) => k === "display").map(([, v]) => v))
+        .at(-1);
+    expect(display(".staff-gate .gate__logo-l", false)).toBe("block");
+    expect(display(".staff-gate .gate__logo-d", false)).toBe("none");
+    expect(display(':root:not([data-theme="light"]) .staff-gate .gate__logo-l', true)).toBe("none");
+    expect(display(':root:not([data-theme="light"]) .staff-gate .gate__logo-d', true)).toBe("block");
+    expect(display('[data-theme="dark"] .staff-gate .gate__logo-l', false)).toBe("none");
+    expect(display('[data-theme="dark"] .staff-gate .gate__logo-d', false)).toBe("block");
   });
 });
 

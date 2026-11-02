@@ -232,6 +232,35 @@ describe("sweep2-checkin-9 F17.3 an open quiz shows answered of checked in, live
   });
 });
 
+// TK-COPY (Sam's call T14): the picked tile carries the state word at its end, as comp
+// phone-quiz-sent draws it: the check glyph and "Sent" once a quiz answer is in. A vote's pick can
+// still change, so it says no "Sent" (its line under the tiles says "You picked B.").
+describe("TK-COPY the phone's quiz tile says Sent once the answer is in", () => {
+  const tiles = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => m[1]);
+  beforeEach(() => {
+    who.user = { name: "Ada Lovelace", email: "ada@example.edu" };
+  });
+
+  it("TK-COPY a quiz answer that's in ends its tile with the check glyph and 'Sent'; the other tiles show no state word", () => {
+    Object.assign(answers, { "checkin/quiz:current": open("quiz"), "checkin/quiz:mine": 1, "checkin/read:me": true });
+    const [a, b, c] = tiles(card());
+    expect(b).toMatch(/^<b>B<\/b> Coulomb <span class="choice__state"><svg class="icon icon--d"[^>]*>.*<\/svg>Sent<\/span>$/);
+    expect(a).toBe("<b>A</b> Ohm");
+    expect(c).toBe("<b>C</b> Faraday");
+  });
+
+  it("TK-COPY a vote's pick has no 'Sent', and an open quiz with no answer shows no state word", () => {
+    Object.assign(answers, { "checkin/quiz:current": open("vote"), "checkin/quiz:mine": 1, "checkin/read:me": true });
+    let html = card();
+    expect(html).toContain("You picked B.");
+    expect(html).not.toContain("choice__state");
+    expect(html).not.toMatch(/\bSent\b|\bSending\b/);
+    Object.assign(answers, { "checkin/quiz:current": open("quiz"), "checkin/quiz:mine": null });
+    html = card();
+    expect(tiles(html)).toEqual(["<b>A</b> Ohm", "<b>B</b> Coulomb", "<b>C</b> Faraday"]);
+  });
+});
+
 describe("sweep2-checkin-11 F17.5 'This class' gives '% right' for a quiz with a right answer only", () => {
   it("a quiz with a right answer shows '67% right'; a vote and a quiz with no right answer show none", () => {
     Object.assign(answers, {

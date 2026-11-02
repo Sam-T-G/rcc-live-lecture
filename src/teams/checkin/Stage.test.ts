@@ -448,3 +448,35 @@ describe("the stage's link (stageLink.ts)", () => {
     expect(deckAddress("http://localhost.example.com/deck", true)?.href).toBe("https://localhost.example.com/deck");
   });
 });
+
+// TK-COPY (Sam's call T14): each presenter note on the stage starts with "For the presenter:" on
+// its own line after the warning glyph, as comps projector-stage-setup and
+// projector-stage-setup--no-deck draw it, so the room can tell which lines are for whoever runs
+// the screen. The note's own words stay as they were.
+describe("TK-COPY the stage's presenter notes start with 'For the presenter:'", () => {
+  const WHO = '<span class="pnote__who">For the presenter:</span> ';
+  // The warning glyph, then the note's words, which open with the label.
+  const OPENS = /<svg class="icon"[^>]*>(?:(?!<\/svg>).)*<\/svg><span><span class="pnote__who">For the presenter:<\/span> /g;
+
+  it("TK-COPY no ?deck=, a deck link that can't load, and a ?bridge=saved link with no saved key each open their note with the label", () => {
+    vi.stubGlobal("sessionStorage", stubStorage());
+    const cases: [hash: string, line: string, notes: number][] = [
+      ["#/checkin/stage", "For the presenter: Add ?deck=<your deck's address> to this page's link.", 1],
+      ["#/checkin/stage?deck=decks/week9/", "For the presenter: That deck link didn't work. Put your deck's address after ?deck= in this page's link.", 1],
+      [`#/checkin/stage?bridge=saved&deck=${DECK}`, "For the presenter: Phones aren't getting these slides. Open this page from the full link again.", 1],
+      ["#/checkin/stage?bridge=saved", "For the presenter: Phones aren't getting these slides. Open this page from the full link again.", 2],
+    ];
+    for (const [hash, line, notes] of cases) {
+      const html = open(hash);
+      expect(words(html), hash).toContain(line);
+      expect(html.split(WHO).length - 1, hash).toBe(notes);
+      expect(html.match(OPENS)?.length, hash).toBe(notes);
+    }
+  });
+
+  it("TK-COPY a stage whose deck loads shows no note and no label", () => {
+    vi.stubGlobal("sessionStorage", stubStorage());
+    expect(open(`#/checkin/stage?deck=${DECK}`)).not.toContain("For the presenter:");
+    expect(open(`#/checkin/stage?bridge=gdg.k1&deck=${DECK}`)).not.toContain("For the presenter:");
+  });
+});

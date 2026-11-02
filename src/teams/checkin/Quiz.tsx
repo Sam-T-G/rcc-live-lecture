@@ -153,7 +153,10 @@ function Answer({ poll, mine, here, signedIn, ended }: { poll: Poll; mine: numbe
 
   // One tile's look (kit .choice): the student's pick keeps its fill and takes the ring; while an
   // answer sends, the tapped tile is busy with the same ring and the others step down to the out
-  // fill, as they do once a quiz answer is in; a failed send rings its tile red.
+  // fill, as they do once a quiz answer is in; a failed send rings its tile red. The tapped tile
+  // ends with "Sending" while it sends, and a quiz answer that's in ends with the check and
+  // "Sent" (comps phone-quiz-sending and phone-quiz-sent); a vote's pick can still change, so it
+  // gets no "Sent".
   function tile(i: number) {
     const busy = sending && tapped === i;
     const out = (sending && tapped !== null && tapped !== i) || (locked && mine !== i);
@@ -181,7 +184,12 @@ function Answer({ poll, mine, here, signedIn, ended }: { poll: Poll; mine: numbe
               aria-busy={(sending && tapped === i) || undefined}
             >
               <b>{LETTERS[i]}</b> {c}
-              {sending && tapped === i && <Icon name="clock" className="choice__clock" />}
+              {/* A space before the word, so the button reads "B Current Sent". */}
+              {sending && tapped === i ? (
+                <> <span className="choice__state"><Icon name="clock" className="choice__clock" />Sending</span></>
+              ) : (
+                locked && mine === i && <> <span className="choice__state"><Icon name="check" className="icon--d" />Sent</span></>
+              )}
             </button>
           ))}
         </div>

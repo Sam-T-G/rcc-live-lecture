@@ -160,6 +160,14 @@ describe("projector (#/checkin/stage and #/live/leaderboard at 1920 x 1080)", ()
     expect(value(stage, ".stage__late .late__item", "font-size")).toBe("var(--p-body)");
   });
 
+  it("TK-COPY a presenter note's 'For the presenter:' is its own first line, in the warning glyph's color (comp projector-stage-setup)", () => {
+    expect(value(stage, ".stage__lane .pnote__who", "display")).toBe("block");
+    expect(value(stage, ".stage__lane .pnote__who", "color")).toBe("var(--st-open-mark)");
+    expect(value(stage, ".stage__lane .pnote__who", "font-weight")).toBe("var(--w-head)");
+    // The glyph takes the same color in the kit, so the label reads with it.
+    expect(value(kit, ".pnote .icon", "color")).toBe("var(--st-open-mark)");
+  });
+
   it("past six teams the big board's rows are tighter, so ten teams fit 1080 tall (DESIGN-fixcheck-2)", () => {
     // StageBoard.tsx adds .board--many past six and lists at most ten (Page.test.ts): two columns
     // of rows at 40, the place on the name's first line.

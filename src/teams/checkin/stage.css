@@ -264,6 +264,10 @@ body.stage-body { margin: 0; overflow: hidden; }
   font-size: var(--p-small);
   overflow-wrap: anywhere;
 }
+/* "For the presenter:" opens each note (Stage.tsx) on its own line beside the warning glyph, in
+   the glyph's color (comp projector-stage-setup), so the room can tell which lines are for
+   whoever runs the screen. */
+.stage__lane .pnote__who { display: block; color: var(--st-open-mark); font-weight: var(--w-head); }
 /* A ?bridge=saved link opened in a tab with no saved key (Stage.tsx): the note tells the presenter
    that phones aren't following the slides. */
 .stage__warn { margin: 0; background: none; }
