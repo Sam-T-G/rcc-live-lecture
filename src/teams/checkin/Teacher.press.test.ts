@@ -35,6 +35,7 @@ vi.mock("react", async (orig) => {
       return list[i];
     },
     useEffect: () => {},
+    useLayoutEffect: () => {},
     useId: () => {
       const [list, i] = slot(() => `id${hooks.slots.size}-${hooks.at}`);
       return list[i];

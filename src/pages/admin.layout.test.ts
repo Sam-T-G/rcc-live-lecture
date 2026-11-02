@@ -38,3 +38,16 @@ describe("DS-STAFF-risk-5 #/admin is one column under 1024 wide", () => {
     }
   });
 });
+
+// IT1-STAFF design loop (round 1 judges): row actions and the role pickers.
+describe("IT1-STAFF-4 #/admin row actions and role pickers", () => {
+  it("IT1-STAFF-4 Remove and Unpair are --muted at rest and red only on hover or keyboard focus", () => {
+    expect(value(".admin__act > .btn--danger", "color", 1440)).toBe("var(--muted)");
+    expect(value(".admin__act > .btn--danger:is(:hover, :focus-visible)", "color", 1440)).toBe("var(--error)");
+  });
+
+  it("IT1-STAFF-4 the role pickers draw the kit's chevron, not the browser's", () => {
+    expect(value(".admin-people td select", "appearance", 1440)).toBe("none");
+    expect(value(".admin-people td select", "background", 1440)).toContain("var(--select-chev)");
+  });
+});

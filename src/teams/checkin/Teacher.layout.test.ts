@@ -63,9 +63,10 @@ describe("DS-STAFF-risk-1 #/checkin/teacher opens under the staff bar", () => {
 
 describe("DS-STAFF-design-1 This class keeps Past classes near the first view", () => {
   // At 1440x900 with 38 check-ins the list was 1680px tall and Past classes started at y 1972.
-  it("DS-STAFF-design-1 the check-in list scrolls inside its well, about 8 rows tall, at every width", () => {
+  // It ends on row 8's bottom edge: at 8.5 rows the 9th row was cut through its words (IT1 staff-craft-1-1).
+  it("DS-STAFF-design-1 the check-in list scrolls inside its well, 8 whole rows tall, at every width", () => {
     for (const w of [720, 860, 960, 1280, 1440]) {
-      expect(value(".att-list", "max-height", w), `${w}`).toMatch(/^calc\(8\.5 \* var\(--row-h\)/);
+      expect(value(".att-list", "max-height", w), `${w}`).toMatch(/^calc\(8 \* var\(--row-h\)/);
       expect(value(".att-list", "overflow-y", w), `${w}`).toBe("auto");
     }
   });
@@ -95,5 +96,35 @@ describe("DS-STAFF-risk-4 the scanner comes first when the page is one column", 
       expect(value(".att-desk > .att-side", "grid-column", w), `${w}`).toBeUndefined();
       expect(value(".att-desk > .att-main", "grid-column", w), `${w}`).toBeUndefined();
     }
+  });
+});
+
+// IT1-STAFF design loop (round 1 judges): row actions, the result panel and its motion.
+describe("IT1-STAFF-2 a row's Remove is quiet at rest; End class keeps its red", () => {
+  it("IT1-STAFF-2 Remove is --muted at rest and red only on hover or keyboard focus; End class stays --error", () => {
+    expect(value(".att-row__action > .btn--danger", "color", 1440)).toBe("var(--muted)");
+    const hover = RULES.find((r) => r.selectors.some((s) => s.trim() === ":is(.att-row__action, .att-status) > .btn--danger:is(:hover, :focus-visible)"));
+    expect(hover?.decls).toContainEqual(["color", "var(--error)"]);
+    expect(value(":is(.att-row__action, .att-status) > .btn--danger", "color", 1440)).toBe("var(--error)");
+  });
+});
+
+describe("IT1-STAFF-3 the result panel keeps one 120 slot and moves only transform and opacity", () => {
+  const css = readFileSync(new URL("./teacher.css", import.meta.url), "utf8");
+  const keyframes = (css.match(/@keyframes att-[a-z]+ \{.*\}/g) ?? []).map((k) => k.replace(/\s+/g, " "));
+  it("IT1-STAFF-3 the stop panel shares .att-result's 120 min-height; the rise is a transform, the fill a background-color", () => {
+    expect(value(".att-result", "min-height", 1440)).toBe("120px");
+    expect(value(".att-result--stop", "min-height", 1440)).toBeUndefined();
+    expect(value(".att-result--stop", "background", 1440)).toBe("var(--st-stop)");
+    expect(keyframes).toEqual([
+      "@keyframes att-fill { from { background-color: transparent; } }",
+      "@keyframes att-rise { from { transform: translateY(40%); } to { transform: none; } }",
+      "@keyframes att-fade { from { opacity: 0; } to { opacity: 1; } }",
+    ]);
+  });
+
+  it("IT1-STAFF-3 under reduced motion the words fade in place (no rise)", () => {
+    const reduced = RULES.filter((r) => r.at.some((a) => a.includes("prefers-reduced-motion: reduce")) && r.selectors.some((s) => s.trim() === ".att-result__mask > *"));
+    expect(reduced.flatMap((r) => r.decls)).toEqual([["animation", "att-fade var(--fx-slow) var(--ease) both"]]);
   });
 });

@@ -44,17 +44,26 @@
 /* While the server checks the sign-in: the action's 48 slot as a well, the clock and the step. */
 .staff-gate__wait { display: inline-flex; align-items: center; gap: var(--s3); min-height: 48px; padding: 0 var(--s5) 0 var(--s4);
   background: var(--well); color: var(--text); border-radius: var(--r-md); }
+/* The signed-out screen has one line of sentence before Google's button; the checking slot leaves
+   that line's room, so the action slot sits at one y while the check lands. */
+.staff-gate > .page > .staff-gate__wait { margin-top: calc(1.5 * var(--t-body) + var(--s5)); }
 .staff-gate__wait > .icon { width: 20px; height: 20px; color: var(--muted); }
 .staff-gate__wait > .status { padding: 0; color: var(--text); font-weight: var(--w-head); }
-/* A sign-in the page doesn't open for: the lock hangs before the reason, in the muted ink. */
+/* A sign-in the page doesn't open for: the reason and Sign out in the same --well slot as the
+   checking line, the lock hanging before them in the muted ink. */
+.staff-gate__why { padding: var(--s4) var(--s5) var(--s4) var(--s4); background: var(--well); color: var(--text); border-radius: var(--r-md); }
 .staff-gate__why > .icon { color: var(--muted); }
+.staff-gate__why > div > p { text-wrap: pretty; }
 .staff-gate__why > div > p:first-child { margin-top: 0; }
+.staff-gate__why > div > p:last-child { margin-bottom: 0; }
 
 /* ------------------------------------------------- #/checkin/teacher */
 /* The page head: the count line (the page's lead number), the link to the quiz page on its
    baseline at the right; then the class status and End class. */
 .att-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: var(--s6); }
 .att-count { margin: 0; }
+/* Two sizes in the line: the lead numeral, then the words and the late count at --n-sm. */
+.att-count > :is(.tally__w, .tally__rest) { font-size: var(--n-sm); font-weight: var(--w-body); }
 .att-count:not(.tally--accent) .tally__lead { color: var(--muted); }
 /* A number still loading: a block the numeral's cap height on its baseline, so nothing moves when
    it lands. */
@@ -87,18 +96,24 @@
 /* This class scrolls inside its well after about 8 rows, so Past classes and its CSVs stay near the
    first view with a full class checked in. A row's Remove focuses Cancel, which scrolls its box
    into view inside the list. */
-.att-list { --rcols: minmax(0, 1fr) 96px 112px; max-height: calc(8.5 * var(--row-h) + 2 * var(--s1)); overflow-y: auto; }
+.att-list { --rcols: minmax(0, 1fr) 96px 112px; max-height: calc(8 * var(--row-h) + 2 * var(--s1)); overflow-y: auto; overflow-anchor: none; }
 .att-past { --rcols: minmax(0, 1fr) 120px 136px; }
 .att-row__name { min-width: 0; overflow-wrap: anywhere; }
 .att-row__name > .badge { margin-inline-start: var(--s2); }
 .att-past__n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .att-row__action { position: relative; display: flex; justify-content: flex-end; }
 /* Remove and End class are ConfirmButtons, whose opener is the kit's danger button. Here it draws
-   as the kit's ghost row action with red words: 32 tall, no fill, the --line-strong ring on hover
-   and keyboard focus. The red fill stays on the confirming button inside the question box. */
+   as the kit's ghost row action: 32 tall, no fill, the --line-strong ring on hover and keyboard
+   focus. End class keeps red words; a row's Remove is --muted at rest and turns red on hover and
+   focus, so 38 rows don't end in a red column. The red fill stays on the confirming button. */
 :is(.att-row__action, .att-status) > .btn--danger { min-height: var(--btn-sm); padding: 0 var(--s3); font-size: var(--t-small);
   background-color: transparent; color: var(--error); }
-:is(.att-row__action, .att-status) > .btn--danger:is(:hover, :focus-visible) { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.att-row__action > .btn--danger { color: var(--muted); }
+:is(.att-row__action, .att-status) > .btn--danger:is(:hover, :focus-visible) { color: var(--error); box-shadow: inset 0 0 0 1px var(--line-strong); }
+/* A check-in that just arrived (Names, staff-scan-in): the st-in tint for --hold-new, Remove in the
+   tint's ink; then the fill fades out on --fx-slow and the words snap back. */
+.att-list > .att-row.is-new .att-row__action > .btn--danger:not(:hover, :focus-visible) { color: var(--on-st-in); }
+.att-list > .att-row.was-new { transition: background-color var(--fx-slow) var(--ease); }
 /* The row's question box rises over its row from the action's slot, so the list never reflows. */
 .att-row__action > .confirm { position: absolute; top: calc(-1 * var(--s2)); right: calc(-1 * var(--s2)); z-index: 3;
   width: max-content; max-width: min(34rem, 80vw); text-align: start; white-space: normal; }
@@ -118,7 +133,7 @@
 /* Off, the video stays mounted (so start() can play into it) and shows nothing. */
 .att-cam > .scanner__video--off { opacity: 0; }
 .att-cam > .cam__corners { inset: var(--s4) auto auto 50%; width: auto; height: calc(100% - var(--tap) - 3 * var(--s4)); aspect-ratio: 1; transform: translateX(-50%); }
-.att-cam.cam--off > .cam__corners { color: var(--line-strong); }
+.att-cam.cam--off > .cam__corners { color: var(--muted); }
 .att-cam.has-msg > .cam__corners { display: none; }
 .att-cam .cam__corners polyline { fill: none; stroke: currentColor; stroke-width: 4px; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .att-cam__act { position: relative; z-index: 1; align-self: end; display: grid; justify-items: center; gap: var(--s3); max-width: 100%; }
@@ -126,18 +141,38 @@
 .att-cam__act > .row { margin: 0; justify-content: center; }
 .att-cam__act > .status { margin: 0; }
 
-/* The last scan: the kit's result panel (.scanres): the check before "Checked in", the name and
-   the email under it; one already in is the waiting tone with the repeat glyph. The card inside
-   draws no box of its own here. */
+/* The last scan: the kit's result panel (.scanres), one 120 slot for every result: the check
+   before "Checked in", the name and the email under it; one already in is the waiting tone with
+   the repeat glyph; a refusal is the stop tone with the warning glyph and the reason. The card
+   inside draws no box of its own here. */
 .att-result { grid-template-columns: 24px minmax(0, 1fr); column-gap: var(--s3); row-gap: var(--s1); align-items: center; min-height: 120px; align-content: start; }
 .att-result > .icon { grid-column: 1; grid-row: 1; width: 24px; height: 24px; stroke-width: 32; color: var(--st-in-mark); }
 .att-result > .panel { display: contents; }
-.att-result > .panel > * { grid-column: 2; margin: 0; }
-.att-result > .panel > h2 { grid-row: 1; font-size: var(--t-h2); line-height: 1.25; font-weight: var(--w-loud); }
-.att-result .pass__name { font-size: var(--t-h3); line-height: 1.3; font-weight: var(--w-head); overflow-wrap: anywhere; }
+.att-result > .panel > *, .att-result > .att-result__mask { grid-column: 2; margin: 0; }
+.att-result > .panel > .att-result__mask:first-child { grid-row: 1; }
+.att-result h2 { margin: 0; font-size: var(--t-h2); line-height: 1.25; font-weight: var(--w-loud); }
+.att-result .pass__name { margin: 0; font-size: var(--t-h3); line-height: 1.3; font-weight: var(--w-head); overflow-wrap: anywhere; }
 .att-result .muted { color: inherit; font-size: var(--t-small); overflow-wrap: anywhere; }
 .att-result--again { background: var(--st-wait); color: var(--on-st-wait); }
 .att-result--again > .icon { color: var(--st-wait-mark); }
+.att-result--stop { background: var(--st-stop); color: var(--on-st-stop); }
+.att-result--stop > .icon { align-self: start; margin-top: calc((1.3em - 24px) / 2); color: var(--st-stop-mark); font-size: var(--t-h3); }
+.att-result--stop > .att-result__mask { grid-row: 1; }
+.att-result--stop .att-result__reason { margin: 0; font-size: var(--t-h3); line-height: 1.3; font-weight: var(--w-head); text-wrap: pretty; }
+
+/* staff-scan-in (design motion MOTION.md): each result mounts fresh (Teacher.tsx keys it by scan),
+   so it plays once. The fill comes in on --fx; the headline and the name rise through their own
+   masks on --sp-fast; the email fades in on --fx-slow. Reduced motion: no rise, the words fade. */
+.att-result__mask { overflow: hidden; overflow: clip; }
+.att-result { animation: att-fill var(--fx) var(--ease) both; }
+.att-result__mask > * { animation: att-rise var(--sp-fast) var(--ease-arrive) both; }
+.att-result > .panel > .muted { animation: att-fade var(--fx-slow) var(--ease) both; }
+@keyframes att-fill { from { background-color: transparent; } }
+@keyframes att-rise { from { transform: translateY(40%); } to { transform: none; } }
+@keyframes att-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .att-result__mask > * { animation: att-fade var(--fx-slow) var(--ease) both; }
+}
 
 /* The typed code and its Check in button on one line, the button level with the field. */
 .att-code { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--s3); margin: 0; }
@@ -150,8 +185,13 @@
 .att-start-panel > :is(.status, .row) { margin: 0; }
 .att-start { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: var(--s3) var(--s4); margin: 0; }
 .att-start .field { margin: 0; }
-.att-start__saved { grid-column: 1; margin: 0; align-self: center; }
-.att-start > .btn { grid-column: 2; justify-self: end; }
+/* The time field's picker button draws the app's clock glyph, not the browser's. */
+.att-start input[type="time"]::-webkit-calendar-picker-indicator { width: 20px; height: 20px; padding: 0; background: var(--muted);
+  -webkit-mask: var(--clock-glyph) center / 20px no-repeat; mask: var(--clock-glyph) center / 20px no-repeat; cursor: pointer; }
+/* The saved line and Save on one row under both fields, so the line gets the row's width. */
+.att-start__foot { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--s4); min-width: 0; }
+.att-start__saved { min-width: 0; margin: 0; }
+.att-start__foot > .btn { flex: none; margin-inline-start: auto; }
 /* The two fields on one grid: labels on one line, the day hint under Class starts, the inputs on
    one line, whatever the hint does. */
 @supports (grid-template-rows: subgrid) {
@@ -161,11 +201,10 @@
     .att-start > .field > .field__label { grid-row: 1; }
     .att-start > .field > .field__hint { grid-row: 2; }
     .att-start > .field > :last-child { grid-row: 3; }
-    .att-start > :is(.att-start__saved, .btn) { grid-row: 4; margin-top: var(--s3); }
+    .att-start > .att-start__foot { grid-row: 4; margin-top: var(--s3); }
   }
 }
 
 @media (max-width: 720px) {
   .att-start { grid-template-columns: minmax(0, 1fr); }
-  .att-start > .btn { grid-column: 1; justify-self: start; }
 }

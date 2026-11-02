@@ -13,7 +13,7 @@ import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../convex/_generated/api";
 import { SignedInAs } from "../blocks/auth";
-import { Badge, Button, ConfirmButton, EmptyState, Field, Icon, Segmented, type Choice } from "../blocks/kit";
+import { Button, ConfirmButton, EmptyState, Field, Icon, Segmented, StateChip, type Choice } from "../blocks/kit";
 import { ErrorBoundary, Screen, Status } from "../blocks/ui";
 import { NotStaff, SignInChecking, SignInEnding, SignInRefused, SignInScreen, StaffBar, useStaff, type StaffMe } from "../teams/checkin/prof";
 import { stillPaired, type Paired } from "./paired";
@@ -99,7 +99,10 @@ export function ProfessorView() {
             </ErrorBoundary>
           </div>
           <div className="admin__main">
-            <p className="muted admin__note">Only admins can add people.</p>
+            <p className="notice notice--plain admin__note">
+              <Icon name="lock" />
+              <span>Only admins can add people.</span>
+            </p>
             <ErrorBoundary label="The door iPad list">
               <Devices />
             </ErrorBoundary>
@@ -144,7 +147,7 @@ export function AddPerson() {
       <h2>Add someone</h2>
       <form onSubmit={submit} className="admin-add">
         <Field label="Email" hint="The Google account they sign in with.">
-          {(f) => <input {...f} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" required />}
+          {(f) => <input {...f} className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" required />}
         </Field>
         <Segmented label="Role" options={ROLES} value={role} onChange={setRole} />
         <p className="muted">
@@ -242,7 +245,10 @@ function PersonRow({ p, onError }: { p: Person; onError: (message: string) => vo
       <td>
         {p.locked ? (
           <span className="admin__locked">
-            Admin <Badge>Permanent</Badge>
+            Admin{" "}
+            <StateChip tone="neutral" glyph="lock">
+              Permanent
+            </StateChip>
           </span>
         ) : (
           <select
@@ -356,7 +362,7 @@ function PairDevice() {
           )}
         </Field>
         <Field label="Name" hint="Where the iPad is, like A-210 door.">
-          {(f) => <input {...f} value={label} onChange={(e) => setLabel(e.target.value)} maxLength={40} autoComplete="off" required />}
+          {(f) => <input {...f} className="input" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={40} autoComplete="off" required />}
         </Field>
         {error && <Status kind="error">{error}</Status>}
         <Button type="submit" busy={busy}>
@@ -407,7 +413,14 @@ function DeviceRow({ d }: { d: Device }) {
       <div>
         <p className="admin__label">{d.label}</p>
         <p className="muted admin__email">
-          Paired by {d.pairedBy}, {when(d.pairedAt)}. {d.lastUsedAt === null ? "No scans yet." : `Last scan ${when(d.lastUsedAt)}.`}
+          Paired by {d.pairedBy}, <span className="nowrap">{when(d.pairedAt)}.</span>{" "}
+          {d.lastUsedAt === null ? (
+            "No scans yet."
+          ) : (
+            <>
+              Last scan <span className="nowrap">{when(d.lastUsedAt)}.</span>
+            </>
+          )}
         </p>
       </div>
       <span className="admin__act">

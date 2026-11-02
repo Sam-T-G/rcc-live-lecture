@@ -18,7 +18,13 @@
 .admin-sec > * { margin: 0; }
 .admin-sec > h2, .admin-pair > h2 { font-size: var(--t-h3); line-height: 1.3; }
 .admin__note { font-size: var(--t-small); }
+/* A professor's "Only admins can add people.": the kit's plain notice, the lock in its 24 column. */
+.admin__note.notice > .icon { margin-top: calc((1.5em - 20px) / 2); }
 .admin-empty > :is(.status, .empty) { padding: 0; }
+/* An empty list is one quiet line in its well, like attendance's "No one yet.": no bold title. */
+.admin-empty .empty { gap: var(--s1); }
+.admin-empty .empty__title { font-size: var(--t-body); line-height: 1.5; font-weight: var(--w-body); }
+.admin-empty .empty__text { font-size: var(--t-small); }
 
 /* Add someone: the email, the role, the roles' sentence, then Add. */
 .admin-add { display: grid; gap: var(--s4); justify-items: start; max-width: 40rem; }
@@ -35,7 +41,12 @@
 .admin-people__act { width: 112px; }
 .admin-people .trunc { --trunc: 100%; }
 .admin-people .admin__email { overflow-wrap: normal; }
-.admin-people td select { min-height: var(--btn-sm); padding-block: 0; font-size: var(--t-small); }
+/* The role pickers: the kit's small select drawing (.select--sm) on the bare <select>, the kit
+   chevron in place of the browser's. */
+.admin-people td select { appearance: none; -webkit-appearance: none; min-height: var(--btn-sm); padding: 0 var(--s8) 0 var(--s3);
+  border: 1px solid var(--line-strong); border-radius: var(--r-sm); font-size: var(--t-small); color: var(--text);
+  background: var(--raised) var(--select-chev) right var(--s3) center / 16px 16px no-repeat; }
+.admin-people td select:disabled { background-color: var(--well); }
 .admin__locked { display: inline-flex; align-items: center; gap: var(--s2); }
 .admin__when { font-variant-numeric: tabular-nums; }
 .admin__act { position: relative; text-align: right; }
@@ -44,10 +55,11 @@
 @media (min-width: 1024px) { .admin-people { overflow: visible; } }
 
 /* Remove and Unpair are ConfirmButtons, whose opener is the kit's danger button. Here it draws as
-   the kit's ghost row action with red words: 32 tall, no fill, the --line-strong ring on hover and
-   keyboard focus. The red fill stays on the confirming button inside the question box. */
-.admin__act > .btn--danger { min-height: var(--btn-sm); padding: 0 var(--s3); font-size: var(--t-small); background-color: transparent; color: var(--error); }
-.admin__act > .btn--danger:is(:hover, :focus-visible) { box-shadow: inset 0 0 0 1px var(--line-strong); }
+   the kit's ghost row action: 32 tall, no fill, --muted words at rest, red words and the
+   --line-strong ring on hover and keyboard focus. The red fill stays on the confirming button
+   inside the question box. */
+.admin__act > .btn--danger { min-height: var(--btn-sm); padding: 0 var(--s3); font-size: var(--t-small); background-color: transparent; color: var(--muted); }
+.admin__act > .btn--danger:is(:hover, :focus-visible) { color: var(--error); box-shadow: inset 0 0 0 1px var(--line-strong); }
 /* The row's question box rises over its row from the action's slot, so the list never reflows. */
 .admin__act > .confirm { position: absolute; top: calc(-1 * var(--s2)); right: calc(-1 * var(--s2)); z-index: 3;
   width: max-content; max-width: min(34rem, 80vw); text-align: start; white-space: normal; }

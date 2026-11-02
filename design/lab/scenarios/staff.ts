@@ -288,7 +288,7 @@ export const scenarios: Scenario[] = [
     title: "ST-04 + ST-06 The camera read a pass: Checked in",
     now: NOW,
     qr: "RCC-7Q4K-PX2M",
-    fixtures: { ...attendance, ...fx(api.checkin.pass.scan, { name: "Gale Example", email: "gale.example@example.edu", already: false }) },
+    fixtures: { ...attendance, ...fx(api.checkin.pass.scan, { name: "Gale Example", short: "Gale E.", email: "gale.example@example.edu", already: false }) },
     clicks: ['button:has-text("Start scanning")'],
     later: [{ afterMs: 1200, fixtures: {} }],
   },
@@ -299,9 +299,30 @@ export const scenarios: Scenario[] = [
     role: "professor",
     title: "ST-06 Typed code checked a student in",
     now: NOW,
-    fixtures: { ...attendance, ...fx(api.checkin.pass.scan, { name: "Gale Example", email: "gale.example@example.edu", already: false }) },
+    fixtures: { ...attendance, ...fx(api.checkin.pass.scan, { name: "Gale Example", short: "Gale E.", email: "gale.example@example.edu", already: false }) },
     type: typeCode("RCC-7Q4K-PX2M"),
     later: settle,
+  },
+  {
+    // staff-scan-in: the typed code checks Ivy in, then the live list and count bring her row. The
+    // shot lands inside --hold-new, so her row shows the st-in tint at the top of This class.
+    id: "staff-attendance-scan-new-row",
+    area: "staff",
+    route: "checkin/teacher",
+    role: "professor",
+    title: "ST-06 + ST-08 Typed code checked a student in; their row arrives tinted",
+    now: NOW,
+    fixtures: { ...attendance, ...fx(api.checkin.pass.scan, { name: "Ivy Sample", short: "Ivy S.", email: "ivy.sample@example.edu", already: false }) },
+    type: typeCode("RCC-7Q4K-PX2M"),
+    later: [
+      {
+        afterMs: 900,
+        fixtures: {
+          ...fx(api.checkin.read.names, [{ id: "lab-checkin-39" as Id<"checkins">, name: "Ivy Sample", at: at(NOW, 0) }, ...NAMES]),
+          ...fx(api.checkin.attendance.sheet, [...SHEET, { name: "Ivy Sample", email: "ivy.sample@example.edu", at: at(NOW, 0), lateMin: 6 }]),
+        },
+      },
+    ],
   },
   {
     id: "staff-attendance-scan-already",
@@ -310,7 +331,7 @@ export const scenarios: Scenario[] = [
     role: "professor",
     title: "ST-06 Typed code for a student already checked in",
     now: NOW,
-    fixtures: { ...attendance, ...fx(api.checkin.pass.scan, { name: "Pip Example", email: "pip.example@example.edu", already: true }) },
+    fixtures: { ...attendance, ...fx(api.checkin.pass.scan, { name: "Pip Example", short: "Pip E.", email: "pip.example@example.edu", already: true }) },
     type: typeCode("RCC-7Q4K-PX2M"),
     later: settle,
   },

@@ -12,7 +12,7 @@
 // and Past classes, each a list in a well). The side column comes first in the page, so it stays on
 // top in one column; with two columns teacher.css puts the main column on the left.
 import "./teacher.css";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Badge, Banner, Button, ConfirmButton, Field, Icon } from "../../blocks/kit";
@@ -321,18 +321,32 @@ function LastScan({ result }: { result: Result }) {
   }
   if (open !== undefined && open !== mine) return null;
   if (!result.ok && opens !== null && result.at < opens && Date.now() >= opens) return null;
-  // A check-in is the st-in panel with the check, one already in is the waiting tone with the
-  // repeat glyph; a refusal is the error line.
+  // One 120 panel for every result, so the code field under it holds its y: a check-in is the
+  // st-in panel with the check, one already in is the waiting tone with the repeat glyph, a refusal
+  // the stop tone with the warning glyph and the reason (role=alert). The headline, the name and
+  // the reason each sit in a mask they rise through (teacher.css, staff-scan-in).
   return result.ok ? (
     <div className={result.already ? "scanres att-result att-result--again" : "scanres att-result"}>
       <Icon name={result.already ? "repeat" : "check"} />
-      <Card title={result.already ? "Already checked in" : "Checked in"}>
-        <p className="pass__name">{result.name}</p>
+      <Card>
+        <div className="att-result__mask">
+          <h2>{result.already ? "Already checked in" : "Checked in"}</h2>
+        </div>
+        <div className="att-result__mask">
+          <p className="pass__name">{result.name}</p>
+        </div>
         <p className="muted">{result.email}</p>
       </Card>
     </div>
   ) : (
-    <Status kind="error">{scanError(result.text, openRow?.startsAt)}</Status>
+    <div className="scanres att-result att-result--stop">
+      <Icon name="warning" />
+      <div className="att-result__mask">
+        <p className="att-result__reason" role="alert">
+          {scanError(result.text, openRow?.startsAt)}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -407,8 +421,8 @@ export function ClassStart() {
     await send(startsAt);
   }
 
-  // A section under the scanner card: the two fields side by side, the saved line and Save under
-  // them. On the page, not in a well, so its fields keep their edge while they wait (disabled).
+  // A section under the scanner card: the two fields side by side, the saved line and Save on one
+  // row under them. On the page, not in a well, so its fields keep their edge while they wait (disabled).
   return (
     <section className="att-start-panel">
       <h2>Class start</h2>
@@ -419,6 +433,7 @@ export function ClassStart() {
             {(f) => (
               <input
                 {...f}
+                className="input"
                 type="time"
                 value={shownTime}
                 onChange={(e) => {
@@ -431,16 +446,18 @@ export function ClassStart() {
             )}
           </Field>
           <Field label="Late after (minutes)">
-            {(f) => <input {...f} type="number" min={0} max={60} step={1} inputMode="numeric" value={shownGrace} onChange={(e) => setGrace(e.target.value)} />}
+            {(f) => <input {...f} className="input" type="number" min={0} max={60} step={1} inputMode="numeric" value={shownGrace} onChange={(e) => setGrace(e.target.value)} />}
           </Field>
-          {start !== undefined && (
-            <p className="muted att-start__saved">
-              {start ? `Late after ${timeOrDay(start.startsAt + start.graceMin * MIN, now)}` : "No start time yet, so nobody is late."}
-            </p>
-          )}
-          <Button type="submit" variant="secondary" busy={busy}>
-            Save
-          </Button>
+          <div className="att-start__foot">
+            {start !== undefined && (
+              <p className="muted att-start__saved">
+                {start ? `Late after ${timeOrDay(start.startsAt + start.graceMin * MIN, now)}` : "No start time yet, so nobody is late."}
+              </p>
+            )}
+            <Button type="submit" variant="secondary" busy={busy}>
+              Save
+            </Button>
+          </div>
         </fieldset>
       </form>
       {err && <Status kind="error">{anyway !== null ? stillOpen(anyway, sheet?.[0]) : err}</Status>}
@@ -504,6 +521,8 @@ function Names() {
   const classes = useQuery(api.checkin.attendance.lectures, { channel: CHANNEL });
   const remove = useMutation(api.checkin.attendance.removeCheckin);
   const canRemove = classes !== undefined && earlierOnly(classes) === undefined;
+  const list = useRef<HTMLUListElement>(null);
+  useArrivals(list, names?.map((n) => n.id).join(" "));
   if (names === undefined)
     return (
       <div className="att-list-wrap" aria-busy="true">
@@ -526,9 +545,9 @@ function Names() {
       </div>
     );
   return (
-    <ul className="ruled ruled--well reg att-list">
+    <ul ref={list} className="ruled ruled--well reg att-list">
       {names.map((n) => (
-        <li key={n.id} className="ruled__row att-row">
+        <li key={n.id} className="ruled__row att-row" data-row={n.id}>
           <span className="att-row__name">{n.name}</span>
           <span className="reg__time">{clock(n.at)}</span>
           <span className="att-row__action">
@@ -546,6 +565,68 @@ function Names() {
       ))}
     </ul>
   );
+}
+
+// staff-scan-in (design motion MOTION.md): a check-in that arrives while the list is showing keeps
+// the kit's st-in tint (.is-new) for --hold-new, then fades on --fx-slow (.was-new). With the list
+// at its top, the new row opens downward from its top edge while the rows below move down one row
+// (a FLIP on transform), both on --sp-fast; with the list scrolled, scrollTop takes the new rows'
+// height in the same frame, so the rows staff are reading stay put (teacher.css turns off the
+// browser's own scroll anchoring, which Safari lacks). No movement under reduced motion, over 40
+// rows, on the first load, or when more than 3 arrive at once (a class change, a reconnect).
+// `key` is the row ids in order; the rows are read from the DOM by data-row. The classes are set
+// on the DOM (React never changes a row's className), and the holds run from the arrival.
+function useArrivals(list: RefObject<HTMLUListElement | null>, key: string | undefined) {
+  // Each row's top inside the list's content (scroll-independent), at the last commit.
+  const seen = useRef<Map<string, number> | null>(null);
+  const timers = useRef<number[]>([]);
+  useEffect(() => {
+    const t = timers.current;
+    return () => t.forEach(clearTimeout);
+  }, []);
+  useLayoutEffect(() => {
+    if (key === undefined) return;
+    const ul = list.current;
+    const rows = ul ? [...ul.querySelectorAll<HTMLElement>(":scope > [data-row]")] : [];
+    const top0 = ul ? ul.getBoundingClientRect().top - ul.scrollTop : 0;
+    const now = new Map(rows.map((r) => [r.dataset.row!, r.getBoundingClientRect().top - top0]));
+    const before = seen.current;
+    seen.current = now;
+    if (!ul || before === null) return;
+    const fresh = rows.filter((r) => !before.has(r.dataset.row!));
+    if (fresh.length === 0 || fresh.length > 3) return;
+    const css = getComputedStyle(document.documentElement);
+    const ms = (name: string, or: number) => {
+      const v = parseFloat(css.getPropertyValue(name));
+      return Number.isFinite(v) ? v : or;
+    };
+    const hold = ms("--hold-new", 4000);
+    const out = ms("--fx-slow", 220);
+    for (const r of fresh) {
+      r.classList.add("is-new");
+      timers.current.push(
+        window.setTimeout(() => {
+          r.classList.replace("is-new", "was-new");
+          timers.current.push(window.setTimeout(() => r.classList.remove("was-new"), out));
+        }, hold),
+      );
+    }
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches || rows.length > 40) return;
+    const stay = rows.filter((r) => before.has(r.dataset.row!));
+    if (ul.scrollTop > 0) {
+      const anchor = stay[0];
+      if (anchor) ul.scrollTop += now.get(anchor.dataset.row!)! - before.get(anchor.dataset.row!)!;
+      return;
+    }
+    if (typeof ul.animate !== "function") return;
+    const timing: KeyframeAnimationOptions = { duration: ms("--sp-fast", 200), easing: css.getPropertyValue("--ease").trim() || "ease", fill: "backwards" };
+    for (const r of stay) {
+      const was = before.get(r.dataset.row!)!;
+      const step = was - now.get(r.dataset.row!)!;
+      if (step !== 0 && was < ul.clientHeight) r.animate([{ transform: `translateY(${step}px)` }, { transform: "none" }], timing);
+    }
+    for (const r of fresh) r.animate([{ clipPath: "inset(0 0 100% 0)" }, { clipPath: "inset(0)" }], timing);
+  }, [list, key]);
 }
 
 // Every class with check-ins, this one included, each with its own CSV.

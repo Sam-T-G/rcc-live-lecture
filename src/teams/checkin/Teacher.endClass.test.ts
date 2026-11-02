@@ -35,6 +35,7 @@ vi.mock("react", async (orig) => {
       return list[i];
     },
     useEffect: () => {},
+    useLayoutEffect: () => {},
     useId: () => {
       const [list, i] = slot(() => `id${hooks.slots.size}-${hooks.at}`);
       return list[i];
@@ -330,5 +331,29 @@ describe("F8.1 End class on #/checkin/teacher", () => {
     expect(statusRow(page())).toBe("No class running.");
     server.results["checkin/attendance:lectures"] = undefined;
     expect(statusRow(page())).toBe("Loading…");
+  });
+});
+
+// IT1-STAFF design loop: a refusal sat in a 72px error line where a check-in sat in the 120 result
+// panel, so the code field under it jumped 32px between scans (staff-craft-1-2, staff-use-1-4).
+describe("IT1-STAFF-1 every scan result is the one result panel", () => {
+  const panel = (t: Tree[]) => hosts(t).find((h) => typeof h.props.className === "string" && h.props.className.startsWith("scanres att-result"));
+  it("IT1-STAFF-1 a check-in, one already in, and a refusal each draw as .scanres.att-result; the refusal's reason stays in role=alert", async () => {
+    checkIn("abc123");
+    sent("checkin/pass:scan")[0].resolve({ name: "Sample student 1", email: "s1@example.edu", already: false });
+    await settle();
+    expect(panel(page())?.props.className).toBe("scanres att-result");
+    checkIn("def456");
+    sent("checkin/pass:scan")[1].resolve({ name: "Sample student 2", email: "s2@example.edu", already: true });
+    await settle();
+    expect(panel(page())?.props.className).toBe("scanres att-result att-result--again");
+    checkIn("ghi789");
+    sent("checkin/pass:scan")[2].reject(new ConvexError("That code is old."));
+    await settle();
+    const stop = panel(page());
+    expect(stop?.props.className).toBe("scanres att-result att-result--stop");
+    expect(words(stop!.children)).toBe("That code is old.");
+    expect(hosts(stop!.children).find((h) => h.props.role === "alert")).toBeDefined();
+    expect(alertText(page())).toBe("That code is old.");
   });
 });
