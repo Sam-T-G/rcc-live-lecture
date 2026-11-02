@@ -145,7 +145,7 @@ struct DeckView: View {
 
     @State private var follow = Follow()
     @State private var pendingStart: Int?
-    /// True while the deck screen is under `shortHeight` tall (see `largestType`).
+    /// True while the deck screen is under `shortHeight` tall and `shortWidth` wide (see `isShort`).
     @State private var short = false
 
     static func readOut(_ line: String) {
@@ -162,8 +162,8 @@ struct DeckView: View {
     /// and 148 of 402 at AX5 (LayoutTests). The slide itself keeps every size, and VoiceOver reads
     /// the full words either way.
     /// On a 375 pt wide phone the same words wrap onto more lines, and portrait's caps left an
-    /// iPhone SE's slide 160 of 667 pt at AX2 to AX5 (T18). So a `short` screen, under
-    /// `shortHeight`, takes landscape's caps in portrait too: this stops at xxxLarge and the late
+    /// iPhone SE's slide 160 of 667 pt at AX2 to AX5 (T18). So a `short` screen (`isShort`)
+    /// takes landscape's caps in portrait too: this stops at xxxLarge and the late
     /// card at AX1 (`largestLateType`). The SE's slide then keeps 276 of 667 pt at AX1 to AX5
     /// (LayoutTests), and an iPhone 13 mini's 357 of 812 (it had 241).
     static func largestType(verticalSize: UserInterfaceSizeClass?, short: Bool = false) -> DynamicTypeSize {
@@ -179,6 +179,18 @@ struct DeckView: View {
     /// The deck screen's height inside the safe area under which it is short: an iPhone SE has
     /// 647 pt in portrait and an iPhone 13 mini 728; an iPhone 16e has 763 and an iPhone 17 778.
     nonisolated static let shortHeight: CGFloat = 740
+
+    /// The deck screen's width under which a short screen takes the tighter caps: every iPhone is
+    /// at most 440 pt wide in portrait, and an iPad screen at least 744. An iPad mini held
+    /// sideways is 700 pt tall but 1133 wide, so its words don't wrap like the SE's and it keeps
+    /// the usual caps (TK-BUGS-spec-1). A narrow iPad window (Split View, Stage Manager) counts.
+    nonisolated static let shortWidth: CGFloat = 600
+
+    /// Whether a deck screen of `size` (inside the safe area) is short: under `shortHeight` tall
+    /// and under `shortWidth` wide.
+    nonisolated static func isShort(_ size: CGSize) -> Bool {
+        size.height < shortHeight && size.width < shortWidth
+    }
 
     private var largest: DynamicTypeSize { DeckView.largestType(verticalSize: verticalSize, short: short) }
     /// An iPhone in landscape: about 360 pt of height for everything.
@@ -235,7 +247,7 @@ struct DeckView: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.load.problem)
         // The whole screen's height, the late banner's room included, so the caps don't change
         // when a card comes or goes.
-        .onGeometryChange(for: Bool.self) { $0.size.height < DeckView.shortHeight } action: { short = $0 }
+        .onGeometryChange(for: Bool.self) { DeckView.isShort($0.size) } action: { short = $0 }
     }
 
     private var notice: String? { follow.notice(live: store.live?.slide.index) }

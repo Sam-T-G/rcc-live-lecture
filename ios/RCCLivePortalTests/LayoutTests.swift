@@ -6,8 +6,10 @@
 // and 110 of 874 in portrait, less than the slide's heading; with the bar up as well, the capped
 // screen still left 112 of 402 in landscape and 280 of 874 in portrait (sweep2-ios-fixcheck-1).
 // At iPhone SE's size, portrait's caps left the slide 24% of the height at AX2 to AX5 (T18).
-// The tests host DeckView in a window at iPhone 17's size and at iPhone SE's, and measure the
-// pager (the TabView's paging scroll view).
+// The SE's tighter caps must not reach an iPad mini held sideways, which is as short but 1133 pt
+// wide (TK-BUGS-spec-1).
+// The tests host DeckView in a window at iPhone 17's size, iPhone SE's and iPad mini's, and
+// measure the pager (the TabView's paging scroll view).
 import Combine
 import ConvexMobile
 import SwiftUI
@@ -46,6 +48,8 @@ struct Phone: CustomStringConvertible {
     let portrait: CGSize
     let portraitInsets: EdgeInsets
     let landscapeInsets: EdgeInsets
+    /// The vertical size class in landscape: compact on an iPhone, regular on an iPad.
+    var landscapeVertical: UserInterfaceSizeClass = .compact
 
     /// iPhone 17, 402 x 874 pt: the Dynamic Island and the home bar.
     static let iPhone17 = Phone(
@@ -58,6 +62,13 @@ struct Phone: CustomStringConvertible {
         description: "iPhone SE", portrait: CGSize(width: 375, height: 667),
         portraitInsets: EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0),
         landscapeInsets: EdgeInsets())
+    /// iPad mini (A17 Pro), 744 x 1133 pt: a 24 pt status bar and a 20 pt home bar either way,
+    /// and regular size classes in landscape.
+    static let iPadMini = Phone(
+        description: "iPad mini", portrait: CGSize(width: 744, height: 1133),
+        portraitInsets: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0),
+        landscapeInsets: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0),
+        landscapeVertical: .regular)
 
     func size(landscape: Bool) -> CGSize {
         landscape ? CGSize(width: portrait.height, height: portrait.width) : portrait
@@ -85,7 +96,7 @@ struct Hosted {
         let size = phone.size(landscape: landscape)
         let insets = phone.insets(landscape: landscape)
         let root = DeckView(store: store, announce: announce)
-            .environment(\.verticalSizeClass, landscape ? .compact : .regular)
+            .environment(\.verticalSizeClass, landscape ? phone.landscapeVertical : .regular)
             .dynamicTypeSize(type)
             .padding(insets)
             .frame(width: size.width, height: size.height)
@@ -169,5 +180,33 @@ struct LayoutTests {
         for (landscape, height, pager) in try await pagerHeights(type: type, phone: .iPhoneSE) {
             #expect(pager >= height / 3, "iPhone SE \(type) \(landscape ? "landscape" : "portrait"): the slide is \(Int(pager)) of \(Int(height)) pt")
         }
+    }
+
+    @Test("TK-BUGS-spec-1 only a narrow screen counts as short: an iPhone SE or 13 mini, not an iPad mini held sideways")
+    func shortNeedsANarrowScreen() {
+        // Each deck screen's size inside the safe area.
+        #expect(DeckView.isShort(CGSize(width: 375, height: 647)), "iPhone SE portrait")
+        #expect(DeckView.isShort(CGSize(width: 375, height: 728)), "iPhone 13 mini portrait")
+        #expect(!DeckView.isShort(CGSize(width: 402, height: 778)), "iPhone 17 portrait")
+        #expect(!DeckView.isShort(CGSize(width: 1133, height: 700)), "iPad mini landscape")
+        #expect(!DeckView.isShort(CGSize(width: 1194, height: 790)), "11-inch iPad landscape")
+        #expect(!DeckView.isShort(CGSize(width: 744, height: 1089)), "iPad mini portrait")
+    }
+
+    @Test("TK-BUGS-risk-2 on an iPad mini the slide keeps a third of the height, and held sideways the words still grow past AX1, in the same worst case")
+    func iPadMiniKeepsItsCaps() async throws {
+        var landscapePager: [DynamicTypeSize: CGFloat] = [:]
+        for type in [DynamicTypeSize.large, .accessibility1, .accessibility3, .accessibility5] {
+            for (landscape, height, pager) in try await pagerHeights(type: type, phone: .iPadMini) {
+                #expect(pager >= height / 3, "iPad mini \(type) \(landscape ? "landscape" : "portrait"): the slide is \(Int(pager)) of \(Int(height)) pt")
+                if landscape { landscapePager[type] = pager }
+            }
+        }
+        // With the SE's caps the words stop at xxxLarge and the late card at AX1, so the slide is
+        // the same height at AX1 and AX3 (393 of 744 pt). With the iPad's own caps the late card
+        // still grows to AX2.
+        let ax1 = try #require(landscapePager[.accessibility1])
+        let ax3 = try #require(landscapePager[.accessibility3])
+        #expect(ax3 < ax1, "iPad mini landscape: the slide is \(Int(ax1)) pt at AX1 and \(Int(ax3)) at AX3")
     }
 }
