@@ -27,6 +27,15 @@
    right before its page. On #/host the bar says it, so the strip would only push the live view
    84px under the 800 fold. */
 .page--wide:has(+ .host-root) { display: none; }
+/* The tabs keep their full width in every window, so all three stay clickable. */
+.host-bar > .tabs__list { flex: none; }
+/* Under 1180 the bar has no room for who is signed in next to the tabs: the bar's line goes and
+   StaffGate's strip comes back above the bar, so "Not you? Sign out" stays on the page and the
+   bar stays one 56px row. */
+@media (max-width: 1180px) {
+  .host-bar > .whoami { display: none; }
+  .page--wide:has(+ .host-root) { display: revert-layer; }
+}
 
 /* ------------------------------------------------------------ the slide track */
 /* The kit's band and track: the slide and its title start on the card text line, the lane ends on

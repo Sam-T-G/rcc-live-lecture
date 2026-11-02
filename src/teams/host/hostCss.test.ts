@@ -26,6 +26,16 @@ describe("host.css", () => {
     expect(body).toMatch(/(^|\n)\.page--wide:has\(\+ \.host-root\) \{ display: none; \}/);
   });
 
+  // e2e-host-tabs-narrow: at 900px the bar squeezed the tablist (overflow-x: auto lets it shrink)
+  // and the Questions tab's centre landed on the header. The tablist keeps its width, and under
+  // 1180 the bar's whoami gives way to StaffGate's strip so "Not you? Sign out" stays reachable.
+  it("e2e-host-tabs-narrow keeps the bar's tabs at full width and moves whoami to the strip under 1180", () => {
+    const body = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(body).toMatch(/(^|\n)\.host-bar > \.tabs__list \{ flex: none; \}/);
+    const narrow = body.slice(body.indexOf("@media (max-width: 1180px)"));
+    expect(narrow).toMatch(/^@media \(max-width: 1180px\) \{\s*\.host-bar > \.whoami \{ display: none; \}\s*\.page--wide:has\(\+ \.host-root\) \{ display: revert-layer; \}\s*\}/);
+  });
+
   it("its header names src/styles/tokens.css as where the colors come from", () => {
     expect(CSS.slice(0, CSS.indexOf("*/"))).toContain("src/styles/tokens.css");
   });
