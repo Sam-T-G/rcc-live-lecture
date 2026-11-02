@@ -11,6 +11,12 @@ body.stage-body { margin: 0; overflow: hidden; }
 /* No ?deck=, or one that can't load: the Projector is the slide area's ground and the lane's note
    says what to fix. */
 .stage > .projector { position: absolute; inset: 0; }
+/* While a question is open the panel and the card take the whole frame, so the light page ground
+   (Stage.tsx themes it light) covers the deck around them: no cut-off slide words in the 48 gutter
+   or the 96 frame. The deck stays loaded under it and keeps the arrow keys; an ended panel shows
+   the deck again. */
+.stage__ground { display: none; position: absolute; inset: 0; background: var(--page); pointer-events: none; }
+.stage:has(.stage__choices) > .stage__ground { display: block; }
 
 /* ------------------------------------------------------------------ the check-in card
    The kit's .stage-card inside the aside is the card: the field, 600 wide on the frame's right
@@ -39,7 +45,7 @@ body.stage-body { margin: 0; overflow: hidden; }
   padding: 0;
   background-color: transparent;
   color: var(--on-field);
-  box-shadow: inset 0 0 0 max(1px, calc(3 * var(--stage-u))) var(--on-field-muted);
+  box-shadow: inset 0 0 0 var(--p-ring) var(--on-field-muted);
 }
 .stage__hide .icon { width: 50%; height: 50%; }
 /* <QR> writes its px width inline; the card's width wins, so phones scan it from the back row. It
@@ -67,20 +73,23 @@ body.stage-body { margin: 0; overflow: hidden; }
   line-height: 0.8;
   letter-spacing: -0.03em;
   margin-inline-start: -0.04em;
+  /* Proportional on purpose: tabular digits at 240 make "38" 323 wide, and "checked in" then wraps
+     under the numeral in the card's 512. */
   font-variant-numeric: lining-nums proportional-nums;
 }
-/* Loading: "…" takes the numeral's place at the head size, muted, on the same baseline. */
+/* Loading: "…" holds the numeral's slot at the numeral's size, muted, on the same baseline. */
 .stage__count[aria-busy="true"] { color: var(--on-field-muted); }
-.stage__count[aria-busy="true"] b { font-size: var(--p-head); letter-spacing: -0.01em; }
+.stage__count[aria-busy="true"] b { font-size: var(--p-count); letter-spacing: 0.04em; }
 
-/* While a quiz or vote shows, the card steps down to the sunken rung (the kit's
+/* While a quiz or vote is open, the card steps down to the sunken rung (the kit's
    .stage-card--poll), keeps its box and its QR, and its count drops to 160, so the quiz panel
-   is the screen's first thing. */
-.stage__card > .stage-card:has(.stage__poll) { background: var(--well); color: var(--text); }
-.stage__card > .stage-card:has(.stage__poll) :focus-visible { outline-color: var(--focus); }
-.stage__card:has(.stage__poll) .stage__hide { color: var(--text); box-shadow: inset 0 0 0 max(1px, calc(3 * var(--stage-u))) var(--line-strong); }
-.stage__card:has(.stage__poll) .stage__count { color: var(--muted); }
-.stage__card:has(.stage__poll) .stage__count b { font-size: var(--p-rank); color: var(--text); }
+   is the screen's first thing. Once it ends the card is the field again with its 240 count: the
+   ended panel stays up for the rest of class and reads second. */
+.stage__card > .stage-card:has(.stage__choices) { background: var(--well); color: var(--text); }
+.stage__card > .stage-card:has(.stage__choices) :focus-visible { outline-color: var(--focus); }
+.stage__card:has(.stage__choices) .stage__hide { color: var(--text); box-shadow: inset 0 0 0 var(--p-ring) var(--line-strong); }
+.stage__card:has(.stage__choices) .stage__count { color: var(--muted); }
+.stage__card:has(.stage__choices) .stage__count b { font-size: var(--p-rank); color: var(--text); }
 
 /* ------------------------------------------------------------------ the quiz panel
    Drawn from the card's markup, so × hides it with the card, as its own panel in the left column
@@ -129,6 +138,7 @@ body.stage-body { margin: 0; overflow: hidden; }
   font-weight: var(--w-loud);
   line-height: 1.15;
   overflow-wrap: anywhere;
+  text-wrap: balance;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
@@ -143,7 +153,7 @@ body.stage-body { margin: 0; overflow: hidden; }
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  column-gap: calc(28 * var(--stage-u));
+  column-gap: calc(24 * var(--stage-u));
   font-size: var(--p-body);
   font-weight: var(--w-head);
   line-height: 1;
@@ -151,7 +161,7 @@ body.stage-body { margin: 0; overflow: hidden; }
 .stage__answered b {
   font-size: var(--p-count);
   font-weight: var(--w-loud);
-  line-height: 0.75;
+  line-height: 0.8;
   letter-spacing: -0.03em;
   margin-inline-start: -0.04em;
   font-variant-numeric: tabular-nums lining-nums;
@@ -193,8 +203,8 @@ body.stage-body { margin: 0; overflow: hidden; }
   font-weight: var(--w-head);
   line-height: 1.2;
 }
-.stage__bar::before { content: ""; grid-area: track; align-self: center; height: calc(24 * var(--stage-u)); border-radius: calc(6 * var(--stage-u)); background: var(--on-raised); }
-.stage__fill { grid-area: track; align-self: center; justify-self: start; height: calc(24 * var(--stage-u)); border-radius: calc(6 * var(--stage-u)); background: var(--bar-rest); }
+.stage__bar::before { content: ""; grid-area: track; align-self: center; height: calc(24 * var(--stage-u)); border-radius: calc(2 * var(--stage-u)); background: var(--line); }
+.stage__fill { grid-area: track; align-self: center; justify-self: start; height: calc(24 * var(--stage-u)); border-radius: calc(2 * var(--stage-u)); background: var(--bar-rest); transform-origin: left center; }
 .stage__label {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -210,19 +220,21 @@ body.stage-body { margin: 0; overflow: hidden; }
 .stage__right { grid-area: tag; font-weight: var(--w-loud); white-space: nowrap; }
 .stage__bar--right { grid-template-areas: "label n" "tag tag" "track track"; }
 /* The letter tile (the kit's .letter, the same A to D the phones show) at the front of each row's
-   words, at stage size: 64 on the open rows at 48, 56 on the bars at 40. */
+   words, as tall as the row's line box (58 on the open rows at 48, 48 on the bars at 40), so the
+   label's line clamp never cuts its foot, with the word 24 after it. */
 .stage__label > .letter {
   display: inline-grid;
-  vertical-align: middle;
-  width: calc(64 * var(--stage-u));
-  height: calc(64 * var(--stage-u));
-  margin-block: calc(-6 * var(--stage-u));
+  vertical-align: top;
+  width: 1.2em;
+  height: 1.2em;
+  margin-block: 0;
+  margin-inline-end: calc(12 * var(--stage-u));
   border-radius: calc(8 * var(--stage-u));
   font-size: inherit;
   line-height: 1;
 }
 .stage__choice > .stage__label > .letter { background: var(--field-letter); color: var(--on-field-tile); }
-.stage__bar > .stage__label > .letter { width: calc(56 * var(--stage-u)); height: calc(56 * var(--stage-u)); background: var(--on-raised); color: var(--text); }
+.stage__bar > .stage__label > .letter { background: var(--on-raised); color: var(--text); }
 .stage__bar--right > .stage__label > .letter { background: var(--st-in-mark); color: var(--on-accent); }
 /* The right answer: the st-in fill inside a 6 stage px ring in its mark (the projector's rule
    width), reaching 20 past the text column so the words keep their edge, with "✓ right answer"
@@ -232,9 +244,17 @@ body.stage-body { margin: 0; overflow: hidden; }
   margin-inline: calc(-20 * var(--stage-u));
   padding-inline: calc(20 * var(--stage-u));
   border-top-color: transparent;
+  position: relative;
   background: var(--st-in) padding-box;
   color: var(--on-st-in);
+}
+/* The ring is its own layer, so the results reveal can fade it in (a box-shadow never animates). */
+.stage__bars > .stage__bar--right::after {
+  content: "";
+  position: absolute;
+  inset: 0;
   box-shadow: inset 0 0 0 var(--p-rule) var(--st-in-mark);
+  pointer-events: none;
 }
 .stage__bars > .stage__bar--right + .stage__bar { border-top-color: transparent; }
 .stage__bar--right::before { background: var(--raised); }
@@ -275,13 +295,14 @@ body.stage-body { margin: 0; overflow: hidden; }
    that phones aren't following the slides. */
 .stage__warn { margin: 0; background: none; }
 /* The late banner (LateBanner.tsx; the kit's .late__item strip, its colors in kit.css) at stage
-   size: one strip per arrival, 120 tall, the --warn fill alone. */
-.stage__late { background: none; pointer-events: none; }
+   size: one strip per arrival, a 1080 x 120 lower third in one spot whatever its words, the --warn
+   fill alone. */
+.stage__late { align-self: stretch; background: none; pointer-events: none; }
 .stage__late .late {
   position: static;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: calc(16 * var(--stage-u));
 }
 .stage__late .late__item {
@@ -293,16 +314,25 @@ body.stage-body { margin: 0; overflow: hidden; }
   min-height: calc(120 * var(--stage-u));
   margin: 0;
   padding: calc(16 * var(--stage-u)) calc(40 * var(--stage-u));
+  border-radius: calc(16 * var(--stage-u));
   font-size: var(--p-body);
   line-height: 1.2;
   text-align: start;
 }
+/* While a quiz or vote shows, the lane keeps only the newest strip (LateBanner puts it first), so
+   the panel above it always has the room for its choices. The others stay in the live region and
+   leave on their own 8 s timer, as before. */
+.stage:has(.stage__poll) .stage__late .late__item ~ .late__item { display: none; }
 
 /* A part that didn't load (ErrorBoundary in ui.tsx): its error line and Try again at projector
-   size on the presenter note's ground, where the presenter looks for it: the count's and the late
-   banner's in the bottom-left lane, the quiz's in the quiz panel's place. The card keeps its box. */
+   size on the presenter note's ground, where the presenter looks for it: the bottom-left lane,
+   above anything already there. The card keeps its box. The kit draws the line with no fill and a
+   ringed Try again; here its glyph takes the presenter note's amber, like its label. */
 .stage .row > .status--error,
 .stage .row > .btn--quiet { font-size: var(--proj-ledger); }
+.stage .row > .status--error::before { background: var(--st-open-mark); }
+.stage__late > .row,
+.stage__card > .stage-card > .row { align-items: center; }
 .stage__late > .row,
 .stage__card > .stage-card > .row {
   box-sizing: border-box;
@@ -315,7 +345,6 @@ body.stage-body { margin: 0; overflow: hidden; }
   pointer-events: auto;
 }
 .stage__card > .stage-card > .row { position: fixed; left: var(--p-margin); bottom: var(--p-margin); z-index: 2; }
-.stage__card > .stage-card > .stage__hint ~ .row { top: var(--p-margin); bottom: auto; }
 
 /* ------------------------------------------------------------------ the left column's stack
    Nothing in the left column overlaps: from the bottom up, the lane (late strips and notes),
@@ -356,6 +385,15 @@ body.stage-body { margin: 0; overflow: hidden; }
 .stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card:has(> .row + .stage__hint) .stage__poll {
   bottom: calc(var(--p-margin) + 288 * var(--stage-u));
 }
+/* The quiz's error row (the .row after "Scan to check in") stacks the same way as the panel it
+   stands in for: on the frame's bottom, or above the lane and the count's error row. */
+.stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card > .stage__hint ~ .row,
+.stage__card > .stage-card:has(> .row + .stage__hint) > .stage__hint ~ .row {
+  bottom: calc(var(--p-margin) + 144 * var(--stage-u));
+}
+.stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card:has(> .row + .stage__hint) > .stage__hint ~ .row {
+  bottom: calc(var(--p-margin) + 288 * var(--stage-u));
+}
 /* A presenter note is 196 tall ("For the presenter:" on its own line, then two lines), so a
    browser without anchor positioning reserves 196 plus the 24 gap above one instead of 144. */
 @supports not (anchor-name: --a) {
@@ -369,6 +407,12 @@ body.stage-body { margin: 0; overflow: hidden; }
   .stage:has(> .stage__lane .pnote) .stage__card > .stage-card:has(> .row + .stage__hint) .stage__poll {
     bottom: calc(var(--p-margin) + 364 * var(--stage-u));
   }
+  .stage:has(> .stage__lane .pnote) .stage__card > .stage-card > .stage__hint ~ .row {
+    bottom: calc(var(--p-margin) + 220 * var(--stage-u));
+  }
+  .stage:has(> .stage__lane .pnote) .stage__card > .stage-card:has(> .row + .stage__hint) > .stage__hint ~ .row {
+    bottom: calc(var(--p-margin) + 364 * var(--stage-u));
+  }
 }
 @supports (anchor-name: --a) {
   .stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card > .row:has(+ .stage__hint) {
@@ -377,6 +421,10 @@ body.stage-body { margin: 0; overflow: hidden; }
   .stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card .stage__poll,
   .stage__card > .stage-card:has(> .row + .stage__hint) .stage__poll,
   .stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card:has(> .row + .stage__hint) .stage__poll {
+    bottom: calc(anchor(--stage-foot top) + 24 * var(--stage-u));
+  }
+  .stage:has(> .stage__lane :is(.late__item, .pnote, .row)) .stage__card > .stage-card > .stage__hint ~ .row,
+  .stage__card > .stage-card:has(> .row + .stage__hint) > .stage__hint ~ .row {
     bottom: calc(anchor(--stage-foot top) + 24 * var(--stage-u));
   }
 }
@@ -398,4 +446,35 @@ body.stage-body { margin: 0; overflow: hidden; }
   font-size: var(--p-body);
   font-weight: var(--w-loud);
   line-height: 1;
+}
+
+/* ------------------------------------------------------------------ results reveal
+   MOTION.md projector results-reveal (protos/projector-results-reveal.html). Stage.tsx adds
+   .stage__poll--reveal only when it sees the open question end, so a reload of an ended question
+   shows the still end state. t=0: the panel, rows, words and tracks are the ended look in one frame
+   (no color tween). The counts arrive after --fx-fast on --fx-slow. Every fill grows from the left
+   edge together on --sp-slow (scaleX on a fill whose width is already set, so no layout moves).
+   At --sp-slow, once the fills stop, the right row's tint, ring, letter, track, fill, ink and
+   "✓ right answer" arrive on --fx-slow: the spread reads first, the answer second; done by 700.
+   Reduced motion: --sp-slow is 0 there, so the fills stand at their values and the marks fade in
+   at once. Nothing loops; only transform, opacity and colors animate. */
+.stage__poll--reveal .stage__bar > b { animation: stage-in var(--fx-slow) var(--ease) var(--fx-fast) both; }
+.stage__poll--reveal .stage__fill { animation: stage-grow var(--sp-slow) var(--ease) both; }
+.stage__poll--reveal .stage__bars > .stage__bar--right { animation: stage-mark-row var(--fx-slow) var(--ease) var(--sp-slow) both; }
+.stage__poll--reveal .stage__bars > .stage__bar--right::after { animation: stage-in var(--fx-slow) var(--ease) var(--sp-slow) both; }
+.stage__poll--reveal .stage__bar--right > .stage__right { animation: stage-in var(--fx-slow) var(--ease) var(--sp-slow) both; }
+.stage__poll--reveal .stage__bar--right > b { animation: stage-in var(--fx-slow) var(--ease) var(--fx-fast) both, stage-mark-ink var(--fx-slow) var(--ease) var(--sp-slow) both; }
+.stage__poll--reveal .stage__bar--right > .stage__label > .letter { animation: stage-mark-letter var(--fx-slow) var(--ease) var(--sp-slow) both; }
+.stage__poll--reveal .stage__bar--right::before { animation: stage-mark-track var(--fx-slow) var(--ease) var(--sp-slow) both; }
+.stage__poll--reveal .stage__bar--right .stage__fill { animation: stage-grow var(--sp-slow) var(--ease) both, stage-mark-fill var(--fx-slow) var(--ease) var(--sp-slow) both; }
+@keyframes stage-in { from { opacity: 0; } }
+@keyframes stage-grow { from { transform: scaleX(0); } }
+@keyframes stage-mark-row { from { background-color: transparent; color: var(--text); } }
+@keyframes stage-mark-ink { from { color: var(--text); } }
+@keyframes stage-mark-letter { from { background-color: var(--on-raised); color: var(--text); } }
+@keyframes stage-mark-track { from { background-color: var(--line); } }
+@keyframes stage-mark-fill { from { background-color: var(--bar-rest); } }
+@media (prefers-reduced-motion: reduce) {
+  .stage__poll--reveal .stage__fill { animation: none; }
+  .stage__poll--reveal .stage__bar--right .stage__fill { animation: stage-mark-fill var(--fx-slow) var(--ease) 0ms both; }
 }

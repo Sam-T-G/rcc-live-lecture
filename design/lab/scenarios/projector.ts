@@ -195,6 +195,41 @@ export const scenarios: Scenario[] = [
     ),
   },
   {
+    // MOTION.md results-reveal: the professor ends the open question while the stage is up. The
+    // shot is the end state; the motion check plays the change from the scenario's `later` step.
+    id: "projector-stage-quiz-reveal",
+    area: "projector",
+    route: DECK,
+    role: "signedout",
+    title: "Stage as the professor ends the open quiz (results-reveal)",
+    now: NOW,
+    fixtures: stage(
+      fx(api.checkin.quiz.current, {
+        id: pollId(12),
+        kind: "quiz",
+        question: "Which hook runs after every render by default?",
+        choices: ["useMemo", "useEffect", "useRef", "useId"],
+        open: true,
+        answered: 36,
+        results: null,
+      }),
+    ),
+    later: [
+      {
+        afterMs: 800,
+        fixtures: fx(api.checkin.quiz.current, {
+          id: pollId(12),
+          kind: "quiz",
+          question: "Which hook runs after every render by default?",
+          choices: ["useMemo", "useEffect", "useRef", "useId"],
+          open: false,
+          answered: 36,
+          results: { counts: [7, 22, 5, 2], correct: 1 },
+        }),
+      },
+    ],
+  },
+  {
     id: "projector-stage-vote-ended",
     area: "projector",
     route: DECK,
@@ -384,6 +419,38 @@ export const scenarios: Scenario[] = [
       ...fx(api.live.groups.mine, null),
       ...fx(api.checkin.attendance.lateFeed, []),
     },
+  },
+  {
+    // MOTION.md board-reorder: after quiz 3, Green passes Red (6 right on 3 students, 2.0 per student).
+    // The shot is the end state; the motion check plays the change from the scenario's `later` step.
+    id: "projector-leaderboard-reorder",
+    area: "projector",
+    route: "live/leaderboard",
+    role: "signedout",
+    title: "Team leaderboard after a quiz moves Green from 3rd to 2nd (board-reorder)",
+    now: NOW,
+    fixtures: board([
+      team({ team: 2, color: "blue", label: "Blue", members: 4, correct: 7, changes: 0, rank: 1, ec: 5 }),
+      team({ team: 1, color: "red", label: "Red", members: 4, correct: 6, changes: 0, rank: 2, ec: 3 }),
+      team({ team: 4, color: "green", label: "Green", members: 3, correct: 4, changes: 0, rank: 3, ec: 1 }),
+      team({ team: 3, color: "yellow", label: "Yellow", members: 4, correct: 4, changes: 0, rank: 4, ec: 0 }),
+      team({ team: 5, color: "orange", label: "Orange", members: 3, correct: 2, changes: 0, rank: 5, ec: 0 }),
+    ], 2),
+    later: [
+      {
+        afterMs: 800,
+        fixtures: fx(api.live.groups.leaderboard, {
+          questions: 3,
+          teams: [
+            team({ team: 2, color: "blue", label: "Blue", members: 4, correct: 9, changes: 0, rank: 1, ec: 5 }),
+            team({ team: 4, color: "green", label: "Green", members: 3, correct: 6, changes: 0, rank: 2, ec: 3 }),
+            team({ team: 1, color: "red", label: "Red", members: 4, correct: 7, changes: 0, rank: 3, ec: 1 }),
+            team({ team: 3, color: "yellow", label: "Yellow", members: 4, correct: 5, changes: 0, rank: 4, ec: 0 }),
+            team({ team: 5, color: "orange", label: "Orange", members: 3, correct: 2, changes: 0, rank: 5, ec: 0 }),
+          ],
+        }),
+      },
+    ],
   },
   {
     id: "projector-leaderboard-eight",

@@ -5,7 +5,8 @@
 // "N answered" and the choices, each after its A to D letter tile. Once it ends, the panel is the
 // card's width at the bottom of the left column, with a bar per choice and "✓ right answer" on the
 // right one, so the deck shows around it for the rest of class (quiz.current keeps returning the
-// ended poll); the card steps down to the sunken rung while it shows and keeps its box. × hides the
+// ended poll); the card steps down to the sunken rung while the question is open and keeps its box,
+// and the page's light ground covers the deck around them (.stage__ground). × hides the
 // card (and the quiz panel with it) and "Show check-in" brings it back. The bottom-left lane holds
 // the late banner (LateBanner.tsx: a student's first name when they check in late, unless they
 // turned that off on their pass) and the notes for the presenter: no ?deck=, a deck link that
@@ -37,8 +38,8 @@
 // can't cover the card; use the browser's own full screen. Arrow keys go to the deck: it gets focus
 // when it loads and after every click or tap on the card. The count, the quiz and the late banner
 // each sit in an ErrorBoundary, so a query that fails shows an error and the deck and the QR stay
-// up: the error and its Try again sit in the bottom-left lane for the count and the late banner,
-// and in the quiz panel's place for the quiz.
+// up: the error and its Try again sit in the bottom-left lane, stacked above anything already
+// there.
 //
 // Markup that Stage.test.ts and Stage.press.test.ts pin: the root .stage with the deck first, the
 // aside .stage__card (data-theme light), the hide button right before the QR, the count, "Scan to
@@ -95,6 +96,7 @@ export default function Stage() {
       ) : (
         <Projector />
       )}
+      <div className="stage__ground" data-theme="light" aria-hidden="true" />
       <div className="stage__lane" data-theme="light" data-surface="projector">
         <div className="stage__late" data-theme="light">
           <ErrorBoundary label="The late banner">
@@ -187,14 +189,23 @@ function Count() {
 // stage.css draws it as its own panel in the left column (the field and the column's full height
 // while it's open, the raised rung and the card's width once it ends). "No quiz or vote yet." is there for screen readers
 // only: the stage shows the deck until a question opens.
+// When this screen sees the open question end, the panel gets .stage__poll--reveal for that
+// question (the results reveal in stage.css: the bars grow, then the right answer is marked). A
+// question that was already over when the page opened shows its results still.
 function Poll() {
   const poll = useQuery(api.checkin.quiz.current, { channel: CHANNEL });
+  const [last, setLast] = useState<{ id: string; open: boolean } | null>(null);
+  const [revealed, setRevealed] = useState<string | null>(null);
+  if (poll && (!last || last.id !== poll.id || last.open !== poll.open)) {
+    if (last && last.id === poll.id && last.open && !poll.open) setRevealed(poll.id);
+    setLast({ id: poll.id, open: poll.open });
+  }
   if (poll === undefined) return null;
   if (poll === null) return <p className="stage__none sr-only">No quiz or vote yet.</p>;
   const results = poll.results;
   const total = results ? results.counts.reduce((a, b) => a + b, 0) : 0;
   return (
-    <div className="stage__poll">
+    <div className={!poll.open && revealed === poll.id ? "stage__poll stage__poll--reveal" : "stage__poll"}>
       <p className="stage__q">{poll.question}</p>
       {poll.open ? (
         <>

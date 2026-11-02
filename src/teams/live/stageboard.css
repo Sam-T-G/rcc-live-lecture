@@ -30,11 +30,13 @@
 .stageboard { grid-template-columns: calc(560 * var(--stage-u)) minmax(0, 1fr); align-items: stretch; }
 .stageboard > .pledger { align-self: start; }
 .stageboard .first { grid-template-rows: auto auto auto minmax(0, 1fr); align-content: start; }
-.stageboard .first__line { align-self: end; text-wrap: balance; }
+/* The facts line at the ledger's size, on one line ("7 right · 1.8 per student" never parts a
+   value from its unit). */
+.stageboard .first__line { align-self: end; text-wrap: wrap; }
 /* live.css sizes the phone card's names, credit and numbers; in the block they take its sizes. */
 .first .board__name { font-size: inherit; font-weight: inherit; line-height: inherit; }
 .first :is(.board__ec, .board__score) { color: inherit; font-weight: inherit; white-space: normal; }
-.first .board__score { font-variant-numeric: tabular-nums lining-nums; }
+.first .board__score { font-size: var(--p-small); font-variant-numeric: tabular-nums lining-nums; }
 
 /* The ledger: ruled rows (the kit's .pledger__row, its 6 stage px rule in --line-strong), no fill
    and no radius. Each row: the place on the name's baseline, the chip and the name, the extra
@@ -48,6 +50,8 @@ ol.board.board--big { display: grid; gap: 0; margin: 0; padding: 0; list-style: 
   padding-block: calc(10 * var(--stage-u));
   border-top-color: var(--line-strong);
 }
+/* Each row holds the moved-row ring (StageBoard.tsx, the board reorder). */
+.board--big .pledger__row { position: relative; }
 .board--big .pledger__place { font-size: var(--proj-body); font-weight: var(--w-loud); line-height: 1.1; }
 .board--big .team { min-width: 0; }
 .board--big .board__name {
@@ -88,7 +92,10 @@ ol.board.board--many:has(> :nth-child(9)) { grid-template-rows: repeat(5, auto);
 .board--many .pledger__place { grid-row: auto; font-size: var(--proj-small); }
 .board--many :is(.board__name, .board__ec) { font-size: var(--proj-small); }
 .board--many small { font-size: var(--proj-ledger); }
-.board--many .board__score { grid-row: 2; font-size: var(--proj-ledger); }
+/* The numbers teams rank by stay at 40, the compact rows' floor; rows give back 4 of their
+   padding so ten rows and the foot still fit. */
+.board--many .board__score { grid-row: 2; font-size: var(--proj-small); }
+.board--many .pledger__row { padding-block: calc(6 * var(--stage-u)); }
 .board--many:not(.board--tied) > .pledger__row:first-child {
   border-top-color: transparent;
   border-radius: var(--p-radius);
@@ -98,12 +105,44 @@ ol.board.board--many:has(> :nth-child(9)) { grid-template-rows: repeat(5, auto);
 .board--many:not(.board--tied) > .pledger__row:first-child :is(.board__ec, .board__score, small) { color: var(--on-field); }
 .board--many:not(.board--tied) > .pledger__row:first-child .team__chip { box-shadow: 0 0 0 calc(3 * var(--stage-u)) var(--on-field); }
 .board--many:not(.board--tied) > .pledger__row:first-child + .pledger__row { border-top-color: transparent; }
+/* The leader's row carries the board's one large mark: its place at 92 across both lines, its
+   name at 48. */
+.board--many:not(.board--tied) > .pledger__row:first-child .pledger__place {
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-size: var(--p-head);
+  line-height: 1;
+}
+.board--many:not(.board--tied) > .pledger__row:first-child .board__name { font-size: var(--p-body); font-weight: var(--w-loud); }
 
-/* No teams yet, or the scores still loading: the 1st place block's frame on the page tone with a
-   4 stage px ring, the step in it. While loading, still blocks stand where the ledger's places,
-   names and credit will land. */
-.first--wait { align-content: start; background: none; color: var(--text); box-shadow: inset 0 0 0 var(--p-ring) var(--line-strong); }
+/* No teams yet, the scores still loading, or the board that didn't load: the 1st place block's
+   slot filled with the stage's well tone (no outline), 320 tall and ending under its words, the
+   step or the error in it. While loading, still blocks stand where the ledger's places, names and
+   credit will land. */
+.stageboard .first--wait {
+  align-self: start;
+  align-content: start;
+  grid-template-rows: none;
+  min-height: calc(320 * var(--stage-u));
+  box-sizing: border-box;
+  background: var(--p-well);
+  color: var(--text);
+}
 .first--wait > .status { padding: 0; font-size: var(--p-body); font-weight: var(--w-head); line-height: 1.25; color: var(--text); }
+.projector:has(> .live-board__late) > .row {
+  box-sizing: border-box;
+  width: calc(560 * var(--stage-u));
+  min-height: calc(320 * var(--stage-u));
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: calc(24 * var(--stage-u));
+  padding: calc(40 * var(--stage-u));
+  border-radius: var(--p-radius);
+  background: var(--p-well);
+}
+.projector:has(> .live-board__late) > .row > .status--error { margin: 0; font-size: var(--p-body); font-weight: var(--w-head); line-height: 1.25; }
+.projector:has(> .live-board__late) > .row > .btn--quiet { font-size: var(--p-small); }
 .stageboard__skel {
   grid-template-columns: calc(104 * var(--stage-u)) minmax(0, 1fr) auto;
   min-height: calc(120 * var(--stage-u));
@@ -127,8 +166,9 @@ ol.board.board--many:has(> :nth-child(9)) { grid-template-rows: repeat(5, auto);
   left: var(--p-margin);
   right: auto;
   bottom: var(--p-margin);
+  width: calc(1080 * var(--stage-u));
   max-width: calc(1080 * var(--stage-u));
-  align-items: flex-start;
+  align-items: stretch;
   gap: calc(16 * var(--stage-u));
 }
 .live-board__late .late__item {
@@ -140,6 +180,37 @@ ol.board.board--many:has(> :nth-child(9)) { grid-template-rows: repeat(5, auto);
   min-height: calc(120 * var(--stage-u));
   margin: 0;
   padding: calc(16 * var(--stage-u)) calc(40 * var(--stage-u));
+  border-radius: calc(16 * var(--stage-u));
   font-size: var(--p-body);
   line-height: 1.2;
 }
+
+/* ------------------------------------------------------------------ board reorder
+   MOTION.md projector board-reorder (StageBoard.tsx Swap and useReorder). A changed numbers line:
+   the old value and the new share one grid cell; the old leaves on --fx-fast, the new arrives after
+   it on --fx, so the slot never shows two values. The travel itself is a FLIP in StageBoard.tsx.
+   The moved-row ring: a 6 stage px --accent ring on the row's own layer (--on-field on the green
+   leader row), in on --fx-fast, out on --fx-slow after its 2 s hold. Opacity only; nothing loops. */
+.stageboard .swap { display: inline-grid; }
+.stageboard .swap > * { grid-area: 1 / 1; }
+.stageboard .swap__old { opacity: 0; animation: board-out var(--fx-fast) var(--ease-exit) both; }
+.stageboard .swap__new { animation: board-in var(--fx) var(--ease) var(--fx-fast) both; }
+@keyframes board-out { from { opacity: 1; } }
+@keyframes board-in { from { opacity: 0; } }
+.board--big .pledger__row::after {
+  content: "";
+  position: absolute;
+  inset: calc(4 * var(--stage-u)) calc(-20 * var(--stage-u));
+  border-radius: calc(12 * var(--stage-u));
+  box-shadow: inset 0 0 0 var(--p-rule) var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--fx-slow) var(--ease);
+}
+.board--many .pledger__row::after { inset-inline: 0; border-radius: var(--p-radius); }
+.board--many:not(.board--tied) > .pledger__row:first-child::after { box-shadow: inset 0 0 0 var(--p-rule) var(--on-field); }
+.board--big .pledger__row--moved::after { opacity: 1; transition-duration: var(--fx-fast); }
+/* The rising team's plate (StageBoard.tsx useReorder adds it for one move and removes it): its
+   row's text band, behind the team's words and over the falling team's. Its fill is set by script
+   from the row's own tone; its opacity and travel are the move's. */
+.board--big .pledger__plate { position: absolute; inset-block: calc(4 * var(--stage-u)); z-index: 1; border-radius: calc(10 * var(--stage-u)); pointer-events: none; }

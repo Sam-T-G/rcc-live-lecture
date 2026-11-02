@@ -183,6 +183,50 @@ describe("projector (#/checkin/stage and #/live/leaderboard at 1920 x 1080)", ()
     expect(value(board, ".board--many .pledger__place", "font-size")).toMatch(/^var\(--proj-/);
   });
 
+  it("IT1-PROJECTOR while a quiz or vote shows, the lane keeps only the newest late strip, so the panel keeps all its choices", () => {
+    // LateBanner puts the newest arrival first; the rest stay in its live region on their own timer.
+    expect(value(stage, ".stage:has(.stage__poll) .stage__late .late__item ~ .late__item", "display")).toBe("none");
+    // Every strip is one full-width lower third, whatever its words.
+    expect(value(stage, ".stage__late", "align-self")).toBe("stretch");
+    expect(value(stage, ".stage__late .late", "align-items")).toBe("stretch");
+  });
+
+  it("IT1-PROJECTOR the quiz's error row sits in the bottom-left lane, never on the slide title at the top", () => {
+    const top = every(stage, "top").filter((d) => d.r.selectors.some((s) => s.includes(".stage__hint ~ .row")));
+    expect(top.map((d) => d.where)).toEqual([]);
+    expect(value(stage, ".stage__card > .stage-card:has(> .row + .stage__hint) > .stage__hint ~ .row", "bottom")).toBe("calc(anchor(--stage-foot top) + 24 * var(--stage-u))");
+  });
+
+  it("IT1-PROJECTOR the A to D tile is as tall as its row's line, so the label's line clamp never cuts its foot", () => {
+    expect(value(stage, ".stage__label > .letter", "height")).toBe("1.2em");
+    expect(value(stage, ".stage__label > .letter", "margin-block")).toBe("0");
+    for (const sel of [".stage__choice", ".stage__bar"]) expect(value(stage, sel, "line-height"), sel).toBe("1.2");
+  });
+
+  it("IT1-PROJECTOR the results reveal and the board reorder move only transform and opacity, plus color fills, and never loop (MOTION.md)", () => {
+    const ok = new Set(["transform", "opacity", "color", "background-color"]);
+    for (const sheet of [stage, board]) {
+      const frames = sheet.filter((r) => r.at.some((a) => a.startsWith("@keyframes")));
+      expect(frames.length).toBeGreaterThan(0);
+      const bad = frames.flatMap((r) => r.decls.filter(([k]) => !ok.has(k)).map(([k]) => `${r.at.join(" ")} ${k}`));
+      expect(bad).toEqual([]);
+      const props = every(sheet, "transition").map((d) => d.v.split(/\s+/)[0]);
+      expect(props.filter((p) => !ok.has(p))).toEqual([]);
+      expect(every(sheet, "animation").filter((d) => /infinite/.test(d.v)).map((d) => d.where)).toEqual([]);
+    }
+    // Reduced motion: the bars stand at their values (no scale), the marks still arrive.
+    const calm = stage.filter((r) => r.at.some((a) => a.includes("prefers-reduced-motion")) && r.selectors.includes(".stage__poll--reveal .stage__fill"));
+    expect(calm.flatMap((r) => r.decls).find(([k]) => k === "animation")?.[1]).toBe("none");
+  });
+
+  it("IT1-PROJECTOR the right answer's ring and the moved-row ring are rings on their own layer, so they fade with opacity", () => {
+    expect(value(stage, ".stage__bars > .stage__bar--right::after", "box-shadow")).toBe("inset 0 0 0 var(--p-rule) var(--st-in-mark)");
+    expect(value(stage, ".stage__bars > .stage__bar--right", "box-shadow")).toBeUndefined();
+    expect(value(board, ".board--big .pledger__row::after", "box-shadow")).toBe("inset 0 0 0 var(--p-rule) var(--accent)");
+    expect(value(board, ".board--big .pledger__row::after", "opacity")).toBe("0");
+    expect(value(board, ".board--big .pledger__row--moved::after", "opacity")).toBe("1");
+  });
+
   it("the big leaderboard sizes its words from the --proj-* tokens", () => {
     for (const sel of [".board--big .pledger__place", ".board--big .board__name", ".board--big .board__ec", ".board--big .board__score", ".board--big small"]) {
       expect(value(board, sel, "font-size"), sel).toMatch(/^var\(--proj-/);
