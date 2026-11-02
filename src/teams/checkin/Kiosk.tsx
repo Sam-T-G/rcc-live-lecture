@@ -169,7 +169,9 @@ export function KioskScanner({ device }: { device: string | undefined }) {
     last.current = { code, at: now };
     try {
       const r = await scan({ channel: CHANNEL, code, device });
-      setResult({ kind: r.already ? "again" : "ok", text: r.name });
+      // The first name and last initial (T1), for every scanner. Only a server from before
+      // `short` (Convex rolled back while this page stays open) sends just `name`.
+      setResult({ kind: r.already ? "again" : "ok", text: r.short ?? r.name });
     } catch (e) {
       setResult({ kind: "error", text: forStudent(scanError(why(e), start?.startsAt), typedIn) });
     }

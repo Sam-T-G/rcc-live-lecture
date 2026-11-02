@@ -29,7 +29,7 @@
 import { mutation, query, type MutationCtx } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
-import { EARLY_SCAN, checkedIn, cleanName, ensureLecture, lectureStart, nameIsEmail, notOpenYet, randomCode, requireUser } from "../lib";
+import { EARLY_SCAN, checkedIn, cleanName, ensureLecture, lectureStart, nameIsEmail, notOpenYet, randomCode, requireUser, shortName } from "../lib";
 import { isProf, pairedDevice, requireScanner, staffRole } from "./prof";
 import { ensureGroup } from "../live/groups";
 
@@ -150,16 +150,29 @@ async function passFor(ctx: MutationCtx, code: string, now: number): Promise<Doc
   throw new ConvexError(NOT_A_PASS);
 }
 
+// What the door iPad shows for a scanned student (scan's `short`, T1): the first name and last
+// initial (lib.shortName), or "Someone" for a name that is the part of an email before the "@",
+// the late banner's rule (attendance.lateFeed): the pass says the name was typed as an email
+// (or, from before names were cleaned, holds one), or the name is the student's own email
+// before the "@", in any case.
+function doorName(name: string, p: Doc<"passes">, email: string) {
+  const local = email.split("@")[0].trim().toLowerCase();
+  const fromEmail = p.nameFromEmail === true || p.name.includes("@") || (local !== "" && name.trim().toLowerCase() === local);
+  return fromEmail ? "Someone" : shortName(name);
+}
+
 // The teacher or the door iPad scans (or types) a pass code. A paired iPad passes its device
 // token as `device`. A scan starts class activity, so it opens a class when none is open
 // (lib.ensureLecture), and checks the student in once per class: a student checked in last class
 // gets a new row in this one. A scan more than 45 minutes (lib.EARLY_MS) before the open class's
 // saved start is refused. The reply has the student's email only for a professor or admin
 // (the teacher scanner shows it); a paired iPad and the scanner role get "" there, since
-// students' emails are otherwise professor-only.
+// students' emails are otherwise professor-only. `name` is the full check-in name the teacher
+// scanner shows (door iPads opened before `short` existed show it too); `short` is what the door
+// iPad shows (doorName), for every caller. The check-in row keeps the full name.
 export const scan = mutation({
   args: { device: v.optional(v.string()), channel: v.string(), code: v.string() },
-  returns: v.object({ name: v.string(), email: v.string(), already: v.boolean() }),
+  returns: v.object({ name: v.string(), short: v.string(), email: v.string(), already: v.boolean() }),
   handler: async (ctx, { device, channel, code }) => {
     const iPad = await requireScanner(ctx, device);
     // Last used on #/admin: the iPad's last scan (a scan that throws below rolls this back too).
@@ -184,6 +197,6 @@ export const scan = mutation({
     if (!row) await ctx.db.insert("checkins", { channel, user: p.user, name, email: p.email, at: now });
     await ensureGroup(ctx, channel, p.user, !row); // Live slides: deals a team in arrival order (Red, Blue, Yellow, ...)
     const email = isProf(await staffRole(ctx)) ? p.email : "";
-    return { name, email, already: row !== null };
+    return { name, short: doorName(name, p, row?.email ?? p.email), email, already: row !== null };
   },
 });

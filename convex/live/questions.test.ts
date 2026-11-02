@@ -200,7 +200,7 @@ describe("F22 questions beside the slide", () => {
     const rows = await t.run((ctx) => ctx.db.query("questions").withIndex("by_channel_and_index", (q) => q.eq("channel", CH).eq("index", 3)).take(10));
     expect(rows.find((r) => r.text === "Is this on the exam?")!.name).toBeUndefined();
     expect((await list(t)).map((q) => [q.text, q.name])).toEqual([
-      ["Where are the slides posted?", "Sample student 2"],
+      ["Where are the slides posted?", "Sample 2."], // first name and last initial (T1)
       ["Is this on the exam?", null],
     ]);
     for (const reader of [t, a, b, await professor(t)]) {
@@ -296,15 +296,15 @@ describe("live-frontend-17 names on by-name posts", () => {
   });
 
   // The privacy lines in AGENTS.md, docs/contracts.md and docs/runbook.md say this: list is open to
-  // anyone, signed out too, and a by-name post carries the whole check-in name, not a first name.
-  // Change those three lines in the same commit as shownName.
-  it("sweep1-docs-fixcheck-1 a by-name post shows the full check-in name to a signed-out reader", async () => {
+  // anyone, signed out too, and since T1 (2026-11-01) a by-name post carries the first name and last
+  // initial (lib.shortName). Change those three lines in the same commit as list's name rule.
+  it("sweep1-docs-fixcheck-1 T1 a by-name post shows the first name and last initial to a signed-out reader", async () => {
     const t = setup();
     await slide(t, CH, 3);
     const s = typed(t, "Sample Middle Student", "sample.middle@example.edu");
     await checkIn(t, s);
     await post(s, "Is this on the exam?", { anonymous: false });
-    expect((await list(t)).map((q) => q.name)).toEqual(["Sample Middle Student"]);
+    expect((await list(t)).map((q) => q.name)).toEqual(["Sample S."]);
   });
 });
 

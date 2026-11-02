@@ -331,10 +331,11 @@ describe("docs: the 2026-10-31 docs fix check", () => {
 
 // The 2026-11-01 check of the 10-31 docs fixes (these ids are that round's findings).
 describe("docs: the 2026-11-01 docs fix check", () => {
-  // live.questions.list is open to anyone, signed out too, and a by-name post carries the whole
-  // check-in name (convex/live/questions.test.ts pins it), so no privacy line may say full names
-  // reach only professors plus the door iPad.
-  it("sweep1-docs-fixcheck-1 the privacy rules name questions by name as a second place a full name reaches students", () => {
+  // live.questions.list is open to anyone, signed out too, and since T1 (2026-11-01) it gives a
+  // by-name post the first name and last initial (lib.shortName; convex/live/questions.private.test.ts
+  // pins it), and the door iPad shows the same short form (checkin.pass.scan's `short`), so every
+  // privacy line says so and none still says a full check-in name or the sign-in name shows there.
+  it("sweep1-docs-fixcheck-1 T1 the privacy rules say questions by name and the door iPad show the first name and last initial", () => {
     const rules = [
       ["docs/runbook.md", "**What stays private:**"],
       ["AGENTS.md", "Who sees names:"],
@@ -342,11 +343,13 @@ describe("docs: the 2026-11-01 docs fix check", () => {
     ];
     for (const [path, start] of rules) {
       const line = lines(path).find((l) => l.includes(start)) ?? "";
-      expect([path, /question[^.]*by name[^.]*full|full[^.]*question[^.]*by name/i.test(line)]).toEqual([path, true]);
-      expect([path, /one exception|(emails and full names|other full names and all emails) show only/i.test(line)]).toEqual([path, false]);
+      expect([path, /question[^.]*by name[^.]*first name and last initial/i.test(line)]).toEqual([path, true]);
+      expect([path, /door iPad[^.]*first name and last initial/i.test(line)]).toEqual([path, true]);
+      expect([path, /full check-in name|sign-in name|each scanned name/i.test(line)]).toEqual([path, false]);
     }
     const contractsLine = lines("docs/contracts.md").find((l) => l.includes("**Privacy:**")) ?? "";
     expect(contractsLine).toContain("`live.questions.list`");
+    expect(contractsLine).toContain("`short`");
   });
 
   it("sweep1-docs-fixcheck-2 BLOCKS.md doesn't list 'after a class ends' as a way deckFrom differs from lectureWindow", () => {

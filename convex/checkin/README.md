@@ -18,7 +18,7 @@ Writes `passes`, `checkins`, `lectures` (a scan opens a class when none is open)
 | `canScan({ device? })` | anyone | Whether this device can scan: a paired iPad's token, or any staff role. |
 | `mine()` | anyone | The signed-in student's pass (code, name, email, when the code was made), or null. |
 | `refresh({ channel? })` | student | Makes the pass, and a new code once the current one is 20 s old. |
-| `scan({ channel, code, device? })` | scanner | Checks the pass's owner in to this class (opens one when none is open). Refused more than 45 minutes before a saved start. Returns the name, the email for professors only, and whether they were checked in already. |
+| `scan({ channel, code, device? })` | scanner | Checks the pass's owner in to this class (opens one when none is open). Refused more than 45 minutes before a saved start. Returns `name` (the full check-in name the teacher scanner shows), `short` (the first name and last initial the door iPad shows, or "Someone" for a name that is the part of an email before the "@"), the email for professors only, and whether they were checked in already. |
 
 ## read.ts
 

@@ -43,7 +43,7 @@ describe("old rows keep working", () => {
     });
     const listed = await t.query(api.live.questions.list, { channel: CH });
     expect(listed).toHaveLength(1);
-    expect(listed[0]).toMatchObject({ index: 2, text: "Why does the loop stop?", name: "Sample student 1", votes: 0, mine: false, voted: false });
+    expect(listed[0]).toMatchObject({ index: 2, text: "Why does the loop stop?", name: "Sample 1.", votes: 0, mine: false, voted: false });
     expect(await t.query(api.live.questions.list, { channel: CH, index: 2 })).toHaveLength(1);
     expect(await t.query(api.deck.current, { channel: CH })).toEqual({ index: 2, beat: 1, count: 12, title: "Loops", lines: ["for", "while"], at: T0 });
 

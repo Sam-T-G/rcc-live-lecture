@@ -328,7 +328,7 @@ describe("F8 the next class on the same channel starts clean", () => {
     expect(await s3.query(api.live.groups.mine, { channel: CH })).toBeNull();
 
     const two = await classTwo(t, one.prof);
-    expect(two.back).toEqual({ name: name(3), email: email(3), already: false });
+    expect(two.back).toEqual({ name: name(3), short: "Sample 3.", email: email(3), already: false });
     expect(await s3.query(api.checkin.read.me, { channel: CH })).toBe(true);
     // Dealt fresh in class 2's arrival order: student 5 first (Red), student 3 second (Blue), both
     // at 0 points. Class 1 ended with student 3 on Red at 4.
@@ -336,7 +336,7 @@ describe("F8 the next class on the same channel starts clean", () => {
     expect(await two.s5.query(api.live.groups.mine, { channel: CH })).toMatchObject({ label: "Red" });
     expect((await t.query(api.live.groups.leaderboard, { channel: CH })).teams.map((g) => `${g.label} ${g.members} ${g.points}`)).toEqual(["Red 1 0", "Blue 1 0"]);
     // Scanned again in class 2, student 3 is already checked in.
-    expect(await checkIn(t, s3)).toEqual({ name: name(3), email: email(3), already: true });
+    expect(await checkIn(t, s3)).toEqual({ name: name(3), short: "Sample 3.", email: email(3), already: true });
 
     // 21:35 Class 2's lock re-deals only class 2's students: 2 students make one team. Class 1's
     // 4 team rows stay as they were.
@@ -353,7 +353,7 @@ describe("F8 the next class on the same channel starts clean", () => {
     // 21:50 Student 1, back from class 1, walks in 20 minutes late: a new check-in with class 2's
     // late minutes, on the late banner, and a place on class 2's team.
     await until(t, C2 + 20 * MIN);
-    expect(await checkIn(t, s1)).toEqual({ name: name(1), email: email(1), already: false });
+    expect(await checkIn(t, s1)).toEqual({ name: name(1), short: "Sample 1.", email: email(1), already: false });
     expect(await s1.query(api.live.groups.mine, { channel: CH })).toMatchObject({ label: "Red" });
     expect((await one.prof.query(api.checkin.attendance.sheet, { channel: CH })).map((r) => [r.name, r.lateMin])).toEqual([
       [name(5), null],
@@ -459,7 +459,7 @@ describe("F8 the next class on the same channel starts clean", () => {
       await until(t, C2 - 10 * MIN);
       expect(await views(t, one.prof, s1)).toEqual(EMPTY);
       const code = await passCode(s1);
-      expect(await admin(t).mutation(api.checkin.pass.scan, { channel: CH, code: `RCC-${code}` })).toEqual({ name: name(1), email: email(1), already: false });
+      expect(await admin(t).mutation(api.checkin.pass.scan, { channel: CH, code: `RCC-${code}` })).toEqual({ name: name(1), short: "Sample 1.", email: email(1), already: false });
       expect(await s1.query(api.checkin.read.me, { channel: CH })).toBe(true);
       expect(await classes(t)).toHaveLength(2);
     }

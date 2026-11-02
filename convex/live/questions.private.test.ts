@@ -2,7 +2,8 @@
 // (f) (sweep1-live-2): the professor's answer to a private question can't be shared, not even with
 // its author ("That question is private."), and "Group by topic with AI" sends private question
 // texts to Gemini too, never names. UC-spec-1: a by-name post shows the name the student checked
-// in with, not the name on a later sign-in.
+// in with, not the name on a later sign-in. T1 (2026-11-01): list, which anyone can read, gives
+// that name as the first name and last initial (lib.shortName); forHost keeps the full name.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../_generated/api";
 import { at, checkIn, professor, profEnv, setup, slide, typed, type Caller, type T } from "../test.helpers";
@@ -125,10 +126,59 @@ describe("UC-spec-1 by-name posts use the name from check-in", () => {
     await room(t, 1); // checked in as Sample student 1
     const renamed = typed(t, "Professor Lee", "student1@example.edu"); // same tokenIdentifier, new name
     await post(renamed, "Quiz is cancelled, leave now", { anonymous: false });
-    expect((await list(t)).map((q) => q.name)).toEqual(["Sample student 1"]);
+    // The room sees the scanned name's first name and last initial (T1), never "Professor L.".
+    expect((await list(t)).map((q) => q.name)).toEqual(["Sample 1."]);
     expect((await forHost(await professor(t))).map((q) => q.name)).toEqual(["Sample student 1"]);
     // Anonymous still stores no name.
     await post(renamed, "Second one");
     expect((await list(t)).find((q) => q.text === "Second one")!.name).toBeNull();
+  });
+});
+
+describe("T1 list never returns a full name; forHost still does", () => {
+  it("T1 by-name questions come back from list as first name and last initial to every reader, signed out too, on every slide and one slide; forHost has the full names", async () => {
+    const t = setup();
+    await slide(t, CH, 3);
+    const people = [
+      typed(t, "Ivy Sample", "student1@example.edu"),
+      typed(t, "Mary Ann Lee", "student2@example.edu"),
+      typed(t, "Élodie Ñúñez", "student3@example.edu"),
+      typed(t, "Ana", "student4@example.edu"),
+    ];
+    for (const s of people) await checkIn(t, s);
+    const [ivy, mary, elodie, ana] = people;
+    await post(ivy, "Is this on the exam?", { anonymous: false });
+    await post(ivy, "Can you zoom in?"); // anonymous
+    await post(mary, "Where are the slides posted?", { anonymous: false });
+    await post(elodie, "Can I come to office hours?", { anonymous: false, private: true });
+    await post(ana, "What does O(n) mean?", { anonymous: false });
+    const p = await professor(t);
+
+    const named = (rows: { text: string; name: string | null }[]) => Object.fromEntries(rows.map((q) => [q.text, q.name]));
+    const seen = {
+      "Is this on the exam?": "Ivy S.",
+      "Can you zoom in?": null,
+      "Where are the slides posted?": "Mary L.",
+      "What does O(n) mean?": "Ana",
+    };
+    for (const index of [undefined, 3]) {
+      for (const reader of [t, ivy, mary, ana, p]) expect(named(await list(reader, index))).toEqual(seen);
+      // The author of the private question sees it, under her short name too.
+      expect(named(await list(elodie, index))).toEqual({ ...seen, "Can I come to office hours?": "Élodie Ñ." });
+      for (const reader of [t, ivy, mary, elodie, ana, p]) {
+        const sent = JSON.stringify(await list(reader, index));
+        for (const full of ["Ivy Sample", "Mary Ann Lee", "Élodie Ñúñez", "Sample", "Lee", "Ñúñez"]) expect(sent).not.toContain(full);
+      }
+    }
+    expect(named(await forHost(p))).toEqual({
+      "Is this on the exam?": "Ivy Sample",
+      "Can you zoom in?": null,
+      "Where are the slides posted?": "Mary Ann Lee",
+      "Can I come to office hours?": "Élodie Ñúñez",
+      "What does O(n) mean?": "Ana",
+    });
+    // The stored rows keep the full name: the short form is made on each read.
+    const stored = await t.run((ctx) => ctx.db.query("questions").withIndex("by_channel", (q) => q.eq("channel", CH)).take(10));
+    expect(stored.map((r) => r.name ?? null).sort()).toEqual(["Ana", "Ivy Sample", "Mary Ann Lee", "Élodie Ñúñez", null].sort());
   });
 });

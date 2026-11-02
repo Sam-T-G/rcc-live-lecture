@@ -268,11 +268,12 @@ describe("ROLES pairing: expiry, single use, unpair revokes, only staff approve,
     expect(await t.mutation(api.staff.requestPairing, { token: DEVICE_TOKEN })).toEqual({ status: "paired", label: "A-210 door" });
     expect(await professorAs.query(api.staff.devices, {})).toEqual([{ _id: device, label: "A-210 door", pairedBy: PROF_EMAIL, pairedAt: T0 + MIN, lastUsedAt: null }]);
 
-    // Signed out, the iPad scans a pass with its token.
+    // Signed out, the iPad scans a pass with its token. It shows `short`, the first name and last
+    // initial (T1); `name` stays whole for door iPads opened before `short` existed.
     vi.setSystemTime(T0 + 2 * MIN);
     expect(await t.query(api.checkin.pass.canScan, { device: DEVICE_TOKEN })).toBe(true);
     const code = await passCode(student(t, 1));
-    expect(await t.mutation(api.checkin.pass.scan, { device: DEVICE_TOKEN, channel: CH, code })).toMatchObject({ name: "Sample student 1", already: false });
+    expect(await t.mutation(api.checkin.pass.scan, { device: DEVICE_TOKEN, channel: CH, code })).toEqual({ name: "Sample student 1", short: "Sample 1.", email: "", already: false });
     expect((await professorAs.query(api.staff.devices, {}))[0].lastUsedAt).toBe(T0 + 2 * MIN);
     expect((await admin(t).query(api.staff.changes, {}))[0]).toMatchObject({
       by: PROF_EMAIL,

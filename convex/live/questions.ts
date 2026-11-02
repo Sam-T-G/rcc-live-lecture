@@ -8,11 +8,14 @@
 //
 // Who sees what:
 //   list (anyone, signed out too)  this class's questions. Another student's private question is
-//       left out; the author sees their own with private: true. name is null when anonymous.
-//       answer is the professor's typed answer once it's shared, else null (the author's too). A
-//       private question's answer is always null: it can't be shared (Sam's decision D12 e).
+//       left out; the author sees their own with private: true. name is the first name and last
+//       initial (lib.shortName, "Ivy S."; T1), so a full name never reaches #/live; null when
+//       anonymous. answer is the professor's typed answer once it's shared, else null (the
+//       author's too). A private question's answer is always null: it can't be shared (Sam's
+//       decision D12 e).
 //   forHost (professors and admins)  every question in this class, private ones too, with the
-//       professor's sorting, the AI's topics and the answer; name is null when anonymous.
+//       professor's sorting, the AI's topics and the answer; name is the full check-in name, null
+//       when anonymous.
 // `user` (the poster's tokenIdentifier, which holds a typed sign-in's email) is stored for "mine",
 // "you can't upvote your own" and delete; no function returns it.
 //
@@ -36,7 +39,8 @@
 //       goes to Gemini, with no name, when the professor groups questions by topic (organize).
 //   api.live.questions.vote      { question } -> null                                       checked in
 //       Upvote; a second tap takes it back. "You can't upvote your own.", "You can't upvote a
-//       private question.", "Check in first."
+//       private question.", "Check in first." A question from another class (outside
+//       lib.lectureWindow, between classes too) changes nothing and returns null (T18).
 //   api.live.questions.remove    { question } -> null                   the author, a professor or admin
 //       Takes the question and its upvotes off every phone. Anyone else: "Only the author or a
 //       professor can delete this." A question that's already gone is a no-op.
@@ -64,7 +68,7 @@ import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { action, internalMutation, mutation, query, type MutationCtx } from "../_generated/server";
 import { gemini } from "../ai";
-import { checkedIn, cleanName, cleanText, deckFrom, lectureWindow, requireUser } from "../lib";
+import { checkedIn, cleanName, cleanText, deckFrom, lectureWindow, requireUser, shortName } from "../lib";
 import { isProf, requireProf, staffRole } from "../checkin/prof";
 
 const MAX_LENGTH = 280; // a question or comment, in characters
@@ -109,6 +113,8 @@ type HostRow = Infer<typeof hostShape>;
 
 // A stored name as it may show. Rows from before cleanName (10-29) can hold an email.
 const shownName = (name: string | undefined) => (name === undefined ? null : cleanName(name));
+// The same name for #/live, which anyone can read: the first name and last initial (T1).
+const roomName = (name: string | undefined) => (name === undefined ? null : shortName(cleanName(name)));
 
 // At most `max` characters (whole characters, so an emoji is never cut in half), trimmed.
 const cut = (text: string, max: number) => Array.from(text.trim()).slice(0, max).join("").trim();
@@ -150,7 +156,7 @@ export const list = query({
         _id: r._id,
         index: r.index,
         text: r.text,
-        name: shownName(r.name),
+        name: roomName(r.name),
         votes: r.votes,
         at: r._creationTime,
         mine: r.user === me,
@@ -225,6 +231,8 @@ export const ask = mutation({
 });
 
 // Upvote a question; a second tap takes the upvote back. Not your own, and not a private one.
+// Only a question in this class counts: one from an earlier class (a phone still showing last
+// class's list) changes nothing and returns quietly (T18).
 export const vote = mutation({
   args: { question: v.id("questions") },
   returns: v.null(),
@@ -232,6 +240,7 @@ export const vote = mutation({
     const me = await requireUser(ctx);
     const row = await ctx.db.get("questions", question);
     if (!row) throw new ConvexError("That question is gone.");
+    if (row._creationTime < (await lectureWindow(ctx, row.channel)).start) return null;
     if (!(await checkedIn(ctx, row.channel, me.tokenIdentifier))) throw new ConvexError("Check in first.");
     if (row.private) throw new ConvexError("You can't upvote a private question.");
     if (row.user === me.tokenIdentifier) throw new ConvexError("You can't upvote your own.");

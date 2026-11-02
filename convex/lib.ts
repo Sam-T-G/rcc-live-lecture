@@ -259,6 +259,18 @@ export function cleanText(raw: string, maxLines: number) {
   return VISIBLE.test(text) ? text : "";
 }
 
+// The name screens anyone can open show for a student (T1): the first word, then the first letter
+// or digit of the last word with any accent marks on it, and a period ("Ivy Sample" -> "Ivy S.",
+// "Mary Ann Lee" -> "Mary L."). A one-word name, cleanName's "Student" and "Someone" included,
+// stays as it is, and so does the first word when the last has no letter or digit. Pass it a
+// cleanName name; professor pages show that full name.
+export function shortName(name: string) {
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return words[0] ?? name;
+  const initial = /[\p{L}\p{N}]\p{M}*/u.exec(words[words.length - 1])?.[0];
+  return initial ? `${words[0]} ${initial}.` : words[0];
+}
+
 // Whether cleanName(raw) is the part of an email address before the "@": the name was typed as
 // one email-looking word ("jdoe1234@gmail.com" -> "jdoe1234"). Shared screens show such a name
 // as "Someone" (checkin.attendance.lateFeed), since it can be the student's personal address.

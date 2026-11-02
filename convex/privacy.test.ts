@@ -3,10 +3,10 @@
 // only the professor can see (by name, so a leak would show her name too), and Dee is the student
 // who looks. Every public query is called signed out and as Dee. The queries come from loading
 // each Convex module, so a new query fails this test until it gets a line in ARGS. An answer may
-// hold no email, no sign-in id (tokenIdentifier) and no full name, except Ben's name on the
-// question he chose to post under it, the first names the late banner shows (lateFeed), and Dee's
-// own name and email on her own pass. Cleo's private question and the professor's answer to it
-// reach nobody else. A host-only query refuses them instead ("Sign in first." or "Only ...").
+// hold no email, no sign-in id (tokenIdentifier) and no full name, except Dee's own name and email
+// on her own pass. Ben's question, posted by name, carries "Ben S." (T1, 2026-11-01: lib.shortName),
+// and the late banner (lateFeed) carries first names. Cleo's private question and the professor's
+// answer to it reach nobody else. A host-only query refuses them instead ("Sign in first." or "Only ...").
 import { makeFunctionReference } from "convex/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
@@ -142,19 +142,15 @@ async function classWithThree(t: T) {
 
 // What may not show in an answer to someone who isn't staff: the other students' emails and full
 // names, the staff's emails and names, anyone's sign-in id, and Cleo's private question and its
-// answer. Ben's name counts as allowed only in the `name` of his own question, so it's taken out
-// of those rows first.
+// answer. Ben's full name counts too, in his own question's `name` as well (T1): list sends "Ben S.".
 const FORBIDDEN = [
   ANA.email, BEN.email, CLEO.email, PROF_EMAIL, ADMIN_EMAIL,
   ANA.name, BEN.name, CLEO.name, "Sample professor", "Sample admin",
   TYPED_ISSUER, GOOGLE_ISSUER, "accounts.google.com", "test-login",
   CLEO_TEXT, CLEO_ANSWER,
 ];
-function leaks(fn: string, value: unknown): string[] {
-  let v = value;
-  if (fn === "live/questions:list" && Array.isArray(v))
-    v = v.map((q: { name?: string | null; text?: string }) => (q.text === BEN_TEXT && q.name === BEN.name ? { ...q, name: "(chosen)" } : q));
-  const s = JSON.stringify(v) ?? "";
+function leaks(value: unknown): string[] {
+  const s = JSON.stringify(value) ?? "";
   return FORBIDDEN.filter((x) => s.toLowerCase().includes(x.toLowerCase()));
 }
 
@@ -185,22 +181,21 @@ describe("F43.2 privacy: what a signed-out caller and another student can read",
     for (const [who, caller] of [["signed out", t], ["Dee", dee]] as const) {
       const got = await readAll(caller, ids);
       for (const [key, r] of Object.entries(got)) {
-        const fn = key.split(" #")[0];
-        if (r.ok) expect(leaks(fn, r.value), `${who}: ${key}`).toEqual([]);
+        if (r.ok) expect(leaks(r.value), `${who}: ${key}`).toEqual([]);
         // A refusal has to be about who is calling, never a bad arg that hides an answer.
         else expect(r.error, `${who}: ${key}`).toMatch(/Sign in first\.|Only (professors|admins) can do that\./);
       }
     }
   });
 
-  it("F43.2 the answers that do come back are the allowed ones: first names late, chosen names on questions, counts on the board", async () => {
+  it("F43.2 T1 the answers that do come back are the allowed ones: first names late, first name and last initial on a question by name, counts on the board", async () => {
     const t = setup();
     const { cleo, dee, ids } = await classWithThree(t);
     const late = await t.query(api.checkin.attendance.lateFeed, { channel: CH });
     expect(late.map((r) => [r.first, r.lateMin])).toEqual([["Ana", 12]]);
     const asDee = await dee.query(api.live.questions.list, { channel: CH });
     expect(asDee.map((q) => [q.text, q.name]).sort()).toEqual([
-      [BEN_TEXT, BEN.name],
+      [BEN_TEXT, "Ben S."],
       [ANA_TEXT, null],
     ].sort());
     // Cleo sees her own private question, and no answer: it can't be shared.
@@ -214,8 +209,8 @@ describe("F43.2 privacy: what a signed-out caller and another student can read",
     // The board and the past quizzes are counts: no names.
     const board = await t.query(api.live.groups.leaderboard, { channel: CH });
     expect(board.teams.length).toBeGreaterThan(0);
-    expect(leaks("live/groups:leaderboard", board)).toEqual([]);
-    expect(leaks("live/past:past", await dee.query(api.live.past.past, { channel: CH }))).toEqual([]);
+    expect(leaks(board)).toEqual([]);
+    expect(leaks(await dee.query(api.live.past.past, { channel: CH }))).toEqual([]);
     expect(await t.query(api.checkin.quiz.mine, { poll: ids.poll })).toBeNull();
   });
 
