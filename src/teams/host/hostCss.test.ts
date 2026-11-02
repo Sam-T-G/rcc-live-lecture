@@ -3,6 +3,7 @@
 // colors come from. A rule for a class nothing renders does nothing when someone restyles it.
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { parse } from "../../styles/cssRules";
 
 const SRC = new URL("../../", import.meta.url);
 const CSS = readFileSync(new URL("teams/host/host.css", SRC), "utf8");
@@ -31,9 +32,25 @@ describe("host.css", () => {
   // 1180 the bar's whoami gives way to StaffGate's strip so "Not you? Sign out" stays reachable.
   it("e2e-host-tabs-narrow keeps the bar's tabs at full width and moves whoami to the strip under 1180", () => {
     const body = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(body).toMatch(/(^|\n)\.host-bar > \.tabs__list \{ flex: none; \}/);
+    expect(body).toMatch(/\.host-bar > \.tabs__list \{ flex: none; \}/);
     const narrow = body.slice(body.indexOf("@media (max-width: 1180px)"));
     expect(narrow).toMatch(/^@media \(max-width: 1180px\) \{\s*\.host-bar > \.whoami \{ display: none; \}\s*\.page--wide:has\(\+ \.host-root\) \{ display: revert-layer; \}\s*\}/);
+  });
+
+  // e2e-host-fixcheck-1: the bar's h1 and Attendance can't shrink, so the tablist is the one item
+  // that gives way. Holding it at full width under 600 made the bar about 558px wide and the whole
+  // page scrolled sideways on a phone. flex: none applies only from 600 up; under that the
+  // tablist shrinks and scrolls inside its own box (kit .tabs__list has overflow-x: auto).
+  it("e2e-host-fixcheck-1 holds the bar's tabs at full width only in windows 600px and wider", () => {
+    const held = parse(CSS).filter(
+      (r) => r.selectors.includes(".host-bar > .tabs__list") && r.decls.some(([p, v]) => p === "flex" && v === "none"),
+    );
+    expect(held.length).toBeGreaterThan(0);
+    for (const r of held) {
+      const minW = r.at.map((a) => /^@media \(min-width: (\d+)px\)$/.exec(a)).find(Boolean);
+      expect(r.at, "flex: none on the bar's tabs must sit in @media (min-width: 600px) or wider").toEqual([minW?.[0]]);
+      expect(Number(minW?.[1])).toBeGreaterThanOrEqual(600);
+    }
   });
 
   it("its header names src/styles/tokens.css as where the colors come from", () => {

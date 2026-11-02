@@ -27,8 +27,12 @@
    right before its page. On #/host the bar says it, so the strip would only push the live view
    84px under the 800 fold. */
 .page--wide:has(+ .host-root) { display: none; }
-/* The tabs keep their full width in every window, so all three stay clickable. */
-.host-bar > .tabs__list { flex: none; }
+/* From 600 up the tabs keep their full width, so all three stay clickable. Under 600 the bar's
+   name and Attendance leave no room for them, so the tab list shrinks and scrolls inside its own
+   box (the kit's overflow-x) and the page never scrolls sideways. */
+@media (min-width: 600px) {
+  .host-bar > .tabs__list { flex: none; }
+}
 /* Under 1180 the bar has no room for who is signed in next to the tabs: the bar's line goes and
    StaffGate's strip comes back above the bar, so "Not you? Sign out" stays on the page and the
    bar stays one 56px row. */
