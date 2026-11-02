@@ -7,6 +7,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ConfirmButton } from "../blocks/kit";
+import { parse } from "../styles/cssRules";
 import UIKit from "./UIKit";
 
 function open(hash: string) {
@@ -150,5 +151,18 @@ describe("DS-KIT-risk-5 #/ui adds no on-screen words the app doesn't have yet", 
     const lines = skill.split("\n").filter((l) => /\bSent\b|\bOffline\b/.test(l));
     expect(lines.length).toBeGreaterThan(0);
     for (const l of lines) expect(l).toMatch(/COPY pass/);
+  });
+});
+
+// The slide track's lane needs 44px plus 32px a slide, so at 390px wide its room count ran to
+// x=531 and the whole page scrolled sideways. The sample sits in its own scroll box, the way
+// .host-track scrolls under 800px on #/host.
+describe("e2e-ui-gallery-sideways #/ui never scrolls sideways at phone width", () => {
+  it("each slide track sample sits in a box that scrolls on its own", () => {
+    const html = open("#/ui");
+    expect(html.match(/<div class="uikit-trackscroll"><div class="track">/g)).toHaveLength(2);
+    const css = parse(readFileSync(new URL("../styles/uikit.css", import.meta.url), "utf8"));
+    const rule = css.find((r) => r.selectors.includes(".uikit-trackscroll") && r.at.length === 0);
+    expect(rule?.decls).toContainEqual(["overflow-x", "auto"]);
   });
 });

@@ -77,23 +77,27 @@ function WideTrack({ name }: { name: "light" | "dark" }) {
   return (
     <section className="uikit__theme" data-theme={name}>
       <Section title="Slide track">
-        <SlideTrack
-          counts={[0, 2, 0, 3, null, null, null, null]}
-          at={3}
-          where={
-            <>
-              <span className="track__of">Slide 4 of 8</span>
-              <span className="track__title">Capacitors in a circuit</span>
-            </>
-          }
-          label="Lost"
-          end={
-            <span className="roomn">
-              <span className="roomn__n">38</span>
-              <span className="roomn__l">checked in</span>
-            </span>
-          }
-        />
+        {/* The lane needs 44px plus 32px a slide: at phone width it scrolls in its own box, as
+            .host-track does under 800px, so the page never scrolls sideways. */}
+        <div className="uikit-trackscroll">
+          <SlideTrack
+            counts={[0, 2, 0, 3, null, null, null, null]}
+            at={3}
+            where={
+              <>
+                <span className="track__of">Slide 4 of 8</span>
+                <span className="track__title">Capacitors in a circuit</span>
+              </>
+            }
+            label="Lost"
+            end={
+              <span className="roomn">
+                <span className="roomn__n">38</span>
+                <span className="roomn__l">checked in</span>
+              </span>
+            }
+          />
+        </div>
       </Section>
     </section>
   );
