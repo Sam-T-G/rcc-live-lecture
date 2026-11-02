@@ -138,51 +138,32 @@ describe("ROLES StaffGate on every professor page", () => {
   });
 });
 
-// TK-COPY (Sam's call T14): the staff sign-in screen carries the GDG on Campus logo and GDG's
-// independence sentence above the page's title, as comp design/comps/staff/staff-gate.html has
-// them: the horizontal lockup in light, the stacked one in dark. The files sit in public/, so each
-// address starts with Vite's base path (/rcc-live-lecture/ on GitHub Pages, / in dev).
-describe("TK-COPY the staff sign-in screen's GDG on Campus logo and independence sentence", () => {
-  const INDEP =
-    "GDG on Campus Riverside City College is an independent group; our activities and the opinions expressed here should in no way be linked to Google, the corporation.";
-  const LOGOS = ["gdg-on-campus-horizontal-light.svg", "gdg-on-campus-stacked-dark.svg"];
+// E2E-1 (Sam's call): the GDG on Campus logo and GDG's independence sentence stay out of the app.
+// The staff sign-in screen starts with the page's title in every state and draws no image.
+describe("E2E-1 the staff sign-in screen has no GDG on Campus logo or independence sentence", () => {
   const ROOT = new URL("../../../", import.meta.url);
-  // Everything the screen draws before the page's title.
-  const top = (html: string) => html.slice(0, html.indexOf("<h1>"));
+  const noBrand = (html: string) => {
+    expect(html).not.toMatch(/<img /);
+    expect(html).not.toContain("gdg-on-campus");
+    expect(html).not.toContain("independent group");
+    expect(html).not.toContain("staff-gate__brand");
+    expect(html.startsWith('<div class="staff-gate"><main class="page page--wide"><h1>Live quiz</h1>')).toBe(true);
+  };
 
-  it("TK-COPY signed out: the light logo, the dark logo and the sentence come before the title, and Google's button after it", () => {
+  it("E2E-1 signed out, checking and refused all start with the title and draw no logo or sentence", () => {
     results["staff:me"] = null;
-    const html = page();
-    expect(top(html)).toContain(
-      '<img class="gate__logo-l" src="/gdg-on-campus-horizontal-light.svg" alt="GDG on Campus Riverside City College" width="360" height="73"/>',
-    );
-    expect(top(html)).toContain(
-      '<img class="gate__logo-d" src="/gdg-on-campus-stacked-dark.svg" alt="GDG on Campus Riverside City College" width="104" height="144"/>',
-    );
-    expect(top(html)).toContain(`<p class="indep">${INDEP}</p>`);
-    expect(html).toContain("<h1>Live quiz</h1>");
-    expect(html.indexOf("<h1>Live quiz</h1>")).toBeLessThan(html.indexOf("[Google button, typed sign-in under it]"));
-  });
-
-  it("TK-COPY each logo's address starts with the app's base path, so it loads under /rcc-live-lecture/ on GitHub Pages", () => {
-    vi.stubEnv("BASE_URL", "/rcc-live-lecture/");
-    results["staff:me"] = null;
-    const srcs = [...page().matchAll(/<img [^>]*src="([^"]*)"/g)].map((m) => m[1]);
-    expect(srcs).toEqual(LOGOS.map((f) => `/rcc-live-lecture/${f}`));
-  });
-
-  it("TK-COPY checking and a sign-in the page doesn't open for keep the logo and the sentence, so the title stays put when the check lands", () => {
+    noBrand(page());
+    expect(page()).toContain("[Google button, typed sign-in under it]");
     auth.loading = true;
-    expect(top(page())).toContain(`<p class="indep">${INDEP}</p>`);
+    noBrand(page());
     auth.loading = false;
     results["staff:me"] = staff("student1@example.edu", null);
     const refused = page();
-    expect(top(refused)).toContain('class="gate__logo-l"');
-    expect(top(refused)).toContain(`<p class="indep">${INDEP}</p>`);
+    noBrand(refused);
     expect(words(refused)).toContain("student1@example.edu isn't on the staff list.");
   });
 
-  it("TK-COPY a professor's open page shows neither, and SignInScreen without `brand` (#/admin) draws what it drew before", () => {
+  it("E2E-1 a professor's open page is the page, and SignInScreen (#/admin) draws only the title and its children", () => {
     results["staff:me"] = staff("prof@example.edu", "professor");
     expect(page()).toBe("[the quiz page]");
     expect(renderToStaticMarkup(createElement(SignInScreen, { title: "Admin", children: "[the reason]" }))).toBe(
@@ -190,40 +171,24 @@ describe("TK-COPY the staff sign-in screen's GDG on Campus logo and independence
     );
   });
 
-  it("TK-COPY the sentence is word for word the comp's, and public/ has both logos byte for byte as design/system/assets has them", () => {
-    const comp = readFileSync(new URL("design/comps/staff/staff-gate.html", ROOT), "utf8");
-    expect(comp).toContain(`<p class="indep">${INDEP}</p>`);
-    for (const f of LOGOS) {
-      const shipped = readFileSync(new URL(`public/${f}`, ROOT));
-      expect(shipped.equals(readFileSync(new URL(`design/system/assets/${f}`, ROOT))), f).toBe(true);
+  it("E2E-1 no file in src/ (tests aside) or public/ carries the logo, its CSS or the sentence", () => {
+    const files = (dir: URL): URL[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(new URL(`${e.name}/`, dir)) : [new URL(e.name, dir)]));
+    expect(readdirSync(new URL("public/", ROOT)).filter((f) => f.startsWith("gdg-on-campus"))).toEqual([]);
+    for (const f of [...files(new URL("src/", ROOT)), ...files(new URL("public/", ROOT))]) {
+      if (f.pathname.endsWith(".test.ts")) continue;
+      const text = readFileSync(f, "utf8");
+      expect(text, f.pathname).not.toContain("gdg-on-campus");
+      expect(text, f.pathname).not.toContain("independent group");
+      expect(text, f.pathname).not.toMatch(/gate__logo|staff-gate__brand/);
     }
   });
 
-  it("TK-COPY teacher.css shows the light logo in light and the dark logo in dark, by the system setting or data-theme", () => {
-    const rules = parse(readFileSync(new URL("./teacher.css", import.meta.url), "utf8"));
-    // The last display each selector gets, with the at-rules around it.
-    const display = (sel: string, media: boolean) =>
-      rules
-        .filter((r) => r.selectors.includes(sel) && r.at.some((a) => /prefers-color-scheme:\s*dark/.test(a)) === media)
-        .flatMap((r) => r.decls.filter(([k]) => k === "display").map(([, v]) => v))
-        .at(-1);
-    expect(display(".staff-gate .gate__logo-l", false)).toBe("block");
-    expect(display(".staff-gate .gate__logo-d", false)).toBe("none");
-    expect(display(':root:not([data-theme="light"]) .staff-gate .gate__logo-l', true)).toBe("none");
-    expect(display(':root:not([data-theme="light"]) .staff-gate .gate__logo-d', true)).toBe("block");
-    expect(display('[data-theme="dark"] .staff-gate .gate__logo-l', false)).toBe("none");
-    expect(display('[data-theme="dark"] .staff-gate .gate__logo-d', false)).toBe("block");
-  });
-
-  it("TKC-1 the logo and sentence block runs 640 wide, past the 560 column, so the sentence breaks into two even lines at 15px", () => {
-    // The sentence measures 1127px on one line in Google Sans at 15px (Chrome, the lab at 1280):
-    // at 560 balance spreads it over three lines; at 640 it takes two of about 565.
+  it("E2E-1 the staff sign-in column stays 560 wide", () => {
     const rules = parse(readFileSync(new URL("./teacher.css", import.meta.url), "utf8"));
     const last = (sel: string, prop: string) =>
       rules.filter((r) => r.selectors.includes(sel) && !r.at.length).flatMap((r) => r.decls.filter(([k]) => k === prop).map(([, v]) => v)).at(-1);
     expect(last(".staff-gate > .page > *", "max-width")).toBe("560px");
-    expect(last(".staff-gate > .page > .staff-gate__brand", "max-width")).toBe("640px");
-    expect(last(".staff-gate .page .indep", "text-wrap")).toBe("balance");
   });
 });
 

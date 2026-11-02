@@ -13,9 +13,7 @@
 //                Sign out at its end.
 //   <SignInScreen title>, <SignInChecking />, <SignInRefused>   the staff sign-in screen (no bar,
 //                one column at the top of the page), its checking line, and the lock glyph
-//                hung before a sign-in the page doesn't open for. StaffGate and #/admin use them;
-//                StaffGate's screen (`brand`) has the GDG on Campus logo and GDG's independence
-//                sentence above the title.
+//                hung before a sign-in the page doesn't open for. StaffGate and #/admin use them.
 //   <SignInEnding />   for the 5 minutes before a Google sign-in ends, its end time and Google's
 //                button pinned to the bottom of the page (StaffGate and #/admin show it; #/live
 //                and #/checkin/student show it with line={STUDENT_ENDING}). With `bar` it is the
@@ -149,7 +147,7 @@ export function StaffGate({ title, bar, children }: { title: string; bar?: boole
     );
   }
   return (
-    <SignInScreen title={title} brand>
+    <SignInScreen title={title}>
       {me === undefined ? <SignInChecking /> : me === null ? <NotStaff me={me} /> : <SignInRefused><NotStaff me={me} /></SignInRefused>}
     </SignInScreen>
   );
@@ -168,32 +166,14 @@ export function StaffBar({ title }: { title: string }) {
 }
 
 // The sign-in screens of the staff pages (and #/host): no bar, one column at the top of the
-// page with the title, the sentence and the action under it. With `brand` (StaffGate's screen,
-// comp staff-gate) the GDG on Campus logo and GDG's independence sentence sit above the title.
-export function SignInScreen({ title, brand, children }: { title: string; brand?: boolean; children: ReactNode }) {
+// page with the title, the sentence and the action under it.
+export function SignInScreen({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="staff-gate">
       <Screen wide>
-        {brand && <GdgBrand />}
         <h1>{title}</h1>
         {children}
       </Screen>
-    </div>
-  );
-}
-
-// The GDG on Campus logo (teacher.css shows the horizontal lockup in light and the stacked one in
-// dark) and GDG's independence sentence, word for word. The files are in public/, so each address
-// starts with Vite's base path: /rcc-live-lecture/ on GitHub Pages, / in dev.
-function GdgBrand() {
-  const base = import.meta.env.BASE_URL;
-  return (
-    <div className="staff-gate__brand">
-      <img className="gate__logo-l" src={`${base}gdg-on-campus-horizontal-light.svg`} alt="GDG on Campus Riverside City College" width={360} height={73} />
-      <img className="gate__logo-d" src={`${base}gdg-on-campus-stacked-dark.svg`} alt="GDG on Campus Riverside City College" width={104} height={144} />
-      <p className="indep">
-        GDG on Campus Riverside City College is an independent group; our activities and the opinions expressed here should in no way be linked to Google, the corporation.
-      </p>
     </div>
   );
 }
