@@ -235,12 +235,15 @@
      a paler ring, never opacity. A busy button keeps its own look (the spinner shows instead). */
   :is(button, .btn):is(:disabled, [aria-disabled="true"]):not([aria-busy="true"], .link, .switch, .choice, .tabs__tab, .seg__item) {
     background-color: var(--neutral-btn); background-image: none; color: var(--muted); box-shadow: none; opacity: 1; cursor: not-allowed; }
-  :is(.color-field, .qfield, .stub) :is(button, .btn):is(:disabled, [aria-disabled="true"]):not([aria-busy="true"]) { background-color: var(--tile-out); color: var(--on-tile-out); }
+  /* On a field a disabled button steps to the out fill, except the student's own pick: a sent
+     answer is disabled too, and it keeps its tile, words and letter well under the ring. */
+  :is(.color-field, .qfield, .stub) :is(button, .btn):is(:disabled, [aria-disabled="true"]):not([aria-busy="true"], .is-picked, [aria-pressed="true"]) { background-color: var(--tile-out); color: var(--on-tile-out); }
   .btn-why { display: inline-flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
   .btn-why__text { font-size: var(--t-small); color: var(--muted); }
   /* Busy: the words keep their place (and stay readable to a screen reader), so the button never
      changes width, and a spinner in the button's own word color sits on top after 0.4s. It is the
-     only spinner in the app. Reduced motion shows a still clock glyph instead. */
+     only spinner in the app, on phone and laptop only. Reduced motion, the door iPad and the
+     projector show a still clock glyph instead. */
   .btn[aria-busy="true"] { opacity: 1; cursor: progress; }
   .btn[aria-busy="true"] .btn__label { opacity: 0; }
   .btn__spinner { position: absolute; inset: 0; margin: auto; width: 1.25em; height: 1.25em; border: 2px solid currentColor;
@@ -250,6 +253,10 @@
     .btn__spinner { animation: rcc-show 1ms linear 400ms forwards; border: 0; border-radius: 0; background: currentColor;
       -webkit-mask: var(--clock-glyph) center / contain no-repeat; mask: var(--clock-glyph) center / contain no-repeat; }
   }
+  /* Nothing loops on a screen people read in passing (RUBRIC blocker 4): a busy door iPad or stage
+     button shows the still clock after 0.4s in every motion setting. */
+  :is([data-surface="kiosk"], [data-surface="projector"], .projector) .btn__spinner { animation: rcc-show 1ms linear 400ms forwards; border: 0;
+    border-radius: 0; background: currentColor; -webkit-mask: var(--clock-glyph) center / contain no-repeat; mask: var(--clock-glyph) center / contain no-repeat; }
 
   /* --------------------------------------------------------------- link */
   /* One style for every text action outside a sentence (Show slide, See all teams, Sign out, Ask the
@@ -413,6 +420,10 @@
   .badge--stop .icon, .badge--error .icon { color: var(--st-stop-mark); }
   .badge--wait { background: var(--st-wait); color: var(--on-st-wait); }
   .badge--quiet { background: var(--well); color: var(--muted); }
+  /* A place ("1st", "2nd, tied") is the ledger's bare numeral, never a chip: the drawing of
+     .ln--place and the Students table's place cell. */
+  .badge--place { min-height: 0; padding: 0; background: none; font-size: var(--t-body); font-weight: var(--w-loud);
+    font-variant-numeric: tabular-nums lining-nums; letter-spacing: 0; }
   /* Retired: the Live badge draws as the state word in --st-in-mark (no pill, no dot). */
   .badge--live { min-height: 0; padding: 0; background: none; color: var(--st-in-mark); font-size: inherit; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
@@ -528,6 +539,14 @@
   .state--error .state__text + .state__text { color: var(--muted); }
   .state--inline.state--error { padding: var(--s4); background: var(--well); border-radius: var(--r-md); }
   .state--inline.state--error > .icon { width: 20px; height: 20px; }
+  /* ErrorBoundary's line for a part that didn't load (ui.tsx; ui.test.ts pins its markup): no
+     filled box, so red is on the glyph only, which hangs at the row's edge; the sentence in
+     --text; Try again drawn as the outline button. Each area's stylesheet puts the line in the
+     frame of the part it stands in for (host.css, stage.css). */
+  .row > .status--error:has(+ .btn--quiet) { background: none; color: var(--text); border-inline-width: calc(1.1em + var(--s2)) 0; }
+  .row > .status--error + .btn--quiet { padding-inline: var(--s5); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); }
+  :is(.phone, [data-surface="phone"], [data-surface="kiosk"]) .row > .status--error + .btn--quiet { box-shadow: var(--hl), inset 0 0 0 2px var(--line-strong); }
+  :is(.projector, [data-surface="projector"]) .row > .status--error + .btn--quiet { box-shadow: inset 0 0 0 var(--p-ring) var(--line-strong); }
   .loading-line { display: flex; align-items: center; gap: var(--s2); color: var(--muted); font-size: var(--t-small); }
   /* <EmptyState>: the heading, the sentence and the one action, top-aligned in its region. */
   .empty { display: grid; justify-items: start; gap: var(--s2); padding: var(--s4) 0; text-align: start; }
@@ -635,6 +654,8 @@
   .vote { display: grid; justify-items: center; align-content: start; min-width: 48px; padding-top: 2px; }
   .vote__n { font-size: var(--n-sm); font-weight: var(--w-loud); font-variant-numeric: tabular-nums; }
   .answer { padding: var(--s2) var(--s3); border-radius: var(--r-sm); background: var(--well); font-size: var(--t-small); }
+  /* Inside a raised card the answer steps up, like every part there, so in dark it is never a hole in the card. */
+  :where(.card, .focal, .hcard, .pass, .livestate) .answer { background: var(--on-raised); }
   .answer__l { font-weight: var(--w-head); }
 
   /* .table: a real <table> as the same part (well, raised head, 44 rows, 1px rules). */
@@ -782,7 +803,8 @@
   .cam { position: relative; background: var(--cam); border-radius: var(--r-xl); overflow: hidden; aspect-ratio: 4 / 3; display: grid; place-items: center; color: var(--cam-mark); }
   .cam--off { background: var(--well); color: var(--muted); }
   .cam__corners { position: absolute; inset: 14%; color: var(--cam-mark); transition: color var(--fx) var(--ease); pointer-events: none; }
-  .cam__corners svg { width: 100%; height: 100%; display: block; }
+  /* The marks run on the svg's own edge: overflow visible draws their whole round-capped stroke, as the door's .target does. */
+  .cam__corners svg { width: 100%; height: 100%; display: block; overflow: visible; }
   .cam.is-ok .cam__corners { color: var(--cam-mark-ok); }
   .cam__msg { position: relative; display: grid; gap: var(--s3); justify-items: center; text-align: center; padding: var(--s6); max-width: 30ch; }
 
@@ -833,17 +855,20 @@
   .pair__gap { display: inline-block; width: .5em; }
   .btn--k { min-height: var(--k-btn); padding: 0 calc(40 * var(--k-u)); font-size: calc(28 * var(--k-u)); }
   /* The door: bar, then one panel of two rows in every state (the status band at --k-door, the camera
-     window in the rest), then the typed-code strip. A result floods the whole panel, so the flood
-     frames the window: Checked in on --field, Already on --st-in, Refused and Camera blocked on
-     --st-stop-fill. Nothing moves between states; only fills, glyphs and words change. */
+     window in the rest), then the typed-code strip. Idle, the panel sits on the page like the strip,
+     so the white bar keeps a rung over it. A result floods the whole panel, so the flood frames the
+     window: Checked in on --field, Already on --accent-soft (st-in's mint in light; in dark a
+     green-tinted neutral, since dark --st-in was 1.04:1 off the field), Refused and Camera blocked
+     on --st-stop-fill. Nothing moves between states; only fills, glyphs and words change. The fill
+     fades; the words change with it in one frame, never fading through grey (MOTION.md). */
   .door { display: flex; flex-direction: column; min-height: 100vh; min-height: 100svh; background: var(--page); color: var(--text); }
   .door > .k-bar { flex: none; }
   .door .roomn__n { font-size: calc(64 * var(--k-u)); min-width: 2ch; text-align: start; }
   .door .roomn__l { font-size: calc(28 * var(--k-u)); }
-  .door__panel { flex: 1; display: grid; grid-template-rows: var(--k-door) minmax(0, 1fr); min-height: 0; background: var(--raised); color: var(--text);
-    transition: background-color var(--fx) var(--ease), color var(--fx) var(--ease); }
+  .door__panel { flex: 1; display: grid; grid-template-rows: var(--k-door) minmax(0, 1fr); min-height: 0; background: var(--page); color: var(--text);
+    transition: background-color var(--fx) var(--ease); }
   .door__panel--in { background: var(--field); color: var(--on-field); }
-  .door__panel--already { background: var(--st-in); color: var(--on-st-in); }
+  .door__panel--already { background: var(--accent-soft); color: var(--on-accent-soft); }
   .door__panel--stop { background: var(--st-stop-fill); color: var(--on-st-stop-fill); }
   .door__status { display: grid; align-content: end; padding: calc(32 * var(--k-u)) var(--k-gutter); }
   .door__status .lockup { font-size: var(--k-status); line-height: 1.02; letter-spacing: -0.01em; }
@@ -864,7 +889,10 @@
     display: grid; place-content: center; justify-items: center; gap: calc(24 * var(--k-u)); cursor: pointer; }
   .camstart .icon { width: calc(128 * var(--k-u)); height: calc(128 * var(--k-u)); stroke-width: 18; }
   .camstart > span { font-size: calc(64 * var(--k-u)); font-weight: var(--w-loud); line-height: 1.05; white-space: nowrap; }
-  .camstart--wait { background: var(--well); color: var(--muted); box-shadow: none; cursor: default; pointer-events: none; }
+  .camstart--wait { background: var(--bar); color: var(--muted); box-shadow: none; cursor: default; pointer-events: none; }
+  /* Inside a result's flood the window is the plain camera window: no green ring, its glyph and
+     words in --cam-mark, so the flood's word stays the one green mass on the door. */
+  :is(.door__panel--in, .door__panel--already, .door__panel--stop) .camstart { box-shadow: none; color: var(--cam-mark); }
   /* The typed code: a field and a separate 64 Check in button, padded above the home bar. */
   .door__strip { flex: none; display: grid; grid-template-columns: minmax(0, 1fr); row-gap: calc(8 * var(--k-u));
     padding: calc(16 * var(--k-u)) var(--k-gutter) calc(var(--k-gutter) + env(safe-area-inset-bottom)); background: var(--page); }
@@ -1015,8 +1043,14 @@
   .qfield .choice { border-radius: var(--r-md); }
   .qfield .choice:not([aria-pressed="true"], .is-picked, .is-error, .is-right) { box-shadow: var(--hl); }
   .qfield .choice.is-out .letter { background: var(--out-letter); color: var(--on-out-letter); }
-  .qfield__foot { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: var(--s4); align-items: start; font-size: var(--t-small); color: var(--on-field); }
+  .qfield__foot { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: var(--s4); align-items: start; font-size: var(--t-small);
+    line-height: var(--lh-small); color: var(--on-field); }
   .qfield__foot > .icon { justify-self: center; }
+  /* The field keeps its height from Sending to Sent: the state word sits in one column wide enough
+     for "Sending", so the tile's words wrap the same way under "Sent", and while a tile sends the
+     footer's two lines are held where the footer lands. */
+  .qfield .choice__state { min-width: 5.25em; justify-content: flex-end; }
+  .qfield:has(.choice[aria-busy="true"]):not(:has(> .qfield__foot))::after { content: ""; min-height: calc(2 * var(--t-small) * var(--lh-small)); }
   /* The slide card: --raised, the screen's one raised object, no shadow. */
   .livestate { display: grid; gap: var(--s3); padding: var(--s4); background: var(--raised); border-radius: var(--r-lg); box-shadow: var(--hl), var(--card-ring); }
   .livestate__where { font-size: var(--t-small); color: var(--muted); font-variant-numeric: tabular-nums; }

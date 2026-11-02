@@ -271,12 +271,13 @@ export function Segmented<T extends string>({
   );
 }
 
-export type Tone = "neutral" | "accent" | "live" | "warn" | "error";
+export type Tone = "neutral" | "accent" | "live" | "warn" | "error" | "place";
 
 // A short label on something that differs between items in one list and that the reader acts
 // on: "Late", "5 min late", "Permanent". The words carry the meaning; the color only repeats it.
 // accent draws as the in state, warn as open, error as stop; live is retired and draws as a
-// green state word. StateChip has the state tones and their glyphs.
+// green state word; place ("1st", "2nd, tied") draws as the ledger's bare place numeral, no
+// chip. StateChip has the state tones and their glyphs.
 export function Badge({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
   return <span className={`badge badge--${tone}`}>{children}</span>;
 }
@@ -610,6 +611,9 @@ export function Skeleton({ lines = 3, height, label = "Loading" }: { lines?: num
 // unhandled rejection. `defaultOpen` starts it asking (#/ui uses it). The question box takes the
 // button's place; with `overlay` it opens as a sheet centered on a scrim over the page instead,
 // for a confirm that ends something for everyone (End class, Delete a question from every phone).
+// `openerVariant` draws the first button in another look while the confirming button keeps
+// `variant`, so red fills only inside the confirm: End class beside Download extra credit is
+// "outline", a row's Remove or Unpair "ghost". Left out, the first button takes `variant`.
 export function ConfirmButton({
   children,
   question,
@@ -618,6 +622,7 @@ export function ConfirmButton({
   onConfirm,
   onError,
   variant = "danger",
+  openerVariant,
   disabled,
   defaultOpen,
   overlay,
@@ -629,6 +634,7 @@ export function ConfirmButton({
   onConfirm: () => unknown;
   onError?: (error: unknown) => void;
   variant?: "danger" | "primary";
+  openerVariant?: ButtonLook;
   disabled?: boolean;
   defaultOpen?: boolean;
   overlay?: boolean;
@@ -665,7 +671,7 @@ export function ConfirmButton({
   }
 
   const opening = (
-    <Button ref={opener} variant={variant} disabled={overlay && open ? true : disabled} onClick={() => show(true)}>
+    <Button ref={opener} variant={openerVariant ?? variant} disabled={overlay && open ? true : disabled} onClick={() => show(true)}>
       {children}
     </Button>
   );
@@ -730,4 +736,30 @@ export function Projector({
       {children}
     </main>
   );
+}
+
+// ---------- calm ----------
+// Reduced motion for scripted moves (MOTION.md "Reduced motion"): true when the person asked their
+// device for less motion. A FLIP or a WAAPI animation asks calm() right before it moves anything,
+// so a setting changed while the page is open counts on the next move; when it says true, jump to
+// the end state (the words and fills still change). CSS moves don't need it: the --sp* tokens are
+// already 0 under reduced motion. Off a browser (tests, the server) it says false.
+const REDUCE = "(prefers-reduced-motion: reduce)";
+
+function reduceQuery(): MediaQueryList | null {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia(REDUCE) : null;
+}
+
+export function calm(): boolean {
+  return reduceQuery()?.matches ?? false;
+}
+
+// Calls `listener` with calm()'s new answer each time the setting changes, for a part that has to
+// redraw when it does. Returns the function that stops listening.
+export function onCalmChange(listener: (calm: boolean) => void): () => void {
+  const query = reduceQuery();
+  if (!query || typeof query.addEventListener !== "function") return () => {};
+  const changed = (e: MediaQueryListEvent) => listener(e.matches);
+  query.addEventListener("change", changed);
+  return () => query.removeEventListener("change", changed);
 }

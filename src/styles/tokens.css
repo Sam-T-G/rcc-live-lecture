@@ -176,6 +176,11 @@
     --ease: var(--rcc-ease-standard);
     --ease-sp: var(--rcc-ease-spatial);  /* the phone's answer tap and the switch knob only */
     --ease-exit: var(--rcc-ease-exit);
+    /* A word or name rising through its mask (the door's result, the staff scan result, the
+       phone's checked-in lockup, the late lower third). Words only: on a bar it ends 90% of the
+       growth by 120ms and hides it. */
+    --ease-arrive: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);  /* the phone's bottom sheet only */
     --hold-result: 3000ms;  /* a kiosk result before it goes back to idle */
     --hold-new: 4000ms;     /* a row just added keeps its tint this long */
 
@@ -308,7 +313,7 @@
     --lift: #ffffff;
     --track: #e4e9e5;     /* a bar chart's track */
     --neutral-btn: #dce3dd; /* .btn--neutral and every disabled button */
-    --skel-fill: #e4e9e5; /* a skeleton block, always lighter than its ground in dark */
+    --skel-fill: #d2d9d3; /* a skeleton block: 1.27:1 on the page, 1.44 on a card, 1.17 on a well (the projector's well tone, so the stage keeps it); always lighter than its ground in dark */
     --bar-rest: #575a58;  /* every poll bar that is not the lead or the right answer */
 
     --on-accent: #ffffff;
@@ -414,7 +419,7 @@
       --out-letter: #025620; --on-out-letter: #ffffff;
       --st-in: #00531e;   --on-st-in: #c6eccb;   --st-in-mark: #96d6a0;
       --st-open: #624000; --on-st-open: #fcdeb5; --st-open-mark: #e7ae58;
-      --st-stop: #910906; --on-st-stop: #ffdbd4; --st-stop-mark: #ffb3a8;
+      --st-stop: #43302d; --on-st-stop: #ffdbd4; --st-stop-mark: #ffb3a8;   /* a quiet red-tinted rung over --raised, not GDG's #910906 slab */
       --st-wait: #383f39; --on-st-wait: #e6e9e6; --st-wait-mark: #b9bcba;
       --st-stop-fill: #8c1d18; --on-st-stop-fill: #ffffff;
       --on-error: #660604;
@@ -493,7 +498,7 @@
     --out-letter: #025620; --on-out-letter: #ffffff;
     --st-in: #00531e;   --on-st-in: #c6eccb;   --st-in-mark: #96d6a0;
     --st-open: #624000; --on-st-open: #fcdeb5; --st-open-mark: #e7ae58;
-    --st-stop: #910906; --on-st-stop: #ffdbd4; --st-stop-mark: #ffb3a8;
+    --st-stop: #43302d; --on-st-stop: #ffdbd4; --st-stop-mark: #ffb3a8;   /* a quiet red-tinted rung over --raised, not GDG's #910906 slab */
     --st-wait: #383f39; --on-st-wait: #e6e9e6; --st-wait-mark: #b9bcba;
     --st-stop-fill: #8c1d18; --on-st-stop-fill: #ffffff;
     --on-error: #660604;

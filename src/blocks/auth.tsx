@@ -335,7 +335,7 @@ export function AuthProvider({ client, children }: { client: ConvexReactClient; 
   const renderButton = useCallback(
     (el: HTMLElement) => {
       if (gsi !== "ready" || !window.google) return wantGoogle();
-      window.google.accounts.id.renderButton(el, { theme: "outline", size: "large", shape: "pill", text: "continue_with" });
+      window.google.accounts.id.renderButton(el, googleButtonOptions(el));
     },
     [gsi, wantGoogle],
   );
@@ -393,6 +393,26 @@ function DropRefused({ token, drop }: { token: string | null; drop: (token: stri
     else if (!isAuthenticated && checking.current === token) drop(token);
   }, [token, isLoading, isAuthenticated, drop]);
   return null;
+}
+
+// What renderButton asks Google's script to draw into `el` (docs/design.md "Sign-in"): the large
+// pill that says "Continue with Google", the outline one on a light page and the filled black one
+// on a dark page (the nearest data-theme, else the device's setting), as wide as its box up to
+// Google's 400. A box narrower than Google's 200, or not laid out yet (a banner's action slot),
+// keeps Google's own width.
+export function googleButtonOptions(el: HTMLElement): Record<string, string | number> {
+  const themed = typeof el.closest === "function" ? el.closest("[data-theme]")?.getAttribute("data-theme") : null;
+  const dark = themed
+    ? themed === "dark"
+    : typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const width = typeof el.getBoundingClientRect === "function" ? Math.floor(el.getBoundingClientRect().width) : 0;
+  return {
+    theme: dark ? "filled_black" : "outline",
+    size: "large",
+    shape: "pill",
+    text: "continue_with",
+    ...(width >= 200 ? { width: Math.min(400, width) } : {}),
+  };
 }
 
 // Google's "Continue with Google" button. Google's script draws it into this box once it has

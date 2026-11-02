@@ -654,6 +654,7 @@ function BadgesAndBanners() {
         <Badge tone="live">Live</Badge>
         <Badge tone="warn">5 min late</Badge>
         <Badge tone="error">Not checked in</Badge>
+        <Badge tone="place">2nd, tied</Badge>
       </p>
       <p className="row">
         <StateChip tone="in" glyph="check">
@@ -860,7 +861,7 @@ function EmptyAndConfirm() {
       <Skeleton height="6rem" />
       <div className="uikit-states">
         <State name="Closed">
-          <ConfirmButton question="Remove this question? Students won't see it again." confirm="Remove" onConfirm={() => wait(800)}>
+          <ConfirmButton openerVariant="ghost" question="Remove this question? Students won't see it again." confirm="Remove" onConfirm={() => wait(800)}>
             Remove
           </ConfirmButton>
         </State>

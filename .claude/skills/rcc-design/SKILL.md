@@ -89,8 +89,8 @@ Evidence tags: `L:R1-nn` to `L:R7-nn` = an entry in `design/system/LESSONS.md` (
 - A state counts only when it is rendered: shoot loading, error and every wait step in the lab; controls render disabled while loading. L:R1-11.
 
 ### Motion
-- Only state changes move, on the named transitions in "Motion"; transform, opacity and color only; no loops but the busy spinner in a pressed button. SYN-24, R blocker 4.
-- Reduced motion replaces spatial moves with color or opacity; never deletes the change. SYN-26.
+- Only state changes move, on the named transitions in "Motion"; transform, opacity and color only; no loops but the busy spinner in a pressed button on phone or laptop (the door iPad and the projector show the still clock). SYN-24, R blocker 4.
+- Reduced motion replaces spatial moves with color or opacity; never deletes the change. Scripted moves (FLIP, WAAPI) ask `calm()` from `src/blocks/kit.tsx` right before they move and jump to the end state when it says true. A word rising through its mask uses `--ease-arrive`; the phone sheet `--ease-sheet`; hold times stay as tokens.css has them. SYN-26, MOTION.md.
 - Live counts swap value in place; the leaderboard reorders instantly with a held ring. SYN-27.
 
 ### Data and safety

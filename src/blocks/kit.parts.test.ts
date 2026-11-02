@@ -37,6 +37,10 @@ describe("Badge and StateChip", () => {
     expect(html(h(Badge, { tone: "warn" }, "Private"))).toBe('<span class="badge badge--warn">Private</span>');
   });
 
+  it("IT1-KIT host-craft-1-3 tone place draws a place as the ledger's bare numeral, in the same markup", () => {
+    expect(html(h(Badge, { tone: "place" }, "2nd, tied"))).toBe('<span class="badge badge--place">2nd, tied</span>');
+  });
+
   it("StateChip draws a state tone with its glyph before the words, hidden from screen readers", () => {
     const out = html(h(StateChip, { tone: "in", glyph: "check" }, "Paired"));
     expect(out).toMatch(/^<span class="badge badge--in"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false">.*<\/svg>Paired<\/span>$/);
@@ -157,6 +161,23 @@ describe("ConfirmButton overlay", () => {
     const out = html(h(ConfirmButton, { ...props, defaultOpen: true, overlay: true }));
     expect(out).toMatch(/^<button disabled="" type="button" class="btn btn--danger"><span class="btn__label">End class<\/span><\/button><div class="scrim"><div class="sheet confirm" role="dialog" aria-modal="true" aria-labelledby="[^"]+">/);
     expect(out).toContain('<p class="confirm__question"');
+  });
+
+  it("IT1-KIT host-use-1-7 openerVariant draws the first button in its own look; the confirming button stays the only red fill", () => {
+    expect(html(h(ConfirmButton, { ...props, openerVariant: "outline" }))).toBe(
+      '<button type="button" class="btn btn--outline"><span class="btn__label">End class</span></button>',
+    );
+    const open = html(h(ConfirmButton, { ...props, openerVariant: "outline", defaultOpen: true, overlay: true }));
+    expect(open).toMatch(/^<button disabled="" type="button" class="btn btn--outline"><span class="btn__label">End class<\/span><\/button><div class="scrim">/);
+    expect(open).toContain('<div class="confirm__actions"><button type="button" class="btn btn--danger"><span class="btn__label">End class</span></button>');
+    expect(html(h(ConfirmButton, { ...props, openerVariant: "ghost", children: "Remove" }))).toBe(
+      '<button type="button" class="btn btn--ghost"><span class="btn__label">Remove</span></button>',
+    );
+  });
+
+  it("IT1-KIT without openerVariant the first button keeps the confirm's look, as before", () => {
+    expect(html(h(ConfirmButton, props))).toBe('<button type="button" class="btn btn--danger"><span class="btn__label">End class</span></button>');
+    expect(html(h(ConfirmButton, { ...props, variant: "primary" }))).toBe('<button type="button" class="btn"><span class="btn__label">End class</span></button>');
   });
 });
 

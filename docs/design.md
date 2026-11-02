@@ -85,7 +85,7 @@ The rungs, low to high. Light fills are GDG v1.0. In dark the well sits one smal
 | `--bar-rest` | `#575a58` | `#8a918c` | Every poll bar that is not the lead or the right answer |
 | `--track` | `#e4e9e5` | `#2d332e` | A bar chart's track, never below the page |
 | `--neutral-btn` | `#dce3dd` | `#383f39` | `.btn--neutral` and every disabled button |
-| `--skel-fill` | `#e4e9e5` | `#383f39` | A skeleton block; in dark always lighter than its ground |
+| `--skel-fill` | `#d2d9d3` | `#383f39` | A skeleton block: in light darker than the page (1.27:1), a white card (1.44:1) and a well (1.17:1), the projector's well tone, since a 1.09 step vanished on the stage and the phone; in dark always lighter than its ground |
 | `--cam`, `--cam-mark`, `--cam-mark-ok` | `#1e201e`, `#ffffff`, `#96d6a0` | `#0b0e0c`, same | The camera's ground and corner marks (green on a read) |
 | `--qr-tile`, `--qr-ink` | `#ffffff`, `#000000` | same | A QR is always black on white, on its own white plate |
 | `--scrim` | `rgb(16 20 18 / .48)` | `rgb(0 0 0 / .64)` | Under a confirm or sheet: the page behind reads clearly dimmed |
@@ -99,10 +99,10 @@ Light rung steps: raised over page 1.13, page over well 1.09, page over bar 1.19
 |---|---|---|---|---|
 | `st-in` | `#cff1d3` / `#003a13` / `#00732d` | `#00531e` / `#c6eccb` / `#96d6a0` | right answer, sent, paired, added, shared with students | check |
 | `st-open` | `#ffe5c0` / `#4f3400` / `#8a5a00` | `#624000` / `#fcdeb5` / `#e7ae58` | private, sign-in ending, presenter notes, needs you | lock, clock, warning |
-| `st-stop` | `#ffeae6` / `#6f0604` / `#c5150f` | `#910906` / `#ffdbd4` / `#ffb3a8` | refused, failed, field error | x, warning |
+| `st-stop` | `#ffeae6` / `#6f0604` / `#c5150f` | `#43302d` / `#ffdbd4` / `#ffb3a8` | refused, failed, field error | x, warning |
 | `st-wait` | `#e3eae3` / `#1e201e` / `#575a58` | `#383f39` / `#e6e9e6` / `#b9bcba` | ended, already checked in, dismissed, waiting | repeat, inbox |
 
-"Checked in" on phone and kiosk is the stronger form of `st-in`: the full `--field`.
+"Checked in" on phone and kiosk is the stronger form of `st-in`: the full `--field`. Dark `st-stop` is a quiet red-tinted step one rung over `--raised` (1.22:1), so a one-line error, a red badge or a field error never outranks the pass, the question list or the Pair card; its words and glyph carry the state. The door's Already checked in floods `--accent-soft`, the same mint as `st-in` in light and in dark a green-tinted neutral 1.27:1 off the field, so a repeat scan never reads as a second Checked in.
 
 **Teams** are data: always a chip plus the written name ("You’re on Teal"), 3:1 or more as a chip on page, well and card in both themes. `.group--<color>` (the name `live.groups` gives) sets `--c` for the chip and `--group` / `--group-text` for older parts; words on a team color use `--on-team` (`--on-team-yellow` on yellow), 4.5:1 or more.
 
@@ -196,7 +196,11 @@ The older roles (`--fs-h1` to `--fs-ledger`, `.text-h1` to `.text-label`, `.ledg
 | `--ease` | `cubic-bezier(0.2, 0, 0, 1)` | Standard |
 | `--ease-sp` | `cubic-bezier(0.34, 1.28, 0.64, 1)`; GDG's sampled spring with `linear()` where the browser has it (Safari 17.2+) | Spatial: the phone's answer tap and the switch knob only |
 | `--ease-exit` | `cubic-bezier(0.4, 0, 1, 1)` | Leaving |
+| `--ease-arrive` | `cubic-bezier(0.16, 1, 0.3, 1)` | A word or name rising through its mask (the door's result, the staff scan result, the phone's checked-in lockup, the late lower third). Words only: on a bar it ends 90% of the growth by 120ms and hides it |
+| `--ease-sheet` | `cubic-bezier(0.32, 0.72, 0, 1)` | The phone's bottom sheet only |
 | `--hold-result`, `--hold-new` | 3000, 4000ms | A kiosk result before idle; a new row's tint |
+
+Scripted motion (a FLIP, a WAAPI animation) asks `calm()` (`src/blocks/kit.tsx`) each time it is about to move something: it reads `prefers-reduced-motion: reduce` then, so a setting changed while the page is open counts on the next move. When it says true, jump to the end state, with the words and fills still changing. `onCalmChange(fn)` hears the setting change and returns the function that stops it. CSS moves need neither: the `--sp*` tokens are already 0 under reduced motion.
 
 ### Projector sizes
 
@@ -335,7 +339,7 @@ A 2 or 3 option switch (Quiz / Vote, Teams of 3 / 4, Most upvoted / Group by top
 - Open or Ended is one state word beside the heading (`.stateword--open` in `--st-in-mark`, `--ended` in `--muted`), no fill, no dot.
 - Type and source facts (Quiz, AI draft) are one `--t-small` `--muted` meta line under the heading (`.facts`).
 - "Right answer" and "Your answer" are plain words on the row's label line, never a chip.
-- Place and rank are bare tabular numerals in a fixed column ("2nd", then "tied" in `--muted`), never a pill.
+- Place and rank are bare tabular numerals in a fixed column ("2nd", then "tied" in `--muted`), never a pill. A place that a page already draws with `Badge` takes **new** `tone="place"`: no fill and no chip edge, `--t-body` 700, tabular, the drawing of `.ln--place` and the Students table's place cell.
 
 ### Team (`.team`, `.team__chip`, `.teamline`, `.credit`, `TeamChip`)
 
@@ -374,6 +378,7 @@ An empty or error state draws the part it stands in for, empty: its frame, headi
   Say what will show up and how it gets there, naming the page people see (its title), never a #/ route.
 - A side panel or a table with nothing yet is one `.state--inline` line on the well (a `--t-small` sentence), the same in every waiting state, error included. No ghost rows under a message; a table whose rows are known but whose values aren't keeps its rows with still blocks in the value cells.
 - An error never shows a placeholder for the value it failed to load: the warning glyph at 24 in `--st-stop-mark` and the app's sentence ("The question didn't load.") take the failed content's slot in its type role in `--text`, and Try again takes the action slot (`.state--error`). No filled pink box, no red heading. A message with no slot of its own is a `Notice`.
+- `ErrorBoundary`'s line for a part that didn't load (`.row > .status--error + .btn--quiet`, markup pinned by `src/blocks/ui.test.ts`) follows the same rule on every surface: no fill, the red glyph hanging at the row's edge, the sentence in `--text`, and Try again drawn as the outline button (1px ring on a laptop, 2px on phone and iPad, `--p-ring` on the projector). Each area's stylesheet puts the line in the frame of the part it stands in for (the host's focal card or aside well, the stage's presenter note).
 - No seal disc (a glyph in a circle) on phone, host or staff: the state glyph sits inline before its headline at 24 to 32. The door's result row is the only place a glyph stands alone.
 
 ### Skeleton (`.skel`, `.skel-lines`, `Skeleton`)
@@ -388,7 +393,7 @@ The real layout's shape, still, with the step named ("Loading the scores…") an
 </ConfirmButton>
 ```
 
-The first press asks the question with two buttons; Cancel or Escape goes back and focus returns to the first button. The box rises to the overlay rung in place (`--overlay`, `--shadow-2`, radius 12); its question starts with the warning glyph in `--st-stop-mark`; the confirming button is the only red fill. **new** `overlay` opens it as a sheet centered on the scrim instead, for a confirm that ends something for everyone (End class, Delete a question from every phone). The box closes when `onConfirm` finishes. When it throws, the box stays open and shows the error under the question: a `ConvexError`'s words ("That class already ended."), or "Something went wrong. Try again." Pass `onError` to show it on the page instead. Don't catch and rethrow inside `onConfirm`. `variant` is `danger` (default) or `primary`. In a table, the in-row confirm is a `Row confirm` that keeps the row's columns.
+The first press asks the question with two buttons; Cancel or Escape goes back and focus returns to the first button. The box rises to the overlay rung in place (`--overlay`, `--shadow-2`, radius 12); its question starts with the warning glyph in `--st-stop-mark`; the confirming button is the only red fill. **new** `overlay` opens it as a sheet centered on the scrim instead, for a confirm that ends something for everyone (End class, Delete a question from every phone). The box closes when `onConfirm` finishes. When it throws, the box stays open and shows the error under the question: a `ConvexError`'s words ("That class already ended."), or "Something went wrong. Try again." Pass `onError` to show it on the page instead. Don't catch and rethrow inside `onConfirm`. `variant` is `danger` (default) or `primary`. **new** `openerVariant` draws the first button in another look while the confirming button keeps `variant`, so red fills only inside the confirm: End class beside Download extra credit is `openerVariant="outline"`, a row's Remove or Unpair `openerVariant="ghost"`. Left out, the first button takes `variant`, as before. In a table, the in-row confirm is a `Row confirm` that keeps the row's columns.
 
 ### Rows and tables (`.ruled`, `.ruled__head`, `.ruled__row`, `.rows`, `.table`, `Rows`, `Row`)
 
@@ -400,7 +405,7 @@ The first press asks the question with two buttons; Cancel or Escape goes back a
 </Rows>
 ```
 
-A laptop table sits in a `--well` inset 4 (radius 12) with a `--raised` head (radius 8, 40 tall, `--t-small` 500 `--muted`); rows sit flat on the well, `--row-h` 44, a 1px `--line` rule between them, every cell on its head's column edges, numbers right-aligned under right-aligned heads (`.end`). `well={false}` puts the list straight on its card (a chart): a transparent head over a 2px `--line-strong` rule. Every body row has the same fill (no zebra). The selected row (`selected`) is a fill step in the same columns (`--raised` in a well, `--on-raised` on a card), no shadow, no ring, no overhang; a row just added (`fresh`) tints `st-in` for `--hold-new`; the in-row confirm (`confirm`) rises to the overlay. A place cell is one line ("2nd" then "tied", `nowrap`), every cell on the row's first baseline. `.rows > .row` is the same part for a list of items (questions, people) with `.row__main`, `.row__text`, `.row__meta`, `.row__time` and `.row__actions` in one fixed right column; `.answer` is the professor's answer under a question ("Answer:" then the words, on `--well`). `.table` draws a real `<table>` the same way.
+A laptop table sits in a `--well` inset 4 (radius 12) with a `--raised` head (radius 8, 40 tall, `--t-small` 500 `--muted`); rows sit flat on the well, `--row-h` 44, a 1px `--line` rule between them, every cell on its head's column edges, numbers right-aligned under right-aligned heads (`.end`). `well={false}` puts the list straight on its card (a chart): a transparent head over a 2px `--line-strong` rule. Every body row has the same fill (no zebra). The selected row (`selected`) is a fill step in the same columns (`--raised` in a well, `--on-raised` on a card), no shadow, no ring, no overhang; a row just added (`fresh`) tints `st-in` for `--hold-new`; the in-row confirm (`confirm`) rises to the overlay. A place cell is one line ("2nd" then "tied", `nowrap`), every cell on the row's first baseline. `.rows > .row` is the same part for a list of items (questions, people) with `.row__main`, `.row__text`, `.row__meta`, `.row__time` and `.row__actions` in one fixed right column; `.answer` is the professor's answer under a question ("Answer:" then the words, on `--well`; inside a raised card it steps up on `--on-raised`, so in dark it never reads as a hole in the card). `.table` draws a real `<table>` the same way.
 
 - Row actions with one or two per row (−1 / +1, Remove, Unpair) show on every row. In a list where each row carries three or more (host Questions), the full set shows on the selected row and appears on hover and keyboard focus in the same fixed column without changing the row's height (`.rows--reveal`); other rows show their state mark in the first slot. Undo is a 32 `.btn--plain`, never bare text.
 - Delete is a ghost with `--error` words 16 after the others and opens the in-row confirm; dismissed rows are muted with Bring back.
@@ -411,8 +416,9 @@ A laptop table sits in a `--well` inset 4 (radius 12) with a `--raised` head (ra
 
 - The letter tile is one drawing, 44 x 44, radius 4: `--bar` off the field, `--field-letter` on it, `--on-raised` inside a card, `--raised` on a well. It never inverts; only the right answer fills it `--accent` with the check.
 - Picked and sent: the tile keeps its fill and letter; a 3px ring inset 2px from the edge (`--text`) and the state word ("Picked", "Sending", "Sent", "Try again" at `--t-body` 500 with an 18 glyph) mark it. Failed: the same inset ring in `--st-stop-mark`, so red never meets the green and the ring never moves between picked, sent and failed. Sending: a 3px `--accent` bar grows once along the tile's bottom inside edge (the clock glyph under reduced motion); never a ring spinner on a tile.
-- Out after sending: a solid `--tile-out` fill with full-strength words, never opacity. Right: the `st-in` fill and ring and the check.
+- Out after sending: a solid `--tile-out` fill with full-strength words, never opacity. Right: the `st-in` fill and ring and the check. A sent pick is a disabled button too, but the field's disabled fill skips it (`.is-picked`, `aria-pressed`), so it keeps `--field-tile`, its words and its letter well under the ring.
 - One glyph size inside the field, 20. `.lockline` says the rule ("Answer sent. Results show when the professor ends the quiz."), only after a choice is sent. The open field starts with the question, no "Question" eyebrow.
+- The field's height holds from Sending to Sent: the state word sits in one 5.25em column at the tile's end, so the tile's words wrap the same way under "Sending" and "Sent", and while a tile sends the field keeps the footer line's two lines (2 x 24) where the footer lands. At 320 wide the quiz footer takes three lines, so one line still arrives with it.
 
 ### Bars (`.bars`, `.barrow`, `.rbars`, `Bars`)
 
@@ -424,7 +430,7 @@ A laptop table sits in a `--well` inset 4 (radius 12) with a `--raised` head (ra
 
 ### Camera well (`.cam`, `.cam__corners`)
 
-`--cam` ground, still corner marks that turn `--cam-mark-ok` on a read (effects track). Camera errors show inside the well (`.cam__msg`), so the layout holds; `.cam--off` is the idle well on `--well`.
+`--cam` ground, still corner marks that turn `--cam-mark-ok` on a read (effects track). The marks' svg draws past its own edge (`overflow: visible`), so a round-capped stroke shows whole, the same drawing as the door's `.target`. Camera errors show inside the well (`.cam__msg`), so the layout holds; `.cam--off` is the idle well on `--well`.
 
 ### Late banner (`.late`, `.late__item`)
 
@@ -448,7 +454,7 @@ See "Layout per area: kiosk".
 
 ### Sign-in (`.signin`, `.gsi-box`)
 
-Google's button is the one control the app doesn't style: `src/blocks/auth.tsx` renders it with `google.accounts.id.renderButton` (theme `outline`, size `large`, shape `pill`, text `continue_with`), so only its box is ours, with no fill, border or shadow. Never a green fill, a recolored G, or a frame, tint or glow on it. It is the screen's first action where it appears, so no filled green button sits beside it. Its dark form (`outline_dark` or `filled_black`) waits on a render check `[TBD]`, as does the box's `min-height` (Google prints no height). The staff sign-in screen's GDG logo and independence line come with the COPY pass.
+Google's button is the one control the app doesn't style: `src/blocks/auth.tsx` renders it with `google.accounts.id.renderButton` (`googleButtonOptions`: size `large`, shape `pill`, text `continue_with`), so only its box is ours, with no fill, border or shadow. The theme is `outline` on a light page and `filled_black` on a dark one, by the nearest `data-theme` or else the device's setting, so it is never a white slab on a dark screen. Its width is its box's, up to Google's 400 (358 in the phone's action bar, 400 on the staff gate); a box narrower than 200 or not laid out yet (a banner's action slot) keeps Google's own width. Never a green fill, a recolored G, or a frame, tint or glow on it. It is the screen's first action where it appears, so no filled green button sits beside it. The screen lab draws a stand-in, so the real button's dark form and the box's `min-height` (Google prints no height) still wait on a check on a real page `[TBD]`. The staff sign-in screen's GDG logo and independence line come with the COPY pass.
 
 ## Not the default look
 
@@ -535,9 +541,9 @@ One door geometry on every screen, so nothing moves between states and only fill
 
 - One gutter, 24 (`--k-gutter`), on every kiosk screen: every headline, the bar, the strip label and the pairing code start at x 24.
 - The bar (`.k-bar`) is 88 tall and keeps its rung (`--shadow-bar`; no area stylesheet removes it): the room count (`.roomn`, 64 / 700 in a 2ch tabular slot, "checked in" 28 on its baseline), the door's name at 28, Staff as a labeled 56 pill (`.k-staffbtn`).
-- The panel (`.door__panel`) is one grid of two rows in every state: the status band at 432 (`--k-door`) and the camera window in the rest, inset 24 on three sides, so the window never changes box. The target corners are a fixed 320 square drawn with `vector-effect: non-scaling-stroke`.
-- A result floods the whole panel, so the flood frames the window: Checked in on `--field`, Already checked in on `st-in` with its glyph, Refused and Camera blocked on `--st-stop-fill` with the x, white words. The result words sit on three bottom-set rows at the band's foot (the word slot 200, two lines at 96; the name 100 at 80 / 500; the fact 56); the status word is 96 in every result, and a long word wraps rather than stepping down. A refusal's or a blocked camera's sentence spans the name and fact rows at 40.
-- Idle Start check-in is the camera window itself (`.camstart`: `--cam`, a 4px `--cam-mark-ok` inset ring, the 128 glyph over the 64 / 700 words), never the green flood, which made idle look like Checked in. The waiting step is a `--well` window with the step named and no progress rule.
+- The panel (`.door__panel`) is one grid of two rows in every state: the status band at 432 (`--k-door`) and the camera window in the rest, inset 24 on three sides, so the window never changes box. The target corners are a fixed 320 square drawn with `vector-effect: non-scaling-stroke`. Idle, the panel sits on `--page` like the typed-code strip under it, so the white bar keeps a rung over it in light (a white panel under a white bar left only a 1px shadow line).
+- A result floods the whole panel, so the flood frames the window: Checked in on `--field`, Already checked in on `--accent-soft` with its glyph (`st-in`'s mint in light; in dark a green-tinted neutral, since dark `st-in` was 1.04:1 off the field), Refused and Camera blocked on `--st-stop-fill` with the x, white words. The flood's fill fades and its words snap with it, never fading through grey. The result words sit on three bottom-set rows at the band's foot (the word slot 200, two lines at 96; the name 100 at 80 / 500; the fact 56); the status word is 96 in every result, and a long word wraps rather than stepping down. A refusal's or a blocked camera's sentence spans the name and fact rows at 40.
+- Idle Start check-in is the camera window itself (`.camstart`: `--cam`, a 4px `--cam-mark-ok` inset ring, the 128 glyph over the 64 / 700 words), never the green flood, which made idle look like Checked in. Inside a result's flood the window drops the green ring and draws its glyph and words in `--cam-mark`, so the flood's word stays the one green mass. The waiting step is a `--bar` window with the step named and no progress rule. A busy door button (Start check-in while the camera starts, Check in while a typed code sends) shows the still clock after 0.4s, never a spinning ring.
 - The typed code is a field plus a separate 64 Check in button in the bottom strip (`.codein`), padded `calc(24px + env(safe-area-inset-bottom))`.
 - Every button 56 or more; Start check-in 72. No back button for students. No blur, filter, loops or ambient motion. Text 16 or more.
 
@@ -547,7 +553,7 @@ One door geometry on every screen, so nothing moves between states and only fill
 | `kiosk-scan` | "Hold your pass up to the camera" | The band's prompt (at most two lines), the camera running with white still corners |
 | `kiosk-checked-in` | "Checked in" | The panel floods `--field`: the check, "Checked in" at 96, the name at 80; the corners turn green; back to idle after 3s |
 | `kiosk-refused` | "Try again" | The panel floods `--st-stop-fill`: the x, "Try again" at 96 in the word slot, the app's sentence at 40 across the name and fact rows |
-| `kiosk-already` | "Already checked in" | The panel floods `st-in`: its glyph, the word and the name in the same slots as Checked in |
+| `kiosk-already` | "Already checked in" | The panel floods `--accent-soft`: its glyph in `--st-in-mark`, the word and the name in the same slots as Checked in |
 | `kiosk-pair-code` | "482 913" at 144 | The bar with the page's name; the code at 144 in Google Sans Code in the middle band with its label over it (`.pair__group`) and "The code works until 2:51 PM." under it |
 
 ## States
@@ -576,7 +582,7 @@ Only state changes move; transform and opacity (and color on the effects track);
 | choice-select | Picked ring | `--fx`, `--ease` | Same |
 | choice-sending | A 3px bar along the sending tile's bottom inside edge grows once | `--sp-slow`, `--ease` | The clock glyph before "Sending", no bar |
 | choice-send | "Sending" to "Sent" | an instant word swap, the fill on `--fx` | Same |
-| kiosk-result | The panel's fill, glyph and words; the corners to green | `--fx`; holds `--hold-result` 3s, then back to idle on `--fx-slow` | Same |
+| kiosk-result | The panel's fill and the corners to green; the glyph and words change with it in one frame (fills fade, ink snaps) | `--fx`; holds `--hold-result` 3s, then back to idle on `--fx-slow` | Same |
 | bar-fill | A results bar grows from the left when a poll ends | `--sp`, `--ease` | Appears at its value |
 | count-swap | Live counts change value in place, tabular, no count-up | instant | Same |
 | board-reorder | Leaderboard rows reorder instantly; the moved row holds a 6px green ring | the ring fades on `--fx-slow` after 2s | Same |
@@ -585,7 +591,7 @@ Only state changes move; transform and opacity (and color on the effects track);
 | switch-knob | The knob slides | `--sp-fast`, `--ease-sp` | Jumps; the track color still changes |
 | row-new | A new row's tint fades to its rung | `--fx-slow` after `--hold-new` 4s | Same |
 | tab-switch | Panels swap | instant | Same |
-| busy | The spinner in a pressed button after 0.4s | an 800ms linear loop | The clock glyph, still |
+| busy | The spinner in a pressed button after 0.4s, phone and laptop only; the door iPad and the projector show the still clock instead | an 800ms linear loop | The clock glyph, still |
 
 Never: shadow, filter, width or height animation; shimmer; pulse; ambient background; confetti; count-ups per vote. No `@starting-style` or view transitions as the only signal (iPadOS 16).
 
@@ -684,7 +690,8 @@ node design/tools/contact.mjs --out <dir>/sheets <dir>/manifest.json
 
 - **Focus ring:** an outline (3px, 2px clear; 3px clear on kiosk and projector), where GDG uses a box-shadow, so a team rule can't hide it.
 - **Disabled:** the button keeps its shape on the neutral fill with `--muted` words and no ring, where GDG uses 38% opacity. Answer tiles never use opacity: unpicked tiles after sending take the solid `--tile-out` fill so a locked answer stays readable.
-- **Busy button:** the spinner sits over the words, so the width holds.
+- **Busy button:** the spinner sits over the words, so the width holds. On the door iPad and the projector it is the still clock: no loop on a screen read in passing.
+- **Dark error fill:** `st-stop` is `#43302d`, a quiet red-tinted rung over `--raised`, where GDG's dark error container is `#910906`; a saturated red line outranked everything else on dark screens, so red stays on the glyph and the words carry the state.
 - **Line heights:** ratios, not px, so a bigger font inside an element never overlaps the next line.
 - **Ligatures:** off on everything.
 - **Tap floor:** 44px for anything on a phone or iPad.
@@ -707,5 +714,6 @@ node design/tools/contact.mjs --out <dir>/sheets <dir>/manifest.json
 - Phosphor Bold SVGs and their LICENSE vendored into `src/` `[TBD]`; `Icon` draws the glyphs to that construction by hand.
 - Words this system needs that the app doesn't have yet ("+2 more" on the late strip, "Picked", "Sent", "For the presenter:", the lock line on the phone, the host's Offline slot, "Reading your pass" and "Hold still" on the door) come with the COPY pass, as does the staff sign-in's GDG logo and independence line. The door's press-and-hold staff corner and "reading" state are new behavior and wait on Sam.
 - `ErrorBoundary` marks only its exact markup (`src/blocks/ui.test.ts` and `Student.test.ts` pin it), so the screen lab finds a boundary by that markup until a `data-boundary` attribute lands with those tests.
-- Google's button: its dark theme and the box's `min-height` wait on a render check.
+- Google's button: `filled_black` on dark pages and the box's width are set, but the lab draws a stand-in, so the real button's look in dark and the box's `min-height` wait on a check on a real page.
+- `src/index.css` cuts every animation and transition to 1ms under reduced motion, an `!important` inside a layer that no team rule can undo, so MOTION.md's reduced forms that keep an `--fx-slow` fade on the new words show as an instant change until that rule leaves the effects track alone.
 - Google Sans `GRAD` stays 0 in both themes until a render comparison. Text shifts a little when Google Sans arrives (GDG `foundations.md` §3.9 leaves `size-adjust` open).

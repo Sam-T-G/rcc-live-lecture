@@ -90,6 +90,8 @@ export const PAIRS: Pair[] = [
   { fg: "--on-error", bg: "--error", min: 4.5, use: "Words on the danger button in a confirm" },
   { fg: "--on-warn", bg: "--warn", min: 4.5, use: "The late banner" },
   { fg: "--cam-mark-ok", bg: "--cam", min: 3, use: "The camera's corner marks on a read, Start check-in" },
+  { fg: "--cam-mark", bg: "--cam", min: 4.5, use: "The camera's still corners; Start check-in's glyph and words inside a result's flood" },
+  { fg: "--st-in-mark", bg: "--accent-soft", min: 3, use: "The repeat glyph on the door's Already checked in flood" },
   { fg: "--qr-ink", bg: "--qr-tile", min: 4.5, use: "A QR code on its plate" },
   { fg: "--bar-rest", bg: "--track", min: 3, use: "A poll bar that isn't the lead or the right answer, on its track" },
   { fg: "--bar-rest", bg: "--on-raised", min: 3, use: "The same bar on its track inside a card" },
