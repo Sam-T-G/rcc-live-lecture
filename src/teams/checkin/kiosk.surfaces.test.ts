@@ -5,7 +5,7 @@
 // (design/lab, `--only kiosk`) shoots every door state.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { parse, type Rule } from "../../styles/cssRules";
+import { parse, splitTop, type Rule } from "../../styles/cssRules";
 
 const kiosk = parse(readFileSync(new URL("./kiosk.css", import.meta.url), "utf8"));
 const tokens = parse(readFileSync(new URL("../../styles/tokens.css", import.meta.url), "utf8"));
@@ -75,8 +75,52 @@ describe("door iPad (#/checkin/kiosk at 820 x 1180 portrait)", () => {
     expect(decls.filter((d) => /radius/.test(d.prop) || d.prop === "box-shadow")).toEqual([]);
   });
 
-  it("DS-KIOSK older door iPads: no blur, filter, animation or transition loop in kiosk.css", () => {
-    expect(decls.filter((d) => /^(-webkit-)?(backdrop-)?filter$|^animation|^transition/.test(d.prop))).toEqual([]);
+  it("DS-KIOSK older door iPads: no blur, filter, standing will-change or loop in kiosk.css", () => {
+    expect(decls.filter((d) => /^(-webkit-)?(backdrop-)?filter$|^will-change$/.test(d.prop))).toEqual([]);
+    expect(decls.filter((d) => /^animation/.test(d.prop) && /\binfinite\b|\balternate\b/.test(d.value))).toEqual([]);
+    expect(decls.filter((d) => d.prop === "animation-iteration-count")).toEqual([]);
+  });
+
+  it("IT1-KIOSK-motion the scan result moment moves only fills, ink, transform and opacity, never a layout property", () => {
+    // Transitions name only fills and ink (or retime or drop the kit's): never `all`, never a size or a place.
+    const transitions = decls.filter((d) => /^transition/.test(d.prop));
+    expect(transitions.length).toBeGreaterThan(0);
+    for (const t of transitions) {
+      if (t.prop === "transition-duration") continue;
+      const props = t.prop === "transition-property" ? t.value.split(",") : splitTop(t.value, ",").map((part) => part.trim().split(/\s+/)[0]);
+      expect(props.map((p) => p.trim()), t.selectors).toSatisfy((ps: string[]) => ps.every((p) => ["background-color", "color", "none"].includes(p)));
+    }
+    // Keyframes set only transform and opacity.
+    const frames = kiosk.filter((r) => r.at.some((a) => a.startsWith("@keyframes")));
+    expect(frames.length).toBeGreaterThan(0);
+    expect(frames.flatMap((r) => r.decls.map(([k]) => k)).filter((k) => k !== "transform" && k !== "opacity")).toEqual([]);
+    // Every animation runs once, on token durations, so with its delay it ends well under 700 ms.
+    const animations = decls.filter((d) => d.prop === "animation");
+    expect(animations.length).toBeGreaterThan(0);
+    for (const a of animations) expect(a.value, a.selectors).toMatch(/^kiosk-(rise|fade) var\(--(fx|fx-slow|sp-fast)\) var\(--ease(-arrive)?\)( var\(--fx(-fast)?\))? both$/);
+  });
+
+  it("IT1-KIOSK-motion reduced motion: the result's lines fade in place, with no rise", () => {
+    const rise = kiosk.filter((r) => !r.at.length && r.decls.some(([k, v]) => k === "animation" && v.startsWith("kiosk-rise")));
+    expect(rise.length).toBeGreaterThan(0);
+    const reduced = kiosk.filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)));
+    for (const r of rise) {
+      const calm = reduced.find((q) => r.selectors.every((s) => q.selectors.includes(s)));
+      expect(calm, r.selectors.join(", ")).toBeDefined();
+      expect(calm!.decls.find(([k]) => k === "animation")?.[1]).toMatch(/^kiosk-fade /);
+    }
+  });
+
+  it("IT1-KIOSK Sign out at the door is the neutral text link (--text, underlined), never a second green beside Start check-in", () => {
+    expect(value(kiosk, ".kiosk-who__line .btn--quiet", "color")).toBe("var(--text)");
+    expect(value(kiosk, ".kiosk-who__line .btn--quiet", "text-decoration-line")).toBe("underline");
+    // Its target stays 44 or more.
+    expect(px(value(kiosk, ".kiosk-who__line .btn", "min-height") ?? "", 820)).toBeGreaterThanOrEqual(44);
+  });
+
+  it("IT1-KIOSK every pairing phase starts at the code's top, and no pale rule sits over the Scanners foot", () => {
+    expect(value(kiosk, ".kiosk-pair__slot", "align-self")).toBe("start");
+    expect(value(kiosk, ".kiosk-pair__foot", "border-top")).toBeUndefined();
   });
 
   it("DS-KIOSK every text size kiosk.css sets is 16 px or more on the iPad, phones' smallest included", () => {

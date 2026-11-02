@@ -26,7 +26,7 @@ import { api } from "../../../convex/_generated/api";
 import { SignedInAs, useGoogleUser } from "../../blocks/auth";
 import { Button, Icon } from "../../blocks/kit";
 import { Big, Status } from "../../blocks/ui";
-import { isProfRole, KioskScreen, NotStaff, useStaff, type StaffMe } from "./prof";
+import { isProfRole, NotStaff, useStaff, type StaffMe } from "./prof";
 import { clock, why } from "./util";
 
 // A door iPad doesn't sign in. The first time it opens #/checkin/kiosk it makes a device token
@@ -171,7 +171,7 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
 
   if (paired && left)
     return (
-      <KioskScreen>
+      <DoorNote>
         {staffOnPairedIPad ? <Status kind="loading">Signing out {left}…</Status> : <p>Signed out {left} on this iPad.</p>}
         <p>This iPad is paired, so it scans passes with nobody signed in.</p>
         <p>
@@ -185,7 +185,7 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
             <Button onClick={() => saveSignedOut(null)}>Open the scanner</Button>
           )}
         </p>
-      </KioskScreen>
+      </DoorNote>
     );
   if (token && status?.status === "paired") return <WhoIsSignedIn>{children(token)}</WhoIsSignedIn>;
   if (me?.role === "scanner") return <WhoIsSignedIn ends>{children(undefined)}</WhoIsSignedIn>;
@@ -198,7 +198,7 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
   // code too (status "waiting").
   if ((ended || ranOut) && me === null && !pairAnyway)
     return (
-      <KioskScreen>
+      <DoorNote>
         <p>Your sign-in ended. On your own phone, sign in again on #/admin, then open #/checkin/kiosk there.</p>
         <p className="muted">Nobody signs in to Google on this iPad. Google keeps the account in Safari, and anyone in line could sign in with it.</p>
         <p>
@@ -212,9 +212,24 @@ export function DoorGate({ children }: { children: (device: string | undefined) 
             Show a pairing code
           </Button>
         </p>
-      </KioskScreen>
+      </DoorNote>
     );
   return <PairScreen me={me} token={token} status={status} />;
+}
+
+// The door's hand-off screens (a professor signed out on a paired iPad, a sign-in that ended):
+// the door's own frame, the bar with "Check-in kiosk" over the page and the lines at the kiosk's
+// sizes (kiosk.css .kiosk-note), so they read as the same station as the scanner and the pairing
+// screen. The first line leads.
+function DoorNote({ children }: { children: ReactNode }) {
+  return (
+    <div className="kiosk-pair kiosk-note">
+      <header className="k-bar kiosk-pair__bar">
+        <h1>Check-in kiosk</h1>
+      </header>
+      <main className="kiosk-pair__body kiosk-note__body">{children}</main>
+    </div>
+  );
 }
 
 // The scanner, with "Signed in as …" and Sign out above it whenever someone is signed in on the
