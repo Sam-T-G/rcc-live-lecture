@@ -84,7 +84,10 @@ export function StudentPass() {
   const { signOut } = useGoogleUser();
   const pass = useQuery(api.checkin.pass.mine);
   // True once checked in; still loading counts as not yet, so the pass asks for codes meanwhile.
-  const here = useQuery(api.checkin.read.me, { channel: CHANNEL }) === true;
+  // The checked-in moment gets the raw answer, so loading then true (a student already checked in
+  // opening the page) doesn't play it.
+  const me = useQuery(api.checkin.read.me, { channel: CHANNEL });
+  const here = me === true;
   const refresh = useMutation(api.checkin.pass.refresh);
   const [err, setErr] = useState("");
   // The code on screen (by its `at`) and when this phone got it, by the phone's own clock.
@@ -96,7 +99,7 @@ export function StudentPass() {
   const passRef = useCallback((node: HTMLElement | null) => {
     if (node) passEl.current = node;
   }, []);
-  const moment = <CheckInMoment here={here} pass={passEl} stub={stubEl} />;
+  const moment = <CheckInMoment me={me} pass={passEl} stub={stubEl} />;
 
   // The server makes a new code only once the current one is 20 s old. "Sign in first." means it
   // no longer takes this sign-in, so the page signs out and the sign-in form comes back.
@@ -202,12 +205,16 @@ type Spot = { top: number; left: number; width: number; height: number };
 type Box = { current: HTMLElement | null };
 const ROWS = [".ph-opt", ".ph-foot"];
 const MOMENT_MS = 450;
-function CheckInMoment({ here, pass, stub }: { here: boolean; pass: Box; stub: Box }) {
+// It records the pass only while read.me answers false, never while it loads, so only a real false
+// to true change plays the moment, never a reload by a student who is already checked in.
+function CheckInMoment({ me, pass, stub }: { me: boolean | undefined; pass: Box; stub: Box }) {
+  const here = me === true;
   const seen = useRef<{ card: Spot; rows: (number | null)[] } | null>(null);
   useLayoutEffect(() => {
+    if (me === undefined) seen.current = null;
     const card = pass.current;
     const body = card?.parentElement;
-    if (here || !card?.isConnected || !body) return;
+    if (me !== false || !card?.isConnected || !body) return;
     const b = body.getBoundingClientRect();
     const r = card.getBoundingClientRect();
     seen.current = {

@@ -431,7 +431,9 @@ const list: S[] = [
     title: "PH-66 No questions yet on this slide",
     expect: "empty",
     fixtures: livePage({ ...fx(api.live.questions.list, []) }),
-    scrollTo: QUESTIONS,
+    // Centered on "No questions yet." rather than the whole card: centering the short empty card
+    // left the second Past quizzes row half under the fixed action bar (IT1-PHONE-design-1).
+    scrollTo: `${QUESTIONS} .status--empty`,
   },
   {
     id: "phone-live-post-error",
