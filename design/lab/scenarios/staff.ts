@@ -357,6 +357,17 @@ export const scenarios: Scenario[] = [
     clicks: ['.att-row__action button:has-text("Remove")'],
   },
   {
+    // IT1-STAFF-check-1: with one row the well is one row tall, and the box has to stay whole in it.
+    id: "staff-attendance-remove-confirm-one",
+    area: "staff",
+    route: "checkin/teacher",
+    role: "professor",
+    title: "ST-08 Remove pressed with one check-in: the whole question shows in the well",
+    now: NOW,
+    fixtures: { ...attendance, ...fx(api.checkin.read.names, NAMES.slice(0, 1)) },
+    clicks: ['.att-row__action button:has-text("Remove")'],
+  },
+  {
     id: "staff-attendance-list-error",
     area: "staff",
     route: "checkin/teacher",

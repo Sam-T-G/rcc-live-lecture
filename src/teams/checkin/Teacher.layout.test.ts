@@ -128,3 +128,17 @@ describe("IT1-STAFF-3 the result panel keeps one 120 slot and moves only transfo
     expect(reduced.flatMap((r) => r.decls)).toEqual([["animation", "att-fade var(--fx-slow) var(--ease) both"]]);
   });
 });
+
+// IT1-STAFF design loop (check pass): a row's Remove confirm inside This class's scrolling well.
+// The box was absolute over its row; with one or two rows the well scrolled to Cancel and cut off
+// the question (elementFromPoint at the question hit MAIN). In the row's flow it grows the row, so
+// the well holds the whole box. The lab scenario staff-attendance-remove-confirm-one shows it.
+describe("IT1-STAFF-check-1 a row's Remove confirm stays whole inside the This class well", () => {
+  it("IT1-STAFF-check-1 the question box sits in the row's flow, not absolute over the well's scroll area", () => {
+    for (const w of [720, 1280, 1440]) expect(value(".att-row__action > .confirm", "position", w), `${w}`).not.toBe("absolute");
+  });
+
+  it("IT1-STAFF-check-1 the action cell holding the box takes a line of its own under the name and time", () => {
+    expect(value(".att-list > .att-row > .att-row__action:has(> .confirm)", "grid-column", 1440)).toBe("1 / -1");
+  });
+});

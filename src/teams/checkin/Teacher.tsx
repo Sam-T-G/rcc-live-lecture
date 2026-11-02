@@ -572,11 +572,14 @@ function Names() {
 // at its top, the new row opens downward from its top edge while the rows below move down one row
 // (a FLIP on transform), both on --sp-fast; with the list scrolled, scrollTop takes the new rows'
 // height in the same frame, so the rows staff are reading stay put (teacher.css turns off the
-// browser's own scroll anchoring, which Safari lacks). No movement under reduced motion, over 40
-// rows, on the first load, or when more than 3 arrive at once (a class change, a reconnect).
+// browser's own scroll anchoring, which Safari lacks), in every case below too. No movement under
+// reduced motion, over 40 rows, on the first load, or when more than 3 arrive at once (a class
+// change, a reconnect), and no tint for more than 3.
 // `key` is the row ids in order; the rows are read from the DOM by data-row. The classes are set
 // on the DOM (React never changes a row's className), and the holds run from the arrival.
-function useArrivals(list: RefObject<HTMLUListElement | null>, key: string | undefined) {
+// Exported for its test (Teacher.arrivals.test.ts) only.
+// eslint-disable-next-line react-refresh/only-export-components
+export function useArrivals(list: RefObject<HTMLUListElement | null>, key: string | undefined) {
   // Each row's top inside the list's content (scroll-independent), at the last commit.
   const seen = useRef<Map<string, number> | null>(null);
   const timers = useRef<number[]>([]);
@@ -594,7 +597,16 @@ function useArrivals(list: RefObject<HTMLUListElement | null>, key: string | und
     seen.current = now;
     if (!ul || before === null) return;
     const fresh = rows.filter((r) => !before.has(r.dataset.row!));
-    if (fresh.length === 0 || fresh.length > 3) return;
+    if (fresh.length === 0) return;
+    // Keeping the rows in place isn't motion, so it runs in every case (reduced motion, over 40
+    // rows, a burst of arrivals); the tint and the FLIP below are the parts those cases skip.
+    const stay = rows.filter((r) => before.has(r.dataset.row!));
+    const scrolled = ul.scrollTop > 0;
+    if (scrolled) {
+      const anchor = stay[0];
+      if (anchor) ul.scrollTop += now.get(anchor.dataset.row!)! - before.get(anchor.dataset.row!)!;
+    }
+    if (fresh.length > 3) return;
     const css = getComputedStyle(document.documentElement);
     const ms = (name: string, or: number) => {
       const v = parseFloat(css.getPropertyValue(name));
@@ -611,13 +623,7 @@ function useArrivals(list: RefObject<HTMLUListElement | null>, key: string | und
         }, hold),
       );
     }
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches || rows.length > 40) return;
-    const stay = rows.filter((r) => before.has(r.dataset.row!));
-    if (ul.scrollTop > 0) {
-      const anchor = stay[0];
-      if (anchor) ul.scrollTop += now.get(anchor.dataset.row!)! - before.get(anchor.dataset.row!)!;
-      return;
-    }
+    if (scrolled || matchMedia("(prefers-reduced-motion: reduce)").matches || rows.length > 40) return;
     if (typeof ul.animate !== "function") return;
     const timing: KeyframeAnimationOptions = { duration: ms("--sp-fast", 200), easing: css.getPropertyValue("--ease").trim() || "ease", fill: "backwards" };
     for (const r of stay) {

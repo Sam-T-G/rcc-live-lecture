@@ -51,3 +51,13 @@ describe("IT1-STAFF-4 #/admin row actions and role pickers", () => {
     expect(value(".admin-people td select", "background", 1440)).toContain("var(--select-chev)");
   });
 });
+
+// IT1-STAFF design loop (check pass): admin.css is unlayered, so its role picker drawing beats the
+// kit's @layer kit :disabled look; the disabled rule has to give the muted words and no edge back.
+describe("IT1-STAFF-risk-2 a role picker that is saving looks disabled", () => {
+  it("IT1-STAFF-risk-2 :disabled sets the kit's well fill, --muted words and a transparent border", () => {
+    expect(value(".admin-people td select:disabled", "background-color", 1440)).toBe("var(--well)");
+    expect(value(".admin-people td select:disabled", "color", 1440)).toBe("var(--muted)");
+    expect(value(".admin-people td select:disabled", "border-color", 1440)).toBe("transparent");
+  });
+});

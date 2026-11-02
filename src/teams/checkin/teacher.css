@@ -114,9 +114,13 @@
    tint's ink; then the fill fades out on --fx-slow and the words snap back. */
 .att-list > .att-row.is-new .att-row__action > .btn--danger:not(:hover, :focus-visible) { color: var(--on-st-in); }
 .att-list > .att-row.was-new { transition: background-color var(--fx-slow) var(--ease); }
-/* The row's question box rises over its row from the action's slot, so the list never reflows. */
-.att-row__action > .confirm { position: absolute; top: calc(-1 * var(--s2)); right: calc(-1 * var(--s2)); z-index: 3;
-  width: max-content; max-width: min(34rem, 80vw); text-align: start; white-space: normal; }
+/* The row's question box opens inside its row, on a line of its own under the name and time (which
+   keep their 44 line), so the well holds the whole box and Cancel's focus scrolls it into view
+   like a row. A box laid over the row spilled past a short well, and the scroll to Cancel cut off
+   the question (IT1-STAFF-check-1). */
+.att-list > .att-row:has(> .att-row__action > .confirm) { grid-template-rows: calc(var(--row-h) - 1px) auto; padding-block-end: var(--s2); }
+.att-list > .att-row > .att-row__action:has(> .confirm) { grid-column: 1 / -1; }
+.att-row__action > .confirm { flex: 1 1 auto; min-width: 0; text-align: start; white-space: normal; }
 .att-list-wrap { display: grid; gap: var(--s2); }
 .att-list-wrap > .status { padding: 0; }
 /* The loading rows' blocks on the well: one step up from it, so they show in both themes. */
