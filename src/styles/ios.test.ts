@@ -67,9 +67,11 @@ const palette = [...(SWIFT["Palette.swift"] ?? "").matchAll(ENTRY)].map(([, name
 // colors (`.red`, `.gray`, `.teal`, `.accentColor`) and UIKit's (`.systemOrange`,
 // `.secondarySystemBackground`, `.label`, `.secondaryLabel`, `.separator`), as in
 // `.tint(showNotice ? .red : .accentColor)`, `Color(uiColor: .systemRed)` or `Color.gray`.
-// `.system(size:)` fonts and `.foregroundStyle(.secondary)` don't match.
+// `.system(size:)` fonts and `.foregroundStyle(.secondary)` don't match. UIKit's secondary,
+// tertiary and quaternary colors are all Label or System names (`.tertiaryLabel`,
+// `.quaternarySystemFill`), so `.secondaryAction`, a toolbar placement, doesn't match either.
 const SYSTEM_NAMES =
-  "red|orange|yellow|green|mint|teal|cyan|blue|indigo|purple|pink|brown|gray|accentColor|system\\w+|(?:secondary|tertiary|quaternary)[A-Z]\\w*|label|separator|opaqueSeparator|placeholderText|link|lightGray|darkGray|lightText|darkText";
+  "red|orange|yellow|green|mint|teal|cyan|blue|indigo|purple|pink|brown|gray|accentColor|system\\w+|(?:secondary|tertiary|quaternary)(?:Label|System)\\w*|label|separator|opaqueSeparator|placeholderText|link|lightGray|darkGray|lightText|darkText";
 const SYSTEM_COLOR = new RegExp(`\\b(?:Color|UIColor)\\s*\\.\\s*(?:${SYSTEM_NAMES})\\b|(?<![\\w)\\]])\\.(?:${SYSTEM_NAMES})\\b`, "g");
 
 describe("iOS app colors and layout follow docs/design.md", () => {
@@ -92,7 +94,7 @@ describe("iOS app colors and layout follow docs/design.md", () => {
     expect(hits).toEqual([]);
   });
 
-  it("the system-color check catches the system colors SwiftUI and UIKit name, and passes fonts and Palette", () => {
+  it("the system-color check catches the system colors SwiftUI and UIKit name, and passes fonts, Palette and the .secondaryAction toolbar placement", () => {
     // DeckView no longer uses a system color, so the check above passes with a narrower pattern
     // too. These fixed lines fail the test when the pattern stops seeing one (sweep2-core-fixcheck-1).
     const caught = [
@@ -100,8 +102,16 @@ describe("iOS app colors and layout follow docs/design.md", () => {
       "Color(uiColor: .systemRed)",
       "Color(.systemBackground)",
       "Color(.secondarySystemBackground)",
+      "Color(.tertiarySystemBackground)",
+      "Color(.secondarySystemGroupedBackground)",
+      "Color(.tertiarySystemGroupedBackground)",
+      "Color(.secondarySystemFill)",
+      "Color(.tertiarySystemFill)",
+      "Color(.quaternarySystemFill)",
       "Color(.label)",
       "Color(uiColor: .secondaryLabel)",
+      "Color(uiColor: .tertiaryLabel)",
+      "UIColor.quaternaryLabel",
       ".foregroundStyle(Color(.separator))",
       "UIColor.systemBlue",
       "Color.gray",
@@ -118,6 +128,8 @@ describe("iOS app colors and layout follow docs/design.md", () => {
       ".background(Palette.surface.color)",
       ".labelStyle(.titleOnly)",
       "Text(Words.live).font(.title)",
+      // A toolbar placement, not a color (T18).
+      "ToolbarItem(placement: .secondaryAction) {",
     ];
     const hit = (line: string) => [...line.matchAll(SYSTEM_COLOR)].length > 0;
     expect(caught.filter((l) => !hit(l))).toEqual([]);

@@ -86,9 +86,13 @@
 .late__item { margin: 0 auto; max-width: 640px; width: 100%; animation: late-in 300ms ease-out; }
 .late__grace { width: 4em; }
 /* #/checkin/student keeps the banner outside <Screen> (Student.tsx), so the page's gutter doesn't
-   reach it. If the banner fails, ErrorBoundary's error line and Try again show here instead, 16px
-   in from each side like .late. The .late inside stays fixed on its own. */
+   reach it. The .late inside stays fixed on its own. If the banner fails, ErrorBoundary's error
+   line and Try again show here instead, in the page under its last line ("Not you? Sign out"),
+   16px in from each side. The phone frame then stops filling the screen, so the row comes right
+   after that line. Fixed at the bottom, the row covered Not you? Sign out (T18, lateError.test.ts). */
 .student-late { position: fixed; left: 16px; right: 16px; bottom: max(16px, calc(var(--banner-stack-space, 0px) + 8px)); z-index: 50; pointer-events: none; }
+.student-late:has(> .row) { position: static; margin-inline: 16px; margin-block: 0 16px; }
+.ph:has(~ .student-late > .row) { min-height: 0; }
 .student-late > .row { pointer-events: auto; padding: 8px 12px; background: var(--surface); border-radius: var(--radius); }
 @keyframes late-in { from { transform: translateY(24px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .late__item { animation: none; } }

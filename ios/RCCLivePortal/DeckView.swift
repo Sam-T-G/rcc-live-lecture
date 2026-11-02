@@ -145,6 +145,8 @@ struct DeckView: View {
 
     @State private var follow = Follow()
     @State private var pendingStart: Int?
+    /// True while the deck screen is under `shortHeight` tall (see `largestType`).
+    @State private var short = false
 
     static func readOut(_ line: String) {
         AccessibilityNotification.Announcement(line).post()
@@ -159,11 +161,26 @@ struct DeckView: View {
     /// the slide keeps at least a third of the height at every size in the worst case: 366 of 874
     /// and 148 of 402 at AX5 (LayoutTests). The slide itself keeps every size, and VoiceOver reads
     /// the full words either way.
-    static func largestType(verticalSize: UserInterfaceSizeClass?) -> DynamicTypeSize {
-        verticalSize == .compact ? .xxxLarge : .accessibility1
+    /// On a 375 pt wide phone the same words wrap onto more lines, and portrait's caps left an
+    /// iPhone SE's slide 160 of 667 pt at AX2 to AX5 (T18). So a `short` screen, under
+    /// `shortHeight`, takes landscape's caps in portrait too: this stops at xxxLarge and the late
+    /// card at AX1 (`largestLateType`). The SE's slide then keeps 276 of 667 pt at AX1 to AX5
+    /// (LayoutTests), and an iPhone 13 mini's 357 of 812 (it had 241).
+    static func largestType(verticalSize: UserInterfaceSizeClass?, short: Bool = false) -> DynamicTypeSize {
+        verticalSize == .compact || short ? .xxxLarge : .accessibility1
     }
 
-    private var largest: DynamicTypeSize { DeckView.largestType(verticalSize: verticalSize) }
+    /// The largest text size for the late card: AX1 on a short screen, as in landscape; otherwise
+    /// only the card's own cap (LateBannerView.largestType).
+    static func largestLateType(short: Bool) -> DynamicTypeSize {
+        short ? .accessibility1 : .accessibility5
+    }
+
+    /// The deck screen's height inside the safe area under which it is short: an iPhone SE has
+    /// 647 pt in portrait and an iPhone 13 mini 728; an iPhone 16e has 763 and an iPhone 17 778.
+    nonisolated static let shortHeight: CGFloat = 740
+
+    private var largest: DynamicTypeSize { DeckView.largestType(verticalSize: verticalSize, short: short) }
     /// An iPhone in landscape: about 360 pt of height for everything.
     private var compact: Bool { verticalSize == .compact }
 
@@ -196,7 +213,10 @@ struct DeckView: View {
         .background(Palette.bg.color) // #/portal's page color, not the system's white or black
         // The late banner takes its own room under the buttons, so it never covers the slide
         // count, the Live badge, the bar or the slide (sweep1-ios-1). #/portal does the same.
-        .safeAreaInset(edge: .bottom, spacing: 0) { LateBannerView(banner: store.late) }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            LateBannerView(banner: store.late)
+                .dynamicTypeSize(...DeckView.largestLateType(short: short))
+        }
         // Arrows and anything else that takes the tint: the web's green, never system blue.
         .tint(Palette.accent.color)
         .onAppear { pendingStart = store.config.startOnSlide }
@@ -213,6 +233,9 @@ struct DeckView: View {
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: showNotice)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.load.problem)
+        // The whole screen's height, the late banner's room included, so the caps don't change
+        // when a card comes or goes.
+        .onGeometryChange(for: Bool.self) { $0.size.height < DeckView.shortHeight } action: { short = $0 }
     }
 
     private var notice: String? { follow.notice(live: store.live?.slide.index) }

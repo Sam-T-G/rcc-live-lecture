@@ -163,6 +163,14 @@ const list: S[] = [
   },
   { id: "phone-pass-late-banner", route: "checkin/student", role: "student", title: "SH-10 Pass with the late banner", fixtures: passPage(), later: late },
   {
+    id: "phone-late-error",
+    route: "checkin/student",
+    role: "student",
+    title: "PH-13 + SH-04 The late banner didn't load: its error row under the pass, clear of Not you? Sign out",
+    expect: "error",
+    fixtures: passPage({ ...fx(api.checkin.attendance.lateFeed, fails()) }),
+  },
+  {
     id: "phone-checkedin",
     route: "checkin/student",
     role: "student",

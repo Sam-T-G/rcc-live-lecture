@@ -61,8 +61,9 @@ export function Student() {
   // The late banner sits beside StudentPass, not inside its screens, so it stays mounted when a
   // scan swaps the pass for "You're checked in.": a remount would count the scan's own late
   // arrival as already seen, and the late student's phone would never show it. Outside <Screen>
-  // there is no page gutter, so .student-late (checkin.css) holds the boundary fixed 16px in from
-  // each side: "The late banner didn't load." and Try again stay clear of the screen's edges.
+  // there is no page gutter, so .student-late (checkin.css) holds the boundary 16px in from each
+  // side: "The late banner didn't load." and Try again stay clear of the screen's edges, in the
+  // page under "Not you? Sign out" (T18).
   return (
     <>
       <SignInEnding line={STUDENT_ENDING} />
