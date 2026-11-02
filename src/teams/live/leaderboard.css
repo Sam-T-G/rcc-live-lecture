@@ -31,6 +31,12 @@ ol.board.board--card .board__members { grid-column: 2 / -1; grid-row: 2; padding
 /* While the scores load: three rows at the real rows' height, a still block for each name and credit. */
 ol.board.board--wait .skel { align-self: center; height: 12px; }
 ol.board.board--wait .board__rank { color: var(--muted); }
+/* Each wait row has the loaded row's two lines: the name's block from the name's x, then a second
+   block where the students line sits (a 12px block in its 24px line box), so the rows are the
+   loaded rows' height and nothing under the board moves when the scores land. */
+ol.board.board--wait .skel--w40 { margin-inline-start: calc(16px + var(--s2)); }
+ol.board.board--wait > .board__row::after { content: ""; grid-column: 2; grid-row: 2; width: 60%; height: 24px; box-sizing: border-box;
+  margin-inline-start: calc(16px + var(--s2)); border-block: 6px solid transparent; border-radius: var(--r-xs); background: var(--skel-fill) padding-box; }
 
 /* All N teams: a ruled row that opens, its chevron on the right edge. */
 .ph-board details { border-top: 1px solid var(--line-strong); }

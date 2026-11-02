@@ -10,7 +10,7 @@
 // the name and the code a professor reads out when the camera fails. Checked in, the pass turns
 // into its stub on the green field. The late opt-out and the signed-in line follow the pass.
 // checkin.css draws the frame.
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Link } from "../../blocks/router";
@@ -28,7 +28,9 @@ import { why } from "./util";
 // The phone frame for the pass page: the app bar with the page's name (signed out and while the
 // pass loads; the pass and the checked-in screen carry their own title as the page heading), then
 // its body, then the action bar at the bottom when the screen has one (kit .phone-actions).
-function PassFrame({ title, actions, children }: { title?: string; actions?: ReactNode; children: ReactNode }) {
+// `moment` (CheckInMoment) renders nothing; it sits after the body so its effects run once the
+// body's parts are on the page, in the same place on every screen so it stays mounted.
+function PassFrame({ title, actions, moment, children }: { title?: string; actions?: ReactNode; moment?: ReactNode; children: ReactNode }) {
   return (
     <div className="ph" data-surface="phone">
       {title && (
@@ -37,6 +39,7 @@ function PassFrame({ title, actions, children }: { title?: string; actions?: Rea
         </header>
       )}
       <main className="ph__body">{children}</main>
+      {moment}
       {actions && <div className="phone-actions">{actions}</div>}
     </div>
   );
@@ -87,6 +90,13 @@ export function StudentPass() {
   // The code on screen (by its `at`) and when this phone got it, by the phone's own clock.
   const [got, setGot] = useState<{ at: number; when: number } | null>(null);
   const now = useClock(!here);
+  // The pass card and its stub, for the checked-in moment (CheckInMoment, below).
+  const passEl = useRef<HTMLElement | null>(null);
+  const stubEl = useRef<HTMLElement | null>(null);
+  const passRef = useCallback((node: HTMLElement | null) => {
+    if (node) passEl.current = node;
+  }, []);
+  const moment = <CheckInMoment here={here} pass={passEl} stub={stubEl} />;
 
   // The server makes a new code only once the current one is 20 s old. "Sign in first." means it
   // no longer takes this sign-in, so the page signs out and the sign-in form comes back.
@@ -116,8 +126,8 @@ export function StudentPass() {
   // Checked in: the pass's stub on the green field, then the next step, Follow the slides.
   if (here)
     return (
-      <PassFrame>
-        <section className="stub">
+      <PassFrame moment={moment}>
+        <section key="stub" ref={stubEl} className="stub">
           <h1 className="text-h2 lockup" style={HEAD}>
             <Icon name="check" className="icon--d" />
             You’re checked in.
@@ -137,8 +147,8 @@ export function StudentPass() {
   // takes the square's place.
   if (!pass)
     return (
-      <PassFrame title="Your check-in pass">
-        <section className="pass">
+      <PassFrame title="Your check-in pass" moment={moment}>
+        <section key="pass" ref={passRef} className="pass">
           {err ? (
             <Status kind="error">{err}</Status>
           ) : (
@@ -156,8 +166,8 @@ export function StudentPass() {
   // to "Getting a new code…" on the waiting fill, and its letters keep their line, hidden.
   const old = got?.at === pass.at && codeIsOld(got.when, now);
   return (
-    <PassFrame>
-      <section className="pass">
+    <PassFrame moment={moment}>
+      <section key="pass" ref={passRef} className="pass">
         <h1 className="text-h2 pass__head" style={HEAD}>Show this to the professor</h1>
         <div className={old ? "pass__qr qr--wait" : "pass__qr"}>
           {old ? <Status kind="loading">Getting a new code…</Status> : <QR value={"RCC-" + pass.code} size={280} />}
@@ -176,6 +186,113 @@ export function StudentPass() {
       </footer>
     </PassFrame>
   );
+}
+
+// The checked-in moment (MOTION.md phone checked-in; checkin.css draws it). When the door or the
+// professor checks the student in while the pass is open, the pass card turns into its stub: a
+// copy of the pass fades out where it stood, the card's bottom edge moves up to the stub's height
+// with the rows under it riding along, the fill steps to the field and "You’re checked in." rises
+// into place. The pass and the stub are separate <section>s (keyed), so React leaves the old pass
+// whole, off the page, and its copy can fade. While the pass shows, each render records where it
+// and the rows under it sit. Effects only: it renders nothing, nothing here changes what the page
+// says or does, and the helpers and classes go at 450ms. Reduced motion: the layout swaps at once
+// and only the fill, the words and what follows the stub fade. Its own component (PassFrame places
+// it after the body), since the pass page's tests call StudentPass as a plain function.
+type Spot = { top: number; left: number; width: number; height: number };
+type Box = { current: HTMLElement | null };
+const ROWS = [".ph-opt", ".ph-foot"];
+const MOMENT_MS = 450;
+function CheckInMoment({ here, pass, stub }: { here: boolean; pass: Box; stub: Box }) {
+  const seen = useRef<{ card: Spot; rows: (number | null)[] } | null>(null);
+  useLayoutEffect(() => {
+    const card = pass.current;
+    const body = card?.parentElement;
+    if (here || !card?.isConnected || !body) return;
+    const b = body.getBoundingClientRect();
+    const r = card.getBoundingClientRect();
+    seen.current = {
+      card: { top: r.top - b.top, left: r.left - b.left, width: r.width, height: r.height },
+      rows: ROWS.map((sel) => {
+        const row = body.querySelector(`:scope > ${sel}`);
+        return row ? row.getBoundingClientRect().top - b.top : null;
+      }),
+    };
+  });
+  useLayoutEffect(() => {
+    const before = seen.current;
+    seen.current = null;
+    const old = pass.current;
+    const card = stub.current;
+    if (!here || !before || !old || old.isConnected || !card) return;
+    return playCheckIn(card, old, before);
+  }, [here, pass, stub]);
+  return null;
+}
+
+function playCheckIn(card: HTMLElement, old: HTMLElement, before: { card: Spot; rows: (number | null)[] }): () => void {
+  const body = card.parentElement;
+  if (!body) return () => {};
+  const quiet = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const kids = [...body.children] as HTMLElement[];
+  const rows = ROWS.map((sel) => body.querySelector<HTMLElement>(`:scope > ${sel}`));
+  // What sits between the stub and the rows (the quiz card, Follow the slides) is new: it fades in.
+  const after = kids.filter((el) => el !== card && !rows.includes(el));
+  const added: HTMLElement[] = [];
+  let timer = 0;
+  const done = () => {
+    window.clearTimeout(timer);
+    added.forEach((el) => el.remove());
+    card.classList.remove("ci-arrive", "ci-quiet");
+    after.forEach((el) => el.classList.remove("ci-late", "ci-quiet-in"));
+    rows.forEach((el) => {
+      el?.classList.remove("ci-row");
+      el?.style.removeProperty("--dy");
+    });
+    body.classList.remove("ci-host");
+  };
+  if (quiet) {
+    card.classList.add("ci-quiet");
+    after.forEach((el) => el.classList.add("ci-quiet-in"));
+  } else {
+    const b = body.getBoundingClientRect();
+    const r = card.getBoundingClientRect();
+    const now = { top: r.top - b.top, left: r.left - b.left, width: r.width, height: r.height };
+    const place = (el: HTMLElement, at: Spot) =>
+      Object.assign(el.style, { top: `${at.top}px`, left: `${at.left}px`, width: `${at.width}px`, height: `${at.height}px` });
+    // The rows below start where they stood under the pass and ride up with the card's edge.
+    rows.forEach((el, i) => {
+      const was = before.rows[i];
+      if (!el || was === null) return;
+      el.style.setProperty("--dy", `${was - (el.getBoundingClientRect().top - b.top)}px`);
+      el.classList.add("ci-row");
+    });
+    // Stub-sized surfaces from the stub's box down to the pass's old bottom edge, each moving up by
+    // its share of the drop on one curve, so together they always draw one unbroken card.
+    const drop = Math.max(0, before.card.top + before.card.height - (now.top + now.height));
+    const n = Math.max(1, Math.ceil(drop / Math.max(1, now.height - 32)));
+    for (let i = 0; i <= n; i++) {
+      const s = document.createElement("div");
+      s.className = i ? "ci-surface ci-surface--edge" : "ci-surface";
+      s.setAttribute("aria-hidden", "true");
+      place(s, now);
+      s.style.setProperty("--dy", `${(drop * i) / n}px`);
+      added.push(s);
+    }
+    // The pass as it stood, fading out over the new layout: never read, focused or tapped.
+    const leave = old.cloneNode(true) as HTMLElement;
+    leave.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+    leave.classList.add("ci-leave");
+    leave.setAttribute("aria-hidden", "true");
+    leave.setAttribute("inert", "");
+    place(leave, before.card);
+    added.push(leave);
+    body.classList.add("ci-host");
+    card.classList.add("ci-arrive");
+    after.forEach((el) => el.classList.add("ci-late"));
+    body.append(...added);
+  }
+  timer = window.setTimeout(done, MOMENT_MS);
+  return done;
 }
 
 // The time now, by this phone's clock: every second while `on`, and at once when the page turns

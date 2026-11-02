@@ -7,7 +7,9 @@
 /* The kit's bar, not sticky here: the page's name with the team line at its end, and the
    signed-in line under them. */
 .ph-head { flex-wrap: wrap; column-gap: var(--s3); row-gap: 0; padding-block: var(--s2); }
-.ph-head > h1 { flex: 1 1 auto; min-width: 0; margin: 0; font-size: var(--t-h3); line-height: 1.3; }
+/* The title row is 32 tall (the team line's height) before the team loads too, so nothing moves
+   when it arrives. */
+.ph-head > h1 { flex: 1 1 auto; display: flex; align-items: center; min-width: 0; min-height: 32px; margin: 0; font-size: var(--t-h3); line-height: 1.3; }
 .ph-head > .teamline { order: 1; margin: 0; }
 .ph-head > .row { order: 2; flex: 1 1 100%; gap: 0 var(--s3); margin: 0; font-size: var(--t-small); }
 .ph-head .btn--quiet { padding-inline: 0; color: var(--text); font-weight: var(--w-head); text-decoration: underline; text-underline-offset: 3px; }
@@ -26,11 +28,22 @@
 .ph--live:not(:has(.ph-tolive)) .live:has(> .live__side > .qfield) > .live__side { display: contents; }
 .ph--live:not(:has(.ph-tolive)) .live:has(> .live__side > .qfield) > .live__side > .qfield { order: -1; }
 
-/* Signed in, not checked in: a notice in the open state's tint (the kit .notice--warn's drawing;
-   Page.test.ts reads this markup, so the kit part can't wrap it), the warning glyph and the app's
-   sentence, then the Check in link. */
-.ph__body > .live-checkin { display: grid; gap: var(--s3); padding: var(--s3) var(--s4); border-radius: var(--r-md);
+/* Signed in, not checked in: a strip in the open state's tint attached under the bar, full width
+   (Page.test.ts reads this markup, so the kit part can't wrap it): the warning glyph and the app's
+   sentence on the 32 edge, the Check in link at its end. While an open quiz has its own Check in
+   on the field, the strip's link drops to underlined words, so the field's white button is the
+   screen's one Check in button. Under 360 wide the link goes under the sentence. */
+.ph__body > .live-checkin { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--s2) var(--s3);
+  margin: calc(-1 * var(--s4)) calc(-1 * var(--ph-gutter)) 0; padding: var(--s3) var(--ph-edge); border-radius: 0;
   background: var(--st-open); color: var(--on-st-open); }
+.ph__body > .live-checkin > .btn { width: auto; justify-self: end; min-height: 44px; padding-inline: var(--s4); }
+.ph__body:has(.quiz-how) > .live-checkin > .btn { padding-inline: var(--s2); background-color: transparent; box-shadow: none; color: var(--on-st-open);
+  text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 359px) {
+  .ph__body > .live-checkin { grid-template-columns: minmax(0, 1fr); }
+  .ph__body > .live-checkin > .btn { justify-self: start; }
+  .ph__body:has(.quiz-how) > .live-checkin > .btn { padding-inline: 0; }
+}
 .live-checkin__note { position: relative; margin: 0; padding-inline-start: calc(20px + var(--s3)); font-size: var(--t-small); font-weight: var(--w-head);
   line-height: var(--lh-small); }
 .live-checkin__note::before { content: ""; position: absolute; left: 0; top: calc((1lh - 20px) / 2); width: 20px; height: 20px; background: var(--st-open-mark);
@@ -48,6 +61,10 @@
 .slide__live { margin: 0; font-size: var(--t-small); }
 .livestate > .status { padding-block: 0; }
 .livestate--load { min-height: 160px; align-content: start; }
+/* The loading card is drawn as the slide card waiting: a title block at the 28 title's cap height,
+   then the lines' blocks on the bullets' text edge. */
+.livestate--load .skel-lines > .skel:first-child { width: 55%; height: 20px; margin-block: 7px 19px; }
+.livestate--load .skel-lines > .skel:nth-child(n+2) { margin-inline-start: var(--s6); }
 /* Paged back: Back to live under "The professor is on slide 7 now.", then I'm lost's line ends
    the card. Both sat in the sticky action bar until DS-PHONE-design-2 (the bar took a third of a
    320 phone). */
@@ -106,6 +123,10 @@ html:has(.ph--live > .ph-actions > .lost > .status) { --pha-err: calc(var(--s2) 
 .lost__note { margin: 0; font-size: var(--fs-small); color: var(--muted); }
 .ph-actions > .lost > p:not(.status) { margin: 0; padding-inline: var(--s2); font-size: var(--t-small); }
 .ph-actions > .lost > .status { margin: 0; }
+/* While a quiz or its results show, the green field or the right answer is the screen's green:
+   I'm lost takes the neutral fill (kit .btn--neutral) in the same slot, shape and words. */
+.ph--live:has(.qfield, .qresult) .lost__button:not([aria-pressed="true"], [aria-busy="true"], :disabled) { background-color: var(--neutral-btn);
+  color: var(--text); box-shadow: none; }
 .lost__button[aria-pressed="true"] { background-color: var(--accent-soft); color: var(--accent-soft-text); box-shadow: inset 0 0 0 var(--rcc-hairline) var(--accent); }
 
 /* ------------------------------------------------------- the team leaderboard */
@@ -142,6 +163,13 @@ html:has(.ph--live > .ph-actions > .lost > .status) { --pha-err: calc(var(--s2) 
 .board--many .board__members { display: none; }
 
 /* ------------------------------------------------------ past quizzes and votes */
+/* On #/live the card is a section on the page, drawn as the kit .plane the leaderboard and
+   Questions use: a rule above, an 18 heading, no raised card. Its markup stays <section
+   class="panel"> (PastQuestions.test.ts). */
+.ph--live .live__side > .panel { display: grid; gap: var(--s3); align-content: start; margin: 0; padding: var(--s4) var(--s4) 0; background: none;
+  border-radius: 0; box-shadow: none; border-top: 1px solid var(--line-strong); }
+.ph--live .live__side > .panel > h2 { margin: 0; font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.3; }
+.ph--live .live__side > .panel > :is(p, .status) { margin: 0; }
 /* The card's rows are ruled, each one opens to its choices; the summary is the 56 target. */
 .past { list-style: none; margin: 0; padding: 0; display: grid; }
 .past > li { border-top: 1px solid var(--line); }

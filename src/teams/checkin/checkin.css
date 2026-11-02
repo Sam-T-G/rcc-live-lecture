@@ -25,7 +25,7 @@
 /* One option on the page (the late opt-out): a ruled row on the 32 edge; the whole row is the target. */
 .ph-opt { padding-inline: var(--s4); border-top: 1px solid var(--line); }
 .ph-opt > .status--error { margin-block: 0 var(--s3); }
-.ph-check { gap: var(--s3); min-height: 48px; margin: 0; padding-block: var(--s1); font-size: var(--t-small); font-weight: var(--w-body);
+.ph-check { align-items: flex-start; gap: var(--s3); min-height: 48px; margin: 0; padding-block: var(--s1); font-size: var(--t-small); font-weight: var(--w-body);
   line-height: var(--lh-small); color: var(--text); cursor: pointer; }
 /* [kit_request] a checkbox whose own box is the 44 target (kit .checkrow's input is 24): a transparent
    10px border around the drawn 24 box, pulled back by a -10px margin so the row keeps its layout.
@@ -51,14 +51,31 @@
    white plate takes the square's 256 and never runs past the card's edge. */
 .pass__qr { justify-self: center; width: 280px; max-width: 100%; aspect-ratio: 1; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; }
 .pass__qr.qr--wait > .status { padding: var(--s4); }
+/* Waiting for a code (Making your pass…, Getting a new code…): the square is a sunken well with
+   the still clock glyph and the words at its top left, the way a sending tile waits. */
+.ph .pass__qr.qr--wait { place-items: start; padding: var(--s4); background: var(--well); text-align: left; }
+.ph .pass__qr.qr--wait > .status--loading { display: flex; align-items: center; gap: var(--s2); padding: 0; color: var(--text);
+  font-size: var(--t-body); font-weight: var(--w-head); line-height: 1.3; }
+.ph .pass__qr.qr--wait > .status--loading::before { content: ""; flex: none; width: 20px; height: 20px; background: var(--muted);
+  -webkit-mask: var(--clock-glyph) center / contain no-repeat; mask: var(--clock-glyph) center / contain no-repeat; }
 .ph .pass__name { font-size: 1.25rem; font-weight: var(--w-head); line-height: 1.3; }
 /* The code: Google Sans Code 40 / 700, tabular. An old code's letters keep their line, hidden, so
    nothing under them moves while a new code loads. */
 .ph .pass__code { font-family: var(--font-code); font-size: 2.5rem; font-weight: var(--w-loud); line-height: 1.1; letter-spacing: .08em;
   font-variant-numeric: tabular-nums; font-variant-ligatures: none; user-select: all; -webkit-user-select: all; }
 .pass__code--old { visibility: hidden; }
+/* The hidden code's slot shows a still block where the six digits sit (4.1em at this size), like
+   every other value that hasn't arrived yet. */
+.ph .pass__code--old { position: relative; }
+.ph .pass__code--old::after { content: ""; visibility: visible; position: absolute; left: 0; top: calc(50% - .36em); width: 4.1em; height: .72em;
+  border-radius: var(--r-xs); background: var(--skel-fill); }
 .ph .pass__note { max-width: 34ch; }
-/* Signed out: the pass holds the sentence as its head and Google's button under it. */
+/* Signed out: the pass holds the sentence as its head and Google's button under it. One line on
+   the pass's 24 corners drew a pill, the app's pressable shape, so this card takes the 16 corners
+   .livestate and .panel use and a little more height. */
+.ph .pass--out { border-radius: var(--r-lg); padding-block: var(--s5); }
+/* Google's button sits in the middle of the action bar, not pinned to its left edge. */
+.ph > .phone-actions div[aria-busy] { display: flex; justify-content: center; }
 .pass--out > p { font-size: var(--t-h3); font-weight: var(--w-head); line-height: 1.3; }
 .pass--out > div { min-width: 0; }
 .pass--out .status--error { text-wrap: pretty; }
@@ -70,12 +87,47 @@
 .ph .stub > :is(h2, p) { margin: 0; }
 .ph__body:has(> .qfield) > .stub { background: var(--st-in); color: var(--on-st-in); }
 .ph__body:has(> .qfield) > .stub .lockup > .icon { color: var(--st-in-mark); }
-/* Follow the slides, the next step: a full-width row in --text with a green chevron. */
+/* The checked-in moment (MOTION.md phone checked-in; Student.tsx useCheckInMoment). The door or
+   the professor checks the student in while the pass is open:
+     0-90     a copy of the pass fades out where it stood (--fx-fast --ease-exit); the rows below
+              hold their places
+     90-290   the card's bottom edge moves up to the stub's height (stub-sized surfaces, transform
+              only) and the rows below ride with it (--sp-fast --ease)
+     90-310   the fill steps --raised to the stub's fill, the words --text to its ink (--fx-slow)
+     90-290   "You're checked in." rises through the stub's clip (--sp-fast --ease-arrive)
+     180-400  what comes after the stub (the quiz, Follow the slides) fades in (--fx-slow)
+   Reduced motion: the layout swaps at once; the fill, the words and Follow the slides fade on
+   --fx-slow. Nothing loops; the script removes the helpers and classes at 450ms. */
+.ph__body { --ci-fill: var(--field); --ci-ink: var(--on-field); }
+.ph__body:has(> .qfield) { --ci-fill: var(--st-in); --ci-ink: var(--on-st-in); }
+.ph__body.ci-host { position: relative; }
+.ci-leave { position: absolute; z-index: 1; margin: 0; pointer-events: none; animation: ci-out var(--fx-fast) var(--ease-exit) forwards; }
+.ci-surface { position: absolute; z-index: 0; border-radius: var(--r-xl); background: var(--ci-fill); pointer-events: none;
+  animation: ci-surf var(--fx-slow) var(--ease) var(--fx-fast) backwards; }
+.ci-surface--edge { animation: ci-surf var(--fx-slow) var(--ease) var(--fx-fast) backwards, ci-flip var(--sp-fast) var(--ease) var(--fx-fast) backwards; }
+.ph .stub.ci-arrive { position: relative; z-index: 2; background: transparent; animation: ci-ink var(--fx-slow) var(--ease) var(--fx-fast) backwards; }
+.ph .stub.ci-arrive .lockup { animation: ci-rise var(--sp-fast) var(--ease-arrive) var(--fx-fast) backwards; }
+.ci-row { animation: ci-flip var(--sp-fast) var(--ease) var(--fx-fast) backwards; }
+.ci-late { animation: ci-in var(--fx-slow) var(--ease) calc(2 * var(--fx-fast)) backwards; }
+.ph .stub.ci-quiet { animation: ci-fill var(--fx-slow) var(--ease) backwards; }
+.ph .stub.ci-quiet .lockup, .ci-quiet-in { animation: ci-in var(--fx-slow) var(--ease) backwards; }
+@keyframes ci-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ci-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ci-surf { from { background-color: var(--raised); } to { background-color: var(--ci-fill); } }
+@keyframes ci-ink { from { color: var(--text); } to { color: var(--ci-ink); } }
+@keyframes ci-fill { from { background-color: var(--raised); color: var(--text); } to { background-color: var(--ci-fill); color: var(--ci-ink); } }
+@keyframes ci-flip { from { transform: translate(0, var(--dy, 0px)); } to { transform: none; } }
+@keyframes ci-rise { from { transform: translateY(calc(100% + var(--s4))); } to { transform: none; } }
+
+/* Follow the slides, the next step: the kit's raised 56 button at full width, the words in --text
+   and a green chevron at its end. HideLate keeps its own rule, a step further down. */
+.ph-go { margin-top: var(--s1); }
 .ph-go > p { margin: 0; }
-.ph-go a { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 56px; padding-inline: var(--s4);
-  border-block: 1px solid var(--line); color: var(--text); font-size: var(--t-body); font-weight: var(--w-head); text-decoration: none; }
+.ph-go a { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 56px; padding-inline: var(--s5) var(--s4);
+  border: 0; border-radius: var(--r-full); background: var(--raised); box-shadow: var(--hl), var(--shadow-1);
+  color: var(--text); font-size: var(--t-body); font-weight: var(--w-head); text-decoration: none; }
 .ph-go a:hover { text-decoration: underline; }
-.ph-go + .ph-opt { border-top: 0; }
+.ph-go + .ph-opt { margin-top: var(--s3); }
 .ph-go a::after { content: ""; flex: none; width: 20px; height: 20px; background: var(--accent); transform: rotate(-90deg);
   -webkit-mask: var(--select-chev) center / contain no-repeat; mask: var(--select-chev) center / contain no-repeat; }
 
@@ -136,6 +188,22 @@
 /* What to do first, and its button: the white button on the field. */
 .quiz-how { display: grid; gap: var(--s3); justify-items: start; }
 .quiz-how > p { margin: 0; font-size: var(--t-body); font-weight: var(--w-head); color: var(--on-field); }
+/* Motion (MOTION.md answer-press, answer-sending, answer-sent). Finger down steps the tile's fill
+   one rung and scales its face to .98 on --fx-fast; release goes back on --fx with no overshoot.
+   The pick's ring and every word and glyph change in the same frame (box-shadow never animates).
+   The other tiles' fills and letter wells step to the out fill on --fx-slow; their ink snaps.
+   The tapped tile's clock and "Sending" show only once the reply is 300ms late, and no send bar
+   runs (the kit's bar is a timer, not the network). Reduced motion: no scale. */
+.qfield .choice { transition: background-color var(--fx) var(--ease), transform var(--fx) var(--ease); }
+.qfield .choice:not(:disabled):active { background-color: color-mix(in srgb, var(--field-letter) 60%, var(--field-tile)); transition-duration: var(--fx-fast); }
+.qfield .choice:is(.is-out, :disabled) { transition: background-color var(--fx-slow) var(--ease); }
+.qfield .choice > b { transition: background-color var(--fx-slow) var(--ease); }
+.qfield .choice[aria-busy="true"]::after { content: none; }
+.qfield .choice[aria-busy="true"] .choice__clock { display: inline-block; }
+.qfield .choice[aria-busy="true"] > .choice__state { animation: ph-late 1ms linear 300ms backwards; }
+@keyframes ph-late { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .qfield .choice:active { transform: none; } }
+
 /* The line under the tiles: a 20 glyph on the letter column, the words on the label column. */
 .qfield > .qfield__foot { padding-inline: var(--s4); }
 .qfield__foot > span { min-width: 0; }
@@ -162,11 +230,11 @@
 .qresult .bars__label > b { grid-row: 1 / span 2; grid-column: 1; align-self: start; display: grid; place-items: center; width: 44px; height: 44px;
   border-radius: var(--r-xs); background: var(--on-raised); color: var(--text); font-size: 1.25rem; font-weight: var(--w-loud); }
 .qresult .bars__row--right .bars__label > b { background: var(--accent); color: var(--on-accent); }
-.qresult .bars__track { grid-row: 2; grid-column: 2; align-self: center; height: 12px; border-radius: 2px; background: var(--on-raised); }
+.qresult .bars__track { grid-row: 2; grid-column: 2 / -1; align-self: center; height: 12px; border-radius: 2px; background: var(--on-raised); }
 .qresult .bars__fill { border-radius: 0 2px 2px 0; background: var(--bar-rest); }
 .qresult .bars__row--win .bars__fill { background: var(--text); }
 .qresult .bars__row--right .bars__fill { background: var(--accent); }
-.qresult .bars__num { grid-row: 1; grid-column: 3 / -1; display: grid; grid-template-columns: 40px 48px; align-items: baseline; text-align: right; }
+.qresult .bars__num { grid-row: 1; grid-column: 3 / -1; display: grid; grid-template-columns: 40px 48px; column-gap: var(--s3); align-items: baseline; text-align: right; }
 .qresult .bars__count { font-size: var(--n-sm); font-weight: var(--w-loud); line-height: 1.1; }
 .qresult .bars__pct { font-size: var(--t-small); font-weight: var(--w-head); color: var(--muted); }
 .qresult .bars__dot { display: none; }

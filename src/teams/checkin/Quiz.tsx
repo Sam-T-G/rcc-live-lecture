@@ -188,8 +188,12 @@ function Answer({ poll, mine, here, signedIn, ended }: { poll: Poll; mine: numbe
               {/* A space before the word, so the button reads "B Current Sent". */}
               {sending && tapped === i ? (
                 <> <span className="choice__state"><Icon name="clock" className="choice__clock" />Sending</span></>
+              ) : locked && mine === i ? (
+                <> <span className="choice__state"><Icon name="check" className="icon--d" />Sent</span></>
               ) : (
-                locked && mine === i && <> <span className="choice__state"><Icon name="check" className="icon--d" />Sent</span></>
+                // A failed send: the warning glyph in the same slot, no word (the line under the
+                // tiles has the server's words). kit.css colors it --st-stop-mark.
+                !!err && failed?.choice === i && <span className="choice__state"><Icon name="warning" /></span>
               )}
             </button>
           ))}

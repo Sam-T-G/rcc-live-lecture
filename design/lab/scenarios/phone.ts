@@ -178,6 +178,16 @@ const list: S[] = [
     fixtures: passPage({ ...fx(api.checkin.read.me, true), ...fx(api.checkin.quiz.current, null) }),
   },
   {
+    // The checked-in moment (MOTION.md phone checked-in): the pass shows, then the door checks Pip
+    // in at 500ms and the pass turns into its stub. The shot is the end state.
+    id: "phone-pass-checks-in",
+    route: "checkin/student",
+    role: "student",
+    title: "PH-13 to PH-16 The door checks the student in while the pass is open",
+    fixtures: passPage({ ...fx(api.checkin.quiz.current, null) }),
+    later: [{ afterMs: 500, fixtures: fx(api.checkin.read.me, true) }],
+  },
+  {
     id: "phone-checkedin-quiz-open",
     route: "checkin/student",
     role: "student",
