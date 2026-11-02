@@ -25,6 +25,22 @@
 .staff-gate > .page > h1 { margin: 0 0 var(--s4); font-size: var(--t-h1); line-height: 1.2; font-weight: var(--w-head); }
 .staff-gate .page p { font-size: var(--t-body); }
 .staff-gate .page p:has(> .btn) { margin: var(--s5) 0 0; }
+/* StaffGate's screen: the GDG on Campus logo and GDG's independence sentence above the title
+   (comp staff-gate). The horizontal lockup 360 wide in light, the stacked one 144 tall in dark,
+   each with its mark's ink on the text edge; the sentence 16 under the logo, its lines balanced
+   into two at 15px. The sentence runs about 1127 on one line, so this block takes 640, past the
+   560 column (at 560 balance makes three lines). */
+.staff-gate > .page > .staff-gate__brand { max-width: 640px; }
+.staff-gate__brand { display: grid; gap: var(--s4); justify-items: start; margin-bottom: var(--s6); }
+.staff-gate .gate__logo-l { display: block; width: 360px; height: auto; margin-inline-start: -18px; }
+.staff-gate .gate__logo-d { display: none; width: auto; height: 144px; margin-inline-start: -13px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .staff-gate .gate__logo-l { display: none; }
+  :root:not([data-theme="light"]) .staff-gate .gate__logo-d { display: block; }
+}
+[data-theme="dark"] .staff-gate .gate__logo-l { display: none; }
+[data-theme="dark"] .staff-gate .gate__logo-d { display: block; }
+.staff-gate .page .indep { margin: 0; font-size: var(--t-small); color: var(--muted); text-wrap: balance; }
 /* While the server checks the sign-in: the action's 48 slot as a well, the clock and the step. */
 .staff-gate__wait { display: inline-flex; align-items: center; gap: var(--s3); min-height: 48px; padding: 0 var(--s5) 0 var(--s4);
   background: var(--well); color: var(--text); border-radius: var(--r-md); }
