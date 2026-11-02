@@ -105,6 +105,9 @@
 .uikit-wide { display: grid; gap: var(--rcc-space-6); margin-top: var(--rcc-space-6); }
 .uikit-wide .uikit__section { margin-top: 0; }
 .uikit-trackscroll { overflow-x: auto; }
+/* The track is never narrower than its content, so at phone width it overflows only sideways.
+   Held at the box's width, its title column shrank to 0px and the slide numbers fell below the box. */
+.uikit-trackscroll > .track { min-width: max-content; }
 
 /* #/ui/projector */
 .uikit-board { font-variant-numeric: tabular-nums; }

@@ -165,4 +165,14 @@ describe("e2e-ui-gallery-sideways #/ui never scrolls sideways at phone width", (
     const rule = css.find((r) => r.selectors.includes(".uikit-trackscroll") && r.at.length === 0);
     expect(rule?.decls).toContainEqual(["overflow-x", "auto"]);
   });
+
+  // The box clips both ways once it scrolls. Held at the box's 326px, the track squeezed its
+  // title column to 0px, "Slide 4 of 8" wrapped onto 3 lines, and the slide numbers fell below
+  // the 88px box. The track is never narrower than its content, so it only overflows sideways,
+  // and it still fills a wider box at 1280.
+  it("the track inside the box is never narrower than its content", () => {
+    const css = parse(readFileSync(new URL("../styles/uikit.css", import.meta.url), "utf8"));
+    const rule = css.find((r) => r.selectors.includes(".uikit-trackscroll > .track") && r.at.length === 0);
+    expect(rule?.decls).toContainEqual(["min-width", "max-content"]);
+  });
 });
