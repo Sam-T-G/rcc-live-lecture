@@ -285,8 +285,9 @@ describe("live-frontend-17 names on by-name posts", () => {
       await post(s, `Question ${i + 1}`, { anonymous: false });
     }
     const shown = (await list(t)).map((q) => [q.text, q.name]).sort();
+    // A name that is the email before the "@" shows as "Someone" on #/live, the door's rule (TK-NAMES-spec-1).
     expect(shown).toEqual([
-      ["Question 1", "jane.doe"],
+      ["Question 1", "Someone"],
       ["Question 2", "Student"],
       ["Question 3", "Ada"],
     ]);

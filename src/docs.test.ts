@@ -352,6 +352,21 @@ describe("docs: the 2026-11-01 docs fix check", () => {
     expect(contractsLine).toContain("`short`");
   });
 
+  // TK-NAMES-spec-1: live.questions.list shows "Someone" for a name that is the part of an email
+  // before the "@", the door's rule (convex/live/questions.private.test.ts pins it), so each
+  // privacy line names #/live (or list) beside "Someone".
+  it("TK-NAMES-spec-1 the privacy rules say #/live shows Someone for a name from an email", () => {
+    const rules = [
+      ["docs/runbook.md", "**What stays private:**", /"Someone" on #\/live/],
+      ["AGENTS.md", "Who sees names:", /#\/live[^.;]*"Someone"/],
+      ["docs/contracts.md", "**Privacy:**", /`live\.questions\.list`[^.]*"Someone"/],
+    ] as const;
+    for (const [path, start, rule] of rules) {
+      const line = lines(path).find((l) => l.includes(start)) ?? "";
+      expect([path, rule.test(line)]).toEqual([path, true]);
+    }
+  });
+
   it("sweep1-docs-fixcheck-2 BLOCKS.md doesn't list 'after a class ends' as a way deckFrom differs from lectureWindow", () => {
     const rule = lines("BLOCKS.md").find((l) => l.startsWith("**Reading, on the server:**")) ?? "";
     const differs = rule.slice(rule.indexOf("It differs from"));

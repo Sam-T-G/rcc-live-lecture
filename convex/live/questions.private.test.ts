@@ -6,7 +6,7 @@
 // that name as the first name and last initial (lib.shortName); forHost keeps the full name.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../_generated/api";
-import { at, checkIn, professor, profEnv, setup, slide, typed, type Caller, type T } from "../test.helpers";
+import { at, checkIn, google, professor, profEnv, setup, slide, typed, type Caller, type T } from "../test.helpers";
 
 const CH = "gdg";
 const T0 = at(2026, 11, 5, 21, 40);
@@ -180,5 +180,49 @@ describe("T1 list never returns a full name; forHost still does", () => {
     // The stored rows keep the full name: the short form is made on each read.
     const stored = await t.run((ctx) => ctx.db.query("questions").withIndex("by_channel", (q) => q.eq("channel", CH)).take(10));
     expect(stored.map((r) => r.name ?? null).sort()).toEqual(["Ana", "Ivy Sample", "Mary Ann Lee", "Élodie Ñúñez", null].sort());
+  });
+});
+
+describe("TK-NAMES-spec-1 a name that is the part of an email before the @ shows as Someone on #/live", () => {
+  it("TK-NAMES-spec-1 list gives Someone where the door does, to every reader, signed out too; forHost keeps the stored name", async () => {
+    const t = setup();
+    await slide(t, CH, 3);
+    const people = [
+      google(t, "jdoe1234", "jdoe1234@gmail.com"), // the Google name is the email's local part
+      google(t, "kpriv5678@gmail.com", "kpriv5678@gmail.com"), // the Google name is the email
+      typed(t, "JDoe5678", "jdoe5678@example.edu"), // the local part, in another case
+      typed(t, "other.person@example.org", "student5@example.edu"), // typed as another email
+      typed(t, "Ivy Sample", "student1@example.edu"),
+    ];
+    const door: string[] = [];
+    for (const s of people) door.push((await checkIn(t, s)).short);
+    expect(door).toEqual(["Someone", "Someone", "Someone", "Someone", "Ivy S."]);
+    for (const [i, s] of people.entries()) await post(s, `Question ${i}`, { anonymous: false });
+    await post(people[0], "Anonymous one");
+    const p = await professor(t);
+    const named = (rows: { text: string; name: string | null }[]) => Object.fromEntries(rows.map((q) => [q.text, q.name]));
+    const seen = {
+      "Question 0": "Someone",
+      "Question 1": "Someone",
+      "Question 2": "Someone",
+      "Question 3": "Someone",
+      "Question 4": "Ivy S.",
+      "Anonymous one": null,
+    };
+    for (const index of [undefined, 3])
+      for (const reader of [t, ...people, p]) {
+        const rows = await list(reader, index);
+        expect(named(rows)).toEqual(seen);
+        const sent = JSON.stringify(rows).toLowerCase();
+        for (const leak of ["jdoe1234", "kpriv5678", "jdoe5678", "other.person"]) expect(sent).not.toContain(leak);
+      }
+    expect(named(await forHost(p))).toEqual({
+      "Question 0": "jdoe1234",
+      "Question 1": "kpriv5678",
+      "Question 2": "JDoe5678",
+      "Question 3": "other.person",
+      "Question 4": "Ivy Sample",
+      "Anonymous one": null,
+    });
   });
 });

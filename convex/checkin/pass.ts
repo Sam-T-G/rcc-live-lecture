@@ -150,14 +150,14 @@ async function passFor(ctx: MutationCtx, code: string, now: number): Promise<Doc
   throw new ConvexError(NOT_A_PASS);
 }
 
-// What the door iPad shows for a scanned student (scan's `short`, T1): the first name and last
-// initial (lib.shortName), or "Someone" for a name that is the part of an email before the "@",
-// the late banner's rule (attendance.lateFeed): the pass says the name was typed as an email
-// (or, from before names were cleaned, holds one), or the name is the student's own email
-// before the "@", in any case.
-function doorName(name: string, p: Doc<"passes">, email: string) {
+// What the door iPad (scan's `short`, T1) and #/live (live.questions.list) show for a student:
+// the first name and last initial (lib.shortName), or "Someone" for a name that is the part of an
+// email before the "@", the late banner's rule (attendance.lateFeed): the pass says the name was
+// typed as an email (or, from before names were cleaned, holds one), or the name is the
+// student's own email before the "@", in any case. `p` is null when the student has no pass.
+export function doorName(name: string, p: Pick<Doc<"passes">, "name" | "nameFromEmail"> | null, email: string) {
   const local = email.split("@")[0].trim().toLowerCase();
-  const fromEmail = p.nameFromEmail === true || p.name.includes("@") || (local !== "" && name.trim().toLowerCase() === local);
+  const fromEmail = (p !== null && (p.nameFromEmail === true || p.name.includes("@"))) || (local !== "" && name.trim().toLowerCase() === local);
   return fromEmail ? "Someone" : shortName(name);
 }
 

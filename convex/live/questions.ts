@@ -9,8 +9,9 @@
 // Who sees what:
 //   list (anyone, signed out too)  this class's questions. Another student's private question is
 //       left out; the author sees their own with private: true. name is the first name and last
-//       initial (lib.shortName, "Ivy S."; T1), so a full name never reaches #/live; null when
-//       anonymous. answer is the professor's typed answer once it's shared, else null (the
+//       initial (lib.shortName, "Ivy S."; T1), so a full name never reaches #/live, or "Someone"
+//       for a name that is the part of an email before the "@" (checkin.pass.doorName, the door's
+//       rule); null when anonymous. answer is the professor's typed answer once it's shared, else null (the
 //       author's too). A private question's answer is always null: it can't be shared (Sam's
 //       decision D12 e).
 //   forHost (professors and admins)  every question in this class, private ones too, with the
@@ -65,10 +66,11 @@
 // Internal: applyTopics, which organize runs to save the AI's topics.
 import { ConvexError, v, type Infer } from "convex/values";
 import { api, internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
-import { action, internalMutation, mutation, query, type MutationCtx } from "../_generated/server";
+import type { Doc, Id } from "../_generated/dataModel";
+import { action, internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { gemini } from "../ai";
-import { checkedIn, cleanName, cleanText, deckFrom, lectureWindow, requireUser, shortName } from "../lib";
+import { checkedIn, cleanName, cleanText, deckFrom, lectureWindow, requireUser } from "../lib";
+import { doorName } from "../checkin/pass";
 import { isProf, requireProf, staffRole } from "../checkin/prof";
 
 const MAX_LENGTH = 280; // a question or comment, in characters
@@ -113,8 +115,31 @@ type HostRow = Infer<typeof hostShape>;
 
 // A stored name as it may show. Rows from before cleanName (10-29) can hold an email.
 const shownName = (name: string | undefined) => (name === undefined ? null : cleanName(name));
-// The same name for #/live, which anyone can read: the first name and last initial (T1).
-const roomName = (name: string | undefined) => (name === undefined ? null : shortName(cleanName(name)));
+
+// The same names for #/live, which anyone can read: the first name and last initial, or
+// "Someone" for a name that is the part of an email before the "@" (checkin.pass.doorName, the
+// door iPad's rule; TK-NAMES-spec-1). Reads each named poster's pass and this class's check-in
+// (its email) once.
+async function roomNames(ctx: QueryCtx, channel: string, start: number, rows: Doc<"questions">[]) {
+  const posters = new Map<string, { p: Doc<"passes"> | null; email: string }>();
+  for (const r of rows) {
+    if (r.name === undefined || posters.has(r.user)) continue;
+    const p = await ctx.db
+      .query("passes")
+      .withIndex("by_user", (q) => q.eq("user", r.user))
+      .first();
+    const checkin = await ctx.db
+      .query("checkins")
+      .withIndex("by_channel_and_user", (q) => q.eq("channel", channel).eq("user", r.user).gte("_creationTime", start))
+      .first();
+    posters.set(r.user, { p, email: checkin?.email ?? p?.email ?? "" });
+  }
+  return (r: Doc<"questions">) => {
+    if (r.name === undefined) return null;
+    const { p, email } = posters.get(r.user)!;
+    return doorName(cleanName(r.name), p, email);
+  };
+}
 
 // At most `max` characters (whole characters, so an emoji is never cut in half), trimmed.
 const cut = (text: string, max: number) => Array.from(text.trim()).slice(0, max).join("").trim();
@@ -150,13 +175,14 @@ export const list = query({
         .take(1000);
       for (const m of mine) voted.add(m.question);
     }
-    return rows
-      .filter((r) => !r.private || r.user === me)
+    const shown = rows.filter((r) => !r.private || r.user === me);
+    const roomName = await roomNames(ctx, channel, start, shown);
+    return shown
       .map((r) => ({
         _id: r._id,
         index: r.index,
         text: r.text,
-        name: roomName(r.name),
+        name: roomName(r),
         votes: r.votes,
         at: r._creationTime,
         mine: r.user === me,

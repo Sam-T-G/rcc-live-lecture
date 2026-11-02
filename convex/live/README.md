@@ -40,7 +40,7 @@ The contract other teams read (#/host). Counts include only students checked in 
 
 | Function | Args | Who | Reads | Writes |
 |---|---|---|---|---|
-| `list` (query) | `{ channel, index? }` -> `[{ _id, index, text, name, votes, at, mine, voted, private, answer }]`, at most 200; `name` is the first name and last initial (`lib.shortName`), null when anonymous | anyone; another student's private question is left out | `questions`, `questionVotes` | none |
+| `list` (query) | `{ channel, index? }` -> `[{ _id, index, text, name, votes, at, mine, voted, private, answer }]`, at most 200; `name` is the first name and last initial (`lib.shortName`), "Someone" for a name that is the part of an email before the "@" (`checkin.pass.doorName`), null when anonymous | anyone; another student's private question is left out | `questions`, `questionVotes` | none |
 | `ask` (mutation) | `{ channel, index, text, anonymous, private? }` | checked in; 1 to 280 characters; one post every 5 seconds | `checkins`, `deckChannels`, `deckSlides`, `questions` | `questions` |
 | `vote` (mutation) | `{ question }`; a second tap takes it back; a question from an earlier class changes nothing | checked in; not your own, not a private one | `checkins`, `questions`, `questionVotes` | `questions`, `questionVotes` |
 | `remove` (mutation) | `{ question }` | the author, a professor or admin | `questions`, `questionVotes`, `staff` | `questions`, `questionVotes` |
