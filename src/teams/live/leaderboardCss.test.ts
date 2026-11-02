@@ -37,6 +37,14 @@ describe("#/live/leaderboard's ledger rows, 7 or more teams included", () => {
     }
   });
 
+  it("e2e-board-tied-first-green past six teams, the green top row is only for a team alone in 1st (.board--tied rows stay plain)", () => {
+    // StageBoard.tsx adds .board--tied when two or more teams share 1st; every rule that paints
+    // the first row of a .board--many list has to leave a tied list alone.
+    const firstRow = rules.flatMap((r) => r.selectors).filter((s) => /\.board--many\b/.test(s) && /:first-child/.test(s));
+    expect(firstRow.length).toBeGreaterThan(0);
+    for (const s of firstRow) expect(s, s).toMatch(/\.board--many:not\(\.board--tied\)/);
+  });
+
   it("a long name ends in '...' in its own column instead of pushing the credit off the row", () => {
     expect(decls("text-overflow", ".board--big", ".board__name").at(-1)).toBe("ellipsis");
     expect(decls("white-space", ".board--big", ".board__name").at(-1)).toBe("nowrap");

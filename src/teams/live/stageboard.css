@@ -73,8 +73,9 @@ ol.board.board--big { display: grid; gap: 0; margin: 0; padding: 0; list-style: 
 }
 
 /* Past six teams (.board--many): the ledger takes the full width in two columns, filled down and
-   then across, its rows at 40 with the numbers at 32, and the top team's row is the field. Ten
-   teams and the "Plus 2 more teams" line fit on 1920 x 1080. */
+   then across, its rows at 40 with the numbers at 32, and a team alone in 1st has its row on the
+   field (a shared 1st, .board--tied, keeps every row plain). Ten teams and the "Plus 2 more
+   teams" line fit on 1920 x 1080. */
 .stageboard:has(.board--many) { grid-template-columns: minmax(0, 1fr); }
 ol.board.board--many {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -88,15 +89,15 @@ ol.board.board--many:has(> :nth-child(9)) { grid-template-rows: repeat(5, auto);
 .board--many :is(.board__name, .board__ec) { font-size: var(--proj-small); }
 .board--many small { font-size: var(--proj-ledger); }
 .board--many .board__score { grid-row: 2; font-size: var(--proj-ledger); }
-.board--many > .pledger__row:first-child {
+.board--many:not(.board--tied) > .pledger__row:first-child {
   border-top-color: transparent;
   border-radius: var(--p-radius);
   background: var(--field) padding-box;
   color: var(--on-field);
 }
-.board--many > .pledger__row:first-child :is(.board__ec, .board__score, small) { color: var(--on-field); }
-.board--many > .pledger__row:first-child .team__chip { box-shadow: 0 0 0 calc(3 * var(--stage-u)) var(--on-field); }
-.board--many > .pledger__row:first-child + .pledger__row { border-top-color: transparent; }
+.board--many:not(.board--tied) > .pledger__row:first-child :is(.board__ec, .board__score, small) { color: var(--on-field); }
+.board--many:not(.board--tied) > .pledger__row:first-child .team__chip { box-shadow: 0 0 0 calc(3 * var(--stage-u)) var(--on-field); }
+.board--many:not(.board--tied) > .pledger__row:first-child + .pledger__row { border-top-color: transparent; }
 
 /* No teams yet, or the scores still loading: the 1st place block's frame on the page tone with a
    4 stage px ring, the step in it. While loading, still blocks stand where the ledger's places,

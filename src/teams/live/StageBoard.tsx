@@ -12,8 +12,8 @@
 // Teams with the same points per student share a place, and before any quiz with a right answer
 // ends every team is 1st. The block is for a team alone in 1st: when two or more share it, every
 // team is a ledger row at the full width, so no team reads as the only winner, and the ledger's
-// <ol> gets .board--tied. Past BIG_ROOMY the green top row in stageboard.css doesn't check
-// .board--tied yet, so a shared 1st still paints its first row green there. StageBoard.test.ts.
+// <ol> gets .board--tied. Past BIG_ROOMY the green top row in stageboard.css skips a
+// .board--tied list too. StageBoard.test.ts, leaderboardCss.test.ts.
 import type { ReactNode } from "react";
 import { TeamChip } from "../../blocks/kit";
 import { Status } from "../../blocks/ui";
